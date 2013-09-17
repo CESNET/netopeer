@@ -45,8 +45,6 @@ AC_CANONICAL_HOST
 
 PACKAGE_VERSION=`cut -f1 ./VERSION | tr -d '\n'`
 AC_SUBST(PACKAGE_VERSION)
-LIBTOOL_VERSION_INFO=`echo ${PACKAGE_VERSION} | sed -e 's/\./:/g' `
-AC_SUBST(LIBTOOL_VERSION_INFO)
 
 RELEASE=1
 AC_SUBST(RELEASE)
@@ -149,13 +147,6 @@ fi
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
-# Use libtool
-AC_PROG_LIBTOOL
-# Always use ./libtool unless overridden from command-line
-if test -z "$libtool"; then
-	libtool='./libtool'
-fi
-AC_SUBST(libtool)
 
 ############################ Check for libraries ###############################
 export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
