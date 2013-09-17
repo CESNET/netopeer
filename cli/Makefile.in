@@ -36,6 +36,8 @@
 
 NAME = netopeer-cli
 VERSION = @PACKAGE_VERSION@
+RELEASE = @RELEASE@
+
 IDGIT = "built from git $(shell git show --pretty=oneline | head -1 | cut -c -20)"
 IDNOGIT = "released as version $(VERSION)"
 
@@ -55,6 +57,9 @@ CFLAGS = -Wall @CFLAGS@
 CPPFLAGS = @CPPFLAGS@ -DVERSION=\"$(VERSION)\"
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+RPMBUILD = @RPMBUILD@
+RPMDIR = RPMBUILD
 
 INCLUDES= 
 
@@ -89,6 +94,33 @@ $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \
 		(mkdir -p $$(dirname $@))
 	$(CC) $(CFLAGS) $(INCLUDES) $(CPPFLAGS) -fPIC -c $< -o $@
+
+.PHONY: tarball
+tarball: $(SRCS) $(HEADERS)
+	@rm -rf $(NAME)-$(VERSION);
+	@mkdir $(NAME)-$(VERSION);
+	for i in $(SRCS) $(HDRS) configure.in configure \
+	    ltmain.sh Makefile.in VERSION $(NAME).spec.in \
+	    install-sh config.sub config.guess; do \
+	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
+		cp $$i $(NAME)-$(VERSION)/$$i; \
+	done; \
+	@rm -rf $(RPMDIR)/SOURCES/; \
+	mkdir -p $(RPMDIR)/SOURCES/; \
+	tar -c -z -f $(RPMDIR)/SOURCES/$(NAME)-$(VERSION)-$(RELEASE).tar.gz \
+	    $(NAME)-$(VERSION); \
+	rm -rf $(NAME)-$(VERSION);
+
+.PHONY: rpm
+rpm: tarball
+	if [ "$(RPMBUILD)" != "no" ]; then \
+		mkdir -p $(RPMDIR)/BUILD $(RPMDIR)/RPMS $(RPMDIR)/SRPMS; \
+		$(RPMBUILD) -ba $(NAME).spec \
+			--define "_topdir `pwd`/$(RPMDIR)"; \
+	else \
+		echo "Missing rpmbuild"; \
+		exit 1; \
+	fi
 
 .PHONY: install
 install: $(NAME)
