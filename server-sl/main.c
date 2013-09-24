@@ -362,9 +362,6 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	/* cleanup */
 	event_free(config.event_input);
 	event_base_free(config.event_base);
-	if (nc_session_get_status(config.session) == NC_SESSION_STATUS_WORKING) {
-		nc_session_close(config.session, NC_SESSION_TERM_CLOSED);
-	}
 	nc_session_free(config.session);
 	ncds_free(datastore);
 
