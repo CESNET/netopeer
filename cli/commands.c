@@ -518,7 +518,7 @@ int cmd_editconfig (char *arg)
 	char *config_m = NULL, *config = NULL;
 	int config_fd;
 	struct stat config_stat;
-	NC_DATASTORE target, source;
+	NC_DATASTORE target, source = NC_DATASTORE_ERROR;
 	NC_EDIT_DEFOP_TYPE defop = 0; /* do not set this parameter by default */
 	NC_EDIT_ERROPT_TYPE erropt = 0; /* do not set this parameter by default */
 	NC_EDIT_TESTOPT_TYPE testopt = 0;
