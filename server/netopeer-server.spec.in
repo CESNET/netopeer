@@ -1,0 +1,66 @@
+Summary: Netopeer - NETCONF implementation. Server part.
+Name: netopeer-server
+Version: %(cut -f1 ./VERSION | tr -d '\n')
+Release: @RELEASE@
+URL: http://www.liberouter.org/
+Source: https://www.liberouter.org/repo/SOURCES/%{name}-%{version}-%{release}.tar.gz
+Group: Liberouter
+License: BSD
+Vendor: CESNET, z.s.p.o.
+Packager: @USERNAME@ <@USERMAIL@>
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}
+
+BuildRequires: gcc make doxygen pkgconfig
+BuildRequires: @BUILDREQS@
+Requires: @REQS@
+
+%description
+Netopeer project implements NETCONF protocol for remote configuration of
+network devices. This package contains its server part.
+
+%package devel
+Summary: Netopeer server development package.
+Group: Liberouter
+Requires: netopeer-server = %{version}-%{release}
+
+%description devel
+This package contains header files for netopeer server. Install this package
+if you want to develop your own device modules.
+
+%prep
+%setup
+
+%build
+./configure --with-distro=@DISTRO@ --prefix=%{_prefix} @LIBNETCONF_WITH@ --sysconfdir=%{_sysconfdir};
+make
+make doc
+
+%install
+make DESTDIR=$RPM_BUILD_ROOT RUN="RPM" install
+
+%post
+if [ `grep -i "Subsystem netconf" %{_sysconfdir}/ssh/sshd_config | wc -l` -le 0 ]; then echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/ssh/sshd_config; fi
+
+netopeer-dm-manager add -n Netopeer -d %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -c urn:cesnet:tmc:netopeer:1.0 -r file %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+
+%postun
+#delete device module from configuration only when erasing, not on update.
+#https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Running_scriptlets_only_in_certain_situations
+if [ $1 -eq 0 ] ; then
+	netopeer-dm-manager del -n Netopeer -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+fi
+
+%files
+%{_bindir}/netopeer-server
+%{_bindir}/netopeer-agent
+%{_bindir}/netopeer-dm-manager
+%{_prefix}/share/@PACKAGE_NAME@/doxygen/*
+%{_sysconfdir}/dbus-1/system.d/org.liberouter.netopeer2.conf
+%{_datadir}/dbus-1/system-services/org.liberouter.netopeer2.server.service
+%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml
+%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin
+%{_sysconfdir}/init.d/netopeer.rc
+%{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+
+%files devel
+%{_prefix}/include/device_module_interface.h

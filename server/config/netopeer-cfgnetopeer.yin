@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="netopeer-cfgnetopeer"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:cfgnetopeer="urn:cesnet:tmc:netopeer:1.0">
+  <namespace uri="urn:cesnet:tmc:netopeer:1.0"/>
+  <prefix value="cfgnetopeer"/>
+  <organization>
+    <text>CESNET, z.s.p.o.</text>
+  </organization>
+  <contact>
+    <text>dkupka@cesnet.cz</text>
+  </contact>
+  <description>
+    <text>Module specifying Netopeer module data model and RPC operation.</text>
+  </description>
+  <revision date="2013-02-14">
+    <description>
+      <text>Modules are now configurable. Except implemented-rpcs which depends on module data model.</text>
+    </description>
+  </revision>
+  <revision date="2012-11-13">
+    <description>
+      <text>Removed parts implemented by library (RFC6022).</text>
+    </description>
+  </revision>
+  <revision date="2011-10-20">
+    <description>
+      <text>Initial revision</text>
+    </description>
+  </revision>
+  <container name="netopeer">
+    <container name="modules">
+      <list name="module">
+        <key value="module-name"/>
+        <leaf name="module-name">
+          <type name="string"/>
+          <description>
+            <text>Name of module</text>
+          </description>
+        </leaf>
+        <leaf name="module-allowed">
+          <type name="boolean"/>
+          <description>
+            <text>Specify whether or not the module is allowed to be managed over server.</text>
+          </description>
+        </leaf>
+        <leaf-list name="implemented-rpc">
+          <config value="false"/>
+          <type name="string"/>
+        </leaf-list>
+      </list>
+    </container>
+  </container>
+  <rpc name="netopeer-reboot">
+    <description>
+      <text>Operation allowing privileged user to restart netopeer-server.</text>
+    </description>
+    <input>
+      <leaf name="method">
+        <type name="enumeration">
+          <enum name="soft"/>
+          <enum name="hard"/>
+        </type>
+        <default value="soft"/>
+        <mandatory value="false"/>
+        <description>
+          <text>Soft restart only unplugs all device modules and reloads configuration.
+Hard restart also abort all connections and reload the binary.</text>
+        </description>
+      </leaf>
+    </input>
+  </rpc>
+  <rpc name="reload-module">
+    <description>
+      <text>Reload module. More operation may be added in future.</text>
+    </description>
+    <input>
+      <leaf name="module">
+        <type name="string"/>
+        <mandatory value="true"/>
+        <description>
+          <text>Name of module to manage.</text>
+        </description>
+      </leaf>
+    </input>
+  </rpc>
+</module>

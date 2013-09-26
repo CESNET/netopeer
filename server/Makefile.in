@@ -1,0 +1,199 @@
+# Copyright (c) 2011 CESNET
+#
+# LICENSE TERMS
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+# 3. Neither the name of the Company nor the names of its contributors
+#    may be used to endorse or promote products derived from this
+#    software without specific prior written permission.
+#
+# ALTERNATIVELY, provided that this notice is retained in full, this
+# product may be distributed under the terms of the GNU General Public
+# License (GPL) version 2 or later, in which case the provisions
+# of the GPL apply INSTEAD OF those given above.
+#
+# This software is provided ``as is'', and any express or implied
+# warranties, including, but not limited to, the implied warranties of
+# merchantability and fitness for a particular purpose are disclaimed.
+# In no event shall the company or contributors be liable for any
+# direct, indirect, incidental, special, exemplary, or consequential
+# damages (including, but not limited to, procurement of substitute
+# goods or services; loss of use, data, or profits; or business
+# interruption) however caused and on any theory of liability, whether
+# in contract, strict liability, or tort (including negligence or
+# otherwise) arising in any way out of the use of this software, even
+# if advised of the possibility of such damage.
+#
+
+NAME = @PACKAGE_NAME@
+
+# Various configurable paths (remember to edit Makefile.in, not Makefile)
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+datarootdir = @datarootdir@
+datadir = @datadir@
+bindir = @bindir@
+includedir = @includedir@
+libdir =  @libdir@
+mandir = @mandir@
+sysconfdir = @sysconfdir@
+
+CC = @CC@
+DOXYGEN = @DOXYGEN@
+DOXYGEN_CONFIG = Doxyfile
+DOXYGEN_DIR = doxygen
+RPMBUILD = @RPMBUILD@
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+RPMDIR = RPMBUILD
+LIBS = @LIBS@
+CFLAGS = @CFLAGS@ -g -O0
+CPPFLAGS = @CPPFLAGS@
+DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/liberouter/netopeer2/modules.conf.d/\"
+
+OBJDIR= .obj
+VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')
+RELEASE = @RELEASE@
+
+TOPDIR = @CONFIGURE_PWD@
+SUBDIRS = agent \
+	  dm_manager
+
+SRCS =  src/server.c \
+	src/netopeer-cfgnetopeer.c\
+	src/server_sessions.c \
+	src/server_modules.c \
+	src/server_operations.c
+
+HDRS = src/server_operations.h \
+	src/netopeer_operations.h \
+       src/device_module_interface.h\
+       src/netopeer_operations.h \
+	src/netopeer_dbus.h
+
+HDRS_DEVEL = src/device_module_interface.h
+
+OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
+
+all: $(NAME) $(SUBDIRS)
+
+.PHONY: $(SUBDIRS)
+
+$(SUBDIRS):
+	@$(MAKE) -C $@
+
+.PHONY: doc
+doc: doxygen
+
+$(NAME): $(OBJS)
+	@rm -f $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS) -ldl $(OBJS) -o $@;
+
+$(OBJDIR)/%.o: %.c
+	@[ -d $$(dirname $@) ] || \
+		(mkdir -p $$(dirname $@))
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
+
+doxygen: $(DOXYGEN_CONFIG)
+	@if [ -n "$(DOXYGEN)" ]; then \
+		(cat $(DOXYGEN_CONFIG); \
+		echo 'OUTPUT_DIRECTORY = $(DOXYGEN_DIR)' ) | \
+		$(DOXYGEN) - > /dev/null 2>&1; \
+	else \
+		echo "Missing doxygen"; \
+		exit 1; \
+	fi
+
+.PHONY: dist
+dist: $(NAME).spec tarball rpm
+
+.PHONY: tarball
+tarball: $(SRCS) $(HEADERS)
+	@rm -rf $(NAME)-$(VERSION);
+	@mkdir $(NAME)-$(VERSION);
+	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
+	for i in $(SRCS) $(HDRS)  configure.in configure \
+	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh; do \
+	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
+		cp $$i $(NAME)-$(VERSION)/$$i; \
+	done;
+	cp -r config/ $(NAME)-$(VERSION)/
+	@rm -rf $(RPMDIR)/SOURCES/; \
+	mkdir -p $(RPMDIR)/SOURCES/; \
+	tar -c -z -f $(RPMDIR)/SOURCES/$(NAME)-$(VERSION)-$(RELEASE).tar.gz \
+	    $(NAME)-$(VERSION); \
+	rm -rf $(NAME)-$(VERSION);
+
+.PHONY: rpm
+rpm: tarball
+	mkdir -p $(RPMDIR)/BUILD $(RPMDIR)/RPMS $(RPMDIR)/SRPMS
+	$(RPMBUILD) -ba $(NAME).spec \
+		--define "_topdir `pwd`/$(RPMDIR)";
+
+.PHONY: cleanall
+cleanall: clean distclean
+
+.PHONY: distclean
+distclean:
+	rm -rf $(RPMDIR)
+
+.PHONY: install
+install: install-devel install-doc
+	[ -d $(DESTDIR)/$(bindir) ] || \
+	    (mkdir -p $(DESTDIR)/$(bindir); chmod 755 $(DESTDIR)/$(bindir))
+	$(INSTALL_PROGRAM) $(NAME) $(DESTDIR)/$(bindir)/;
+	for i in $(SUBDIRS) ; do \
+		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C $$i install \
+		|| exit 1; \
+	done
+	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
+	[ -d $(DESTDIR)/$(sysconfdir)/dbus-1/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/dbus-1/);
+	[ -d $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/);
+	@cp config/org.liberouter.netopeer2.conf $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/org.liberouter.netopeer2.conf
+	[ -d $(DESTDIR)/$(datadir)/ ] || (mkdir -p $(DESTDIR)/$(datadir)/);
+	[ -d $(DESTDIR)/$(datadir)/dbus-1/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/);
+	[ -d $(DESTDIR)/$(datadir)/dbus-1/system-services/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/system-services/);
+	@cp config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(datadir)/dbus-1/system-services/org.liberouter.netopeer2.server.service
+	@[ "$(RUN)" = "RPM" ] || (echo "Subsystem netconf $(bindir)/netopeer-agent" >> /$(sysconfdir)/ssh/sshd_config);
+	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/);
+	@cp config/datastore.xml $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml
+	@cp config/netopeer-cfgnetopeer.yin $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin
+	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
+	[ -d $(DESTDIR)/$(sysconfdir)/init.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/init.d/);
+	@cp netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/netopeer.rc
+	@chmod a+rx $(DESTDIR)/$(sysconfdir)/init.d/netopeer.rc
+	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
+	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/);
+	@dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
+
+.PHONY: install-devel
+install-devel:
+	[ -d $(DESTDIR)/$(includedir) ] || mkdir -p $(DESTDIR)/$(includedir);\
+	for i in $(HDRS_DEVEL) ; do cp $$i $(DESTDIR)/$(includedir)/ ; done
+	
+.PHONY: install-doc
+install-doc:
+	[ -d $(DESTDIR)/$(datadir)/$(NAME)/$(DOXYGEN_DIR) ] || \
+		(mkdir -p $(DESTDIR)/$(datadir)/$(NAME)/$(DOXYGEN_DIR); \
+		chmod -R 755 $(DESTDIR)/$(datadir)/$(NAME))
+	cp -r $(DOXYGEN_DIR)/* $(DESTDIR)/$(datadir)/$(NAME)/$(DOXYGEN_DIR)/;
+
+.PHONY: clean
+clean:
+	for i in $(SUBDIRS) ; do $(MAKE) -C $$i clean ; done
+	rm -rf $(NAME) $(OBJDIR) doxygen/
+
