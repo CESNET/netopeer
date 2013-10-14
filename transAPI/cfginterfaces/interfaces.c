@@ -383,7 +383,10 @@ static xmlNodePtr get_if_status (NMDevice *device)
 	}
 
 	type = nm_device_get_device_type(device);
-	name = nm_device_get_iface(device);
+	name = nm_device_get_ip_iface(device);
+	if (name == NULL || strlen(name) == 0) {
+		name = nm_device_get_iface(device);
+	}
 	hw_addr = get_device_hw_addr(device);
 
 	interface = xmlNewNode(NULL, BAD_CAST "interface");
