@@ -89,6 +89,7 @@ HDRS =
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 MODULE = ./toaster/
+.PHONY: $(MODULE)
 
 all: $(NAME) $(MODULE)
 
@@ -150,4 +151,4 @@ uninstall:
 .PHONY: clean
 clean:
 	$(MAKE) -C $(MODULE) clean ;
-	rm -rf $(NAME) .obj $(OBJS) $(MODULE)/Makefile ;
+	rm -rf $(NAME) .obj $(OBJS);
