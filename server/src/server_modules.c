@@ -53,7 +53,7 @@ int manage_module (char * name, int op)
 
 	switch (op) {
 	case NETOPEER_MANAGE_RELOAD:
-		VERB (NC_VERB_VERBOSE, "Reloading module %s", name);
+		nc_verb_verbose("Reloading module %s", name);
 		/* unload module */
 		if (server_modules_remove(name)) {
 			return EXIT_FAILURE;
@@ -63,16 +63,16 @@ int manage_module (char * name, int op)
 		}
 		break;
 	case NETOPEER_MANAGE_FORBID:
-		VERB (NC_VERB_VERBOSE, "Forbiding module %s", name);
+		nc_verb_verbose("Forbiding module %s", name);
 		/* unload module */
 		if (server_modules_remove(name)) {
 			return EXIT_FAILURE;
 		}
 		break;
 	case NETOPEER_MANAGE_ALLOW:
-		VERB (NC_VERB_VERBOSE, "Allowing module %s", name);
+		nc_verb_verbose("Allowing module %s", name);
 		if (server_modules_allow (name)) {
-			VERB (NC_VERB_WARNING, "Can't allow module %s", name);
+			nc_verb_warning("Can't allow module %s", name);
 			return EXIT_FAILURE;
 		}
 		break;
@@ -128,7 +128,7 @@ void server_modules_free (struct server_module *dev)
 
 	/* give plugin chance to clean */
 	if (dev->close_plugin != NULL && dev->close_plugin ()) {
-		VERB (NC_VERB_WARNING, "Module %s failed to close correctly. Will be unloaded anyway.", dev->name);
+		nc_verb_warning("Module %s failed to close correctly. Will be unloaded anyway.", dev->name);
 	}
 
 	/* close dynamic library */
@@ -140,7 +140,7 @@ void server_modules_free (struct server_module *dev)
 	if (dev->repo_id != 0) {
 		ncds_free2(dev->repo_id);
 	} else {
-		VERB (NC_VERB_WARNING, "Module %s had no datastore.", dev->name);
+		nc_verb_warning("Module %s had no datastore.", dev->name);
 	}
 
 	/* free name string */
@@ -206,7 +206,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 	/* prepare return structure */
 	retval = (struct server_module*) calloc (1, sizeof(struct server_module));
 	if (retval == NULL) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("Memory allocation failed (%s:%d).", __FILE__, __LINE__);
 		return (NULL);
 	}
 
@@ -230,32 +230,32 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 			/* open dynamic library implementing device configuration module */
 			retval->handler = dlopen ((char*) cfg_node->children->content, RTLD_NOW);
 			if (retval->handler == NULL) {
-				VERB (NC_VERB_ERROR, "Unable to load device configuration plugin: %s", dlerror());
+				nc_verb_error("Unable to load device configuration plugin: %s", dlerror());
 				goto error_cleanup;
 			}
 			/* map device module functions */
 			/* execute operation */
 			retval->execute_operation = dlsym (retval->handler, "execute_operation");
 			if (retval->execute_operation == NULL) {
-				VERB (NC_VERB_ERROR, "Unable to find mandatory \"execute_operation\" function in plugin: %s", dlerror());
+				nc_verb_error("Unable to find mandatory \"execute_operation\" function in plugin: %s", dlerror());
 				goto error_cleanup;
 			}
 			/* init plugin */
 			retval->init_plugin = dlsym (retval->handler, "init_plugin");
 			if (retval->init_plugin == NULL) {
-				VERB (NC_VERB_ERROR, "Unable to find mandatory \"init_plugin\" function in plugin %s.", dlerror());
+				nc_verb_error("Unable to find mandatory \"init_plugin\" function in plugin %s.", dlerror());
 				goto error_cleanup;
 			}
 			/* close plugin */
 			retval->close_plugin = dlsym (retval->handler, "close_plugin");
 			if (retval->close_plugin == NULL) {
-				VERB (NC_VERB_ERROR, "Unable to find mandatory \"close_plugin\" function in plugin: %s", dlerror());
+				nc_verb_error("Unable to find mandatory \"close_plugin\" function in plugin: %s", dlerror());
 				goto error_cleanup;
 			}
 			/* get state data */
 			retval->get_state_data = dlsym (retval->handler, "get_state_data");
 			if (retval->close_plugin == NULL) {
-				VERB (NC_VERB_ERROR, "Unable to find mandatory \"get_state_data\" function in plugin: %s", dlerror());
+				nc_verb_error("Unable to find mandatory \"get_state_data\" function in plugin: %s", dlerror());
 				goto error_cleanup;
 			}
 			/* move out */
@@ -263,7 +263,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 			continue;
 		} else if (xmlStrncmp (BAD_CAST "transapi", cfg_node->name, strlen ("transapi") + 1) == 0) {
 			if ((transapi_path = (char*)xmlNodeGetContent(cfg_node)) == NULL) {
-				VERB (NC_VERB_ERROR, "Failed to get transapi module path.");
+				nc_verb_error("Failed to get transapi module path.");
 				goto error_cleanup;
 			}
 			cfg_node = cfg_node->next;
@@ -283,7 +283,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 						if (xmlStrncmp(BAD_CAST "path", aux_node2->name, strlen("path")+1) == 0) {
 							/* check element duplicity */
 							if (model_path != NULL) {
-								VERB (NC_VERB_WARNING, "More than one <model-main/path> element found in the device configuration - skipping redefinition of data models.");
+								nc_verb_warning("More than one <model-main/path> element found in the device configuration - skipping redefinition of data models.");
 								aux_node2 = aux_node2->next;
 								continue;
 							}
@@ -333,7 +333,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 							/* retrieve the model name */
 							if (model_name == NULL) {
 								if (aux_node2->children == NULL || ncds_model_info((char*) aux_node2->children->content, &model_name, NULL, NULL, NULL, NULL, NULL) != EXIT_SUCCESS) {
-									VERB(NC_VERB_ERROR, "Failed to retrieve the name of a model.");
+									nc_verb_error("Failed to retrieve the name of a model.");
 									goto error_cleanup;
 								}
 								ncds_add_model((char*) aux_node2->children->content);
@@ -347,12 +347,12 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 							if (model_name != NULL && aux_node2->children != NULL) {
 								if (strcmp((char*) aux_node2->children->content, "*") == 0) {
 									if (ncds_features_enableall(model_name) != EXIT_SUCCESS) {
-										VERB(NC_VERB_ERROR, "Failed to enable all the features in the model %s.", model_name);
+										nc_verb_error("Failed to enable all the features in the model %s.", model_name);
 										goto error_cleanup;
 									}
 								} else {
 									if (ncds_feature_enable(model_name, (char*) aux_node2->children->content) != EXIT_SUCCESS) {
-										VERB(NC_VERB_ERROR, "Failed to enable the feature %s in the model %s.", aux_node2->children->content, model_name);
+										nc_verb_error("Failed to enable the feature %s in the model %s.", aux_node2->children->content, model_name);
 										goto error_cleanup;
 									}
 								}
@@ -372,7 +372,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 
 			/* check whether there was model-main/path element */
 			if (model_path == NULL) {
-				VERB(NC_VERB_ERROR, "No <model-main> element in <data-models> children.");
+				nc_verb_error("No <model-main> element in <data-models> children.");
 				goto error_cleanup;
 			}
 
@@ -383,7 +383,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 			/* process <repo> element */
 			/* check element duplicity */
 			if (repo_path != NULL) {
-				VERB (NC_VERB_ERROR, "More than one <repo> element found in the device configuration - skipping redefinition of repositories.");
+				nc_verb_error("More than one <repo> element found in the device configuration - skipping redefinition of repositories.");
 				cfg_node = cfg_node->next;
 				continue;
 			}
@@ -401,7 +401,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 				}
 				repo_path = (char*)xmlNodeGetContent (cfg_node->children);
 			} else {
-				VERB (NC_VERB_ERROR, "Unsupported type of datastore: %s", tmp);
+				nc_verb_error("Unsupported type of datastore: %s", tmp);
 				xmlFree (tmp);
 				goto error_cleanup;
 			}
@@ -427,7 +427,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 		}
 		/* move out - default branch with no matching element */
 		if (cfg_node->type != XML_COMMENT_NODE) {
-			VERB (NC_VERB_WARNING, "Internal device configuration contains unknown parameter (%s).", (char*) cfg_node->name);
+			nc_verb_warning("Internal device configuration contains unknown parameter (%s).", (char*) cfg_node->name);
 		}
 		cfg_node = cfg_node->next;
 		continue;
@@ -462,7 +462,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 		free(transapi_path);
 
 	} else { /* none of above -> ERROR */
-		VERB(NC_VERB_ERROR, "Functionality of module %s is not provided.", retval->name);
+		nc_verb_error("Functionality of module %s is not provided.", retval->name);
 		goto error_cleanup;
 	}
 
@@ -470,13 +470,13 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 	for (i = 0; i < features_size; ++i) {
 		if (strcmp(main_features[i], "*") == 0) {
 			if (ncds_features_enableall(model_name) != EXIT_SUCCESS) {
-				VERB(NC_VERB_ERROR, "Failed to enable all the features in the model %s.", model_name);
+				nc_verb_error("Failed to enable all the features in the model %s.", model_name);
 				goto error_cleanup;
 			}
 			break;
 		}
 		if (ncds_feature_enable(model_name, main_features[i]) != EXIT_SUCCESS) {
-			VERB(NC_VERB_ERROR, "Failed to enable feature %s in the model %s.", main_features[i], model_name);
+			nc_verb_error("Failed to enable feature %s in the model %s.", main_features[i], model_name);
 			goto error_cleanup;
 		}
 	}
@@ -491,7 +491,7 @@ struct server_module* server_modules_load (xmlNodePtr module_cfg)
 	}
 
 	if (repo == NULL) {
-		VERB(NC_VERB_ERROR, "Failed to create datastore for module %s\n", retval->name);
+		nc_verb_error("Failed to create datastore for module %s\n", retval->name);
 		goto error_cleanup;
 	}
 
@@ -582,7 +582,7 @@ xmlNodePtr server_modules_get_device_config (char * name)
 
 	asprintf (&config_file_path, "%s/%s.xml", MODULES_CFG_DIR, name);
 	if ((device_doc = xmlReadFile (config_file_path, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN)) == NULL) {
-		VERB (NC_VERB_WARNING, "Configuration file %s not found.", config_file_path);
+		nc_verb_warning("Configuration file %s not found.", config_file_path);
 		free (config_file_path);
 		return NULL;
 	}
@@ -612,23 +612,23 @@ int server_modules_add (char *name, xmlNodePtr device_cfg)
 	struct server_module_list* dev = NULL, *dev_iter = devices;
 
 	if (server_modules_get_by_name(name) != NULL) {
-		VERB (NC_VERB_WARNING, "Module already in loaded devices list.");
+		nc_verb_warning("Module already in loaded devices list.");
 		return EXIT_SUCCESS;
 	}
 
 	dev = (struct server_module_list*) calloc (1, sizeof(struct server_module_list));
 	if (dev == NULL) {
-		VERB (NC_VERB_ERROR, "calloc failed (%s:%d): %s", __FILE__, __LINE__, strerror (errno));
+		nc_verb_error("calloc failed (%s:%d): %s", __FILE__, __LINE__, strerror (errno));
 	}
 
 	dev->dev = server_modules_load (device_cfg->children);
 	if (dev->dev == NULL) {
-		VERB (NC_VERB_ERROR, "Loading device module %s failed.", name);
+		nc_verb_error("Loading device module %s failed.", name);
 		server_modules_free(dev->dev);
 		free(dev);
 		return (EXIT_FAILURE);
 	}
-	VERB (NC_VERB_VERBOSE, "Device module %s successfully loaded.", name);
+	nc_verb_verbose("Device module %s successfully loaded.", name);
 
 	if (devices == NULL) {
 		/* first device module */
@@ -659,20 +659,20 @@ int server_modules_allow (char * name) {
 	nc_cpblts_free (def_cpblts);
 
 	if ((device_cfg = server_modules_get_device_config (name)) == NULL) {
-		VERB (NC_VERB_ERROR, "Failed to get %s device part from server configuration.", name);
+		nc_verb_error("Failed to get %s device part from server configuration.", name);
 		nc_session_free(dummy);
 		return EXIT_FAILURE;
 	}
 
 	if (server_modules_add (name, device_cfg)) {
-		VERB (NC_VERB_ERROR, "Failed to load plugin %s.", name);
+		nc_verb_error("Failed to load plugin %s.", name);
 		nc_session_free(dummy);
 		return EXIT_FAILURE;
 	}
 	xmlFreeNode (device_cfg);
 
 	if ((dev = (struct server_module*)server_modules_get_by_name(name)) == NULL) {
-		VERB (NC_VERB_ERROR, "Plugin %s not loaded.", name);
+		nc_verb_error("Plugin %s not loaded.", name);
 		nc_session_free(dummy);
 		return EXIT_FAILURE;
 	}
@@ -684,12 +684,12 @@ int server_modules_allow (char * name) {
 
 	if (dev->transapi) { /* module implemented as transapi */
 		if (ncds_consolidate()) {
-			VERB(NC_VERB_WARNING, "Unable to init plugin %s: ncds_consolidate() failed.", name);
+			nc_verb_warning("Unable to init plugin %s: ncds_consolidate() failed.", name);
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		}
 		if (ncds_device_init(&dev->repo_id, NULL, 1)) {
-			VERB(NC_VERB_WARNING, "Unable to init plugin %s: ncds_device_init() failed", name);
+			nc_verb_warning("Unable to init plugin %s: ncds_device_init() failed", name);
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		}
@@ -700,15 +700,15 @@ int server_modules_allow (char * name) {
 		}
 		reply_int = ncds_apply_rpc(dev->repo_id, dummy, rpc_int);
 		if (reply_int == NULL) {
-			VERB(NC_VERB_WARNING, "Unable to init plugin %s: Failed to apply startup data.", name);
+			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		} else if (reply_int == NCDS_RPC_NOT_APPLICABLE) {
-			VERB(NC_VERB_WARNING, "Unable to init plugin %s: Failed to apply startup data.", name);
+			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		} else if (nc_reply_get_type(reply_int) != NC_REPLY_OK) {
-			VERB(NC_VERB_WARNING, "Unable to init plugin %s: Failed to apply startup data.", name);
+			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		}
@@ -716,19 +716,19 @@ int server_modules_allow (char * name) {
 		nc_reply_free(reply_int);
 	} else {/* old style server module */
 		if ((rpc_int = nc_rpc_getconfig (NC_DATASTORE_STARTUP, NULL)) == NULL || nc_rpc_capability_attr(rpc_int, NC_CAP_ATTR_WITHDEFAULTS_MODE, NCWD_MODE_ALL) != 0) {
-			VERB (NC_VERB_WARNING, "Unable to init plugin %s: Failed to create get-config for startup datastore.", name);
+			nc_verb_warning("Unable to init plugin %s: Failed to create get-config for startup datastore.", name);
 			nc_session_free (dummy);
 			return (EXIT_FAILURE);
 		}
 
 		reply_int = ncds_apply_rpc (dev->repo_id, dummy, rpc_int);
 		if (reply_int == NULL) {
-			VERB (NC_VERB_WARNING, "Unable to init plugin %s: ncds_apply_rpc (get-config startup) failed with NULL (non-DATASTORE operation).", name);
+			nc_verb_warning("Unable to init plugin %s: ncds_apply_rpc (get-config startup) failed with NULL (non-DATASTORE operation).", name);
 			nc_rpc_free(rpc_int);
 			nc_session_free (dummy);
 			return (EXIT_FAILURE);
 		} else if (nc_reply_get_type(reply_int) == NC_REPLY_ERROR) {
-			VERB (NC_VERB_WARNING, "Unable to init plugin %s: ncds_apply_rpc (get-config startup) failed: %s.", name, nc_reply_get_errormsg (reply_int));
+			nc_verb_warning("Unable to init plugin %s: ncds_apply_rpc (get-config startup) failed: %s.", name, nc_reply_get_errormsg (reply_int));
 			nc_rpc_free(rpc_int);
 			nc_reply_free(reply_int);
 			nc_session_free (dummy);
@@ -737,13 +737,13 @@ int server_modules_allow (char * name) {
 		nc_rpc_free(rpc_int);
 
 		if ((startup_data = nc_reply_get_data (reply_int)) == NULL) {
-			VERB (NC_VERB_WARNING, "Unable to init plugin %s: get-config reply does not contain data.", name);
+			nc_verb_warning("Unable to init plugin %s: get-config reply does not contain data.", name);
 			nc_reply_free(reply_int);
 			nc_session_free (dummy);
 			return (EXIT_FAILURE);
 		}
 		if ((running_data = dev->init_plugin (dev->device_module_id, device_process_rpc, startup_data)) == NULL) {
-			VERB (NC_VERB_WARNING, "Unable to init plugin %s: Module init_plugin function returned NULL.", name);
+			nc_verb_warning("Unable to init plugin %s: Module init_plugin function returned NULL.", name);
 			free (startup_data);
 			nc_reply_free (reply_int);
 			nc_session_free (dummy);
@@ -753,7 +753,7 @@ int server_modules_allow (char * name) {
 		nc_reply_free (reply_int);
 
 		if ((rpc_int = nc_rpc_copyconfig (NC_DATASTORE_CONFIG, NC_DATASTORE_RUNNING, running_data)) == NULL || nc_rpc_capability_attr(rpc_int, NC_CAP_ATTR_WITHDEFAULTS_MODE, NCWD_MODE_ALL) != 0) {
-			VERB (NC_VERB_ERROR, "Unable to init plugin %s: Failed to create copy-config (config->running).", name);
+			nc_verb_error("Unable to init plugin %s: Failed to create copy-config (config->running).", name);
 			dev->close_plugin ();
 			free (running_data);
 			nc_session_free (dummy);
@@ -763,13 +763,13 @@ int server_modules_allow (char * name) {
 
 		reply_int = ncds_apply_rpc (dev->repo_id, dummy, rpc_int);
 		if (reply_int == NULL) {
-			VERB (NC_VERB_ERROR, "Unable to init plugin %s: ncds_apply_rpc (copy-config config->running) failed with NULL (non-DATASTORE operation).", name);
+			nc_verb_error("Unable to init plugin %s: ncds_apply_rpc (copy-config config->running) failed with NULL (non-DATASTORE operation).", name);
 			nc_rpc_free(rpc_int);
 			dev->close_plugin ();
 			nc_session_free (dummy);
 			return (EXIT_FAILURE);
 		} else if (nc_reply_get_type(reply_int) == NC_REPLY_ERROR) {
-			VERB (NC_VERB_ERROR, "Unable to init plugin %s: ncds_apply_rpc (copy-config config->running) failed: %s.", name, nc_reply_get_errormsg (reply_int));
+			nc_verb_error("Unable to init plugin %s: ncds_apply_rpc (copy-config config->running) failed: %s.", name, nc_reply_get_errormsg (reply_int));
 			dev->close_plugin ();
 			nc_rpc_free(rpc_int);
 			nc_reply_free (reply_int);
@@ -779,7 +779,7 @@ int server_modules_allow (char * name) {
 		nc_rpc_free (rpc_int);
 		nc_reply_free (reply_int);
 	}
-	VERB (NC_VERB_VERBOSE, "Device module %s succesfully initiated.", name);
+	nc_verb_verbose("Device module %s succesfully initiated.", name);
 
 	/* mark plugin as allowed */
 	dev->allowed = 1;
@@ -824,7 +824,7 @@ int server_modules_remove (char* name)
 	server_modules_free (device->dev);
 	free (device);
 
-	VERB (NC_VERB_VERBOSE, "Device module %s successfully removed.", name);
+	nc_verb_verbose("Device module %s successfully removed.", name);
 
 	return (EXIT_SUCCESS);
 }
@@ -879,20 +879,20 @@ struct server_module_list * server_modules_get_providing_rpc_list (const nc_rpc 
 
 	name = strdup ((char *)op_root->name);
 	xmlFreeNode(op_root);
-	VERB (NC_VERB_VERBOSE, "Looking for rpc %s", name);
+	nc_verb_verbose("Looking for rpc %s", name);
 
 	retval = list = server_modules_get_all ();
 
 	while (list) {
-		VERB (NC_VERB_VERBOSE, "Trying device %s:", list->dev->name);
+		nc_verb_verbose("Trying device %s:", list->dev->name);
 		found = 0;
 		if (list->dev->implemented_rpcs) {
          i = 0;
-			VERB (NC_VERB_VERBOSE, "Device implement following rpcs:");
+			nc_verb_verbose("Device implement following rpcs:");
 			while (list->dev->implemented_rpcs[i]) {
-				VERB (NC_VERB_VERBOSE, "%s", list->dev->implemented_rpcs[i]);
+				nc_verb_verbose("%s", list->dev->implemented_rpcs[i]);
 				if (!strcmp(name, list->dev->implemented_rpcs[i])) {
-					VERB (NC_VERB_VERBOSE, "^^^ [matches] ^^^");
+					nc_verb_verbose("^^^ [matches] ^^^");
 					found = 1;
 					break;
 				}

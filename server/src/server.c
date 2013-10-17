@@ -108,7 +108,7 @@ static void print_usage (void)
  */
 void signal_handler (int sig)
 {
-	VERB (NC_VERB_VERBOSE, "Signal %d received.", sig);
+	nc_verb_verbose("Signal %d received.", sig);
 
 	switch (sig) {
 	case SIGINT:
@@ -121,12 +121,12 @@ void signal_handler (int sig)
 			done = 1;
 		} else {
 			/* second attempt */
-			VERB (NC_VERB_ERROR, "Hey! I need some time to stop, be patient next time!");
+			nc_verb_error("Hey! I need some time to stop, be patient next time!");
 			exit (EXIT_FAILURE);
 		}
 		break;
 	default:
-		VERB (NC_VERB_ERROR, "exiting on signal: %d", sig);
+		nc_verb_error("exiting on signal: %d", sig);
 		exit (EXIT_FAILURE);
 		break;
 	}
@@ -211,7 +211,7 @@ int main (int argc, char** argv)
 	/* go to the background as a daemon */
 	if (daemonize == 1) {
 		if (daemon(0, 0) != 0) {
-			VERB (NC_VERB_ERROR, "Going to background failed (%s)", strerror(errno));
+			nc_verb_error("Going to background failed (%s)", strerror(errno));
 			return (EXIT_FAILURE);
 		}
 	}
@@ -220,7 +220,7 @@ int main (int argc, char** argv)
 	/* connect server to dbus */
 	conn = cl_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
 	if (conn == NULL) {
-		VERB (NC_VERB_ERROR, "Connecting to DBus failed.");
+		nc_verb_error("Connecting to DBus failed.");
 		return (EXIT_FAILURE);
 	}
 
@@ -233,7 +233,7 @@ int main (int argc, char** argv)
 
 	/* initialize library including internal datastores and maybee something more */
 	if (nc_init (NC_INIT_NOTIF|NC_INIT_NACM|NC_INIT_MONITORING|NC_INIT_WD) < 0) {
-		VERB (NC_VERB_ERROR, "Library initialization failed.");
+		nc_verb_error("Library initialization failed.");
 		return (EXIT_FAILURE);
 	}
 
@@ -241,25 +241,25 @@ restart:
 	/* start netopeer device module - it will start all modules that are
 	 * in its configuration and in server configuration */
 	if (server_modules_allow ("Netopeer")) {
-		VERB (NC_VERB_ERROR, "Starting necessary plugin Netopeer failed!");
+		nc_verb_error("Starting necessary plugin Netopeer failed!");
 		return EXIT_FAILURE;
 	}
 
-	VERB (NC_VERB_VERBOSE, "Netopeer server successfully initialized.");
+	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
 		/* blocking read of the next available message */
 		dbus_connection_read_write (conn, 1000);
 
 		while (!done && (msg = dbus_connection_pop_message (conn)) != NULL) {
-			VERB (NC_VERB_VERBOSE, "message is a method-call");
-			VERB (NC_VERB_VERBOSE, "message path: %s", dbus_message_get_path (msg));
-			VERB (NC_VERB_VERBOSE, "message interface: %s", dbus_message_get_interface (msg));
-			VERB (NC_VERB_VERBOSE, "message member: %s", dbus_message_get_member (msg));
-			VERB (NC_VERB_VERBOSE, "message destination: %s", dbus_message_get_destination (msg));
+			nc_verb_verbose("message is a method-call");
+			nc_verb_verbose("message path: %s", dbus_message_get_path (msg));
+			nc_verb_verbose("message interface: %s", dbus_message_get_interface (msg));
+			nc_verb_verbose("message member: %s", dbus_message_get_member (msg));
+			nc_verb_verbose("message destination: %s", dbus_message_get_destination (msg));
 
 			if (cl_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
-				VERB (NC_VERB_VERBOSE, "D-Bus standard interface message");
+				nc_verb_verbose("D-Bus standard interface message");
 
 				/* free the message */
 				dbus_message_unref(msg);
@@ -268,7 +268,7 @@ restart:
 				continue;
 			}
 
-			VERB (NC_VERB_VERBOSE, "Some message received");
+			nc_verb_verbose("Some message received");
 
 			/* check if message is a method-call */
 			if (dbus_message_get_type (msg) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
@@ -289,10 +289,10 @@ restart:
 					/* All other requests */
 					process_operation (conn, msg);
 				} else {
-					VERB (NC_VERB_WARNING, "Unsupported DBus request received (interface %s, member %s)", dbus_message_get_destination(msg), dbus_message_get_member(msg));
+					nc_verb_warning("Unsupported DBus request received (interface %s, member %s)", dbus_message_get_destination(msg), dbus_message_get_member(msg));
 				}
 			} else {
-				VERB (NC_VERB_WARNING, "Unsupported DBus message type received.");
+				nc_verb_warning("Unsupported DBus message type received.");
 			}
 
 			/* free the message */
@@ -319,12 +319,12 @@ restart:
 	server_modules_free_list (NULL);
 
 	if (restart_soft) {
-		VERB(NC_VERB_VERBOSE, "Server is going to soft restart.");
+		nc_verb_verbose("Server is going to soft restart.");
 		restart_soft = 0;
 		done = 0;
 		goto restart;
 	} else if (restart_hard) {
-		VERB(NC_VERB_VERBOSE, "Server is going to hard restart.");
+		nc_verb_verbose("Server is going to hard restart.");
 		len = readlink("/proc/self/exe", path, PATH_MAX);
 		path[len] = 0;
 		execv(path, argv);

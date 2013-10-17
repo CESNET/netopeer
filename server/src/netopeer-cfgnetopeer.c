@@ -109,7 +109,7 @@ nc_reply * execute_reload_module (xmlNodePtr root)
 	nc_reply * retval = NULL;
 	struct nc_err *e = NULL;
 
-	VERBOSE (CL_VERBOSE_ADVANCED, "reload-module started");
+	nc_verb_verbose("reload-module started");
 
 	if (root == NULL || !xmlStrEqual(root->name, BAD_CAST "reload-module")) {
 		return nc_reply_error (nc_err_new (NC_ERR_OP_FAILED));
@@ -128,13 +128,13 @@ nc_reply * execute_reload_module (xmlNodePtr root)
 		nc_err_set (e, NC_ERR_PARAM_INFO_BADELEM, "module");
 		return nc_reply_error (e);
 	} else if (strcasecmp(module_name, "netopeer") == 0) {
-		VERBOSE (CL_VERBOSE_BASIC, "Can't reload Netopeer. Restart whole server if you need.");
+		nc_verb_verbose("Can't reload Netopeer. Restart whole server if you need.");
 		e = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(e, NC_ERR_PARAM_MSG, "Can't reload Netopeer. Restart whole server if you need.");
 		return nc_reply_error (e);
 	}
 
-	VERBOSE (CL_VERBOSE_ADVANCED, "reload-module %s", module_name);
+	nc_verb_verbose("reload-module %s", module_name);
 	if (manage_module(module_name, NETOPEER_MANAGE_RELOAD)) {
 		e = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (e, NC_ERR_PARAM_MSG, "Can't reload module.");
@@ -158,19 +158,19 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 	struct nc_err * err = NULL;
 
 	if ((ctxt = xmlXPathNewContext(config_doc)) == NULL) {
-		VERBOSE(CL_ERROR, "Netopeer: unable to create XPath context (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("Netopeer: unable to create XPath context (%s:%d).", __FILE__, __LINE__);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, "Internal error - unable to create XPath context");
 	} else if (xmlXPathRegisterNs (ctxt, BAD_CAST "netopeer", BAD_CAST "urn:cesnet:tmc:netopeer:1.0") != 0) {
-		VERBOSE(CL_ERROR, "Netopeer: unable to register namespace (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("Netopeer: unable to register namespace (%s:%d).", __FILE__, __LINE__);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, "Internal error - unable to register namespace");
 	} else if (asprintf (&xpath_query, "//netopeer:module") == -1) {
-		VERBOSE(CL_ERROR, "Netopeer: asprintf failed (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("Netopeer: asprintf failed (%s:%d).", __FILE__, __LINE__);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, "Internal error - asprintf failed");
 	} else if ((xpath_obj = xmlXPathEvalExpression (BAD_CAST xpath_query, ctxt)) == NULL) {
-		VERBOSE(CL_ERROR, "Netopeer: XPath expression evaluation failed (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("Netopeer: XPath expression evaluation failed (%s:%d).", __FILE__, __LINE__);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, "Internal error - XPath expression evaluation failed");
 	} else {
@@ -207,7 +207,7 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 			}
 			if (allowed) {
 				if (manage_module(name, NETOPEER_MANAGE_ALLOW)) {
-					VERBOSE (CL_ERROR, "Netopeer: unable to start device %s", name);
+					nc_verb_error("Netopeer: unable to start device %s", name);
 					asprintf(&errmsg, "Netopeer: unable to start device %s", name);
 					err = nc_err_new (NC_ERR_OP_FAILED);
 					nc_err_set (err, NC_ERR_PARAM_MSG, errmsg);
@@ -216,7 +216,7 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 				}
 			} else {
 				if (manage_module(name, NETOPEER_MANAGE_FORBID)) {
-					VERBOSE (CL_ERROR, "Netopeer: unable to stop device %s", name);
+					nc_verb_error("Netopeer: unable to stop device %s", name);
 					asprintf(&errmsg, "Netopeer: unable to stop device %s", name);
 					err = nc_err_new (NC_ERR_OP_FAILED);
 					nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
@@ -298,7 +298,7 @@ nc_reply * execute_operation (const struct nc_session * session, const nc_rpc * 
 fail:
 		error = nc_err_new(NC_ERR_OP_FAILED);
 		nc_err_set(error, NC_ERR_PARAM_MSG, errmsg);
-		VERBOSE (CL_ERROR, "%s\n", errmsg);
+		nc_verb_error("%s\n", errmsg);
 		free (errmsg);
 		ret = nc_reply_error(error);
 		break;
@@ -385,7 +385,7 @@ char * init_plugin (int dmid, nc_reply * (*device_process_rpc)(int, const struct
 	apply_rpc = device_process_rpc;
 
 	if ((config_doc = xmlReadDoc(BAD_CAST startup, NULL, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN)) == NULL) {
-		VERBOSE (CL_ERROR, "Netopeer: failed to read startup configuration.");
+		nc_verb_error("Netopeer: failed to read startup configuration.");
 		return NULL;
 	}
 
@@ -397,7 +397,7 @@ char * init_plugin (int dmid, nc_reply * (*device_process_rpc)(int, const struct
 		config = strdup((char *)xmlBufferContent (buffer));
 		xmlBufferFree(buffer);
 	} else {
-		VERBOSE(CL_ERROR, "Failed to start Netopeer plugin. Fix configuration and try again!");
+		nc_verb_error("Failed to start Netopeer plugin. Fix configuration and try again!");
 	}
 
 	nc_reply_free(reply);

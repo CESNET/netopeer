@@ -100,30 +100,30 @@ void get_capabilities (DBusConnection *conn, DBusMessage *msg)
 	/* add the arguments to the reply */
 	dbus_message_iter_init_append(reply, &args);
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_BOOLEAN, &stat)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
+		nc_verb_error("Memory allocation failed (%s:%d)", __FILE__, __LINE__);
 		return;
 	}
 	cpblts = nc_session_get_cpblts_default();
 	cpblts_count = nc_cpblts_count(cpblts);
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_UINT16, &cpblts_count)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
+		nc_verb_error("Memory allocation failed (%s:%d)", __FILE__, __LINE__);
 		return;
 	}
 
 	nc_cpblts_iter_start(cpblts);
 	while ((cpblt = nc_cpblts_iter_next(cpblts)) != NULL) {
 		if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &cpblt)) {
-			VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
+			nc_verb_error("Memory allocation failed (%s:%d)", __FILE__, __LINE__);
 			return;
 		}
 	}
 
 	nc_cpblts_free(cpblts);
 
-	VERB (NC_VERB_VERBOSE, "Sending capabilities to agent.");
+	nc_verb_verbose("Sending capabilities to agent.");
 	/* send the reply && flush the connection */
 	if (!dbus_connection_send(conn, reply, NULL)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
+		nc_verb_error("Memory allocation failed (%s:%d)", __FILE__, __LINE__);
 		return;
 	}
 	dbus_connection_flush(conn);
@@ -147,7 +147,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 	int i = 0, cpblts_count = 0;
 
 	if (!dbus_message_iter_init (msg, &args)) {
-		VERB (NC_VERB_ERROR, "%s: DBus message has no arguments.", NTPR_SRV_SET_SESSION);
+		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_SET_SESSION);
 		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
 		return;
 	} else {
@@ -170,12 +170,12 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 
 		for (i = 0; i < cpblts_count; i++) {
 			if (!dbus_message_iter_next(&args)) {
-				VERB (NC_VERB_ERROR, "D-Bus message has too few arguments");
+				nc_verb_error("D-Bus message has too few arguments");
 				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
 			} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
-				VERB (NC_VERB_ERROR, "TODO");
+				nc_verb_error("TODO");
 				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
@@ -212,7 +212,7 @@ void close_session (DBusConnection *conn, DBusMessage *msg)
 	 */
 	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
 	if (sender_session == NULL) {
-		VERB (NC_VERB_WARNING, "Unable to close session - session is not in the list of active sessions");
+		nc_verb_warning("Unable to close session - session is not in the list of active sessions");
 		return;
 	}
 
@@ -241,13 +241,13 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 
 	if (msg) {
 		if (!dbus_message_iter_init(msg, &args)) {
-			VERB (NC_VERB_ERROR, "kill_session(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
+			nc_verb_error("kill_session(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
 			err = nc_err_new (NC_ERR_OP_FAILED);
 			nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (No parameters of D-Bus message).");
 			reply = nc_reply_error (err);
 			goto send_reply;
 		} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
-			VERB (NC_VERB_ERROR, "kill_session(): First parameter of D-Bus message is not a session ID.");
+			nc_verb_error("kill_session(): First parameter of D-Bus message is not a session ID.");
 			err = nc_err_new (NC_ERR_OP_FAILED);
 			nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): First parameter of D-Bus message is not a session ID.");
 			reply = nc_reply_error (err);
@@ -255,7 +255,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 		} else {
 			dbus_message_iter_get_basic(&args, &session_id);
 			if (session_id == NULL) {
-				VERB (NC_VERB_ERROR, "kill_session(): Getting session ID parameter from D-Bus message failed.");
+				nc_verb_error("kill_session(): Getting session ID parameter from D-Bus message failed.");
 				err = nc_err_new (NC_ERR_OP_FAILED);
 				nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): Getting session ID parameter from D-Bus message failed.");
 				reply = nc_reply_error (err);
@@ -263,7 +263,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 			}
 		}
 	} else {
-		VERB (NC_VERB_ERROR, "kill_session(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("kill_session(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
 		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (msg parameter is NULL).");
@@ -271,7 +271,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 		goto send_reply;
 	}
 	if ((session = (struct session_info *)server_sessions_get_by_id (session_id)) == NULL) {
-		VERB (NC_VERB_ERROR, "Requested session to kill (%s) is not available.", session_id);
+		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
 		asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
@@ -284,7 +284,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
 	if (sender_session != NULL) {
 		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
-			VERB (NC_VERB_VERBOSE, "Request to kill own session.");
+			nc_verb_verbose("Request to kill own session.");
 			err = nc_err_new (NC_ERR_INVALID_VALUE);
 			reply = nc_reply_error (err);
 			goto send_reply;
@@ -302,7 +302,7 @@ send_reply:
 	/* send D-Bus reply */
 	dbus_reply = dbus_message_new_method_return(msg);
 	if (dbus_reply == NULL) {
-		VERB (NC_VERB_ERROR, "kill_session(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("kill_session(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): Failed to create dbus reply message.");
 		return;
@@ -342,29 +342,29 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 			nc_err_set(err, NC_ERR_PARAM_MSG, "Your session is no longer valid!");
 			reply = nc_reply_error (err);
 		} else if (!dbus_message_iter_init(msg, &args)) { /* can not initialize message iterator */
-			VERB (NC_VERB_ERROR, "process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
+			nc_verb_error("process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
 			cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
 			return;
 		} else { /* everything seems fine */
 			if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) { /* message is not formated as expected */
-				VERB (NC_VERB_ERROR, "process_operation(): Second parameter of D-Bus message is not a NETCONF operation.");
+				nc_verb_error("process_operation(): Second parameter of D-Bus message is not a NETCONF operation.");
 				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
 				return;
 			} else { /* message looks alright, build it to nc_rpc "object" */
 				dbus_message_iter_get_basic(&args, &msg_pass);
 				rpc = nc_rpc_build (msg_pass, session->session);
 			}
-			VERB (NC_VERB_VERBOSE, "Request %s", msg_pass);
+			nc_verb_verbose("Request %s", msg_pass);
 		}
 	} else {
-		VERB (NC_VERB_ERROR, "process_operation(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("process_operation(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
 		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		return;
 	}
 
 
 	if ((reply = server_process_rpc (session->session, rpc)) == NULL) {
-			VERB (NC_VERB_ERROR, "process_operation(): Some error occured when device operation executed and error structure isn't filled (%s:%d).", __FILE__, __LINE__);
+			nc_verb_error("process_operation(): Some error occured when device operation executed and error structure isn't filled (%s:%d).", __FILE__, __LINE__);
 			cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Device module error (NULL returned and error not filled).");
 			return;
 	}
@@ -374,7 +374,7 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 
 	dbus_reply = dbus_message_new_method_return(msg);
 	if (dbus_reply == NULL || reply_string == NULL) {
-		VERB (NC_VERB_ERROR, "process_operation(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
+		nc_verb_error("process_operation(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
 		cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
 		free(reply_string);
 		return;
@@ -410,7 +410,7 @@ nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
 			} else if (list->dev->execute_operation) { /* old style modules */
 				reply = list->dev->execute_operation (session, rpc);
 			} else { /* none -> some weird module */
-				VERB(NC_VERB_WARNING, "Module %s has no functionality.", list->dev->name);
+				nc_verb_warning("Module %s has no functionality.", list->dev->name);
 				continue;
 			}
 			/* merge results from the previous runs */
@@ -440,7 +440,7 @@ nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
 				nc_reply_get_type(reply) == NC_REPLY_OK) {
 			for (i = 0; ids[i] != ((ncds_id) -1); i++) {
 				if ((dm = server_modules_get_by_repoid(ids[i])) == NULL) {
-					VERBOSE(NC_VERB_VERBOSE, "Module with datastore ID %d not found.", ids[i]);
+					nc_verb_verbose("Module with datastore ID %d not found.", ids[i]);
 				} else if (dm->transapi == 0 && dm->execute_operation) { /* old style module */
 					reply = dm->execute_operation(session, rpc);
 					reply = old_reply = nc_reply_merge(2, old_reply, reply);
@@ -461,7 +461,7 @@ nc_reply * device_process_rpc (int dmid, const struct nc_session * session, cons
 	struct nc_err * err;
 
 	if (rpc == last_rpc) {
-		VERBOSE(NC_VERB_ERROR, "Potentialy infinite loop detected.");
+		nc_verb_error("Potentialy infinite loop detected.");
 		err = nc_err_new(NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, "Potentialy infinite loop detected.");
 		return nc_reply_error(err);
