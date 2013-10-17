@@ -158,22 +158,6 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS , libxml2-devel"
 REQS="$REQS , libxml2"
 
-# libcommlbr
-AC_ARG_WITH([libcommlbr],
-	AC_HELP_STRING([--with-libcommlbr=PATH],[Set the path to libcommlbr (usually local GIT repository)]),
-	[# local copy of libcommlbr GIT repo with headers and binaries
-	LIBCOMMLBR_CFLAGS="-I$withval"
-	LIBCOMMLBR_LIBS="-L$withval -lcommlbr"],
-	[# get info from pkg-config about installed package
-	PKG_CHECK_MODULES(LIBCOMMLBR, libcommlbr >= 2.2.0)]
-)
-CPPFLAGS="$CPPFLAGS $LIBCOMMLBR_CFLAGS"
-LIBS="$LIBS $LIBCOMMLBR_LIBS"
-AC_SUBST([LIBCOMMLBR_LIBS])
-AC_SUBST([LIBCOMMLBR_CFLAGS])
-BUILDREQS="$BUILDREQS , libcommlbr-devel >= 2.2.0"
-REQS="$REQS , libcommlbr >= 2.2.0"
-
 # libnetconf
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set the path to libnetconf (usually local GIT repository)]),

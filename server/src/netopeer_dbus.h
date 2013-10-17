@@ -40,6 +40,8 @@
 #ifndef NETOPEER_DBUS_H_
 #define NETOPEER_DBUS_H_
 
+#include <dbus/dbus.h>
+
 /**
  * Timeout for sending and receiving messages via DBus, -1 means default DBus's
  * timeout.
@@ -127,5 +129,83 @@
  * DBus TerminateSession method from the basic Netopeer agent DBus interface/path
  */
 #define NTPR_AGENT_TERMINATE "TerminateSession"
+
+/* Folowing functions were stolen from libcommlbr */
+
+/**
+ * @brief Connect to D-Bus (to the specified bus) under specified name
+ *
+ * @param bus            one of well-known bus type
+ * 	- DBUS_BUS_SESSION - The login session bus.
+ * 	- DBUS_BUS_SYSTEM  - The systemwide bus.
+ * @param name           requested name for connection to D-Bus, if NULL then
+ *                       name is not requested, but connection is established
+ * @param flags          flags for dbus_bus_request_name() function
+ * @return
+ * 	- NULL             - if failed (unable to connect to bus, ...)
+ * 	- a DBusConnection with new ref - if successful
+ */
+DBusConnection * ns_dbus_init(DBusBusType bus, const char* name, unsigned int flags);
+
+/**
+ * @brief Send error reply message back to sender
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ * @param error_name     error name according to the syntax given in the D-Bus specification,
+ *                       if NULL then DBUS_ERROR_FAILED is used
+ * @param error_message  the error message string
+ *
+ * @return               zero on success, nonzero else
+ */
+int ns_dbus_error_reply(DBusMessage *msg, DBusConnection * conn, const char *error_name, const char *error_message);
+
+/**
+ * @brief Send positive (method return message with boolean argument set to true) reply message back to sender
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ *
+ * @return               zero on success, nonzero else
+ */
+int ns_dbus_positive_reply(DBusMessage *msg, DBusConnection *conn);
+
+/**
+ * @brief Handle standard D-Bus methods on standard interfaces
+ * org.freedesktop.DBus.Peer, org.freedesktop.DBus.Introspectable
+ * and org.freedesktop.DBus.Properties
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ * @param service        name of the service where you receiving messages
+ *                       from D-Bus (message destination)
+ * @return               zero when message doesn't contain message call
+ *                       of standard method, nonzero if one of standard
+ *                       method was received
+ */
+int ns_dbus_handlestdif (DBusMessage *msg, DBusConnection *conn, const char* service);
+
+/**
+ * @brief Send standard D-Bus method Ping on standard interface
+ * org.freedesktop.DBus.Peer to the specified service
+ *
+ * @param conn           opened connection to the D-Bus
+ * @param service        name of the service where you want to send the
+ *                       messages
+ * @return               0 on success, 1 otherwise
+ */
+int ns_dbus_ping(DBusConnection *conn, const char *service);
+
+/**
+ * @brief Send standard D-Bus method GetMachineId on standard interface
+ * org.freedesktop.DBus.Peer to the specified service
+ *
+ * @param conn           opened connection to the D-Bus
+ * @param service        name of the service where you want to send the
+ *                       messages
+ * @return               pointer to Machine ID string or NULL on error,
+ *                       don't forget to free returned string
+ */
+char* ns_dbus_getmachineid(DBusConnection *conn, const char *service);
 
 #endif /* NETOPEER_DBUS_H_ */

@@ -53,7 +53,6 @@
 
 #include <dbus/dbus.h>
 
-#include <commlbr.h>
 #include <libnetconf_xml.h>
 #include <libnetconf.h>
 
@@ -148,7 +147,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 
 	if (!dbus_message_iter_init (msg, &args)) {
 		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_SET_SESSION);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
+		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
 		return;
 	} else {
 		/* dbus session-id */
@@ -171,12 +170,12 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 		for (i = 0; i < cpblts_count; i++) {
 			if (!dbus_message_iter_next(&args)) {
 				nc_verb_error("D-Bus message has too few arguments");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
+				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
 			} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
 				nc_verb_error("TODO");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
+				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
 			} else {
@@ -193,7 +192,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 	nc_cpblts_free (cpblts);
 
 	/* send reply */
-	cl_dbus_positive_reply (msg, conn);
+	ns_dbus_positive_reply (msg, conn);
 }
 
 /**
@@ -264,7 +263,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 		}
 	} else {
 		nc_verb_error("kill_session(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
+		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (msg parameter is NULL).");
 		reply = nc_reply_error (err);
@@ -343,12 +342,12 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 			reply = nc_reply_error (err);
 		} else if (!dbus_message_iter_init(msg, &args)) { /* can not initialize message iterator */
 			nc_verb_error("process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
-			cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
+			ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
 			return;
 		} else { /* everything seems fine */
 			if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) { /* message is not formated as expected */
 				nc_verb_error("process_operation(): Second parameter of D-Bus message is not a NETCONF operation.");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
+				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
 				return;
 			} else { /* message looks alright, build it to nc_rpc "object" */
 				dbus_message_iter_get_basic(&args, &msg_pass);
@@ -358,14 +357,14 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 		}
 	} else {
 		nc_verb_error("process_operation(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
+		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		return;
 	}
 
 
 	if ((reply = server_process_rpc (session->session, rpc)) == NULL) {
 			nc_verb_error("process_operation(): Some error occured when device operation executed and error structure isn't filled (%s:%d).", __FILE__, __LINE__);
-			cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Device module error (NULL returned and error not filled).");
+			ns_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Device module error (NULL returned and error not filled).");
 			return;
 	}
 	reply_string = nc_reply_dump (reply);
@@ -375,7 +374,7 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 	dbus_reply = dbus_message_new_method_return(msg);
 	if (dbus_reply == NULL || reply_string == NULL) {
 		nc_verb_error("process_operation(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
+		ns_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
 		free(reply_string);
 		return;
 	}

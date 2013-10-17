@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
@@ -10,8 +11,6 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 #include <libnetconf/datastore.h>
-
-#include <commlbr.h>
 
 #include "server_operations.h"
 #include "netopeer_operations.h"

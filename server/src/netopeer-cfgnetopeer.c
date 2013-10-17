@@ -44,7 +44,6 @@
 #include <libxml/xpathInternals.h>
 #include <libnetconf_xml.h>
 #include <libnetconf/datastore.h>
-#include <commlbr.h>
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>

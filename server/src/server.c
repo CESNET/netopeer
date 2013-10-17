@@ -50,8 +50,6 @@
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 
-#include <commlbr.h>
-
 #include <libnetconf_xml.h>
 
 #include "server_operations.h"
@@ -68,9 +66,9 @@ volatile int done = 0, restart_soft = 0, restart_hard = 0;
  *
  * \return              none
  */
-static void print_version (void)
+static void print_version (char *progname)
 {
-	fprintf (stdout, "%s version: %s\n", getprogname(), VERSION);
+	fprintf (stdout, "%s version: %s\n", progname, VERSION);
 	exit (0);
 }
 
@@ -80,9 +78,9 @@ static void print_version (void)
  *
  * \return               none
  */
-static void print_usage (void)
+static void print_usage (char * progname)
 {
-	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", getprogname());
+	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", progname);
 #ifdef DEBUG
 	fprintf(stdout," -D level            debug messages output (0-5)\n");
 #endif
@@ -143,6 +141,10 @@ int main (int argc, char** argv)
 	char *aux_string = NULL, path[PATH_MAX];
 	int next_option;
 	int daemonize = 0, len;
+	int verbose = 0;
+#ifdef DEBUG
+	int	debug = 0;
+#endif
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
@@ -172,16 +174,16 @@ int main (int argc, char** argv)
 		break;
 #endif
 		case 'h':
-			print_usage ();
+			print_usage (argv[0]);
 			break;
 		case 'v':
 			verbose = atoi (optarg);
 			break;
 		case 'V':
-			print_version ();
+			print_version (argv[0]);
 			break;
 		default:
-			print_usage ();
+			print_usage (argv[0]);
 			break;
 		}
 	}
@@ -218,7 +220,7 @@ int main (int argc, char** argv)
 	openlog ("netopeer-server", LOG_PID, LOG_DAEMON);
 
 	/* connect server to dbus */
-	conn = cl_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
+	conn = ns_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
 	if (conn == NULL) {
 		nc_verb_error("Connecting to DBus failed.");
 		return (EXIT_FAILURE);
@@ -258,7 +260,7 @@ restart:
 			nc_verb_verbose("message member: %s", dbus_message_get_member (msg));
 			nc_verb_verbose("message destination: %s", dbus_message_get_destination (msg));
 
-			if (cl_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
+			if (ns_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
 				nc_verb_verbose("D-Bus standard interface message");
 
 				/* free the message */
