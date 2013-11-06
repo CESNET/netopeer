@@ -49,6 +49,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "netopeer_operations.h"
+#include "server_operations.h"
 
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
@@ -153,8 +154,10 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 	xmlXPathObjectPtr xpath_obj = NULL;
 	char * xpath_query = NULL;
 	char * name, *errmsg;
-	int i, allowed;
+	int i, j, len, allowed;
 	struct nc_err * err = NULL;
+	struct device_list * dev_list = NULL;
+	char ** module_names = NULL;
 
 	if ((ctxt = xmlXPathNewContext(config_doc)) == NULL) {
 		nc_verb_error("Netopeer: unable to create XPath context (%s:%d).", __FILE__, __LINE__);
@@ -173,6 +176,13 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, "Internal error - XPath expression evaluation failed");
 	} else {
+		dev_list = device_list_get_all(&len);
+		module_names = calloc(len, sizeof(char*));
+		for (i=0; i<len; i++) {
+			module_names[i] = strdup(dev_list[i].name);
+		}
+		device_list_free(dev_list, len);
+
 		for (i=0; i<xpath_obj->nodesetval->nodeNr; i++) {
 			allowed = 0;
 			module = xpath_obj->nodesetval->nodeTab[i];
@@ -192,6 +202,12 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 				module_attr = module_attr->next;
 			}
 			if (strcasecmp(name, "netopeer") == 0) {
+				for (j=0; j<len; j++) {
+					if (module_names[j] != NULL && strcmp(module_names[j], name) == 0) {
+						free(module_names[j]);
+						module_names[j] = NULL;
+					}
+				}
 				free(name);
 				name = NULL;
 				if (allowed) {
@@ -223,8 +239,29 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 					goto cleanup;
 				}
 			}
+			/* remove module from list */
+			for (j=0; j < len; j++) {
+				if (module_names[j] != NULL && strcmp(module_names[j], name) == 0) {
+					free (module_names[j]);
+					module_names[j] = NULL;
+					break;
+				}
+			}
 			free (name);
 			name = NULL;
+		}
+		/* forbid all modules in list, those are not in netopeer configuration */
+		for (i=0; i < len; i++) {
+			if (module_names[i] != NULL) {
+				if (manage_module(module_names[i], NETOPEER_MANAGE_FORBID)) {
+					nc_verb_error("Netopeer: unable to stop device %s", name);
+					asprintf(&errmsg, "Netopeer: unable to stop device %s", name);
+					err = nc_err_new (NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
+					free (errmsg);
+					goto cleanup;
+				}
+			}
 		}
 	}
 
@@ -233,6 +270,10 @@ cleanup:
 	free(name);
 	xmlXPathFreeObject(xpath_obj);
 	xmlXPathFreeContext(ctxt);
+	for (i=0; i<len; i++) {
+		free(module_names[i]);
+	}
+	free(module_names);
 
 	if (err == NULL) {
 		return nc_reply_ok();
@@ -285,7 +326,7 @@ nc_reply * execute_operation (const struct nc_session * session, const nc_rpc * 
 			goto fail;
 		}
 		nc_reply_free(reply_getrunning);
-		if ((data_doc = xmlReadDoc(BAD_CAST data, NULL, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN)) == NULL) {
+		if ((data_doc = xmlReadDoc(BAD_CAST data, NULL, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR | XML_PARSE_NOWARNING)) == NULL) {
 			errmsg = strdup("Netopeer: Failed to parse reply data.");
 			free(data);
 			goto fail;
@@ -383,7 +424,7 @@ char * init_plugin (int dmid, nc_reply * (*device_process_rpc)(int, const struct
 	device_id = dmid;
 	apply_rpc = device_process_rpc;
 
-	if ((config_doc = xmlReadDoc(BAD_CAST startup, NULL, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN)) == NULL) {
+	if ((config_doc = xmlReadDoc(BAD_CAST startup, NULL, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR | XML_PARSE_NOWARNING)) == NULL) {
 		nc_verb_error("Netopeer: failed to read startup configuration.");
 		return NULL;
 	}
