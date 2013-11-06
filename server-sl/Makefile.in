@@ -34,7 +34,7 @@
 # if advised of the possibility of such damage.
 #
 
-NAME = netconf-server-sl
+NAME = netopeer-server-sl
 VERSION = @PACKAGE_VERSION@
 IDGIT = "built from git $(shell git show --pretty=oneline | head -1 | cut -c -20)"
 IDNOGIT = "released as version $(VERSION)"
