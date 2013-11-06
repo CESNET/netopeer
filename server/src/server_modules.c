@@ -692,27 +692,6 @@ int server_modules_allow (char * name) {
 			nc_session_free (dummy);
 			return(EXIT_FAILURE);
 		}
-		if ((rpc_int = nc_rpc_copyconfig(NC_DATASTORE_STARTUP, NC_DATASTORE_RUNNING)) == NULL ||
-				nc_rpc_capability_attr(rpc_int,NC_CAP_ATTR_WITHDEFAULTS_MODE, NCWD_MODE_ALL) != 0) {
-			nc_session_free (dummy);
-			return(EXIT_FAILURE);
-		}
-		reply_int = ncds_apply_rpc(dev->repo_id, dummy, rpc_int);
-		if (reply_int == NULL) {
-			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
-			nc_session_free (dummy);
-			return(EXIT_FAILURE);
-		} else if (reply_int == NCDS_RPC_NOT_APPLICABLE) {
-			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
-			nc_session_free (dummy);
-			return(EXIT_FAILURE);
-		} else if (nc_reply_get_type(reply_int) != NC_REPLY_OK) {
-			nc_verb_warning("Unable to init plugin %s: Failed to apply startup data.", name);
-			nc_session_free (dummy);
-			return(EXIT_FAILURE);
-		}
-		nc_rpc_free(rpc_int);
-		nc_reply_free(reply_int);
 	} else {/* old style server module */
 		if ((rpc_int = nc_rpc_getconfig (NC_DATASTORE_STARTUP, NULL)) == NULL || nc_rpc_capability_attr(rpc_int, NC_CAP_ATTR_WITHDEFAULTS_MODE, NCWD_MODE_ALL) != 0) {
 			nc_verb_warning("Unable to init plugin %s: Failed to create get-config for startup datastore.", name);
