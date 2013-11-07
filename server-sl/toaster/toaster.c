@@ -1,7 +1,7 @@
 /*
-* This is automaticaly generated callbacks file
+* This is automatically generated callbacks file
 * It contains 3 parts: Configuration callbacks, RPC callbacks and state data callbacks.
-* Do NOT alter function signatures or any structure untill you exactly know what you are doing.
+* Do NOT alter function signatures or any structure until you exactly know what you are doing.
 */
 
 #include <stdlib.h>
@@ -65,7 +65,7 @@ int transapi_init(void)
 	if ((status = shmat (shmid, NULL, 0)) == (void*)-1) {
 		return EXIT_FAILURE;
 	}
-	/* first run after shared memory removed (reboot, manualy) initiate the mutex */
+	/* first run after shared memory removed (reboot, manually) initiate the mutex */
 	if (first) {
 		if (pthread_mutex_init (&status->toaster_mutex, NULL)) {
 			return EXIT_FAILURE;
@@ -88,7 +88,7 @@ void transapi_close(void)
  * @brief Retrieve state data from device and return them as serialized XML *
  * @param model	Device data model. Serialized YIN.
  * @param running	Running datastore content. Serialized XML.
- * @param[out] err	Double poiter to error structure. Fill error when some occurs.
+ * @param[out] err	Double pointer to error structure. Fill error when some occurs.
  *
  * @return State data as serialized XML or NULL in case of error.
  */
