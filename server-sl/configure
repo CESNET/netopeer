@@ -11265,8 +11265,8 @@ fi
 
 # Check whether --with-libnetconf was given.
 if test "${with_libnetconf+set}" = set; then :
-  withval=$with_libnetconf; CFLAGS="-I$withval/include/"
-	LIBS="-L$withval/lib/ -lnetconf $LIBS"
+  withval=$with_libnetconf; CFLAGS="-I$withval/include/ $CFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 
 else
 
@@ -11449,7 +11449,7 @@ $as_echo "$ac_cv_lib_netconf_ncntf_dispatch_receive" >&6; }
 if test "x$ac_cv_lib_netconf_ncntf_dispatch_receive" = xyes; then :
 
 else
-  CPPFLAGS="-DDISABLE_NOTIFICATIONS $PPCFLAGS"
+  CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
 fi
 
 fi

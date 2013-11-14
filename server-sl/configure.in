@@ -176,8 +176,8 @@ export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
 # libnetconf
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-	[CFLAGS="-I$withval/include/"
-	LIBS="-L$withval/lib/ -lnetconf $LIBS"
+	[CFLAGS="-I$withval/include/ $CFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	],[
 	# get info from pkg-config about installed package
 	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
@@ -186,7 +186,7 @@ AC_ARG_WITH([libnetconf],
 )
 AC_CHECK_LIB([netconf], [nc_verbosity], [ ], AC_MSG_ERROR([libnetconf not found.]))
 if test "$notif" = "yes"; then
-	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive], [ ], [CPPFLAGS="-DDISABLE_NOTIFICATIONS $PPCFLAGS"])
+	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive], [ ], [CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"])
 fi
 
 if test "$notif" = "yes"; then

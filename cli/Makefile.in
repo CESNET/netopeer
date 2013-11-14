@@ -48,11 +48,8 @@ exec_prefix = @exec_prefix@
 bindir = @bindir@
 readlink = @READLINK@
 
-# Set path to search for libnetconf if installed into other than default location.
-LIBNETCONF_SEARCH = "-Wl,-rpath,$(prefix)/lib"
-
 CC = @CC@
-LIBS = @LDFLAGS@ @PTHREAD_LIBS@ $(LIBNETCONF_SEARCH) -lnetconf -lreadline -lxml2
+LIBS = @LIBS@
 CFLAGS = -Wall @CFLAGS@
 CPPFLAGS = @CPPFLAGS@ -DVERSION=\"$(VERSION)\"
 INSTALL = @INSTALL@

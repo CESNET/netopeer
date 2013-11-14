@@ -182,24 +182,29 @@ AX_PTHREAD([
 # libnetconf
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-	[CPPFLAGS="-I$withval/include/"
-	LIBS="-L$withval/lib/ -lnetconf $LIBS"
+	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	],[
 	# get info from pkg-config about installed package
 	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
 	BUILDREQS="$BUILDREQS libnetconf-devel"]
 )
 REQS="$REQS libnetconf"
-AC_CHECK_LIB([netconf], [nc_verbosity], [], AC_MSG_ERROR([libnetconf not found.]))
-if test "$notif" = "yes"; then
-	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive], [], [CPPFLAGS="-DDISABLE_NOTIFICATIONS $PPCFLAGS"])
-fi
+AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+	[],
+	[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+)
 
 ### libreadline ###
 AC_CHECK_LIB([readline], [readline], [], AC_MSG_ERROR([Missing libreadline]))
 AC_CHECK_HEADERS(readline/readline.h readline/history.h, [], AC_MSG_ERROR([Missing libreadline headers.]))
 BUILDREQS="$BUILDREQS readline-devel"
 REQS="$REQS readline"
+
+### libxml2 ###
+AC_CHECK_LIB([xml2], [xmlReadFile], [], AC_MSG_ERROR([MIssing libxml2]))
+AC_CHECK_HEADERS(libxml/tree.h, [], AC_MSG_ERROR([Missing libxml2 headers.]))
 
 ###################### Check for configure parameters ##########################
 
