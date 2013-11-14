@@ -52,7 +52,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+
+#ifndef DISABLE_NOTIFICATIONS
 #include <pthread.h>
+#endif
 
 #include "commands.h"
 #include "configuration.h"

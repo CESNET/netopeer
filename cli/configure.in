@@ -171,13 +171,15 @@ if test -z "$WITH_LIBXML2" ; then
 	LDFLAGS="`xml2-config --libs` $LDFLAGS"
 fi
 
-### pthread ###
-AX_PTHREAD([
-	LIBS="$PTHREAD_LIBS $LIBS"
-	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-	CC="$PTHREAD_CC"],
-	AC_MSG_ERROR([Missing POSIX threads support.])
-)
+if test "$notif" = "yes"; then
+	### pthread ###
+	AX_PTHREAD([
+		LIBS="$PTHREAD_LIBS $LIBS"
+		CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+		CC="$PTHREAD_CC"],
+		AC_MSG_ERROR([Missing POSIX threads support.])
+	)
+fi
 
 # libnetconf
 AC_ARG_WITH([libnetconf],
@@ -190,11 +192,15 @@ AC_ARG_WITH([libnetconf],
 	BUILDREQS="$BUILDREQS libnetconf-devel"]
 )
 REQS="$REQS libnetconf"
-AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
-	[],
-	[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
-	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
-)
+if test "$notif" = "yes"; then
+	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+		[],
+		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+	)
+else
+	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.])
+fi
 
 ### libreadline ###
 AC_CHECK_LIB([readline], [readline], [], AC_MSG_ERROR([Missing libreadline]))

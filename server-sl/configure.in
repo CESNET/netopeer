@@ -184,9 +184,14 @@ AC_ARG_WITH([libnetconf],
 	CFLAGS="$LIBNETCONF_CFLAGS $CFLAGS"
 	LIBS="$LIBNETCONF_LIBS $LIBS"]
 )
-AC_CHECK_LIB([netconf], [nc_verbosity], [ ], AC_MSG_ERROR([libnetconf not found.]))
 if test "$notif" = "yes"; then
-	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive], [ ], [CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"])
+	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+		[],
+		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+	)
+else
+	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.])
 fi
 
 if test "$notif" = "yes"; then
