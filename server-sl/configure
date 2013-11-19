@@ -11511,6 +11511,8 @@ else
   as_fn_error $? "libnetconf not found." "$LINENO" 5
 fi
 
+fi
+
 if test "$notif" = "yes"; then
 	### pthread ###
 
@@ -11603,9 +11605,7 @@ ax_pthread_flags="pthreads none -Kthread -kthread lthread -pthread -pthreads -mt
 # pthread-config: use pthread-config program (for GNU Pth library)
 
 case ${host_os} in
-        solaris*
-fi
-
+        solaris*)
 
         # On Solaris (at least, for some versions), libc contains stubbed
         # (non-functional) versions of the pthreads routines, so link-based
