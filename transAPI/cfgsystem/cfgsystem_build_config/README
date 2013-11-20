@@ -1,0 +1,11 @@
+cfgsystem_build_config
+------------------------------------
+
+This small utility is able to read all the configurations
+managed by ietf-system model and display them. They
+actually represent the startup configuration and it
+should be much easier to start using cfgsystem module
+on a preconfigured machine using this application.
+
+Usage:
+	cfgsystem_build_config <cfgsystem.so path>
