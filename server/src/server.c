@@ -55,9 +55,6 @@
 #include "server_operations.h"
 #include "netopeer_dbus.h"
 
-/* program version */
-#define VERSION "0.0.1"
-
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
