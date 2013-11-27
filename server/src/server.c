@@ -135,7 +135,7 @@ int main (int argc, char** argv)
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
-		verbose = -1;
+		verbose = NC_VERB_ERROR;
 	} else {
 		verbose = atoi (aux_string);
 	}
