@@ -191,8 +191,10 @@ int main (int argc, char** argv)
 			nc_verb_error("Going to background failed (%s)", strerror(errno));
 			return (EXIT_FAILURE);
 		}
+		openlog("netopeer-server", LOG_PID, LOG_DAEMON);
+	} else {
+		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
-	openlog ("netopeer-server", LOG_PID, LOG_DAEMON);
 
 	/* connect server to dbus */
 	conn = ns_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
