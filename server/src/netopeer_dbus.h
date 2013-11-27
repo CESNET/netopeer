@@ -54,12 +54,6 @@
 #define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
 
 /**
- * Environment variabe with settings for debug messages level
- */
-#define ENVIRONMENT_DEBUG "NETOPEER_DEBUG"
-
-
-/**
  * DBus bus name for the Netopeer server
  */
 #define NTPR_DBUS_SRV_BUS_NAME "org.liberouter.netopeer2.server"
