@@ -367,6 +367,17 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 			ns_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Device module error (NULL returned and error not filled).");
 			return;
 	}
+
+	if (reply == NULL) {
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "For unknown reason no reply was returned by device/server/library.");
+		reply = nc_reply_error(err);
+	} else if (reply == NCDS_RPC_NOT_APPLICABLE) {
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "There is no device that could be affected.");
+		reply = nc_reply_error(err);
+	}
+
 	reply_string = nc_reply_dump (reply);
 	nc_reply_free (reply);
 	nc_rpc_free (rpc);
