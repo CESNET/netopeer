@@ -324,7 +324,7 @@ int main (int argc, char** argv)
 	nc_callback_print(clb_print);
 
 	/* initialize library */
-	if (nc_init (NC_INIT_NOTIF|NC_INIT_NACM|NC_INIT_MONITORING|NC_INIT_WD) < 0) {
+	if (nc_init (NC_INIT_ALL) < 0) {
 		clb_print (NC_VERB_ERROR, "Library initialization failed");
 		return EXIT_FAILURE;
 	} 

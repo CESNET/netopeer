@@ -234,7 +234,7 @@ int main (int argc, char** argv)
 	LIBXML_TEST_VERSION
 
 	/* initialize library including internal datastores and maybee something more */
-	if (nc_init (NC_INIT_NOTIF|NC_INIT_NACM|NC_INIT_MONITORING|NC_INIT_WD) < 0) {
+	if (nc_init (NC_INIT_ALL) < 0) {
 		nc_verb_error("Library initialization failed.");
 		return (EXIT_FAILURE);
 	}
