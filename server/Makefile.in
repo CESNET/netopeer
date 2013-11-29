@@ -58,7 +58,7 @@ RPMDIR = RPMBUILD
 LIBS = @LIBS@
 CFLAGS = @CFLAGS@ -g -O0
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/liberouter/netopeer2/modules.conf.d/\"
+DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/liberouter/netopeer2/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
 VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')

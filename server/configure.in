@@ -68,7 +68,7 @@ AC_ARG_WITH([distro],
 CFLAGS="$CFLAGS -Wall -DLIBCOMMLBR_WITH_DBUS"
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
-	CFLAGS="$CFLAGS -g -DDEBUG",
+	CFLAGS="$CFLAGS -g",
 	CFLAGS="$CFLAGS -O3"
 )
 

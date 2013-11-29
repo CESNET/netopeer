@@ -84,6 +84,19 @@ void clb_print(NC_VERB_LEVEL level, const char* msg)
 	}
 }
 
+void print_debug(const char * format, ...)
+{
+#define MAX_DEBUG_LEN 4096
+	char msg[MAX_DEBUG_LEN];
+	va_list ap;
+
+	va_start(ap, format);
+	vsnprintf(msg, MAX_DEBUG_LEN, format, ap);
+	va_end(ap);
+
+	clb_print(NC_VERB_DEBUG, msg);
+}
+
 void get_capabilities (DBusConnection *conn, DBusMessage *msg)
 {
 	DBusMessage *reply = NULL;

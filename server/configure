@@ -2338,7 +2338,7 @@ fi
 CFLAGS="$CFLAGS -Wall -DLIBCOMMLBR_WITH_DBUS"
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
-  enableval=$enable_debug; CFLAGS="$CFLAGS -g -DDEBUG"
+  enableval=$enable_debug; CFLAGS="$CFLAGS -g"
 else
   CFLAGS="$CFLAGS -O3"
 

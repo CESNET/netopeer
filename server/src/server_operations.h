@@ -376,4 +376,9 @@ struct server_module_list * server_modules_get_all ();
  */
 void clb_print (NC_VERB_LEVEL, const char *);
 
+/**
+ * @ Print debug messages to syslog
+ */
+void print_debug(const char*, ...);
+
 #endif

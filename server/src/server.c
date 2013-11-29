@@ -55,9 +55,6 @@
 #include "server_operations.h"
 #include "netopeer_dbus.h"
 
-/* program version */
-#define VERSION "0.0.1"
-
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
@@ -81,21 +78,14 @@ static void print_version (char *progname)
 static void print_usage (char * progname)
 {
 	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", progname);
-#ifdef DEBUG
-	fprintf(stdout," -D level            debug messages output (0-5)\n");
-#endif
 	fprintf (stdout, " -d                  daemonize server\n");
 	fprintf (stdout, " -h                  display help\n");
-	fprintf (stdout, " -v level            verbose output level (0-5)\n");
+	fprintf (stdout, " -v level            verbose output level\n");
 	fprintf (stdout, " -V                  show program version\n");
 	exit (0);
 }
 
-#ifdef DEBUG
-#	define OPTSTRING "dD:hv:V"
-#else
-#	define OPTSTRING "dhv:V"
-#endif
+#define OPTSTRING "dhv:V"
 
 /*!
  * \brief Signal handler
@@ -142,24 +132,14 @@ int main (int argc, char** argv)
 	int next_option;
 	int daemonize = 0, len;
 	int verbose = 0;
-#ifdef DEBUG
-	int	debug = 0;
-#endif
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
-		verbose = -1;
+		verbose = NC_VERB_ERROR;
 	} else {
 		verbose = atoi (aux_string);
 	}
 
-#ifdef DEBUG
-	if ((aux_string = getenv(ENVIRONMENT_DEBUG)) == NULL) {
-		debug = -1;
-	} else {
-		debug = atoi(aux_string);
-	}
-#endif
 	aux_string = NULL; /* for sure to avoid unwanted changes in environment */
 
 	/* parse given options */
@@ -168,11 +148,6 @@ int main (int argc, char** argv)
 		case 'd':
 			daemonize = 1;
 			break;
-#ifdef DEBUG
-		case 'D':
-		debug = atoi(optarg);
-		break;
-#endif
 		case 'h':
 			print_usage (argv[0]);
 			break;
@@ -216,8 +191,10 @@ int main (int argc, char** argv)
 			nc_verb_error("Going to background failed (%s)", strerror(errno));
 			return (EXIT_FAILURE);
 		}
+		openlog("netopeer-server", LOG_PID, LOG_DAEMON);
+	} else {
+		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
-	openlog ("netopeer-server", LOG_PID, LOG_DAEMON);
 
 	/* connect server to dbus */
 	conn = ns_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
@@ -254,14 +231,14 @@ restart:
 		dbus_connection_read_write (conn, 1000);
 
 		while (!done && (msg = dbus_connection_pop_message (conn)) != NULL) {
-			nc_verb_verbose("message is a method-call");
-			nc_verb_verbose("message path: %s", dbus_message_get_path (msg));
-			nc_verb_verbose("message interface: %s", dbus_message_get_interface (msg));
-			nc_verb_verbose("message member: %s", dbus_message_get_member (msg));
-			nc_verb_verbose("message destination: %s", dbus_message_get_destination (msg));
+			print_debug("message is a method-call");
+			print_debug("message path: %s", dbus_message_get_path (msg));
+			print_debug("message interface: %s", dbus_message_get_interface (msg));
+			print_debug("message member: %s", dbus_message_get_member (msg));
+			print_debug("message destination: %s", dbus_message_get_destination (msg));
 
 			if (ns_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
-				nc_verb_verbose("D-Bus standard interface message");
+				print_debug("D-Bus standard interface message");
 
 				/* free the message */
 				dbus_message_unref(msg);
