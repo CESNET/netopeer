@@ -1,0 +1,46 @@
+Summary: Netopeer - client web user interface
+Name: mod_netconf
+Version: %(cut -f1 ./VERSION | tr -d '\n')
+Release: @RELEASE@
+URL: http://www.liberouter.org/
+Source: https://www.liberouter.org/repo/SOURCES/%{name}-%{version}-%{release}.tar.gz
+Group: Liberouter
+License: BSD
+Vendor: CESNET, z.s.p.o.
+Packager: @USERNAME@ <@USERMAIL@>
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}
+
+BuildRequires: @BUILDREQS@
+Requires: @REQS@
+
+%description
+Back-end for web user interface of Netopeer client.
+
+%prep
+%setup
+
+%build
+%configure @LIBNETCONF_WITH@;
+make
+
+%install
+make DESTDIR=$RPM_BUILD_ROOT RUN="RPM" install
+
+%post
+#add device module to configuration only when installing, not on update or reinstall.
+#https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Running_scriptlets_only_in_certain_situations
+[ -d /var/run/httpd ] || { mkdir -p /var/run/httpd && chown apache:apache /var/run/httpd; }
+chcon system_u:object_r:httpd_modules_t:s0 /etc/httpd/modules/mod_netconf.so
+service httpd restart
+
+%postun
+#delete device module from configuration only when erasing, not on update.
+#https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Running_scriptlets_only_in_certain_situations
+service httpd restart
+rm -f /tmp/mod_netconf.sock
+
+%files
+%doc README
+%{_libdir}/httpd/modules/*.so
+%config(noreplace) %{_sysconfdir}/httpd/conf.d/*.conf
+

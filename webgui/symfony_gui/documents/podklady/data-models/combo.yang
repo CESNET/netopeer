@@ -1,0 +1,234 @@
+module combo {
+  namespace "urn:cesnet:tmc:combo:1.0";
+  prefix combo;
+
+  organization "CESNET, z.s.p.o.";
+  contact
+    "dkupka@cesnet.cz";
+  description
+    "Module specifying combo card configuration data model and RPC operations.";
+
+  revision 2012-04-13 {
+    description
+      "Initial revision";
+  }
+
+  typedef decimal {
+    type string {
+      pattern "[0-9]+(\\.[0-9]+)?";
+    }
+    description
+      "Simple decimal numbers type definition";
+  }
+
+  container combo {
+    list card {
+      key "device";
+      leaf device {
+        type string;
+        description
+          "Card device file.";
+      }
+      leaf board {
+        config false;
+        type string;
+        description
+          "board type";
+      }
+      leaf subtype {
+        config false;
+        type string;
+        description
+          "Subtype of card";
+      }
+      leaf serial-number {
+        config false;
+        type string;
+        description
+          "Card serial number";
+      }
+      leaf speedgrade {
+        config false;
+        type int8;
+        description
+          "Manufacturer listed speedgrade.";
+      }
+      leaf loaded-design {
+        config false;
+        type string;
+        description
+          "Currently loaded design.";
+      }
+      leaf temperature {
+        config false;
+        type decimal;
+        description
+          "FPGA temperature (from tempctl).";
+      }
+      container combo-interface-cards {
+        config false;
+        list combo-interface-card {
+          key "id";
+          leaf id {
+            type uint8;
+            description
+              "Interface addon card ID.";
+          }
+          leaf type {
+            type string;
+            description
+              "Type of the addon.";
+          }
+          leaf chip {
+            type string;
+            description "Used chip.";
+          }
+          leaf serial-number {
+            type string;
+            description
+              "Addon's serial number";
+          }
+        }
+      }
+      container combo-network-interfaces {
+        config false;
+        list combo-network-interface {
+          key "interface-id";
+          leaf interface-id {
+            type uint8;
+            description
+              "Interface number as lister in tools.";
+          }
+          leaf phyter-vendor {
+            type string;
+            description
+              "Phyter vendor name.";
+          }
+          leaf phyter-model {
+            type string;
+            description
+              "Phyter model.";
+          }
+          container transceiver {
+            leaf power {
+              config false;
+              type enumeration {
+                enum "down";
+                enum "up";
+              }
+              description "If the transceiver is powered up.";
+            }
+            leaf tx-disable {
+              config false;
+              type boolean;
+              description "Disable the transmission laser of the transceiver.";
+            }
+            leaf connected {
+              type boolean;
+              description
+                "Transceiver is present.";
+            }
+            leaf vendor {
+              type string;
+              description
+                "Transceiver vendor name.";
+            }
+            leaf part-number {
+              type string;
+              description
+                "Vendor part number";
+            }
+            leaf revision {
+              type uint8;
+              description
+                "Transceiver revision.";
+            }
+            leaf type {
+              type enumeration {
+                enum "Unknown";
+                enum "GBIC";
+                enum "SFP";
+                enum "XFP";
+                enum "QSFP";
+                enum "QSFP+";
+                enum "CXP";
+                enum "CFP";
+              }
+              description "Transceiver type.";
+            }
+            container wavelength {
+              leaf value {
+                type decimal;
+              }
+              leaf deviation {
+                type decimal;
+              }
+              description
+                "Optical properties of transceiver.";
+            }
+            leaf compliance {
+              type string;
+              description
+                "Standards transceiver is compliant with.";
+            }
+            leaf rx-input-power {
+              type decimal;
+              description
+                "Power of received optical signal.";
+            }
+            leaf temperature {
+              type decimal;
+              description
+                "Transceiver temperature";
+            }
+          }
+          leaf speed {
+            type enumeration {
+              enum "10Mb";
+              enum "100Mb";
+              enum "1Gb";
+              enum "10Gb";
+              enum "40Gb";
+              enum "100Gb";
+            }
+            description
+              "Current interface speed.";
+          }
+          leaf duplex {
+            type enumeration {
+              enum "half";
+              enum "full";
+            }
+            description
+              "Interface communication mode.";
+          }
+          leaf rx-signal-detected {
+            type boolean;
+            description
+              "Phyter detects input signal.";
+          }
+          leaf tx-enabled {
+            type boolean;
+            description
+              "Output enabled.";
+          }
+          leaf tx-fault {
+            type boolean;
+            description
+              "Output fault detected.";
+          }
+          leaf rx-fault {
+            type boolean;
+            description
+              "Input fault detected.";
+          }
+          leaf link-up {
+            type boolean;
+            description
+              "Link established.";
+          }
+        }
+      }
+    }
+  }
+}

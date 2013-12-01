@@ -1,0 +1,418 @@
+module hanic-probe {
+  namespace "urn:cesnet:tmc:hanicprobe:1.0";
+  prefix hanicprobe;
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization "CESNET, z.s.p.o.";
+  contact
+    "rkrejci@cesnet.cz";
+  description
+    "Module specifying configuration model and RPC operations for
+     network traffic flow probe using HANIC.";
+
+  revision 2012-04-13 {
+    description
+      "Initial revision";
+  }
+
+  typedef decimal {
+    type string {
+      pattern "[0-9]+(\\.[0-9]+)?";
+    }
+    description
+      "Simple decimal numbers type definition";
+  }
+
+  container hanic-probes {
+    list hanic-probe {
+      key "combo-card-device";
+      leaf combo-card-device {
+        type string;
+        description
+          "Combo card device file. Connects the flow probe with the specific Combo card.";
+      }
+      container netcope {
+        list ibuf {
+          key "id";
+          leaf id {
+            type uint8;
+            description
+              "IBUF ID.";
+          }
+          leaf enabled {
+            config false;
+            type boolean;
+            default "true";
+            description
+              "Input buffer state.";
+          }
+          leaf pacodag-overflow-occurred {
+            config false;
+            type boolean;
+            description
+              "PACODAG FIFO overflow occurred.";
+          }
+          leaf dfifo-overflow-occurred {
+            config false;
+            type boolean;
+            description
+              "DFIFO overflow occured.";
+          }
+          leaf total-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Total number of packets arrived. Correct? (Viktor)";
+          }
+          leaf received-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of packets received.";
+          }
+          leaf discarded-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of packets discarded.";
+          }
+          leaf buffer-overflow {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of packets rejected because of the full buffer.";
+          }
+          leaf error-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of ivalid packets arrived.";
+          }
+          container error-checks {
+            leaf gmii {
+              config false;
+              type boolean;
+              description
+                "GMII error detection enabled.";
+            }
+            leaf crc {
+              config true;
+              type boolean;
+              default "true";
+              description
+                "CRC check enabled.";
+            }
+            leaf minimum-frame-length {
+              config false;
+              type boolean;
+              description
+                "Minimum frame length check enabled.";
+            }
+            leaf mtu-frame-length {
+              config false;
+              type boolean;
+              description
+                "Maximum frame length check enabled.";
+            }
+            leaf mac-address {
+              config false;
+              type boolean;
+              default "true";
+              description
+                "MAC address (according to mac-mode) check enabled.";
+            }
+          }
+          leaf minimum-frame-length {
+            when "./error-checks/minimum-frame-length='true'";
+            config true;
+            type uint32;
+            default "64";
+            description
+              "Minimum frame length value. If not set, the minimum frame length
+               check is disabled.";
+          }
+          leaf mtu-frame-length {
+            when "./error-checks/mtu-frame-length='true'";
+            config true;
+            type uint32 {
+              range "0..16352";
+            }
+            description
+              "Maximum frame length set. If not set, the MTU frame length check
+               is disabled.";
+          }
+          container mac-address {
+            when "./error-checks/mac-address='true'";
+            config false;
+            description
+              "MAC addresses list.";
+            leaf-list value {
+              type yang:mac-address;
+              max-elements "16";
+              description
+                "MAC address.";
+            }
+          }
+          leaf mac-mode {
+            when "./error-checks/mac-address='true'";
+            config false;
+            /* default promisc; */
+            type enumeration {
+              enum "promisc";
+              enum "mac-only";
+              enum "mac-with-broadcast";
+              enum "non-promisc";
+            }
+            description
+              "Interface mode. Promisc receives all packets. Mac-only receives 
+               only packets for set MAC addresses. Mac-with-broadcast receives 
+               packets for set MAC addresses as well as broadcasted packets. 
+               Non-promisc mode receives packets for set MAC addresses, 
+               broadcasted packets and multicasted packets.";
+          }
+        }
+        list obuf {
+          key "id";
+          leaf id {
+            type uint8;
+            description
+              "OBUF ID.";
+          }
+          leaf enabled {
+            config true;
+            type boolean;
+            default "true";
+            description
+              "Output buffer state.";
+          }
+          leaf total-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Total number of packets attempted to transmit.";
+          }
+          leaf transmited-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of packets actually transmited.";
+          }
+          leaf error-packets {
+            config false;
+            type yang:zero-based-counter64;
+            description
+              "Number of ivalid packets attempted to transmit.";
+          }
+          leaf repeater-mode {
+            config true;
+            type enumeration {
+              enum "obuf";
+              enum "repeater";
+              enum "idle";
+              enum "off"; /* disable TX on transceiver */
+            }
+            default "obuf";
+            description
+              "Port repeater status. In obuf state, interface transmits normal
+               output data controlled by OBUF. In repeater mode, the received
+               traffic is retransmitted. In idle mode, any output is disabled.
+               The last off mode turns off the transceiver.";
+          }
+        }
+      }
+      list hanic {
+	key "id";
+	leaf id {
+	  type uint8;
+	  description "hanic ID";
+	}
+        container hash-fields {
+          description
+            "List of fields to use as hash input.";
+          leaf IPVersion {
+            type boolean;
+            default "false";
+          }
+          leaf SrcIP {
+            type boolean;
+            default "true";
+          }
+          leaf DstIP {
+            type boolean;
+            default "true";
+          }
+          leaf L4Protocol {
+            type boolean;
+            default "false";
+          }
+          leaf SrcPort {
+            type boolean;
+            default "false";
+          }
+          leaf DstPort {
+            type boolean;
+            default "false";
+          }
+        }
+        leaf sampling {
+          type uint8 {
+            range "1..16";
+          }
+          default "1";
+          description
+            "Sampling unit ratio.";
+        }
+        leaf round-robin-enabled {
+          config false;
+          type boolean;
+          description
+            "Use Round Robin packet distribution instead hash based.";
+        }
+        leaf unified-header-enabled {
+          config false;
+          type boolean;
+          description
+            "Forward packets in unified header format.";
+        }
+        container hash-filter {
+          leaf low {
+            type uint16;
+            description
+              "Minimal accepted hash value for hash-based sampling.";
+          }
+          leaf high {
+            type uint16;
+            description
+              "Maximal accepted hash value for hash-based sampling.";
+          }
+        }
+        leaf opposite-direction-enable {
+          type boolean;
+          default "false";
+          description
+            "Compute hash for opposite direction packet (swap Src and Dst IP).";
+        }
+        leaf filtered-packets {
+          /* discarded packets in hanicctl -p */
+          config false;
+          type yang:zero-based-counter64;
+          description
+            "Number of filtered out and sampled packets.";
+        }
+        container dma-discarded-packets {
+          config false;
+          description
+            "Number of discarded packets for the specific DMA channel.";
+          leaf-list value {
+            type yang:zero-based-counter64;
+          }
+        }
+      }
+      container exporters {
+        list exporter {
+          key "id host port";
+          leaf id {
+            type uint8;
+            description
+              "Exporter identification sent to the collector.";
+          }
+          leaf host {
+            type string;
+            description
+              "Hostname (or IPv4/6 address) of the collector where to send data.";
+          }
+          leaf port {
+            type uint16;
+            description
+              "Port of the collector where to send data.";
+          }
+          leaf timeout_active {
+            type uint16 {
+              range "0..1200";
+            }
+            default "180";
+            units "seconds";
+          }
+          leaf timeout_inactive {
+            type uint8 {
+              range "0..60";
+            }
+            default "10";
+            units "seconds";
+          }
+          leaf cpu_mask {
+            type uint8;
+            default "1";
+            description
+              "Mask of allowed CPUs.";
+          }
+          leaf flowcache_size {
+            type uint8 {
+              range "4..30";
+            }
+            default "19";
+            description
+              "Queue (flowcache) size in power of 2.";
+          }
+          leaf protocol_export {
+            type enumeration {
+              enum "NetFlow v5";
+              enum "NetFlow v9";
+              enum "IPFIX";
+            }
+            default "NetFlow v9";
+            description
+              "Flow information export protocol.";
+          }
+          leaf protocol_ip {
+            type enumeration {
+              enum "IPv4";
+              enum "IPv6";
+            }
+            default "IPv4";
+            description
+              "Force IP protocol when connecting to the collector.";
+          }
+          leaf protocol_transport {
+            when "./protocol_export='IPFIX'";
+            type enumeration {
+              enum "UDP";
+              enum "TCP";
+              enum "SCTP";
+            }
+            default "TCP";
+            description
+              "Transport protocol for the IPFIX protocol.";
+          }
+        }
+      }
+    }
+  }
+  rpc reset-counters {
+    description
+      "Reset all counters of the specified probe.";
+    input {
+      leaf combo-card-device {
+        type string;
+        description
+          "Combo card device file. Connects the operation with the specific
+           hanic-probe.";
+      }
+    }
+  }
+  rpc restart-exporters {
+    description
+      "Restart all exporters of the specified probe.";
+    input {
+      leaf combo-card-device {
+        type string;
+        description
+          "Combo card device file. Connects the operation with the specific
+           hanic-probe.";
+      }
+    }
+  }
+}

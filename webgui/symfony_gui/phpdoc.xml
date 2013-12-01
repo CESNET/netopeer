@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<phpdoc>
+	<title><![CDATA[NetopeerWebGUI]]></title>
+	<parser>
+		<target>www/web/bundles/netopeer/docu/</target>
+		<markers>
+			<item>TODO</item>
+			<item>FIXME</item>
+		</markers>
+		<extensions>
+			<extension>php</extension>
+			<extension>php3</extension>
+			<extension>phtml</extension>
+		</extensions>
+	</parser>
+	<transformer>
+        <target>www/web/bundles/netopeer/docu/</target>
+    </transformer>
+    <transformations>
+        <template name="responsive" />
+    </transformations>
+	<files>
+		<directory>./www/src/FIT/NetopeerBundle</directory>
+		<!-- <directory>./www/vendor</directory> -->
+		<ignore>./www/src/FIT/NetopeerBundle/Models/XMLoperations.php</ignore>
+	</files>
+</phpdoc>

@@ -1,0 +1,17 @@
+/app/logs/*
+/app/logs/dev.log
+/app/*.db
+/bin/doctrine
+/bin/doctrine.php
+/src/FIT/NetopeerBundle/Resources/public/.sass-cache/
+/src/FIT/NetopeerBundle/Data/models/*
+/src/winzou/*
+/vendor/*
+/web/phpinfo.php
+/web/adminer.php
+/web/css/*
+/web/js/*
+/web/bundles/*
+.idea
+/src/FIT/NetopeerBundle/Entity/*~
+composer.lock

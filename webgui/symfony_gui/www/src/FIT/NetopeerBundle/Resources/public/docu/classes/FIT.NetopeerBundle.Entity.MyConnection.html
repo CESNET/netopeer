@@ -1,0 +1,459 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+<meta charset="utf-8">
+<title>NetconfWebGUI » \FIT\NetopeerBundle\Entity\MyConnection</title>
+<meta name="author" content="Mike van Riel">
+<meta name="description" content="">
+<link href="../css/template.css" rel="stylesheet" media="all">
+<script src="../js/jquery-1.7.1.min.js" type="text/javascript"></script><script src="../js/jquery-ui-1.8.2.custom.min.js" type="text/javascript"></script><script src="../js/jquery.mousewheel.min.js" type="text/javascript"></script><script src="../js/bootstrap.js" type="text/javascript"></script><script src="../js/template.js" type="text/javascript"></script><script src="../js/prettify/prettify.min.js" type="text/javascript"></script><link rel="shortcut icon" href="../img/favicon.ico">
+<link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="72x72" href="../img/apple-touch-icon-72x72.png">
+<link rel="apple-touch-icon" sizes="114x114" href="../img/apple-touch-icon-114x114.png">
+</head>
+<body>
+<div class="navbar navbar-fixed-top">
+<div class="navbar-inner"><div class="container">
+<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse"><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span></a><a class="brand" href="../index.html">NetconfWebGUI</a><div class="nav-collapse"><ul class="nav">
+<li class="dropdown">
+<a href="#api" class="dropdown-toggle" data-toggle="dropdown">
+                                    API Documentation <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a>Namespaces</a></li>
+<li><a href="../namespaces/FIT.html"><i class="icon-th"></i> FIT</a></li>
+</ul>
+</li>
+<li class="dropdown" id="charts-menu">
+<a href="#charts" class="dropdown-toggle" data-toggle="dropdown">
+                                    Charts <b class="caret"></b></a><ul class="dropdown-menu"><li><a href="../graph_class.html"><i class="icon-list-alt"></i> Class hierarchy diagram</a></li></ul>
+</li>
+<li class="dropdown" id="reports-menu">
+<a href="#reports" class="dropdown-toggle" data-toggle="dropdown">
+                                    Reports <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a href="../errors.html"><i class="icon-remove-sign"></i> Errors 
+                <span class="label label-info">16</span></a></li>
+<li><a href="../markers.html"><i class="icon-map-marker"></i> Markers 
+                <ul><li>todo 
+                <span class="label label-info">6</span>
+</li></ul></a></li>
+<li><a href="../deprecated.html"><i class="icon-stop"></i> Deprecated elements 
+                <span class="label label-info">0</span></a></li>
+</ul>
+</li>
+</ul></div>
+</div></div>
+<div class="go_to_top"><a href="#___" style="color: inherit">Back to top  <i class="icon-upload icon-white"></i></a></div>
+</div>
+<div id="___" class="container">
+<noscript><div class="alert alert-warning">
+                            Javascript is disabled; several features are only available
+                            if Javascript is enabled.
+                        </div></noscript>
+<div class="row">
+<div class="span4">
+<span class="btn-group visibility" data-toggle="buttons-checkbox"><button class="btn public active" title="Show public elements">Public</button><button class="btn protected" title="Show protected elements">Protected</button><button class="btn private" title="Show private elements">Private</button><button class="btn inherited active" title="Show inherited elements">Inherited</button></span><div class="btn-group view pull-right" data-toggle="buttons-radio">
+<button class="btn details" title="Show descriptions and method names"><i class="icon-list"></i></button><button class="btn simple" title="Show only method names"><i class="icon-align-justify"></i></button>
+</div>
+<ul class="side-nav nav nav-list">
+<li class="nav-header">
+<i class="icon-custom icon-method"></i> Methods
+                    <ul>
+<li class="method public "><a href="#method_getHash" title="getHash :: Get hash"><span class="description">Get hash</span><pre>getHash()</pre></a></li>
+<li class="method public "><a href="#method_getHostname" title="getHostname :: Get hostname"><span class="description">Get hostname</span><pre>getHostname()</pre></a></li>
+<li class="method public "><a href="#method_getId" title="getId :: Get id"><span class="description">Get id</span><pre>getId()</pre></a></li>
+<li class="method public "><a href="#method_getModelName" title="getModelName :: Get modelName"><span class="description">Get modelName</span><pre>getModelName()</pre></a></li>
+<li class="method public "><a href="#method_getModelVersion" title="getModelVersion :: Get modelVersion"><span class="description">Get modelVersion</span><pre>getModelVersion()</pre></a></li>
+<li class="method public "><a href="#method_getNamespace" title="getNamespace :: Get namespace"><span class="description">Get namespace</span><pre>getNamespace()</pre></a></li>
+<li class="method public "><a href="#method_getPort" title="getPort :: Get port"><span class="description">Get port</span><pre>getPort()</pre></a></li>
+<li class="method public "><a href="#method_getRootElem" title="getRootElem :: Get rootElem"><span class="description">Get rootElem</span><pre>getRootElem()</pre></a></li>
+<li class="method public "><a href="#method_getUsername" title="getUsername :: Get username"><span class="description">Get username</span><pre>getUsername()</pre></a></li>
+<li class="method public "><a href="#method_setHash" title="setHash :: Set hash"><span class="description">Set hash</span><pre>setHash()</pre></a></li>
+<li class="method public "><a href="#method_setHostname" title="setHostname :: Set hostname"><span class="description">Set hostname</span><pre>setHostname()</pre></a></li>
+<li class="method public "><a href="#method_setModelName" title="setModelName :: Set modelName"><span class="description">Set modelName</span><pre>setModelName()</pre></a></li>
+<li class="method public "><a href="#method_setModelVersion" title="setModelVersion :: Set modelVersion"><span class="description">Set modelVersion</span><pre>setModelVersion()</pre></a></li>
+<li class="method public "><a href="#method_setNamespace" title="setNamespace :: Set namespace"><span class="description">Set namespace</span><pre>setNamespace()</pre></a></li>
+<li class="method public "><a href="#method_setPort" title="setPort :: Set port"><span class="description">Set port</span><pre>setPort()</pre></a></li>
+<li class="method public "><a href="#method_setRootElem" title="setRootElem :: Set rootElem"><span class="description">Set rootElem</span><pre>setRootElem()</pre></a></li>
+<li class="method public "><a href="#method_setUsername" title="setUsername :: Set username"><span class="description">Set username</span><pre>setUsername()</pre></a></li>
+</ul>
+</li>
+<li class="nav-header">
+<i class="icon-custom icon-property"></i> Properties
+                    <ul></ul>
+</li>
+<li class="nav-header protected">» Protected
+                    <ul>
+<li class="property protected "><a href="#property_hostname" title="$hostname :: Hostname of connection"><span class="description"></span><pre>$hostname</pre></a></li>
+<li class="property protected "><a href="#property_modelName" title="$modelName :: Name of the model"><span class="description"></span><pre>$modelName</pre></a></li>
+<li class="property protected "><a href="#property_modelVersion" title="$modelVersion :: Version of the model"><span class="description"></span><pre>$modelVersion</pre></a></li>
+<li class="property protected "><a href="#property_namespace" title="$namespace :: Namespace of the model"><span class="description"></span><pre>$namespace</pre></a></li>
+<li class="property protected "><a href="#property_port" title="$port :: Port of connection"><span class="description"></span><pre>$port</pre></a></li>
+<li class="property protected "><a href="#property_rootElem" title="$rootElem :: Root element in the model"><span class="description"></span><pre>$rootElem</pre></a></li>
+<li class="property protected "><a href="#property_username" title="$username :: Username of connection"><span class="description"></span><pre>$username</pre></a></li>
+</ul>
+</li>
+<li class="nav-header private">» Private
+                    <ul>
+<li class="property private "><a href="#property_hash" title="$hash :: Unique identifier - hash as name of folder in /Data/"><span class="description"></span><pre>$hash</pre></a></li>
+<li class="property private "><a href="#property_id" title="$id :: Unique numeric identifier"><span class="description"></span><pre>$id</pre></a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="span8">
+<a id="\FIT\NetopeerBundle\Entity\MyConnection"></a><ul class="breadcrumb">
+<li>
+<a href="../index.html"><i class="icon-custom icon-class"></i></a><span class="divider">\</span>
+</li>
+<li><a href="../namespaces/FIT.html">FIT</a></li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.html">NetopeerBundle</a>
+</li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.Entity.html">Entity</a>
+</li>
+<li class="active">
+<span class="divider">\</span><a href="../classes/FIT.NetopeerBundle.Entity.MyConnection.html">MyConnection</a>
+</li>
+</ul>
+<div class="element class">
+<p class="short_description">Entity of connected device</p>
+<div class="details">
+<div class="long_description"><p>FIT\NetopeerBundle\Entity\MyConnection</p></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\Table</th>
+<td></td>
+</tr>
+<tr>
+<th>ORM\Entity</th>
+<td>Entity</td>
+</tr>
+</table>
+<h3>
+<i class="icon-custom icon-method"></i> Methods</h3>
+<a id="method_getHash"></a><div class="element clickable method public method_getHash" data-toggle="collapse" data-target=".method_getHash .collapse">
+<h2>Get hash</h2>
+<pre>getHash() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_getHostname"></a><div class="element clickable method public method_getHostname" data-toggle="collapse" data-target=".method_getHostname .collapse">
+<h2>Get hostname</h2>
+<pre>getHostname() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_getId"></a><div class="element clickable method public method_getId" data-toggle="collapse" data-target=".method_getId .collapse">
+<h2>Get id</h2>
+<pre>getId() : integer</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>integer</code></div>
+</div></div>
+</div>
+<a id="method_getModelName"></a><div class="element clickable method public method_getModelName" data-toggle="collapse" data-target=".method_getModelName .collapse">
+<h2>Get modelName</h2>
+<pre>getModelName() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_getModelVersion"></a><div class="element clickable method public method_getModelVersion" data-toggle="collapse" data-target=".method_getModelVersion .collapse">
+<h2>Get modelVersion</h2>
+<pre>getModelVersion() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_getNamespace"></a><div class="element clickable method public method_getNamespace" data-toggle="collapse" data-target=".method_getNamespace .collapse">
+<h2>Get namespace</h2>
+<pre>getNamespace() : \FIT\NetopeerBundle\Entity\text</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>\FIT\NetopeerBundle\Entity\text</code></div>
+</div></div>
+</div>
+<a id="method_getPort"></a><div class="element clickable method public method_getPort" data-toggle="collapse" data-target=".method_getPort .collapse">
+<h2>Get port</h2>
+<pre>getPort() : integer</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>integer</code></div>
+</div></div>
+</div>
+<a id="method_getRootElem"></a><div class="element clickable method public method_getRootElem" data-toggle="collapse" data-target=".method_getRootElem .collapse">
+<h2>Get rootElem</h2>
+<pre>getRootElem() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_getUsername"></a><div class="element clickable method public method_getUsername" data-toggle="collapse" data-target=".method_getUsername .collapse">
+<h2>Get username</h2>
+<pre>getUsername() : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>string</code></div>
+</div></div>
+</div>
+<a id="method_setHash"></a><div class="element clickable method public method_setHash" data-toggle="collapse" data-target=".method_setHash .collapse">
+<h2>Set hash</h2>
+<pre>setHash(string $hash) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$hash</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setHostname"></a><div class="element clickable method public method_setHostname" data-toggle="collapse" data-target=".method_setHostname .collapse">
+<h2>Set hostname</h2>
+<pre>setHostname(string $hostname) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$hostname</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setModelName"></a><div class="element clickable method public method_setModelName" data-toggle="collapse" data-target=".method_setModelName .collapse">
+<h2>Set modelName</h2>
+<pre>setModelName(string $modelName) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$modelName</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setModelVersion"></a><div class="element clickable method public method_setModelVersion" data-toggle="collapse" data-target=".method_setModelVersion .collapse">
+<h2>Set modelVersion</h2>
+<pre>setModelVersion(string $modelVersion) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$modelVersion</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setNamespace"></a><div class="element clickable method public method_setNamespace" data-toggle="collapse" data-target=".method_setNamespace .collapse">
+<h2>Set namespace</h2>
+<pre>setNamespace(\FIT\NetopeerBundle\Entity\text $namespace) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$namespace</h4>
+<code>\FIT\NetopeerBundle\Entity\text</code>
+</div>
+</div></div>
+</div>
+<a id="method_setPort"></a><div class="element clickable method public method_setPort" data-toggle="collapse" data-target=".method_setPort .collapse">
+<h2>Set port</h2>
+<pre>setPort(integer $port) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$port</h4>
+<code>integer</code>
+</div>
+</div></div>
+</div>
+<a id="method_setRootElem"></a><div class="element clickable method public method_setRootElem" data-toggle="collapse" data-target=".method_setRootElem .collapse">
+<h2>Set rootElem</h2>
+<pre>setRootElem(string $rootElem) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$rootElem</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setUsername"></a><div class="element clickable method public method_setUsername" data-toggle="collapse" data-target=".method_setUsername .collapse">
+<h2>Set username</h2>
+<pre>setUsername(string $username) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$username</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<h3>
+<i class="icon-custom icon-property"></i> Properties</h3>
+<a id="property_hostname"> </a><div class="element clickable property protected property_hostname" data-toggle="collapse" data-target=".property_hostname .collapse">
+<h2></h2>
+<pre>$hostname </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", length=255)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_modelName"> </a><div class="element clickable property protected property_modelName" data-toggle="collapse" data-target=".property_modelName .collapse">
+<h2></h2>
+<pre>$modelName </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", length=255)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_modelVersion"> </a><div class="element clickable property protected property_modelVersion" data-toggle="collapse" data-target=".property_modelVersion .collapse">
+<h2></h2>
+<pre>$modelVersion </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", length=10)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_namespace"> </a><div class="element clickable property protected property_namespace" data-toggle="collapse" data-target=".property_namespace .collapse">
+<h2></h2>
+<pre>$namespace </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="text", length=255)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_port"> </a><div class="element clickable property protected property_port" data-toggle="collapse" data-target=".property_port .collapse">
+<h2></h2>
+<pre>$port </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="integer")</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_rootElem"> </a><div class="element clickable property protected property_rootElem" data-toggle="collapse" data-target=".property_rootElem .collapse">
+<h2></h2>
+<pre>$rootElem </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", length=50)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_username"> </a><div class="element clickable property protected property_username" data-toggle="collapse" data-target=".property_username .collapse">
+<h2></h2>
+<pre>$username </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string")</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_hash"> </a><div class="element clickable property private property_hash" data-toggle="collapse" data-target=".property_hash .collapse">
+<h2></h2>
+<pre>$hash </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(name="hash", type="string", unique=true)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_id"> </a><div class="element clickable property private property_id" data-toggle="collapse" data-target=".property_id .collapse">
+<h2></h2>
+<pre>$id : integer</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\Column</th>
+<td>(name="id", type="integer")</td>
+</tr>
+<tr>
+<th>ORM\Id</th>
+<td>Id</td>
+</tr>
+<tr>
+<th>ORM\GeneratedValue</th>
+<td>strategy="AUTO"</td>
+</tr>
+</table>
+</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row"><footer class="span12">
+            Template is built using <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap 2</a> and icons provided by <a href="http://glyphicons.com/">Glyphicons</a>.<br>
+            Documentation is powered by <a href="http://www.phpdoc.org/">phpDocumentor 2.0.0a12</a> and<br>
+            generated on 2013-02-28T19:51:27+01:00.<br></footer></div>
+</div>
+</body>
+</html>

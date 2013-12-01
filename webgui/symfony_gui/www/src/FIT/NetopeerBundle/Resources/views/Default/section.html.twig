@@ -1,0 +1,178 @@
+{#
+@author David Alexa <alexa.david@me.com>
+
+Copyright (C) 2012-2013 CESNET
+
+LICENSE TERMS
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in
+  the documentation and/or other materials provided with the
+  distribution.
+3. Neither the name of the Company nor the names of its contributors
+  may be used to endorse or promote products derived from this
+  software without specific prior written permission.
+
+ALTERNATIVELY, provided that this notice is retained in full, this
+product may be distributed under the terms of the GNU General Public
+License (GPL) version 2 or later, in which case the provisions
+of the GPL apply INSTEAD OF those given above.
+
+This software is provided ``as is'', and any express or implied
+warranties, including, but not limited to, the implied warranties of
+merchantability and fitness for a particular purpose are disclaimed.
+In no event shall the company or contributors be liable for any
+direct, indirect, incidental, special, exemplary, or consequential
+damages (including, but not limited to, procurement of substitute
+goods or services; loss of use, data, or profits; or business
+interruption) however caused and on any theory of liability, whether
+in contract, strict liability, or tort (including negligence or
+otherwise) arising in any way out of the use of this software, even
+if advised of the possibility of such damage.
+#}
+
+{% extends 'FITNetopeerBundle::layout.html.twig' %}
+{% block title %}Section {% if sectionName is defined and not(sectionName is empty) %}- {{sectionName}}{% endif %}{% endblock title %}
+
+{% block topPart %}
+	{% if (hideColumnControl is not defined) or (hideColumnControl is defined and hideColumnControl != true) %}
+		<div class="top-part">
+			<strong>Show as:</strong>
+			<a href="{{ path('changeColumnLayout', {"newValue": "true"}) }}" class="ajaxLink" data-disable-history="true">Single column</a> |
+			<a href="{{ path('changeColumnLayout', {"newValue": "false"}) }}" class="ajaxLink" data-disable-history="true">Double column</a>
+		</div>
+	{% endif %}
+{% endblock topPart %}
+
+{% set stateDefined = 'false' %}
+
+{% block state %}
+{% block singleContent %}
+	{% set stateDefined = 'true' %}
+	{% if configSingleContent is defined %}
+		{{ configSingleContent|raw }}
+	{% else %}
+		<h1 class="left">{% if stateSectionTitle is defined %}{{stateSectionTitle}}{% else %}Config &amp; State data{% endif %}</h1>
+		{% if stateArr is defined and not(stateArr is empty) %}
+			{% if formConfig is defined %}
+				{% block filterConfig %}
+					<form action="" method="post" {{ form_enctype(formConfig) }} class="filter left" name="formConfig" data-disable-active-link="true">
+						{{ form_widget(formConfig) }}
+				    <input type="submit" value="Change" class="button small grey left" />
+						<script type="text/javascript">
+							$('#form_source').change(function () {
+								$(this).closest('form').submit();
+							});
+							$(formConfig).find('input[type=submit]').hide();
+						</script>
+					</form>
+				{% endblock filterConfig %}
+
+				<div id="block--sourceValidation">
+				{% block sourceValidation %}
+					{# duplicated in config form filter !#}
+					<a href="{{ path('validateSource', {"key": app.request.get('key'), "target": dataStore, "module": app.request.get('module')}) }}" class="ajaxLink" data-disable-history="true">validate</a>
+					{% if isSourceValid is defined %}
+						<span class="source-validation bubble {{ (isSourceValid) ? 'green' : 'red' }}">{{ (isSourceValid) ? 'valid' : 'invalid' }}</span>
+					{% endif %}
+				{% endblock %}
+				</div>
+			{% endif %}
+			{% if formCopyConfig is defined %}
+			<form action="" method="post" {{ form_enctype(formCopyConfig) }} class="filter left" name="formCopyConfig">
+				{{ form_widget(formCopyConfig) }}
+			    <input type="submit" value="Copy" class="button small grey left" />
+			</form>
+			{% endif %}
+
+			<hr class="cleaner" />
+			<form action="" method="post" name="formConfigData" data-disable-history="true">
+				<div class="root">
+					{% set iterator = 1 %}
+					{% for key, element in stateArr %}
+						{% include 'FITNetopeerBundle:State:parent.html.twig' with {'element': stateArr.current(), 'level': 0, 'xpath': '/*', 'iterator': iterator} %}
+						{% set iterator = iterator + 1 %}
+					{% endfor %}
+
+					{% if (ncFeatures is defined) and (ncFeatures["nc_feature_writablerunning"] is defined) %}
+						{% if (hideStateSubmitButton is not defined) or hideStateSubmitButton != true %}
+							<input type="submit" value="Save config" />
+						{% endif %}
+					{% endif %}
+				</div>
+			</form>
+		{% else %}
+			<div class="alert info">
+				No results found.
+			</div>
+		{% endif %}
+	{% endif %}
+{% endblock singleContent %}
+{% endblock state %}
+
+{% block config %}
+	<h1 class="left">{% if configSectionTitle is defined %}{{configSectionTitle}}{% else %}Config data only{% endif %}</h1>
+
+	{% if showConfigFilter is defined and showConfigFilter == true %}
+		{{ block('filterConfig') }}
+
+		<div id="block--sourceValidation">
+			{{ block('sourceValidation') }}
+		</div>
+
+		<form action="" method="post" {{ form_enctype(formCopyConfig) }} class="filter left" name="formCopyConfig">
+			{{ form_widget(formCopyConfig) }}
+			<input type="submit" value="Copy" class="button small grey left" />
+		</form>
+	{% endif %}
+
+	<hr class="cleaner" />
+	{% if configArr is defined and not(configArr is empty) %}
+		<form action="" method="post" name="formConfigData" data-disable-history="true">
+			<div class="root">
+				{% set iterator = 1 %}
+				{% for key, element in configArr %}
+					{% include 'FITNetopeerBundle:Config:parent.html.twig' with {'element': configArr.current(), 'level': 0, 'xpath': '/*', 'iterator': iterator} %}
+					{% set iterator = iterator + 1 %}
+				{% endfor %}
+				{% if (ncFeatures is defined) and (ncFeatures["nc_feature_writablerunning"] is defined) %}
+					{# if (hideConfigSubmitButton is not defined) or hideConfigSubmitButton != true #}
+						<input type="submit" value="Save config" />
+					{# endif #}
+				{% endif %}
+			</div>
+		</form>
+	{% else %}
+		<div class="alert info">
+			No results found.
+		</div>
+	{% endif %}
+{% endblock config %}
+
+{% block notifications %}
+	{% if ncFeatures is defined and ncFeatures["nc_feature_notification"] is defined %}
+		{% if (app.request.get('key') is defined) and (not (app.request.get('key') is empty)) and (lockedConn is defined) %}
+			<script type="text/javascript">
+				var lookupIpUrl = '{{ path('lookupIp', {"ip": "REPLACE_IP"}) }}';
+				var socket = getNotifWebSocket({{ app.request.get('key') }}, "{% if sessionHash is defined %}{{sessionHash}}{% endif %}", "ws://{{ app.request.host }}:8080/");
+				if ($(notifOutput).hasClass('hidden')) {
+					$(notifOutput).removeClass('hidden');
+					notifResizable();
+				}
+			</script>
+		{% endif %}
+		<div class="notif-cover">
+			<div class="notif-history-cover"></div>
+			{#<a href="{{ path("notificationsHistoryTo", {"connectedDeviceId": app.request.get('key'), "from": '-10', 'to': '0'} ) }}" data-key="{{ app.request.get('key') }}" class="button grey right" id="js-get-notif-history" title="Get notifications from history">Load history</a>#}
+			{# TODO: show, when notifications history wont cause deadlock #}
+		</div>
+		<div id="ipModalCover" class="modal hide fade" tabindex="-1" role="dialog"></div>
+	{% endif %}
+
+{% endblock notifications %}
+
