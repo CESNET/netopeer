@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([netconfwebgui], [0.0.0], [tmc@cesnet.cz])
+AC_INIT([netconfwebgui], [0.13.0], [tmc@cesnet.cz])
 AM_INIT_AUTOMAKE([silent-rules tar-pax])
 
 USERNAME=`git config --get user.name`
