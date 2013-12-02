@@ -856,6 +856,11 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 		count = 0;
 		cur = node->parent->children;
 		while (cur != NULL) {
+			/* We are working with an XML, children can be in any order and we want only the "search" nodes */
+			if (strcmp(cur->name, "search") != 0) {
+				cur = cur->next;
+				continue;
+			}
 			if (cur == node) {
 				found = true;
 			}
