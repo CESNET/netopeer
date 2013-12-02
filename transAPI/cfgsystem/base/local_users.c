@@ -403,6 +403,7 @@ int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_or
 		asprintf(msg, "SSHD PAM configuration file was not found in \"%s\".", PAM_DIR_PATH);
 		goto error;
 	}
+	free(path);
 
 	i = 1;
 	while (1) {
