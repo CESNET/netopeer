@@ -300,7 +300,7 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) 
 			(*key)[key_count] = malloc(sizeof(struct ssh_key));
 			cur_key = (*key)[key_count];
 
-			cur_key->name = NULL;
+			cur_key->name = strdup(ent->d_name);
 			asprintf(&tmp, "%s/%s", path, ent->d_name);
 			file = fopen(tmp, "r");
 

@@ -364,9 +364,8 @@ int transapi_init(xmlDocPtr * running)
 			cur = xmlNewChild(cur, NULL, BAD_CAST "ssh-key", NULL);
 
 			/* name */
-			asprintf(&tmp, "ssh-key%d", index+1);
-			xmlNewChild(cur, NULL, "name", tmp);
-			free(tmp);
+			xmlNewChild(cur, NULL, "name", key[index]->name);
+			free(key[index]->name);
 
 			/* algorithm */
 			xmlNewChild(cur, NULL, "algorithm", key[index]->alg);
