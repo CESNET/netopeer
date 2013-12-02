@@ -47,7 +47,9 @@ bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg
 	cur = search_node;
 	while (cur != NULL) {
 		cur = cur->next;
-		++new_domain_count;
+		if (strcmp(cur->name, "search") == 0) {
+			++new_domain_count;
+		}
 	}
 
 	/* Get the configuration-file domain count */
@@ -324,7 +326,9 @@ bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char**
 	cur = server_node->parent->children;
 	while (cur != NULL) {
 		cur = cur->next;
-		++new_nameserver_count;
+		if (strcmp(cur->name, "server") == 0) {
+			++new_nameserver_count;
+		}
 	}
 
 	/* Get the configuration-file nameserver count */
