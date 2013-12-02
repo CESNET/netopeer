@@ -449,6 +449,10 @@ nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
 				nc_rpc_get_target(rpc) == NC_DATASTORE_RUNNING &&
 				nc_reply_get_type(reply) == NC_REPLY_OK) {
 			for (i = 0; ids[i] != ((ncds_id) -1); i++) {
+				if (ids[i] == 0) {
+					/* skip libnetconf internal datastores */
+					continue;
+				}
 				if ((dm = server_modules_get_by_repoid(ids[i])) == NULL) {
 					nc_verb_verbose("Module with datastore ID %d not found.", ids[i]);
 				} else if (dm->transapi == 0 && dm->execute_operation) { /* old style module */
