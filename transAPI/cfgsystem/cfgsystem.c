@@ -140,7 +140,7 @@ int transapi_init(xmlDocPtr * running)
 	int ret, index, auth_order_len;
 	bool iburst, prefer;
 	char* udp_address, *domain, *timeout, *attempts, *hostname;
-	char** auth_order;
+	char** auth_order = NULL;
 	struct passwd* pwd;
 	struct spwd* spwd;
 	struct ssh_key** key;
