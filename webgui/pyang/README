@@ -1,0 +1,26 @@
+-* About *-
+The set of these plug-ins can be used to generate
+processed data model for netconfwebgui.
+The output is a hierarchical directory structure
+with files containing filters and model parts.
+
+-* Prerequisites: *-
+Installed pyang version 1.2 on the system.
+
+-* Installation of pyang(1) plug-ins: *-
+Copy plug-ins source codes into pyang(1) plugins directory:
+
+# cp {nmp,resptempl,wyin}.py /usr/lib/python2.6/site-packages/pyang/plugins
+
+-* Usage *-
+The simplifies method is to use nmp.sh script.
+Script accepts all model formats that pyang(1) supports.
+
+To get help, execute nmp.sh without arguments.
+
+Example:
+Read model ietf-netconf-monitoring from the current directory
+and generate output directories hierarchy in
+the /tmp/models directory:
+$ ./nmp.sh -i ietf-netconf-monitoring.yang -o /tmp/models
+

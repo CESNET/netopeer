@@ -1,0 +1,752 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+<meta charset="utf-8">
+<title>NetopeerWebGUI » \FIT\NetopeerBundle\Controller\DefaultController</title>
+<meta name="author" content="Mike van Riel">
+<meta name="description" content="">
+<link href="../css/template.css" rel="stylesheet" media="all">
+<script src="../js/jquery-1.7.1.min.js" type="text/javascript"></script><script src="../js/jquery-ui-1.8.2.custom.min.js" type="text/javascript"></script><script src="../js/jquery.mousewheel.min.js" type="text/javascript"></script><script src="../js/bootstrap.js" type="text/javascript"></script><script src="../js/template.js" type="text/javascript"></script><script src="../js/prettify/prettify.min.js" type="text/javascript"></script><link rel="shortcut icon" href="../img/favicon.ico">
+<link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="72x72" href="../img/apple-touch-icon-72x72.png">
+<link rel="apple-touch-icon" sizes="114x114" href="../img/apple-touch-icon-114x114.png">
+</head>
+<body>
+<div class="navbar navbar-fixed-top">
+<div class="navbar-inner"><div class="container">
+<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse"><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span></a><a class="brand" href="../index.html">NetopeerWebGUI</a><div class="nav-collapse"><ul class="nav">
+<li class="dropdown">
+<a href="#api" class="dropdown-toggle" data-toggle="dropdown">
+                                    API Documentation <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a>Namespaces</a></li>
+<li><a href="../namespaces/FIT.html"><i class="icon-th"></i> FIT</a></li>
+<li><a href="../namespaces/global.html"><i class="icon-th"></i> global</a></li>
+</ul>
+</li>
+<li class="dropdown" id="charts-menu">
+<a href="#charts" class="dropdown-toggle" data-toggle="dropdown">
+                                    Charts <b class="caret"></b></a><ul class="dropdown-menu"><li><a href="../graph_class.html"><i class="icon-list-alt"></i> Class hierarchy diagram</a></li></ul>
+</li>
+<li class="dropdown" id="reports-menu">
+<a href="#reports" class="dropdown-toggle" data-toggle="dropdown">
+                                    Reports <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a href="../errors.html"><i class="icon-remove-sign"></i> Errors 
+                <span class="label label-info">18</span></a></li>
+<li><a href="../markers.html"><i class="icon-map-marker"></i> Markers 
+                <ul><li>todo 
+                <span class="label label-info">5</span>
+</li></ul></a></li>
+<li><a href="../deprecated.html"><i class="icon-stop"></i> Deprecated elements 
+                <span class="label label-info">0</span></a></li>
+</ul>
+</li>
+</ul></div>
+</div></div>
+<div class="go_to_top"><a href="#___" style="color: inherit">Back to top  <i class="icon-upload icon-white"></i></a></div>
+</div>
+<div id="___" class="container">
+<noscript><div class="alert alert-warning">
+                            Javascript is disabled; several features are only available
+                            if Javascript is enabled.
+                        </div></noscript>
+<div class="row">
+<div class="span4">
+<span class="btn-group visibility" data-toggle="buttons-checkbox"><button class="btn public active" title="Show public elements">Public</button><button class="btn protected" title="Show protected elements">Protected</button><button class="btn private" title="Show private elements">Private</button><button class="btn inherited active" title="Show inherited elements">Inherited</button></span><div class="btn-group view pull-right" data-toggle="buttons-radio">
+<button class="btn details" title="Show descriptions and method names"><i class="icon-list"></i></button><button class="btn simple" title="Show only method names"><i class="icon-align-justify"></i></button>
+</div>
+<ul class="side-nav nav nav-list">
+<li class="nav-header">
+<i class="icon-custom icon-method"></i> Methods
+                    <ul>
+<li class="method public inherited"><a href="#method___construct" title="__construct :: constructor, which instantiate empty class variables"><span class="description">constructor, which instantiate empty class variables</span><pre>__construct()</pre></a></li>
+<li class="method public "><a href="#method_changeColumnLayoutAction" title="changeColumnLayoutAction :: Change session value for showing single or double column layout"><span class="description">Change session value for showing single or double column layout</span><pre>changeColumnLayoutAction()</pre></a></li>
+<li class="method public "><a href="#method_handleConnectionAction" title="handleConnectionAction :: Handle actions and execute them in Models/Data"><span class="description">Handle actions and execute them in Models/Data</span><pre>handleConnectionAction()</pre></a></li>
+<li class="method public "><a href="#method_indexAction" title="indexAction :: Prepares form for connection to the server and table with active connection list"><span class="description">Prepares form for connection to the server and table with active connection list</span><pre>indexAction()</pre></a></li>
+<li class="method public "><a href="#method_moduleAction" title="moduleAction :: Prepares section, module or subsection action data"><span class="description">Prepares section, module or subsection action data</span><pre>moduleAction()</pre></a></li>
+<li class="method public "><a href="#method_reloadDeviceAction" title="reloadDeviceAction :: Reload current device and invalidate cache"><span class="description">Reload current device and invalidate cache</span><pre>reloadDeviceAction()</pre></a></li>
+<li class="method public "><a href="#method_sessionInfoAction" title="sessionInfoAction :: Shows info page with information"><span class="description">Shows info page with information</span><pre>sessionInfoAction()</pre></a></li>
+<li class="method public inherited"><a href="#method_setActiveSectionKey" title="setActiveSectionKey :: sets current section key"><span class="description">sets current section key</span><pre>setActiveSectionKey()</pre></a></li>
+<li class="method public inherited"><a href="#method_setSubmenuUrl" title="setSubmenuUrl :: sets submenu URL."><span class="description">sets submenu URL.</span><pre>setSubmenuUrl()</pre></a></li>
+</ul>
+</li>
+<li class="nav-header protected">» Protected
+                    <ul>
+<li class="method protected inherited"><a href="#method_assign" title="assign :: Assignees variable to array, which will be send to template"><span class="description">Assignees variable to array, which will be send to template</span><pre>assign()</pre></a></li>
+<li class="method protected inherited"><a href="#method_getTwigArr" title="getTwigArr :: Prepares variables to template, sort flashes and prepare menu"><span class="description">Prepares variables to template, sort flashes and prepare menu</span><pre>getTwigArr()</pre></a></li>
+</ul>
+</li>
+<li class="nav-header private">» Private
+                    <ul>
+<li class="method private "><a href="#method_completeRequestTree" title="completeRequestTree :: Completes request tree (XML) with necessary nodes (parent nodes)."><span class="description">Completes request tree (XML) with necessary nodes (parent nodes).</span><pre>completeRequestTree()</pre></a></li>
+<li class="method private "><a href="#method_decodeXPath" title="decodeXPath :: decodes XPath value"><span class="description">decodes XPath value</span><pre>decodeXPath()</pre></a></li>
+<li class="method private "><a href="#method_divideInputName" title="divideInputName :: divides string into the array (name, value) (according to the XML tree node =&gt; value)"><span class="description">divides string into the array (name, value) (according to the XML tree node =&gt; value)</span><pre>divideInputName()</pre></a></li>
+<li class="method private "><a href="#method_elementValReplace" title="elementValReplace :: updates (modifies) value of XML node"><span class="description">updates (modifies) value of XML node</span><pre>elementValReplace()</pre></a></li>
+<li class="method private "><a href="#method_executeEditConfig" title="executeEditConfig :: sends modified XML to server"><span class="description">sends modified XML to server</span><pre>executeEditConfig()</pre></a></li>
+<li class="method private "><a href="#method_handleDuplicateNodeForm" title="handleDuplicateNodeForm :: duplicates node in config - values of duplicated nodes (elements)"><span class="description">duplicates node in config - values of duplicated nodes (elements)</span><pre>handleDuplicateNodeForm()</pre></a></li>
+<li class="method private "><a href="#method_handleEditConfigForm" title="handleEditConfigForm :: handles edit config form - changes config values into the $_POST values
+and sends them to editConfig process"><span class="description">handles edit config form - changes config values into the $_POST values
+and sends them to editConfig process</span><pre>handleEditConfigForm()</pre></a></li>
+<li class="method private "><a href="#method_handleFilterConfig" title="handleFilterConfig :: sets new filter for config part"><span class="description">sets new filter for config part</span><pre>handleFilterConfig()</pre></a></li>
+<li class="method private "><a href="#method_handleFilterState" title="handleFilterState :: sets new filter for state part"><span class="description">sets new filter for state part</span><pre>handleFilterState()</pre></a></li>
+<li class="method private "><a href="#method_handleGenerateNodeForm" title="handleGenerateNodeForm :: create new node in config - according to the values in XML model"><span class="description">create new node in config - according to the values in XML model</span><pre>handleGenerateNodeForm()</pre></a></li>
+<li class="method private "><a href="#method_handleRemoveNodeForm" title="handleRemoveNodeForm :: removes node from config XML tree"><span class="description">removes node from config XML tree</span><pre>handleRemoveNodeForm()</pre></a></li>
+<li class="method private "><a href="#method_loadFilters" title="loadFilters :: loading file with filter specification for current module or subsection"><span class="description">loading file with filter specification for current module or subsection</span><pre>loadFilters()</pre></a></li>
+<li class="method private "><a href="#method_processSectionForms" title="processSectionForms :: process all kinds of form in section, module or subsection"><span class="description">process all kinds of form in section, module or subsection</span><pre>processSectionForms()</pre></a></li>
+<li class="method private "><a href="#method_setConfigParams" title="setConfigParams :: Set values of config array"><span class="description">Set values of config array</span><pre>setConfigParams()</pre></a></li>
+<li class="method private "><a href="#method_setSectionFilterForms" title="setSectionFilterForms :: prepares filter forms for both sections"><span class="description">prepares filter forms for both sections</span><pre>setSectionFilterForms()</pre></a></li>
+<li class="method private "><a href="#method_setSectionFormsParams" title="setSectionFormsParams :: Set default values to config and state arrays"><span class="description">Set default values to config and state arrays</span><pre>setSectionFormsParams()</pre></a></li>
+<li class="method private "><a href="#method_setStateParams" title="setStateParams :: Set values of state array"><span class="description">Set values of state array</span><pre>setStateParams()</pre></a></li>
+</ul>
+</li>
+<li class="nav-header">
+<i class="icon-custom icon-property"></i> Properties
+                    <ul></ul>
+</li>
+<li class="nav-header private">» Private
+                    <ul>
+<li class="property private inherited"><a href="#property_activeSectionKey" title="$activeSectionKey :: "><span class="description">Active section key</span><pre>$activeSectionKey</pre></a></li>
+<li class="property private "><a href="#property_filterForms" title="$filterForms :: "><span class="description">configuration of filter form (in both section)</span><pre>$filterForms</pre></a></li>
+<li class="property private "><a href="#property_paramsConfig" title="$paramsConfig :: "><span class="description">array of parameters for &lt;get&gt; command</span><pre>$paramsConfig</pre></a></li>
+<li class="property private "><a href="#property_paramsState" title="$paramsState :: "><span class="description">array of parameters for &lt;get&gt; command</span><pre>$paramsState</pre></a></li>
+<li class="property private inherited"><a href="#property_submenuUrl" title="$submenuUrl :: "><span class="description">url of submenu</span><pre>$submenuUrl</pre></a></li>
+<li class="property private inherited"><a href="#property_twigArr" title="$twigArr :: "><span class="description">array of all variables assigned into template</span><pre>$twigArr</pre></a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="span8">
+<a id="\FIT\NetopeerBundle\Controller\DefaultController"></a><ul class="breadcrumb">
+<li>
+<a href="../index.html"><i class="icon-custom icon-class"></i></a><span class="divider">\</span>
+</li>
+<li><a href="../namespaces/FIT.html">FIT</a></li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.html">NetopeerBundle</a>
+</li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.Controller.html">Controller</a>
+</li>
+<li class="active">
+<span class="divider">\</span><a href="../classes/FIT.NetopeerBundle.Controller.DefaultController.html">DefaultController</a>
+</li>
+</ul>
+<div class="element class">
+<p class="short_description">Default controller for all pages directly visible from
+webGUI.</p>
+<div class="details">
+<div class="long_description"><p>For example connection management, section detail etc.</p></div>
+<h3>
+<i class="icon-custom icon-method"></i> Methods</h3>
+<a id="method___construct"></a><div class="element clickable method public method___construct" data-toggle="collapse" data-target=".method___construct .collapse">
+<h2>constructor, which instantiate empty class variables</h2>
+<pre>__construct() </pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::__construct()</td>
+</tr></table>
+</div></div>
+</div>
+<a id="method_changeColumnLayoutAction"></a><div class="element clickable method public method_changeColumnLayoutAction" data-toggle="collapse" data-target=".method_changeColumnLayoutAction .collapse">
+<h2>Change session value for showing single or double column layout</h2>
+<pre>changeColumnLayoutAction(string $newValue) : array | \Symfony\Component\HttpFoundation\RedirectResponse</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>Route</th>
+<td>("/changeColumnLayout/{newValue}/", name="changeColumnLayout")</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$newValue</h4>
+<code>string</code><p>new value of columns settings</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code><code>\Symfony\Component\HttpFoundation\RedirectResponse</code>
+</div>
+</div></div>
+</div>
+<a id="method_handleConnectionAction"></a><div class="element clickable method public method_handleConnectionAction" data-toggle="collapse" data-target=".method_handleConnectionAction .collapse">
+<h2>Handle actions and execute them in Models/Data</h2>
+<pre>handleConnectionAction(string $command, int $key, string $identifier) : \Symfony\Component\HttpFoundation\RedirectResponse</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>Route</th>
+<td>("/handle/{command}/{key}/{identifier}", defaults={"identifier" = ""}, name="handleConnection")</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$command</h4>
+<code>string</code><p>name of the command to handle (get, info, getconfig, getschema, connect, disconnect)</p>
+</div>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected device</p></div>
+<div class="subelement argument">
+<h4>$identifier</h4>
+<code>string</code><p>identifier for get-schema</p>
+</div>
+<h3>Returns</h3>
+<div class="subelement response"><code>\Symfony\Component\HttpFoundation\RedirectResponse</code></div>
+</div></div>
+</div>
+<a id="method_indexAction"></a><div class="element clickable method public method_indexAction" data-toggle="collapse" data-target=".method_indexAction .collapse">
+<h2>Prepares form for connection to the server and table with active connection list</h2>
+<pre>indexAction(int $connectedDeviceId) : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>Route</th>
+<td>("/", name="_home")</td>
+</tr>
+<tr>
+<th>Route</th>
+<td>("/device-{connectedDeviceId}/", name="homeFromHistory")</td>
+</tr>
+<tr>
+<th>Template</th>
+<td>()</td>
+</tr>
+</table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$connectedDeviceId</h4>
+<code>int</code><p>id of connected device from history</p></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>array</code></div>
+</div></div>
+</div>
+<a id="method_moduleAction"></a><div class="element clickable method public method_moduleAction" data-toggle="collapse" data-target=".method_moduleAction .collapse">
+<h2>Prepares section, module or subsection action data</h2>
+<pre>moduleAction(int $key, null | string $module, null | string $subsection) : array | \Symfony\Component\HttpFoundation\RedirectResponse</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>Route</th>
+<td>("/sections/{key}/", name="section")</td>
+</tr>
+<tr>
+<th>Route</th>
+<td>("/sections/{key}/{module}/", name="module")</td>
+</tr>
+<tr>
+<th>Route</th>
+<td>("/sections/{key}/{module}/{subsection}/", name="subsection")</td>
+</tr>
+<tr>
+<th>Template</th>
+<td>("FITNetopeerBundle:Default:section.html.twig")
+Prepares section = whole get&get-config part of server
+Shows module part = first level of connected server (except of root)
+Prepares subsection = second level of connected server tree</td>
+</tr>
+</table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected server</p></div>
+<div class="subelement argument">
+<h4>$module</h4>
+<code>null</code><code>string</code><p>name of the module</p></div>
+<div class="subelement argument">
+<h4>$subsection</h4>
+<code>null</code><code>string</code><p>name of the subsection</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code><code>\Symfony\Component\HttpFoundation\RedirectResponse</code>
+</div>
+</div></div>
+</div>
+<a id="method_reloadDeviceAction"></a><div class="element clickable method public method_reloadDeviceAction" data-toggle="collapse" data-target=".method_reloadDeviceAction .collapse">
+<h2>Reload current device and invalidate cache</h2>
+<pre>reloadDeviceAction(int $key) : array | \Symfony\Component\HttpFoundation\RedirectResponse</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>Route</th>
+<td>("/reload/{key}/", name="reloadDevice")</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected device</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code><code>\Symfony\Component\HttpFoundation\RedirectResponse</code>
+</div>
+</div></div>
+</div>
+<a id="method_sessionInfoAction"></a><div class="element clickable method public method_sessionInfoAction" data-toggle="collapse" data-target=".method_sessionInfoAction .collapse">
+<h2>Shows info page with information</h2>
+<pre>sessionInfoAction(int $key, string $action) : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>Route</th>
+<td>("/info-page/{key}/{action}/", name="infoPage")</td>
+</tr>
+<tr>
+<th>Template</th>
+<td>("FITNetopeerBundle:Default:section.html.twig")</td>
+</tr>
+</table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected server</p></div>
+<div class="subelement argument">
+<h4>$action</h4>
+<code>string</code><p>name of the action</p></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>array</code></div>
+</div></div>
+</div>
+<a id="method_setActiveSectionKey"></a><div class="element clickable method public method_setActiveSectionKey" data-toggle="collapse" data-target=".method_setActiveSectionKey .collapse">
+<h2>sets current section key</h2>
+<pre>setActiveSectionKey(int $key) </pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::setActiveSectionKey()</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected server</p></div>
+</div></div>
+</div>
+<a id="method_setSubmenuUrl"></a><div class="element clickable method public method_setSubmenuUrl" data-toggle="collapse" data-target=".method_setSubmenuUrl .collapse">
+<h2>sets submenu URL.</h2>
+<pre>setSubmenuUrl(string $submenuUrl) </pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::setSubmenuUrl()</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$submenuUrl</h4>
+<code>string</code><p>URL for submenu</p></div>
+</div></div>
+</div>
+<a id="method_assign"></a><div class="element clickable method protected method_assign" data-toggle="collapse" data-target=".method_assign .collapse">
+<h2>Assignees variable to array, which will be send to template</h2>
+<pre>assign(mixed $key, mixed $value) </pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::assign()</td>
+</tr></table>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>mixed</code><p>key of the associative array</p></div>
+<div class="subelement argument">
+<h4>$value</h4>
+<code>mixed</code><p>value of the associative array</p></div>
+</div></div>
+</div>
+<a id="method_getTwigArr"></a><div class="element clickable method protected method_getTwigArr" data-toggle="collapse" data-target=".method_getTwigArr .collapse">
+<h2>Prepares variables to template, sort flashes and prepare menu</h2>
+<pre>getTwigArr() : array</pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::getTwigArr()</td>
+</tr></table>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code>array of assigned variables to template</div>
+</div></div>
+</div>
+<a id="method_completeRequestTree"></a><div class="element clickable method private method_completeRequestTree" data-toggle="collapse" data-target=".method_completeRequestTree .collapse">
+<h2>Completes request tree (XML) with necessary nodes (parent nodes).</h2>
+<pre>completeRequestTree(<a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a> $tmpConfigXml, string $config_string) : <a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a></pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"><p>Tree must be valid for edit-config action</p></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$tmpConfigXml</h4>
+<code><a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a></code>
+</div>
+<div class="subelement argument">
+<h4>$config_string</h4>
+<code>string</code>
+</div>
+<h3>Returns</h3>
+<div class="subelement response"><code><a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a></code></div>
+</div></div>
+</div>
+<a id="method_decodeXPath"></a><div class="element clickable method private method_decodeXPath" data-toggle="collapse" data-target=".method_decodeXPath .collapse">
+<h2>decodes XPath value</h2>
+<pre>decodeXPath(string $value) : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$value</h4>
+<code>string</code><p>encoded XPath string</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>string</code>decoded XPath string</div>
+</div></div>
+</div>
+<a id="method_divideInputName"></a><div class="element clickable method private method_divideInputName" data-toggle="collapse" data-target=".method_divideInputName .collapse">
+<h2>divides string into the array (name, value) (according to the XML tree node =&gt; value)</h2>
+<pre>divideInputName(string $postKey) : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$postKey</h4>
+<code>string</code><p>post value</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code>modified array</div>
+</div></div>
+</div>
+<a id="method_elementValReplace"></a><div class="element clickable method private method_elementValReplace" data-toggle="collapse" data-target=".method_elementValReplace .collapse">
+<h2>updates (modifies) value of XML node</h2>
+<pre>elementValReplace(string $configXml, string $elementName, string $xpath, string $val, string $xPathPrefix) : <a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a></pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$configXml</h4>
+<code>string</code><p>xml file</p></div>
+<div class="subelement argument">
+<h4>$elementName</h4>
+<code>string</code><p>name of the element</p></div>
+<div class="subelement argument">
+<h4>$xpath</h4>
+<code>string</code><p>XPath to the element</p></div>
+<div class="subelement argument">
+<h4>$val</h4>
+<code>string</code><p>new value</p></div>
+<div class="subelement argument">
+<h4>$xPathPrefix</h4>
+<code>string</code>
+</div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code><a href="http://php.net/manual/en/class.simplexmlelement.php">\SimpleXMLElement</a></code>modified node</div>
+</div></div>
+</div>
+<a id="method_executeEditConfig"></a><div class="element clickable method private method_executeEditConfig" data-toggle="collapse" data-target=".method_executeEditConfig .collapse">
+<h2>sends modified XML to server</h2>
+<pre>executeEditConfig(int $key, string $config, string $target) : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key of current connection</p></div>
+<div class="subelement argument">
+<h4>$config</h4>
+<code>string</code><p>XML document which will be send</p></div>
+<div class="subelement argument">
+<h4>$target</h4>
+<code>string</code><p>= "running" target source</p>
+</div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>int</code>return 0 on success, 1 on error</div>
+</div></div>
+</div>
+<a id="method_handleDuplicateNodeForm"></a><div class="element clickable method private method_handleDuplicateNodeForm" data-toggle="collapse" data-target=".method_handleDuplicateNodeForm .collapse">
+<h2>duplicates node in config - values of duplicated nodes (elements)</h2>
+<pre>handleDuplicateNodeForm(int $key) : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"><p>could be changed by user</p></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key of current connection</p></div>
+<h3>Exceptions</h3>
+<table class="table table-bordered"><tr>
+<th><code><a href="http://php.net/manual/en/class.errorexception.php">\ErrorException</a></code></th>
+<td></td>
+</tr></table>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>int</code>result code</div>
+</div></div>
+</div>
+<a id="method_handleEditConfigForm"></a><div class="element clickable method private method_handleEditConfigForm" data-toggle="collapse" data-target=".method_handleEditConfigForm .collapse">
+<h2>handles edit config form - changes config values into the $_POST values
+and sends them to editConfig process</h2>
+<pre>handleEditConfigForm(int $key) : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key of current connection</p></div>
+<h3>Exceptions</h3>
+<table class="table table-bordered"><tr>
+<th><code><a href="http://php.net/manual/en/class.errorexception.php">\ErrorException</a></code></th>
+<td></td>
+</tr></table>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>int</code>result code</div>
+</div></div>
+</div>
+<a id="method_handleFilterConfig"></a><div class="element clickable method private method_handleFilterConfig" data-toggle="collapse" data-target=".method_handleFilterConfig .collapse">
+<h2>sets new filter for config part</h2>
+<pre>handleFilterConfig(int $key) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key for current server</p></div>
+</div></div>
+</div>
+<a id="method_handleFilterState"></a><div class="element clickable method private method_handleFilterState" data-toggle="collapse" data-target=".method_handleFilterState .collapse">
+<h2>sets new filter for state part</h2>
+<pre>handleFilterState(int $key) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key for current server</p></div>
+</div></div>
+</div>
+<a id="method_handleGenerateNodeForm"></a><div class="element clickable method private method_handleGenerateNodeForm" data-toggle="collapse" data-target=".method_handleGenerateNodeForm .collapse">
+<h2>create new node in config - according to the values in XML model</h2>
+<pre>handleGenerateNodeForm(int $key, string $module, string $subsection) : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"><p>could be changed by user</p></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key of current connection</p></div>
+<div class="subelement argument">
+<h4>$module</h4>
+<code>string</code><p>module name</p></div>
+<div class="subelement argument">
+<h4>$subsection</h4>
+<code>string</code><p>subsection name</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>int</code>result code</div>
+</div></div>
+</div>
+<a id="method_handleRemoveNodeForm"></a><div class="element clickable method private method_handleRemoveNodeForm" data-toggle="collapse" data-target=".method_handleRemoveNodeForm .collapse">
+<h2>removes node from config XML tree</h2>
+<pre>handleRemoveNodeForm(int $key) : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>session key of current connection</p></div>
+<h3>Exceptions</h3>
+<table class="table table-bordered"><tr>
+<th><code><a href="http://php.net/manual/en/class.errorexception.php">\ErrorException</a></code></th>
+<td>when get-config could not be loaded</td>
+</tr></table>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>int</code>result code</div>
+</div></div>
+</div>
+<a id="method_loadFilters"></a><div class="element clickable method private method_loadFilters" data-toggle="collapse" data-target=".method_loadFilters .collapse">
+<h2>loading file with filter specification for current module or subsection</h2>
+<pre>loadFilters(string $module, string $subsection) : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$module</h4>
+<code>string</code><p>module name</p></div>
+<div class="subelement argument">
+<h4>$subsection</h4>
+<code>string</code><p>subsection name</p></div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>array</code>array with config and state filter</div>
+</div></div>
+</div>
+<a id="method_processSectionForms"></a><div class="element clickable method private method_processSectionForms" data-toggle="collapse" data-target=".method_processSectionForms .collapse">
+<h2>process all kinds of form in section, module or subsection</h2>
+<pre>processSectionForms(int $key, string $module, string $subsection) : \Symfony\Component\HttpFoundation\RedirectResponse</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected server</p></div>
+<div class="subelement argument">
+<h4>$module</h4>
+<code>string</code><p>= null      module name</p>
+</div>
+<div class="subelement argument">
+<h4>$subsection</h4>
+<code>string</code><p>= null  subsection name</p>
+</div>
+<h3>Returns</h3>
+<div class="subelement response">
+<code>\Symfony\Component\HttpFoundation\RedirectResponse</code>redirect to page, which was this method called from</div>
+</div></div>
+</div>
+<a id="method_setConfigParams"></a><div class="element clickable method private method_setConfigParams" data-toggle="collapse" data-target=".method_setConfigParams .collapse">
+<h2>Set values of config array</h2>
+<pre>setConfigParams(mixed $key, mixed $value) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>mixed</code><p>key of associative array</p></div>
+<div class="subelement argument">
+<h4>$value</h4>
+<code>mixed</code><p>value of associative array</p></div>
+</div></div>
+</div>
+<a id="method_setSectionFilterForms"></a><div class="element clickable method private method_setSectionFilterForms" data-toggle="collapse" data-target=".method_setSectionFilterForms .collapse">
+<h2>prepares filter forms for both sections</h2>
+<pre>setSectionFilterForms() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_setSectionFormsParams"></a><div class="element clickable method private method_setSectionFormsParams" data-toggle="collapse" data-target=".method_setSectionFormsParams .collapse">
+<h2>Set default values to config and state arrays</h2>
+<pre>setSectionFormsParams(int $key, string $filterState, string $filterConfig, string $sourceConfig) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>int</code><p>key of connected server</p></div>
+<div class="subelement argument">
+<h4>$filterState</h4>
+<code>string</code><p>state filter</p></div>
+<div class="subelement argument">
+<h4>$filterConfig</h4>
+<code>string</code><p>config filter</p></div>
+<div class="subelement argument">
+<h4>$sourceConfig</h4>
+<code>string</code><p>source param of config</p></div>
+</div></div>
+</div>
+<a id="method_setStateParams"></a><div class="element clickable method private method_setStateParams" data-toggle="collapse" data-target=".method_setStateParams .collapse">
+<h2>Set values of state array</h2>
+<pre>setStateParams(mixed $key, mixed $value) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$key</h4>
+<code>mixed</code><p>key of associative array</p></div>
+<div class="subelement argument">
+<h4>$value</h4>
+<code>mixed</code><p>value of associative array</p></div>
+</div></div>
+</div>
+<h3>
+<i class="icon-custom icon-property"></i> Properties</h3>
+<a id="property_activeSectionKey"> </a><div class="element clickable property private property_activeSectionKey" data-toggle="collapse" data-target=".property_activeSectionKey .collapse">
+<h2>Active section key</h2>
+<pre>$activeSectionKey : int</pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::$$activeSectionKey</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_filterForms"> </a><div class="element clickable property private property_filterForms" data-toggle="collapse" data-target=".property_filterForms .collapse">
+<h2>configuration of filter form (in both section)</h2>
+<pre>$filterForms : \FIT\NetopeerBundle\Controller\holds</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="property_paramsConfig"> </a><div class="element clickable property private property_paramsConfig" data-toggle="collapse" data-target=".property_paramsConfig .collapse">
+<h2>array of parameters for &lt;get&gt; command</h2>
+<pre>$paramsConfig : array: array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="property_paramsState"> </a><div class="element clickable property private property_paramsState" data-toggle="collapse" data-target=".property_paramsState .collapse">
+<h2>array of parameters for &lt;get&gt; command</h2>
+<pre>$paramsState : array: array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="property_submenuUrl"> </a><div class="element clickable property private property_submenuUrl" data-toggle="collapse" data-target=".property_submenuUrl .collapse">
+<h2>url of submenu</h2>
+<pre>$submenuUrl : string</pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::$$submenuUrl</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_twigArr"> </a><div class="element clickable property private property_twigArr" data-toggle="collapse" data-target=".property_twigArr .collapse">
+<h2>array of all variables assigned into template</h2>
+<pre>$twigArr : array</pre>
+<div class="labels"><span class="label">Inherited</span></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>inherited_from</th>
+<td>\FIT\NetopeerBundle\Controller\BaseController::$$twigArr</td>
+</tr></table>
+</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row"><footer class="span12">
+            Template is built using <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap 2</a> and icons provided by <a href="http://glyphicons.com/">Glyphicons</a>.<br>
+            Documentation is powered by <a href="http://www.phpdoc.org/">phpDocumentor 2.0.0a12</a> and<br>
+            generated on 2013-05-03T20:04:45+02:00.<br></footer></div>
+</div>
+</body>
+</html>

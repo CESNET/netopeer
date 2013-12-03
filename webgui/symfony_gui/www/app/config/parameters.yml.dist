@@ -1,0 +1,15 @@
+# This file is auto-generated during the composer install
+parameters:
+    database_driver:    pdo_sqlite
+    database_host:      localhost
+    database_port:      ~
+    database_name:      ~
+    database_user:      ~
+    database_path:      '%kernel.root_dir%/netopeerWebGui.db'
+    database_password:  ~
+    mailer_transport:   smtp
+    mailer_host:        localhost
+    mailer_user:        ~
+    mailer_password:    ~
+    locale:             en
+    secret:             fjdpaiouczvjyqperncvmz0900rfq

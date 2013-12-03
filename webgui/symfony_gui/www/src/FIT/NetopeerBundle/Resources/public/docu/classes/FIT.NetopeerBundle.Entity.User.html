@@ -1,0 +1,490 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+<meta charset="utf-8">
+<title>NetopeerWebGUI » \FIT\NetopeerBundle\Entity\User</title>
+<meta name="author" content="Mike van Riel">
+<meta name="description" content="">
+<link href="../css/template.css" rel="stylesheet" media="all">
+<script src="../js/jquery-1.7.1.min.js" type="text/javascript"></script><script src="../js/jquery-ui-1.8.2.custom.min.js" type="text/javascript"></script><script src="../js/jquery.mousewheel.min.js" type="text/javascript"></script><script src="../js/bootstrap.js" type="text/javascript"></script><script src="../js/template.js" type="text/javascript"></script><script src="../js/prettify/prettify.min.js" type="text/javascript"></script><link rel="shortcut icon" href="../img/favicon.ico">
+<link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="72x72" href="../img/apple-touch-icon-72x72.png">
+<link rel="apple-touch-icon" sizes="114x114" href="../img/apple-touch-icon-114x114.png">
+</head>
+<body>
+<div class="navbar navbar-fixed-top">
+<div class="navbar-inner"><div class="container">
+<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse"><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span></a><a class="brand" href="../index.html">NetopeerWebGUI</a><div class="nav-collapse"><ul class="nav">
+<li class="dropdown">
+<a href="#api" class="dropdown-toggle" data-toggle="dropdown">
+                                    API Documentation <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a>Namespaces</a></li>
+<li><a href="../namespaces/FIT.html"><i class="icon-th"></i> FIT</a></li>
+<li><a href="../namespaces/global.html"><i class="icon-th"></i> global</a></li>
+</ul>
+</li>
+<li class="dropdown" id="charts-menu">
+<a href="#charts" class="dropdown-toggle" data-toggle="dropdown">
+                                    Charts <b class="caret"></b></a><ul class="dropdown-menu"><li><a href="../graph_class.html"><i class="icon-list-alt"></i> Class hierarchy diagram</a></li></ul>
+</li>
+<li class="dropdown" id="reports-menu">
+<a href="#reports" class="dropdown-toggle" data-toggle="dropdown">
+                                    Reports <b class="caret"></b></a><ul class="dropdown-menu">
+<li><a href="../errors.html"><i class="icon-remove-sign"></i> Errors 
+                <span class="label label-info">18</span></a></li>
+<li><a href="../markers.html"><i class="icon-map-marker"></i> Markers 
+                <ul><li>todo 
+                <span class="label label-info">5</span>
+</li></ul></a></li>
+<li><a href="../deprecated.html"><i class="icon-stop"></i> Deprecated elements 
+                <span class="label label-info">0</span></a></li>
+</ul>
+</li>
+</ul></div>
+</div></div>
+<div class="go_to_top"><a href="#___" style="color: inherit">Back to top  <i class="icon-upload icon-white"></i></a></div>
+</div>
+<div id="___" class="container">
+<noscript><div class="alert alert-warning">
+                            Javascript is disabled; several features are only available
+                            if Javascript is enabled.
+                        </div></noscript>
+<div class="row">
+<div class="span4">
+<span class="btn-group visibility" data-toggle="buttons-checkbox"><button class="btn public active" title="Show public elements">Public</button><button class="btn protected" title="Show protected elements">Protected</button><button class="btn private" title="Show private elements">Private</button><button class="btn inherited active" title="Show inherited elements">Inherited</button></span><div class="btn-group view pull-right" data-toggle="buttons-radio">
+<button class="btn details" title="Show descriptions and method names"><i class="icon-list"></i></button><button class="btn simple" title="Show only method names"><i class="icon-align-justify"></i></button>
+</div>
+<ul class="side-nav nav nav-list">
+<li class="nav-header">
+<i class="icon-custom icon-method"></i> Methods
+                    <ul>
+<li class="method public "><a href="#method___construct" title="__construct :: initialize User object and generates salt for password"><span class="description">initialize User object and generates salt for password</span><pre>__construct()</pre></a></li>
+<li class="method public "><a href="#method___sleep" title="__sleep :: don't know, why this method must exist, but some
+error occurred without"><span class="description">don't know, why this method must exist, but some
+error occurred without</span><pre>__sleep()</pre></a></li>
+<li class="method public "><a href="#method_addBaseConnection" title="addBaseConnection :: Add connectedDevicesInHistory"><span class="description">Add connectedDevicesInHistory</span><pre>addBaseConnection()</pre></a></li>
+<li class="method public "><a href="#method_addConnection" title="addConnection :: Add connection either to history or profile"><span class="description">Add connection either to history or profile</span><pre>addConnection()</pre></a></li>
+<li class="method public "><a href="#method_addConnectionToProfiles" title="addConnectionToProfiles :: Add connectedDevicesInProfile"><span class="description">Add connectedDevicesInProfile</span><pre>addConnectionToProfiles()</pre></a></li>
+<li class="method public "><a href="#method_equals" title="equals :: {@inheritDoc}"><span class="description">{@inheritDoc}</span><pre>equals()</pre></a></li>
+<li class="method public "><a href="#method_eraseCredentials" title="eraseCredentials :: {@inheritdoc}"><span class="description">{@inheritdoc}</span><pre>eraseCredentials()</pre></a></li>
+<li class="method public "><a href="#method_getConnectedDevicesInHistory" title="getConnectedDevicesInHistory :: Get connectedDevicesInHistory"><span class="description">Get connectedDevicesInHistory</span><pre>getConnectedDevicesInHistory()</pre></a></li>
+<li class="method public "><a href="#method_getConnectedDevicesInProfiles" title="getConnectedDevicesInProfiles :: Get connectedDevicesInProfiles"><span class="description">Get connectedDevicesInProfiles</span><pre>getConnectedDevicesInProfiles()</pre></a></li>
+<li class="method public "><a href="#method_getId" title="getId :: Get id"><span class="description">Get id</span><pre>getId()</pre></a></li>
+<li class="method public "><a href="#method_getPassword" title="getPassword :: {@inheritdoc}"><span class="description">{@inheritdoc}</span><pre>getPassword()</pre></a></li>
+<li class="method public "><a href="#method_getRoles" title="getRoles :: {@inheritdoc}"><span class="description">{@inheritdoc}</span><pre>getRoles()</pre></a></li>
+<li class="method public "><a href="#method_getSalt" title="getSalt :: {@inheritdoc}"><span class="description">{@inheritdoc}</span><pre>getSalt()</pre></a></li>
+<li class="method public "><a href="#method_getSettings" title="getSettings :: Get user settings"><span class="description">Get user settings</span><pre>getSettings()</pre></a></li>
+<li class="method public "><a href="#method_getUsername" title="getUsername :: {@inheritdoc}"><span class="description">{@inheritdoc}</span><pre>getUsername()</pre></a></li>
+<li class="method public "><a href="#method_setId" title="setId :: Set id"><span class="description">Set id</span><pre>setId()</pre></a></li>
+<li class="method public "><a href="#method_setPassword" title="setPassword :: Set password"><span class="description">Set password</span><pre>setPassword()</pre></a></li>
+<li class="method public "><a href="#method_setRoles" title="setRoles :: Set roles"><span class="description">Set roles</span><pre>setRoles()</pre></a></li>
+<li class="method public "><a href="#method_setSalt" title="setSalt :: Set salt"><span class="description">Set salt</span><pre>setSalt()</pre></a></li>
+<li class="method public "><a href="#method_setSettings" title="setSettings :: Set user settings"><span class="description">Set user settings</span><pre>setSettings()</pre></a></li>
+<li class="method public "><a href="#method_setUsername" title="setUsername :: Set username"><span class="description">Set username</span><pre>setUsername()</pre></a></li>
+</ul>
+</li>
+<li class="nav-header">
+<i class="icon-custom icon-property"></i> Properties
+                    <ul></ul>
+</li>
+<li class="nav-header protected">» Protected
+                    <ul>
+<li class="property protected "><a href="#property_connectedDevicesInHistory" title="$connectedDevicesInHistory :: "><span class="description">array of connected devices (from history)</span><pre>$connectedDevicesInHistory</pre></a></li>
+<li class="property protected "><a href="#property_connectedDevicesInProfiles" title="$connectedDevicesInProfiles :: "><span class="description">array of connected devices (from profiles)</span><pre>$connectedDevicesInProfiles</pre></a></li>
+<li class="property protected "><a href="#property_id" title="$id :: "><span class="description">unique identifier</span><pre>$id</pre></a></li>
+<li class="property protected "><a href="#property_password" title="$password :: "><span class="description">salted password</span><pre>$password</pre></a></li>
+<li class="property protected "><a href="#property_roles" title="$roles :: "><span class="description">string of user roles</span><pre>$roles</pre></a></li>
+<li class="property protected "><a href="#property_salt" title="$salt :: "><span class="description">salt for salting password</span><pre>$salt</pre></a></li>
+<li class="property protected "><a href="#property_settings" title="$settings :: "><span class="description">serialized object of UserSettings class</span><pre>$settings</pre></a></li>
+<li class="property protected "><a href="#property_username" title="$username :: "><span class="description">unique username</span><pre>$username</pre></a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="span8">
+<a id="\FIT\NetopeerBundle\Entity\User"></a><ul class="breadcrumb">
+<li>
+<a href="../index.html"><i class="icon-custom icon-class"></i></a><span class="divider">\</span>
+</li>
+<li><a href="../namespaces/FIT.html">FIT</a></li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.html">NetopeerBundle</a>
+</li>
+<li>
+<span class="divider">\</span><a href="../namespaces/FIT.NetopeerBundle.Entity.html">Entity</a>
+</li>
+<li class="active">
+<span class="divider">\</span><a href="../classes/FIT.NetopeerBundle.Entity.User.html">User</a>
+</li>
+</ul>
+<div class="element class">
+<p class="short_description">Class with Entity of logged user.</p>
+<div class="details">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\Entity</th>
+<td>Entity</td>
+</tr>
+<tr>
+<th>ORM\Table</th>
+<td>name="user"</td>
+</tr>
+</table>
+<h3>
+<i class="icon-custom icon-method"></i> Methods</h3>
+<a id="method___construct"></a><div class="element clickable method public method___construct" data-toggle="collapse" data-target=".method___construct .collapse">
+<h2>initialize User object and generates salt for password</h2>
+<pre>__construct() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method___sleep"></a><div class="element clickable method public method___sleep" data-toggle="collapse" data-target=".method___sleep .collapse">
+<h2>don't know, why this method must exist, but some
+error occurred without</h2>
+<pre>__sleep() : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>array</code></div>
+</div></div>
+</div>
+<a id="method_addBaseConnection"></a><div class="element clickable method public method_addBaseConnection" data-toggle="collapse" data-target=".method_addBaseConnection .collapse">
+<h2>Add connectedDevicesInHistory</h2>
+<pre>addBaseConnection(\FIT\NetopeerBundle\Entity\BaseConnection $connectedDevicesInHistory) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$connectedDevicesInHistory</h4>
+<code><a href="../classes/FIT.NetopeerBundle.Entity.BaseConnection.html">\FIT\NetopeerBundle\Entity\BaseConnection</a></code>
+</div>
+</div></div>
+</div>
+<a id="method_addConnection"></a><div class="element clickable method public method_addConnection" data-toggle="collapse" data-target=".method_addConnection .collapse">
+<h2>Add connection either to history or profile</h2>
+<pre>addConnection(\FIT\NetopeerBundle\Entity\BaseConnection $conn, int $kind) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$conn</h4>
+<code><a href="../classes/FIT.NetopeerBundle.Entity.BaseConnection.html">\FIT\NetopeerBundle\Entity\BaseConnection</a></code>
+</div>
+<div class="subelement argument">
+<h4>$kind</h4>
+<code>int</code><p>kind of connection</p></div>
+</div></div>
+</div>
+<a id="method_addConnectionToProfiles"></a><div class="element clickable method public method_addConnectionToProfiles" data-toggle="collapse" data-target=".method_addConnectionToProfiles .collapse">
+<h2>Add connectedDevicesInProfile</h2>
+<pre>addConnectionToProfiles(\FIT\NetopeerBundle\Entity\BaseConnection $connectedDevicesInProfile) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$connectedDevicesInProfile</h4>
+<code><a href="../classes/FIT.NetopeerBundle.Entity.BaseConnection.html">\FIT\NetopeerBundle\Entity\BaseConnection</a></code>
+</div>
+</div></div>
+</div>
+<a id="method_equals"></a><div class="element clickable method public method_equals" data-toggle="collapse" data-target=".method_equals .collapse">
+<h2>{@inheritDoc}</h2>
+<pre>equals(\Symfony\Component\Security\Core\User\UserInterface $user) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument"><h4>$user</h4></div>
+</div></div>
+</div>
+<a id="method_eraseCredentials"></a><div class="element clickable method public method_eraseCredentials" data-toggle="collapse" data-target=".method_eraseCredentials .collapse">
+<h2>{@inheritdoc}</h2>
+<pre>eraseCredentials() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_getConnectedDevicesInHistory"></a><div class="element clickable method public method_getConnectedDevicesInHistory" data-toggle="collapse" data-target=".method_getConnectedDevicesInHistory .collapse">
+<h2>Get connectedDevicesInHistory</h2>
+<pre>getConnectedDevicesInHistory() : \Doctrine\Common\Collections\Collection</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>\Doctrine\Common\Collections\Collection</code></div>
+</div></div>
+</div>
+<a id="method_getConnectedDevicesInProfiles"></a><div class="element clickable method public method_getConnectedDevicesInProfiles" data-toggle="collapse" data-target=".method_getConnectedDevicesInProfiles .collapse">
+<h2>Get connectedDevicesInProfiles</h2>
+<pre>getConnectedDevicesInProfiles() : \Doctrine\Common\Collections\Collection</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>\Doctrine\Common\Collections\Collection</code></div>
+</div></div>
+</div>
+<a id="method_getId"></a><div class="element clickable method public method_getId" data-toggle="collapse" data-target=".method_getId .collapse">
+<h2>Get id</h2>
+<pre>getId() : integer</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code>integer</code></div>
+</div></div>
+</div>
+<a id="method_getPassword"></a><div class="element clickable method public method_getPassword" data-toggle="collapse" data-target=".method_getPassword .collapse">
+<h2>{@inheritdoc}</h2>
+<pre>getPassword() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_getRoles"></a><div class="element clickable method public method_getRoles" data-toggle="collapse" data-target=".method_getRoles .collapse">
+<h2>{@inheritdoc}</h2>
+<pre>getRoles() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_getSalt"></a><div class="element clickable method public method_getSalt" data-toggle="collapse" data-target=".method_getSalt .collapse">
+<h2>{@inheritdoc}</h2>
+<pre>getSalt() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_getSettings"></a><div class="element clickable method public method_getSettings" data-toggle="collapse" data-target=".method_getSettings .collapse">
+<h2>Get user settings</h2>
+<pre>getSettings() : <a href="../classes/FIT.NetopeerBundle.Entity.UserSettings.html">\FIT\NetopeerBundle\Entity\UserSettings</a></pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Returns</h3>
+<div class="subelement response"><code><a href="../classes/FIT.NetopeerBundle.Entity.UserSettings.html">\FIT\NetopeerBundle\Entity\UserSettings</a></code></div>
+</div></div>
+</div>
+<a id="method_getUsername"></a><div class="element clickable method public method_getUsername" data-toggle="collapse" data-target=".method_getUsername .collapse">
+<h2>{@inheritdoc}</h2>
+<pre>getUsername() </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description"><div class="long_description"></div></div></div>
+</div>
+<a id="method_setId"></a><div class="element clickable method public method_setId" data-toggle="collapse" data-target=".method_setId .collapse">
+<h2>Set id</h2>
+<pre>setId(integer $id) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$id</h4>
+<code>integer</code>
+</div>
+</div></div>
+</div>
+<a id="method_setPassword"></a><div class="element clickable method public method_setPassword" data-toggle="collapse" data-target=".method_setPassword .collapse">
+<h2>Set password</h2>
+<pre>setPassword(string $password) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$password</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setRoles"></a><div class="element clickable method public method_setRoles" data-toggle="collapse" data-target=".method_setRoles .collapse">
+<h2>Set roles</h2>
+<pre>setRoles(string $roles) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$roles</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setSalt"></a><div class="element clickable method public method_setSalt" data-toggle="collapse" data-target=".method_setSalt .collapse">
+<h2>Set salt</h2>
+<pre>setSalt(string $salt) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$salt</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<a id="method_setSettings"></a><div class="element clickable method public method_setSettings" data-toggle="collapse" data-target=".method_setSettings .collapse">
+<h2>Set user settings</h2>
+<pre>setSettings(\FIT\NetopeerBundle\Entity\UserSettings $settings) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$settings</h4>
+<code><a href="../classes/FIT.NetopeerBundle.Entity.UserSettings.html">\FIT\NetopeerBundle\Entity\UserSettings</a></code>
+</div>
+</div></div>
+</div>
+<a id="method_setUsername"></a><div class="element clickable method public method_setUsername" data-toggle="collapse" data-target=".method_setUsername .collapse">
+<h2>Set username</h2>
+<pre>setUsername(string $username) </pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<h3>Parameters</h3>
+<div class="subelement argument">
+<h4>$username</h4>
+<code>string</code>
+</div>
+</div></div>
+</div>
+<h3>
+<i class="icon-custom icon-property"></i> Properties</h3>
+<a id="property_connectedDevicesInHistory"> </a><div class="element clickable property protected property_connectedDevicesInHistory" data-toggle="collapse" data-target=".property_connectedDevicesInHistory .collapse">
+<h2>array of connected devices (from history)</h2>
+<pre>$connectedDevicesInHistory : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\OneToMany</th>
+<td>targetEntity="BaseConnection", mappedBy="userId"</td>
+</tr>
+<tr>
+<th>ORM\OrderBy</th>
+<td>{"accessTime" = "DESC"}</td>
+</tr>
+</table>
+</div></div>
+</div>
+<a id="property_connectedDevicesInProfiles"> </a><div class="element clickable property protected property_connectedDevicesInProfiles" data-toggle="collapse" data-target=".property_connectedDevicesInProfiles .collapse">
+<h2>array of connected devices (from profiles)</h2>
+<pre>$connectedDevicesInProfiles : array</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\OneToMany</th>
+<td>targetEntity="BaseConnection", mappedBy="userId"</td>
+</tr>
+<tr>
+<th>ORM\OrderBy</th>
+<td>{"host" = "ASC"}</td>
+</tr>
+</table>
+</div></div>
+</div>
+<a id="property_id"> </a><div class="element clickable property protected property_id" data-toggle="collapse" data-target=".property_id .collapse">
+<h2>unique identifier</h2>
+<pre>$id : int</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\Id</th>
+<td>Id</td>
+</tr>
+<tr>
+<th>ORM\Column</th>
+<td>(type="integer")</td>
+</tr>
+<tr>
+<th>ORM\GeneratedValue</th>
+<td>strategy="AUTO"</td>
+</tr>
+</table>
+</div></div>
+</div>
+<a id="property_password"> </a><div class="element clickable property protected property_password" data-toggle="collapse" data-target=".property_password .collapse">
+<h2>salted password</h2>
+<pre>$password : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", nullable="true")</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_roles"> </a><div class="element clickable property protected property_roles" data-toggle="collapse" data-target=".property_roles .collapse">
+<h2>string of user roles</h2>
+<pre>$roles : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", nullable="true")</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_salt"> </a><div class="element clickable property protected property_salt" data-toggle="collapse" data-target=".property_salt .collapse">
+<h2>salt for salting password</h2>
+<pre>$salt : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="string", length=32)</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_settings"> </a><div class="element clickable property protected property_settings" data-toggle="collapse" data-target=".property_settings .collapse">
+<h2>serialized object of UserSettings class</h2>
+<pre>$settings : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered"><tr>
+<th>ORM\Column</th>
+<td>(type="object")</td>
+</tr></table>
+</div></div>
+</div>
+<a id="property_username"> </a><div class="element clickable property protected property_username" data-toggle="collapse" data-target=".property_username .collapse">
+<h2>unique username</h2>
+<pre>$username : string</pre>
+<div class="labels"></div>
+<div class="row collapse"><div class="detail-description">
+<div class="long_description"></div>
+<table class="table table-bordered">
+<tr>
+<th>ORM\Column</th>
+<td>(type="string", length="64", nullable="true", unique="true")</td>
+</tr>
+<tr>
+<th>ORM\JoinColumn</th>
+<td>onDelete="cascade"</td>
+</tr>
+</table>
+</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row"><footer class="span12">
+            Template is built using <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap 2</a> and icons provided by <a href="http://glyphicons.com/">Glyphicons</a>.<br>
+            Documentation is powered by <a href="http://www.phpdoc.org/">phpDocumentor 2.0.0a12</a> and<br>
+            generated on 2013-05-03T20:04:36+02:00.<br></footer></div>
+</div>
+</body>
+</html>

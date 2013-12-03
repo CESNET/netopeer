@@ -1,0 +1,17 @@
+#
+# This configuration file sets the netconfgui location 
+Alias /@webguiname@ @webguidir@/@webguiname@/web
+
+<Location /@webguiname@>
+    Order allow,deny
+    Deny from none
+    Allow from all
+    # Allow from .example.com
+    DirectoryIndex app.php
+    Options FollowSymLinks
+</Location>
+<Directory @webguidir@/@webguiname@/web>
+    Options FollowSymLinks
+    AllowOverride All
+</Directory>
+
