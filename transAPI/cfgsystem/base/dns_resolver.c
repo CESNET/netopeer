@@ -46,10 +46,10 @@ bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg
 	/* Get the search-node count */
 	cur = search_node;
 	while (cur != NULL) {
-		cur = cur->next;
 		if (strcmp(cur->name, "search") == 0) {
 			++new_domain_count;
 		}
+		cur = cur->next;
 	}
 
 	/* Get the configuration-file domain count */
