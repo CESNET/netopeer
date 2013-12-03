@@ -905,6 +905,10 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 		index = 1;
 		cur = node->parent->children;
 		while (cur != NULL) {
+			if (strcmp(cur->name, "search") != 0) {
+				cur = cur->next;
+				continue;
+			}
 			if (dns_augeas_add_search_domain(a, get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
 				return fail_with_aug(error, msg, a, EXIT_FAILURE);
 			}
