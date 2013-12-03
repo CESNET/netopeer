@@ -54,8 +54,8 @@ bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg
 
 	/* Get the configuration-file domain count */
 	asprintf(&path, "/files/%s/search/domain", RESOLV_CONF_FILE_PATH);
-	new_domain_count = aug_match(a, path, NULL);
-	if (new_domain_count == -1) {
+	old_domain_count = aug_match(a, path, NULL);
+	if (old_domain_count == -1) {
 		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
 		free(path);
 		return false;
