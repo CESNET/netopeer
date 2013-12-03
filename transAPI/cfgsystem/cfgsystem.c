@@ -840,7 +840,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 	augeas* a;
 
 	/* Already processed, skip */
-	if (op & XMLDIFF_REORDER && dns_search_reorder == 1) {
+	if (op & XMLDIFF_SIBLING && dns_search_reorder == 1) {
 		return EXIT_SUCCESS;
 	}
 
@@ -893,7 +893,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 		if (dns_augeas_rem_search_domain(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail_with_aug(error, msg, a, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_REORDER) {
+	} else if (op & XMLDIFF_SIBLING) {
 		if (!dns_augeas_equal_search_count(a, node, &msg)) {
 			if (msg != NULL) {
 				return fail_with_aug(error, msg, a, EXIT_FAILURE);
@@ -1013,7 +1013,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server (void ** data
 	char* msg = NULL;
 	int index;
 
-	if (dns_nmsrv_mod_reorder == 2 || ((op & XMLDIFF_REORDER) && dns_nmsrv_mod_reorder == 0)) {
+	if (dns_nmsrv_mod_reorder == 2 || (op & XMLDIFF_SIBLING && dns_nmsrv_mod_reorder == 0)) {
 
 		if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
@@ -1443,7 +1443,7 @@ int callback_systemns_system_systemns_authentication (void ** data, XMLDIFF_OP o
 	augeas* a;
 
 	/* user-authentication-order */
-	if (op & XMLDIFF_MOD) {
+	if (op & (XMLDIFF_MOD | XMLDIFF_REORDER)) {
 		if (users_augeas_init(&a, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
