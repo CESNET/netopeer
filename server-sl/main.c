@@ -266,7 +266,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	nc_verbosity(NC_VERB_DEBUG);
 
 	/* set message printing into the system log */
-	openlog("ncserver", LOG_PID, LOG_DAEMON);
+	openlog("ncserver", LOG_PID | LOG_PERROR, LOG_DAEMON);
 	nc_callback_print(clb_print);
 
 	init = nc_init(NC_INIT_ALL);
