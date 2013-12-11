@@ -97,7 +97,7 @@ doc: doxygen
 
 $(NAME): $(OBJS)
 	@rm -f $@;
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS) -ldl $(OBJS) -o $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(OBJS) $(LIBS) -ldl -o $@;
 
 $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \

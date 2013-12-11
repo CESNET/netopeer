@@ -77,7 +77,7 @@ doc:
 
 $(TARGETS): $(OBJS)
 	@rm -f $@;
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS) $(OBJS) -o $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(OBJS) $(LIBS) -o $@;
 
 $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \
