@@ -325,16 +325,16 @@ bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char**
 	/* Get the server-node count, go from the beginning */
 	cur = server_node->parent->children;
 	while (cur != NULL) {
-		cur = cur->next;
 		if (strcmp(cur->name, "server") == 0) {
 			++new_nameserver_count;
 		}
+		cur = cur->next;
 	}
 
 	/* Get the configuration-file nameserver count */
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	new_nameserver_count = aug_match(a, path, NULL);
-	if (new_nameserver_count == -1) {
+	old_nameserver_count = aug_match(a, path, NULL);
+	if (old_nameserver_count == -1) {
 		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
 		free(path);
 		return false;
