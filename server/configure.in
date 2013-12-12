@@ -176,6 +176,7 @@ AC_SUBST([LIBNETCONF_CFLAGS])
 AC_SUBST([LIBNETCONF_WITH])
 REQS="$REQS , libnetconf"
 AC_CHECK_LIB([netconf], [ncds_new],[],AC_MSG_ERROR([libnetconf not found.]))
+AC_CHECK_LIB([netconf], [ncntf_dispatch_send],[],AC_MSG_ERROR([missing notification support in libnetconf.]))
 
 # libdbus
 # Test whether Libdbus-1 exist
