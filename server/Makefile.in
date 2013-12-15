@@ -164,7 +164,6 @@ install: install-devel install-doc
 	[ -d $(DESTDIR)/$(datadir)/dbus-1/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/);
 	[ -d $(DESTDIR)/$(datadir)/dbus-1/system-services/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/system-services/);
 	@cp config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(datadir)/dbus-1/system-services/org.liberouter.netopeer2.server.service
-	@[ "$(RUN)" = "RPM" ] || (echo "Subsystem netconf $(bindir)/netopeer-agent" >> /$(sysconfdir)/ssh/sshd_config);
 	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
