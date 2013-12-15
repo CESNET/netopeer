@@ -40,6 +40,7 @@
 #include <libnetconf_xml.h>
 #include <stdbool.h>
 #include <string.h>
+#include "server_operations.h"
 #include "netopeer_dbus.h"
 #include "dbus/dbus.h"
 

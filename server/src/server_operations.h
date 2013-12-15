@@ -46,8 +46,12 @@
 #include <libxml/tree.h>
 
 /* VERBOSE macro */
+extern int verbose;
 char err_msg[4096];
 #define VERB(level,format,args...) if(verbose>=level){snprintf(err_msg,4095,format,##args); clb_print(level,err_msg);}
+#define nc_verb_error(msg,args...) if(verbose>=NC_VERB_ERROR){snprintf(err_msg,4095,msg,##args);clb_print(NC_VERB_ERROR,err_msg);}
+#define nc_verb_warning(msg,args...) if(verbose>=NC_VERB_WARNING){snprintf(err_msg,4095,msg,##args);clb_print(NC_VERB_WARNING,err_msg);}
+#define nc_verb_verbose(msg,args...) if(verbose>=NC_VERB_VERBOSE){snprintf(err_msg,4095,msg,##args);clb_print(NC_VERB_VERBOSE,err_msg);}
 
 struct session_info {
 	/**

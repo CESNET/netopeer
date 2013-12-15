@@ -60,7 +60,7 @@
 
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
-
+int verbose = 0;
 /**
  * \brief Print program version
  *
@@ -134,7 +134,6 @@ int main (int argc, char** argv)
 	char *aux_string = NULL, path[PATH_MAX];
 	int next_option;
 	int daemonize = 0, len;
-	int verbose = 0;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
