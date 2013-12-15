@@ -620,13 +620,15 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 DISTRO
-LIBNETCONF_WITH
+CONFIGURE_PARAMS
 REQS
 BUILDREQS
 LIBOBJS
 EGREP
 GREP
 CPP
+LIBDBUS_LIBS
+LIBDBUS_CFLAGS
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -647,7 +649,6 @@ DOXYGEN
 UNAME
 GROUP
 USER
-DBUSCONF
 PKG_CONFIG
 CONFIGURE_PWD
 USERMAIL
@@ -698,7 +699,8 @@ with_distro
 enable_debug
 with_group
 with_libnetconf
-with_dbus_config_path
+with_libdbus
+with_dbus_config_dir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -713,6 +715,8 @@ PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 LIBNETCONF_CFLAGS
 LIBNETCONF_LIBS
+LIBDBUS_CFLAGS
+LIBDBUS_LIBS
 CPP'
 
 
@@ -1332,8 +1336,10 @@ Optional Packages:
   --with-group=GROUP      Group of users with enabled access to Netopeer
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
-  --with-dbus-config-path=DIR
-                          path prefix to D-Bus config files (/etc/dbus-1 by
+  --with-libdbus=PATH     Set explicit installation prefix to the libdbus
+                          library
+  --with-dbus-config-dir=DIR
+                          path to D-Bus config files (/etc/dbus-1/system.d/ by
                           default)
 
 Some influential environment variables:
@@ -1353,6 +1359,10 @@ Some influential environment variables:
               C compiler flags for LIBNETCONF, overriding pkg-config
   LIBNETCONF_LIBS
               linker flags for LIBNETCONF, overriding pkg-config
+  LIBDBUS_CFLAGS
+              C compiler flags for LIBDBUS, overriding pkg-config
+  LIBDBUS_LIBS
+              linker flags for LIBDBUS, overriding pkg-config
   CPP         C preprocessor
 
 Use these variables to override the choices made by `configure' or to help
@@ -2335,7 +2345,6 @@ else
 fi
 
 
-CFLAGS="$CFLAGS -Wall -DLIBCOMMLBR_WITH_DBUS"
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; CFLAGS="$CFLAGS -g"
@@ -2357,8 +2366,6 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GROUP" >&5
 $as_echo "$GROUP" >&6; }
-
-DBUSCONF="/etc/dbus-1"
 
 USER="root"
 
@@ -3659,7 +3666,7 @@ fi
 if test "${with_libnetconf+set}" = set; then :
   withval=$with_libnetconf; CFLAGS="-I$withval/include/ $CFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-	LIBNETCONF_WITH="--with-libnetconf=$withval"
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
 
 else
 
@@ -3755,7 +3762,7 @@ else
 $as_echo "yes" >&6; }
 
 fi
-	CFLAGS="$LIBNETCONF_CFLAGS $CFLAGS"
+	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
 	LIBS="$LIBNETCONF_LIBS $LIBS"
 
 fi
@@ -3880,99 +3887,195 @@ REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
-# Test whether Libdbus-1 exist
-if test -n "$with_libdbus_path" ; then
-	LIBS_LIB_DBUS="-ldbus-1"
-	LDFLAGS_LIB_DBUS="-L$with_libdbus_path/lib"
+# - library
+
+# Check whether --with-libdbus was given.
+if test "${with_libdbus+set}" = set; then :
+  withval=$with_libdbus; CFLAGS="-I$withval/include/ $CFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
+
 else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -ldbus-1" >&5
-$as_echo_n "checking for main in -ldbus-1... " >&6; }
-if ${ac_cv_lib_dbus_1_main+:} false; then :
+
+	# get info from pkg-config about installed package
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for LIBDBUS" >&5
+$as_echo_n "checking for LIBDBUS... " >&6; }
+
+if test -n "$LIBDBUS_CFLAGS"; then
+    pkg_cv_LIBDBUS_CFLAGS="$LIBDBUS_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"dbus-1 >= 1.0.0\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "dbus-1 >= 1.0.0") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_LIBDBUS_CFLAGS=`$PKG_CONFIG --cflags "dbus-1 >= 1.0.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$LIBDBUS_LIBS"; then
+    pkg_cv_LIBDBUS_LIBS="$LIBDBUS_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"dbus-1 >= 1.0.0\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "dbus-1 >= 1.0.0") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_LIBDBUS_LIBS=`$PKG_CONFIG --libs "dbus-1 >= 1.0.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
+        else
+	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$LIBDBUS_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (dbus-1 >= 1.0.0) were not met:
+
+$LIBDBUS_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables LIBDBUS_CFLAGS
+and LIBDBUS_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables LIBDBUS_CFLAGS
+and LIBDBUS_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5; }
+else
+	LIBDBUS_CFLAGS=$pkg_cv_LIBDBUS_CFLAGS
+	LIBDBUS_LIBS=$pkg_cv_LIBDBUS_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
+	CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
+	LIBS="$LIBDBUS_LIBS $LIBS"
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dbus_bus_get" >&5
+$as_echo_n "checking for library containing dbus_bus_get... " >&6; }
+if ${ac_cv_search_dbus_bus_get+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ldbus-1  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dbus_bus_get ();
 int
 main ()
 {
-return main ();
+return dbus_bus_get ();
   ;
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_dbus_1_main=yes
-else
-  ac_cv_lib_dbus_1_main=no
+for ac_lib in '' dbus-1; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dbus_bus_get=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_dbus_bus_get+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dbus_1_main" >&5
-$as_echo "$ac_cv_lib_dbus_1_main" >&6; }
-if test "x$ac_cv_lib_dbus_1_main" = xyes; then :
-   LIBS_LIB_DBUS="-ldbus-1"
-else
-   echo "libdbus-1 not found (use --with-libdbus-path=DIR if you have it in some non-standard directory)" ; exit 1
-fi
-
-fi
-
-# Extract the first word of "pkg-config", so it can be a program name with args.
-set dummy pkg-config; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_PKG_CONFIG+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$PKG_CONFIG"; then
-  ac_cv_prog_PKG_CONFIG="$PKG_CONFIG" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_PKG_CONFIG=""yes""
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
 done
-  done
-IFS=$as_save_IFS
+if ${ac_cv_search_dbus_bus_get+:} false; then :
 
-  test -z "$ac_cv_prog_PKG_CONFIG" && ac_cv_prog_PKG_CONFIG=""no""
-fi
-fi
-PKG_CONFIG=$ac_cv_prog_PKG_CONFIG
-if test -n "$PKG_CONFIG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PKG_CONFIG" >&5
-$as_echo "$PKG_CONFIG" >&6; }
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
+  ac_cv_search_dbus_bus_get=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dbus_bus_get" >&5
+$as_echo "$ac_cv_search_dbus_bus_get" >&6; }
+ac_res=$ac_cv_search_dbus_bus_get
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libdbus not found." "$LINENO" 5
 fi
 
 
-if test "$PKG_CONFIG" = "no" ; then
-	echo "pkg-config not found!"
-	exit 1
-fi
-if test "`pkg-config dbus-1 --atleast-version=1.0.0;echo $?`" != "0" ; then
-	echo "Wrong version of libdbus found - version 1.0 or higher is required."
-	exit 1
+# - configuration directory
+
+# Check whether --with-dbus-config-dir was given.
+if test "${with_dbus_config_dir+set}" = set; then :
+  withval=$with_dbus_config_dir; DBUSCONF="$withval"
+
+else
+  DBUSCONF="/etc/dbus-1/system.d/"
+
 fi
 
-CFLAGS="$CFLAGS `pkg-config dbus-1 --cflags`"
-LIBS="$LIBS $LIBS_LIB_DBUS"
-LDFLAGS="$LDFLAGS $LDFLAGS_LIB_DBUS"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus configuration directory $DBUSCONF" >&5
+$as_echo_n "checking for existence of D-Bus configuration directory $DBUSCONF... " >&6; }
+if test ! -d "$DBUSCONF"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
+$as_echo "missing" >&6; }
+	as_fn_error $? "Wrong D-Bus configuration path, $DBUSCONF does not exist." "$LINENO" 5
+else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+$as_echo "ok" >&6; }
+fi
+
+# - spec file dependencies
 case $DISTRO in
 	suse )
 		BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
@@ -3985,27 +4088,6 @@ case $DISTRO in
 		;;
 esac
 
-# check D-Bus configuration directory
-# Add --with-dbus-config-path parameter
-
-# Check whether --with-dbus-config-path was given.
-if test "${with_dbus_config_path+set}" = set; then :
-  withval=$with_dbus_config_path;
-fi
-
-if test -n "$with_dbus_config_path" ; then
-	if test -d "$with_dbus_config_path/system.d" ; then
-		DBUSCONF="$with_dbus_config_path"
-	else
-		echo "Given D-Bus configuration path ($with_dbus_config_path) is invalid"
-		exit 1
-	fi
-else
-	if test ! -d "$DBUSCONF/system.d" ; then
-		echo "D-Bus configuration path ($DBUSCONFIG) is invalid - exiting! (use --with-dbus-config-path=DIR if you has it in some other directory)"
-		exit 1
-	fi
-fi
 
 ###################### Check for configure parameters ##########################
 
@@ -4408,6 +4490,19 @@ done
 
 
 for ac_header in stdlib.h string.h sys/time.h unistd.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+for ac_header in dbus/dbus.h libnetconf_xml.h libxml/tree.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
