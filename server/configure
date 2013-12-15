@@ -620,13 +620,13 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 DISTRO
+LIBNETCONF_WITH
 REQS
 BUILDREQS
 LIBOBJS
 EGREP
 GREP
 CPP
-LIBNETCONF_WITH
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -1330,8 +1330,8 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-distro=DISTRO    Compile for specific Linux distribution
   --with-group=GROUP      Group of users with enabled access to Netopeer
-  --with-libnetconf=PATH  Set the path to libnetconf (usually local GIT
-                          repository)
+  --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
+                          library
   --with-dbus-config-path=DIR
                           path prefix to D-Bus config files (/etc/dbus-1 by
                           default)
@@ -3530,8 +3530,8 @@ fi
 CFLAGS="$CFLAGS `xml2-config --cflags`"
 LIBS="$LIBS $LIBS_LIB_XML"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
-BUILDREQS="$BUILDREQS , libxml2-devel"
-REQS="$REQS , libxml2"
+BUILDREQS="$BUILDREQS libxml2-devel"
+REQS="$REQS libxml2"
 
 # libnetconf
 
@@ -3657,12 +3657,13 @@ fi
 
 # Check whether --with-libnetconf was given.
 if test "${with_libnetconf+set}" = set; then :
-  withval=$with_libnetconf; # local copy of libnetconf GIT repo with headers and binaries
-	LIBNETCONF_CFLAGS="-I`cd $withval;pwd`"
-	LIBNETCONF_LIBS="-L`cd $withval;pwd` -lnetconf"
-    LIBNETCONF_WITH=" --with-libnetconf=$withval"
+  withval=$with_libnetconf; CFLAGS="-I$withval/include/ $CFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+	LIBNETCONF_WITH="--with-libnetconf=$withval"
+
 else
-  # get info from pkg-config about installed package
+
+	# get info from pkg-config about installed package
 
 pkg_failed=no
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for LIBNETCONF" >&5
@@ -3754,23 +3755,17 @@ else
 $as_echo "yes" >&6; }
 
 fi
-    BUILDREQS="$BUILDREQS ,libnetconf-devel"
+	CFLAGS="$LIBNETCONF_CFLAGS $CFLAGS"
+	LIBS="$LIBNETCONF_LIBS $LIBS"
 
 fi
 
-CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
-LIBS="$LIBS $LIBNETCONF_LIBS"
-
-
-
-REQS="$REQS , libnetconf"
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ncds_new in -lnetconf" >&5
-$as_echo_n "checking for ncds_new in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_ncds_new+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_init" >&5
+$as_echo_n "checking for library containing nc_init... " >&6; }
+if ${ac_cv_search_nc_init+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3780,44 +3775,55 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char ncds_new ();
+char nc_init ();
 int
 main ()
 {
-return ncds_new ();
+return nc_init ();
   ;
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_ncds_new=yes
-else
-  ac_cv_lib_netconf_ncds_new=no
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_init=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_init+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_ncds_new" >&5
-$as_echo "$ac_cv_lib_netconf_ncds_new" >&6; }
-if test "x$ac_cv_lib_netconf_ncds_new" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
+done
+if ${ac_cv_search_nc_init+:} false; then :
 
-  LIBS="-lnetconf $LIBS"
+else
+  ac_cv_search_nc_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_init" >&5
+$as_echo "$ac_cv_search_nc_init" >&6; }
+ac_res=$ac_cv_search_nc_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
   as_fn_error $? "libnetconf not found." "$LINENO" 5
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ncntf_dispatch_send in -lnetconf" >&5
-$as_echo_n "checking for ncntf_dispatch_send in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_ncntf_dispatch_send+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
+$as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3827,37 +3833,51 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char ncntf_dispatch_send ();
+char ncntf_dispatch_receive ();
 int
 main ()
 {
-return ncntf_dispatch_send ();
+return ncntf_dispatch_receive ();
   ;
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_ncntf_dispatch_send=yes
-else
-  ac_cv_lib_netconf_ncntf_dispatch_send=no
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ncntf_dispatch_receive=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_ncntf_dispatch_send" >&5
-$as_echo "$ac_cv_lib_netconf_ncntf_dispatch_send" >&6; }
-if test "x$ac_cv_lib_netconf_ncntf_dispatch_send" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
-
-  LIBS="-lnetconf $LIBS"
+done
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
 
 else
-  as_fn_error $? "missing notification support in libnetconf." "$LINENO" 5
+  ac_cv_search_ncntf_dispatch_receive=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ncntf_dispatch_receive" >&5
+$as_echo "$ac_cv_search_ncntf_dispatch_receive" >&6; }
+ac_res=$ac_cv_search_ncntf_dispatch_receive
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libnetconf does not support notifications." "$LINENO" 5
 fi
 
+REQS="$REQS libnetconf"
+BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
 # Test whether Libdbus-1 exist
@@ -3955,13 +3975,13 @@ LIBS="$LIBS $LIBS_LIB_DBUS"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_DBUS"
 case $DISTRO in
 	suse )
-		BUILDREQS="$BUILDREQS , dbus-1-devel >= 1.0.0"
-		REQS="$REQS , dbus-1 >= 1.0.0"
+		BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
+		REQS="$REQS dbus-1 >= 1.0.0"
 		;;
 	* )
 		# RH distros
-		BUILDREQS="$BUILDREQS , dbus-devel >= 1.0.0"
-		REQS="$REQS , dbus >= 1.0.0"
+		BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
+		REQS="$REQS dbus >= 1.0.0"
 		;;
 esac
 
