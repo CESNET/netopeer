@@ -155,8 +155,8 @@ fi
 CFLAGS="$CFLAGS `xml2-config --cflags`"
 LIBS="$LIBS $LIBS_LIB_XML"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
-BUILDREQS="$BUILDREQS , libxml2-devel"
-REQS="$REQS , libxml2"
+BUILDREQS="$BUILDREQS libxml2-devel"
+REQS="$REQS libxml2"
 
 # libnetconf
 AC_ARG_WITH([libnetconf],
@@ -167,16 +167,16 @@ AC_ARG_WITH([libnetconf],
     LIBNETCONF_WITH=" --with-libnetconf=$withval"],
 	[# get info from pkg-config about installed package
 	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
-    BUILDREQS="$BUILDREQS ,libnetconf-devel"]
 )
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
 AC_SUBST([LIBNETCONF_LIBS])
 AC_SUBST([LIBNETCONF_CFLAGS])
 AC_SUBST([LIBNETCONF_WITH])
-REQS="$REQS , libnetconf"
 AC_CHECK_LIB([netconf], [ncds_new],[],AC_MSG_ERROR([libnetconf not found.]))
 AC_CHECK_LIB([netconf], [ncntf_dispatch_send],[],AC_MSG_ERROR([missing notification support in libnetconf.]))
+REQS="$REQS libnetconf"
+BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
 # Test whether Libdbus-1 exist
@@ -204,13 +204,13 @@ LIBS="$LIBS $LIBS_LIB_DBUS"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_DBUS"
 case $DISTRO in
 	suse )
-		BUILDREQS="$BUILDREQS , dbus-1-devel >= 1.0.0"
-		REQS="$REQS , dbus-1 >= 1.0.0"
+		BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
+		REQS="$REQS dbus-1 >= 1.0.0"
 		;;
 	* )
 		# RH distros
-		BUILDREQS="$BUILDREQS , dbus-devel >= 1.0.0"
-		REQS="$REQS , dbus >= 1.0.0"
+		BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
+		REQS="$REQS dbus >= 1.0.0"
 		;;
 esac
 
@@ -249,7 +249,6 @@ AC_CHECK_FUNCS([select strdup strerror])
 AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(DISTRO)
-
 
 AC_SUBST(DOXYGEN)
 if test -z "$DOXYGEN"; then
