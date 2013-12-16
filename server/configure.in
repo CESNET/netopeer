@@ -59,11 +59,27 @@ if test "x$PKG_CONFIG" = "xno"; then
 	AC_MSG_ERROR(['pkgconfig' not found.])
 fi
 
+# check for Linux distribution
 AC_ARG_WITH([distro],
-	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),
-	DISTRO=$withval,
-	DISTRO=redhat
+	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution (RHEL based by default)]),
+	DISTRO=`echo $withval | tr A-Z a-z`,
+	if test -n "`cat /proc/version | grep 'Red Hat'`"; then
+		DISTRO=redhat;
+	else		
+		DISTRO=`cat /etc/*release | grep ^ID= | sed 's/.*=//'`;
+	fi	
 )
+AC_MSG_CHECKING([for distro])
+AC_MSG_RESULT([$DISTRO])
+case $DISTRO in
+	opensuse | suse | rhel | redhat )
+		# ok, supported distros
+		;;
+	* )
+		# unknown
+		AC_MSG_WARN([Unsupported Linux distro \"$DISTRO\", only RHEL and SUSE are fully supported.])
+		;;
+esac
 
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
