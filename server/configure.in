@@ -74,10 +74,19 @@ AC_ARG_ENABLE([debug],
 # Add --with-group parameter
 AC_MSG_CHECKING([for group])
 AC_ARG_WITH([group],
-	AC_HELP_STRING([--with-group=GROUP],[Group of users with enabled access to Netopeer]),
-	GROUP="$with_group"
+	AC_HELP_STRING([--with-group=GROUP],[Group of users with enabled access to Netopeer server (root by default)]),
+	GROUP="$with_group",
+	GROUP="root"
 )
 AC_MSG_RESULT([$GROUP])
+
+AC_MSG_CHECKING([for user])
+AC_ARG_WITH([user],
+	AC_HELP_STRING([--with-user=USER],[User to be allowed to start Netopeer server (root by default)]),
+	USER="$with_group",
+	USER="root"
+)
+AC_MSG_RESULT([$USER])
 
 AC_SUBST([USER],["root"])
 AC_SUBST([GROUP],["root"])
@@ -250,6 +259,7 @@ fi
 AC_CONFIG_FILES(Makefile)
 AC_CONFIG_FILES(agent/Makefile)
 AC_CONFIG_FILES(dm_manager/Makefile)
+AC_CONFIG_FILES(config/org.liberouter.netopeer2.conf)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
 

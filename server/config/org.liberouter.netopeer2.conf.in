@@ -10,7 +10,7 @@
 
   <!-- Allow group users to invoke methods -->
   <!-- Change this if you want to be more restrictive -->
-  <policy group="all-users">
+  <policy group="@GROUP@">
     <allow send_destination="org.liberouter.netopeer2.server"/>
     <allow receive_sender="org.liberouter.netopeer2.server"/>
   </policy>
