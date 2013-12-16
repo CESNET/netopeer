@@ -2369,6 +2369,7 @@ $as_echo "$as_me: WARNING: Unsupported Linux distro \"$DISTRO\", only RHEL and S
 		;;
 esac
 
+CFLAGS="-Wall -Wextra"
 # --enable-debug
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
@@ -3383,7 +3384,7 @@ if test "$XML2_CONFIG" = "no"; then
 	echo "xml2-config not found - exiting!"
 	exit 1
 fi
-CFLAGS="$CFLAGS `xml2-config --cflags`"
+CPPFLAGS="$CPPFLAGS `xml2-config --cflags`"
 LIBS="$LIBS $LIBS_LIB_XML"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
@@ -3513,7 +3514,7 @@ fi
 
 # Check whether --with-libnetconf was given.
 if test "${with_libnetconf+set}" = set; then :
-  withval=$with_libnetconf; CFLAGS="-I$withval/include/ $CFLAGS"
+  withval=$with_libnetconf; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
 
@@ -3740,7 +3741,7 @@ BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # Check whether --with-libdbus was given.
 if test "${with_libdbus+set}" = set; then :
-  withval=$with_libdbus; CFLAGS="-I$withval/include/ $CFLAGS"
+  withval=$with_libdbus; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
 

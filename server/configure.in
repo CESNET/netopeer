@@ -177,7 +177,7 @@ if test "$XML2_CONFIG" = "no"; then
 	echo "xml2-config not found - exiting!"
 	exit 1
 fi
-CFLAGS="$CFLAGS `xml2-config --cflags`"
+CPPFLAGS="$CPPFLAGS `xml2-config --cflags`"
 LIBS="$LIBS $LIBS_LIB_XML"
 LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
@@ -186,7 +186,7 @@ REQS="$REQS libxml2"
 # libnetconf
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-	[CFLAGS="-I$withval/include/ $CFLAGS"
+	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
 	],[
@@ -204,7 +204,7 @@ BUILDREQS="$BUILDREQS libnetconf-devel"
 # - library
 AC_ARG_WITH([libdbus],
 	AC_HELP_STRING([--with-libdbus=PATH],[Set explicit installation prefix to the libdbus library]),
-	[CFLAGS="-I$withval/include/ $CFLAGS"
+	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
 	],[
