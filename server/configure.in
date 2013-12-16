@@ -156,7 +156,7 @@ AC_CHECK_PROG(DOXYGEN, doxygen, doxygen)
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
 
 # Check for standard programs
-AC_PROG_CC
+AC_PROG_CC(clang llvm-gcc gcc)
 AC_PROG_INSTALL
 
 ############################ Check for libraries ###############################
