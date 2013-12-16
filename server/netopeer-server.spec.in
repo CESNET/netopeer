@@ -36,7 +36,7 @@ make
 make doc
 
 %install
-make DESTDIR=$RPM_BUILD_ROOT RUN="RPM" install
+make DESTDIR=$RPM_BUILD_ROOT install
 
 %post
 if [ `grep -i "Subsystem netconf" %{_sysconfdir}/ssh/sshd_config | wc -l` -le 0 ]; then echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/ssh/sshd_config; fi
