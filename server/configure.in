@@ -81,9 +81,11 @@ case $DISTRO in
 		;;
 esac
 
+CFLAGS="-Wall -Wextra"
+# --enable-debug
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
-	CFLAGS="$CFLAGS -g",
+	CFLAGS="$CFLAGS -g -O0",
 	CFLAGS="$CFLAGS -O3"
 )
 
