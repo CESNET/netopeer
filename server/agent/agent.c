@@ -296,7 +296,7 @@ int send_session_info (DBusConnection * conn, struct nc_session * session)
 	return EXIT_SUCCESS;
 }
  
-int main (int argc, char** argv)
+int main ()
 {
 	DBusConnection * dbus_con;
 	struct nc_session * netconf_con;

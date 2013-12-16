@@ -161,7 +161,7 @@ void get_capabilities (DBusConnection *conn, DBusMessage *msg);
  * @param conn DBus connection to the Netopeer agent
  * @param msg KillSession DBus message from the Netopeer agent
  */
-void close_session (DBusConnection *conn, DBusMessage *msg);
+void close_session (DBusMessage *msg);
 
 /**
  * @ingroup dbus
@@ -276,9 +276,8 @@ void server_sessions_add (const char * session_id, const char * username, struct
  * @brief Close and remove session and stop agent
  *
  * @param session Session to stop.
- * @param msg Human readable reason for SSH session disconnection.
  */
-void server_sessions_stop (struct session_info *session, NC_SESSION_TERM_REASON msg);
+void server_sessions_stop (struct session_info *session);
 
 /**
  * @brief Close and remove all sessions

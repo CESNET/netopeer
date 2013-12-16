@@ -101,7 +101,7 @@ struct device_list * device_list_get_all (int *count)
 
 	return retval;
 }
-void device_list_free (struct device_list * list, int count)
+void device_list_free (struct device_list * list)
 {
 	free (list);
 }

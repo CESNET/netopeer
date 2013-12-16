@@ -237,7 +237,7 @@ restart:
 			print_debug("message member: %s", dbus_message_get_member (msg));
 			print_debug("message destination: %s", dbus_message_get_destination (msg));
 
-			if (ns_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
+			if (ns_dbus_handlestdif (msg, conn) != 0) {
 				print_debug("D-Bus standard interface message");
 
 				/* free the message */
@@ -260,7 +260,7 @@ restart:
 					set_new_session (conn, msg);
 				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CLOSE_SESSION) == TRUE) {
 					/* CloseSession request */
-					close_session (conn, msg);
+					close_session (msg);
 				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
 					/* KillSession request */
 					kill_session (conn, msg);

@@ -181,7 +181,7 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 		for (i=0; i<len; i++) {
 			module_names[i] = strdup(dev_list[i].name);
 		}
-		device_list_free(dev_list, len);
+		device_list_free(dev_list);
 
 		for (i=0; i<xpath_obj->nodesetval->nodeNr; i++) {
 			allowed = 0;
@@ -397,7 +397,7 @@ char * get_state_data (const char * model, const char * running, struct nc_err *
 			}
 		}
 	}
-	device_list_free(dev_list, len);
+	device_list_free(dev_list);
 
 	buffer = xmlBufferCreate ();
 	xmlNodeDump(buffer, state, netopeer, 1, 1);

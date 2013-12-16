@@ -181,13 +181,11 @@ int ns_dbus_positive_reply(DBusMessage *msg, DBusConnection *conn)
  *
  * @param msg            received message with request
  * @param conn           opened connection to the D-Bus
- * @param service        name of the service where you receiving messages
- *                       from D-Bus (message destination)
  * @return               zero when message doesn't contain message call
  *                       of standard method, nonzero if one of standard
  *                       method was received
  */
-int ns_dbus_handlestdif (DBusMessage *msg, DBusConnection *conn, const char* service)
+int ns_dbus_handlestdif (DBusMessage *msg, DBusConnection *conn)
 {
 	DBusMessage     *reply;
 	DBusMessageIter  args;

@@ -215,7 +215,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
  * @param conn DBus connection to the Netopeer agent
  * @param msg KillSession DBus message from the Netopeer agent
  */
-void close_session (DBusConnection *conn, DBusMessage *msg)
+void close_session (DBusMessage *msg)
 {
 	struct session_info *sender_session;
 	/*
@@ -228,7 +228,7 @@ void close_session (DBusConnection *conn, DBusMessage *msg)
 		return;
 	}
 
-	server_sessions_stop (sender_session, NC_SESSION_TERM_CLOSED);
+	server_sessions_stop (sender_session);
 }
 
 /**
@@ -304,7 +304,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 		}
 	}
 
-	server_sessions_stop (session, NC_SESSION_TERM_KILLED);
+	server_sessions_stop (session);
 
 	reply = nc_reply_ok();
 	boolean = 1;

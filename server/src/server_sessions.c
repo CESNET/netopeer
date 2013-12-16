@@ -100,7 +100,7 @@ int server_sessions_remove (const char* session_id)
 	return (EXIT_SUCCESS);
 }
 
-void server_sessions_stop (struct session_info *session, NC_SESSION_TERM_REASON msg)
+void server_sessions_stop (struct session_info *session)
 {
 	const char * sid = NULL;
 	int agent_pid;
@@ -126,7 +126,7 @@ void server_sessions_destroy_all (void) {
 	while (tmp != NULL) {
 		rem = tmp;
 		tmp = tmp->next;
-		server_sessions_stop (rem, NC_SESSION_TERM_OTHER);
+		server_sessions_stop (rem);
 	}
 }
 

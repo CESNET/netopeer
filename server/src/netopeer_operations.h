@@ -56,7 +56,7 @@ void session_log_free (struct session_log * log, int count);
 /* implemented in server_modules.c */
 int manage_module (char * name, int op);
 struct device_list * device_list_get_all (int *count);
-void device_list_free (struct device_list * list, int count);
+void device_list_free (struct device_list * list);
 
 /* implemented in server_info.c */
 char ** server_capability_get_list (void);
