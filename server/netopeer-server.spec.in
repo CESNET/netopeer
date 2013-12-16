@@ -54,7 +54,6 @@ fi
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
 %{_bindir}/netopeer-dm-manager
-%{_prefix}/share/@PACKAGE_NAME@/doxygen/*
 %{_sysconfdir}/dbus-1/system.d/org.liberouter.netopeer2.conf
 %{_datadir}/dbus-1/system-services/org.liberouter.netopeer2.server.service
 %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml
