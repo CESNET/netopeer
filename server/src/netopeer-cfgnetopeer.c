@@ -51,6 +51,12 @@
 #include "netopeer_operations.h"
 #include "server_operations.h"
 
+#ifdef __GNUC__
+#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#	define UNUSED(x) UNUSED_ ## x
+#endif
+
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
 extern int restart_soft, restart_hard, done;
@@ -368,7 +374,7 @@ fail:
 	return ret;
 }
 
-char * get_state_data (const char * model, const char * running, struct nc_err **error)
+char * get_state_data (const char * UNUSED(model), const char * UNUSED(running), struct nc_err** UNUSED(error))
 {
 	xmlDocPtr state;
 	xmlNsPtr namespace;
