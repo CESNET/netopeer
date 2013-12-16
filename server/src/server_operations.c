@@ -344,7 +344,7 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 	DBusMessage * dbus_reply;
 	dbus_bool_t boolean = 1;
 	struct session_info * session;
-	nc_rpc * rpc;
+	nc_rpc * rpc = NULL;
 	nc_reply * reply;
 	struct nc_err * err;
 
@@ -478,7 +478,7 @@ nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
 nc_reply * device_process_rpc (int dmid, const struct nc_session * session, const nc_rpc * rpc)
 {
 	struct server_module_list * list = calloc (1, sizeof (struct server_module_list));
-	nc_reply * reply, * dev_reply;
+	nc_reply * reply = NULL, * dev_reply;
 	static const nc_rpc * last_rpc = NULL;
 	struct nc_err * err;
 

@@ -159,7 +159,7 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 	xmlXPathContextPtr ctxt = NULL;
 	xmlXPathObjectPtr xpath_obj = NULL;
 	char * xpath_query = NULL;
-	char * name, *errmsg;
+	char * name = NULL, *errmsg;
 	int i, j, len, allowed;
 	struct nc_err * err = NULL;
 	struct device_list * dev_list = NULL;
