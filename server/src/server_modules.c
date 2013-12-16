@@ -579,7 +579,10 @@ xmlNodePtr server_modules_get_device_config (char * name)
 	char * config_file_path;
 	xmlNodePtr ret = NULL;
 
-	asprintf (&config_file_path, "%s/%s.xml", MODULES_CFG_DIR, name);
+	if (asprintf (&config_file_path, "%s/%s.xml", MODULES_CFG_DIR, name) < 0) {
+		nc_verb_warning("Configuration file %s not found.", config_file_path);
+		return(NULL);
+	}
 	if ((device_doc = xmlReadFile (config_file_path, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN)) == NULL) {
 		nc_verb_warning("Configuration file %s not found.", config_file_path);
 		free (config_file_path);

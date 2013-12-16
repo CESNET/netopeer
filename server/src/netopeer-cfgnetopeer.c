@@ -223,20 +223,20 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 			if (allowed) {
 				if (manage_module(name, NETOPEER_MANAGE_ALLOW)) {
 					nc_verb_error("Netopeer: unable to start device %s", name);
-					asprintf(&errmsg, "Netopeer: unable to start device %s", name);
 					err = nc_err_new (NC_ERR_OP_FAILED);
-					nc_err_set (err, NC_ERR_PARAM_MSG, errmsg);
-					free (errmsg);
-					goto cleanup;
+					if (asprintf(&errmsg, "Netopeer: unable to start device %s", name) > 0) {
+						nc_err_set (err, NC_ERR_PARAM_MSG, errmsg);
+						free (errmsg);
+					}
 				}
 			} else {
 				if (manage_module(name, NETOPEER_MANAGE_FORBID)) {
 					nc_verb_error("Netopeer: unable to stop device %s", name);
-					asprintf(&errmsg, "Netopeer: unable to stop device %s", name);
 					err = nc_err_new (NC_ERR_OP_FAILED);
-					nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
-					free (errmsg);
-					goto cleanup;
+					if (asprintf(&errmsg, "Netopeer: unable to stop device %s", name) > 0) {
+						nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
+						free (errmsg);
+					}
 				}
 			}
 			/* remove module from list */
@@ -255,11 +255,11 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 			if (module_names[i] != NULL) {
 				if (manage_module(module_names[i], NETOPEER_MANAGE_FORBID)) {
 					nc_verb_error("Netopeer: unable to stop device %s", name);
-					asprintf(&errmsg, "Netopeer: unable to stop device %s", name);
 					err = nc_err_new (NC_ERR_OP_FAILED);
-					nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
-					free (errmsg);
-					goto cleanup;
+					if (asprintf(&errmsg, "Netopeer: unable to stop device %s", name) > 0) {
+						nc_err_set(err, NC_ERR_PARAM_MSG, errmsg);
+						free (errmsg);
+					}
 				}
 			}
 		}

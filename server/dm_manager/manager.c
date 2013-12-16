@@ -87,7 +87,12 @@ int add_module (char * name, char * old_module, char * transapi_module, char * r
 		xmlAddChild (device_node, device_tmp);
 	}
 
-	asprintf (&config_file_path, "%s/%s.xml", config, name);
+	if (asprintf(&config_file_path, "%s/%s.xml", config, name) < 0) {
+		fprintf (stderr, "Unable to allocate memory.");
+		xmlFreeDoc (config_doc);
+		xmlCleanupParser ();
+		return EXIT_FAILURE;
+	}
 	if ((config_file = fopen (config_file_path, "w")) == NULL) {
 		fprintf (stderr, "Unable to open file %s for writing\n", config);
 		xmlFreeDoc (config_doc);
@@ -110,7 +115,10 @@ int del_module (char * name, char * config)
 {
 	char * config_file_path;
 
-	asprintf (&config_file_path, "%s/%s.xml", config, name);
+	if (asprintf(&config_file_path, "%s/%s.xml", config, name) < 0) {
+		fprintf (stderr, "Unable to allocate memory.");
+		return EXIT_FAILURE;
+	}
 
 	remove (config_file_path);
 

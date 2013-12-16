@@ -284,10 +284,11 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 	}
 	if ((session = (struct session_info *)server_sessions_get_by_id (session_id)) == NULL) {
 		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
-		asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id);
 		err = nc_err_new (NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
-		free (aux_string);
+		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
+			nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
+			free (aux_string);
+		}
 		reply = nc_reply_error (err);
 		goto send_reply;
 	}
