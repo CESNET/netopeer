@@ -149,34 +149,25 @@ distclean:
 
 .PHONY: install
 install: install-devel
-	[ -d $(DESTDIR)/$(bindir) ] || \
-	    (mkdir -p $(DESTDIR)/$(bindir); chmod 755 $(DESTDIR)/$(bindir))
+	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(NAME) $(DESTDIR)/$(bindir)/;
 	for i in $(SUBDIRS) ; do \
 		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C $$i install \
 		|| exit 1; \
 	done
-	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/);
-	@cp config/datastore.xml $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml
-	@cp config/netopeer-cfgnetopeer.yin $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin
-	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
-	[ -d $(DESTDIR)/$(sysconfdir)/init.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/init.d/);
-	@cp netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/netopeer.rc
-	@chmod a+rx $(DESTDIR)/$(sysconfdir)/init.d/netopeer.rc
-	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
-	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/);
-	@dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
 	$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/
 	$(INSTALL_DATA) config/org.liberouter.netopeer2.conf $(DESTDIR)/$(dbusconfdir)/
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
 		$(INSTALL_DATA) config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
+	$(INSTALL_DATA) config/datastore.xml $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
+	$(INSTALL_DATA) config/netopeer-cfgnetopeer.yin $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
+	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/;
+	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
 
 .PHONY: install-devel
 install-devel:
