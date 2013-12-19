@@ -228,7 +228,31 @@ if test ! -d "$DBUSCONF"; then
 	AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
 else
 	AC_MSG_RESULT([ok])
+	AC_SUBST(DBUSCONF)
 fi
+
+# - services directory
+AC_ARG_WITH([dbus-services],
+	AC_HELP_STRING([--with-dbus-services@<:@=DIR@:>@],
+		[path to D-Bus services directory (/usr/share/dbus-1/services/ by default), \
+		if this parameter is not used, service file for netopeer-server is not installed!]),
+		if test "$withval" = "yes"; then
+			DBUSSERVICES="/usr/share/dbus-1/services/"
+		else
+			DBUSSERVICES="$withval"
+		fi
+		AC_MSG_CHECKING([for existence of D-Bus services directory $DBUSSERVICES])
+		if test ! -d "$DBUSSERVICES"; then
+			AC_MSG_RESULT([missing])
+			AC_MSG_ERROR([Wrong D-Bus service path, $DBUSSERVICES does not exist.])
+		else
+			AC_MSG_RESULT([ok])
+			AC_SUBST(DBUSSERVICES)
+		fi
+		,
+		# do not install DBus service file anywhere
+		DBUSSERVICES=""
+)
 
 # - spec file dependencies
 case $DISTRO in

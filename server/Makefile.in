@@ -45,6 +45,8 @@ includedir = @includedir@
 libdir =  @libdir@
 mandir = @mandir@
 sysconfdir = @sysconfdir@
+dbusconfdir = @DBUSCONF@
+dbusservices = @DBUSSERVICES@
 
 CC = @CC@
 DOXYGEN = @DOXYGEN@
@@ -155,14 +157,6 @@ install: install-devel
 		|| exit 1; \
 	done
 	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
-	[ -d $(DESTDIR)/$(sysconfdir)/dbus-1/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/dbus-1/);
-	[ -d $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/);
-	@cp config/org.liberouter.netopeer2.conf $(DESTDIR)/$(sysconfdir)/dbus-1/system.d/org.liberouter.netopeer2.conf
-	[ -d $(DESTDIR)/$(datadir)/ ] || (mkdir -p $(DESTDIR)/$(datadir)/);
-	[ -d $(DESTDIR)/$(datadir)/dbus-1/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/);
-	[ -d $(DESTDIR)/$(datadir)/dbus-1/system-services/ ] || (mkdir -p $(DESTDIR)/$(datadir)/dbus-1/system-services/);
-	@cp config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(datadir)/dbus-1/system-services/org.liberouter.netopeer2.server.service
-	[ -d $(DESTDIR)/$(sysconfdir)/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/);
@@ -177,6 +171,12 @@ install: install-devel
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/);
 	[ -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/ ] || (mkdir -p $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/);
 	@dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
+	$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/
+	$(INSTALL_DATA) config/org.liberouter.netopeer2.conf $(DESTDIR)/$(dbusconfdir)/
+	if test -n "$(dbusservices)"; then \
+		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(dbusservices)/; \
+	fi
 
 .PHONY: install-devel
 install-devel:
