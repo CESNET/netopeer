@@ -160,7 +160,7 @@ nc_reply * apply_config (xmlDocPtr config_doc)
 	xmlXPathObjectPtr xpath_obj = NULL;
 	char * xpath_query = NULL;
 	char * name = NULL, *errmsg;
-	int i, j, len, allowed;
+	int i, j, len = 0, allowed;
 	struct nc_err * err = NULL;
 	struct device_list * dev_list = NULL;
 	char ** module_names = NULL;
