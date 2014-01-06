@@ -2408,7 +2408,7 @@ $as_echo_n "checking for user... " >&6; }
 
 # Check whether --with-user was given.
 if test "${with_user+set}" = set; then :
-  withval=$with_user; USER="$with_group"
+  withval=$with_user; USER="$with_user"
 else
   USER="root"
 
@@ -2417,9 +2417,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $USER" >&5
 $as_echo "$USER" >&6; }
 
-USER="root"
 
-GROUP="root"
 
 
 ############################ Check for programs ################################
@@ -4535,6 +4533,8 @@ ac_config_files="$ac_config_files dm_manager/Makefile"
 
 ac_config_files="$ac_config_files config/org.liberouter.netopeer2.conf"
 
+ac_config_files="$ac_config_files config/org.liberouter.netopeer2.server.service"
+
 ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
@@ -5250,6 +5250,7 @@ do
     "agent/Makefile") CONFIG_FILES="$CONFIG_FILES agent/Makefile" ;;
     "dm_manager/Makefile") CONFIG_FILES="$CONFIG_FILES dm_manager/Makefile" ;;
     "config/org.liberouter.netopeer2.conf") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer2.conf" ;;
+    "config/org.liberouter.netopeer2.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer2.server.service" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
 
