@@ -79,14 +79,19 @@ SRCS =  src/server.c \
 
 HDRS = src/server_operations.h \
 	src/netopeer_operations.h \
-       src/device_module_interface.h\
-       src/netopeer_operations.h \
+	src/device_module_interface.h\
+	src/netopeer_operations.h \
 	src/netopeer_dbus.h
 
 HDRS_DEVEL = src/device_module_interface.h
 
 CFGS = config/datastore.xml \
 	config/netopeer-cfgnetopeer.yin \
+	config/netopeer-cfgnetopeer-data.rng \
+	config/netopeer-cfgnetopeer-gdefs.rng \
+	config/netopeer-cfgnetopeer-schematron.xsl
+	
+CFGS_TAR = $(CFGS) \
 	config/org.liberouter.netopeer2.conf.in \
 	config/org.liberouter.netopeer2.server.service.in
 
@@ -127,7 +132,7 @@ tarball: $(SRCS) $(HEADERS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
 	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
-	for i in $(SRCS) $(HDRS) $(CFGS) configure.in configure \
+	for i in $(SRCS) $(HDRS) $(CFGS_TAR) configure.in configure \
 	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh; do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
@@ -166,8 +171,7 @@ install: install-devel
 		$(INSTALL_DATA) config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
-	$(INSTALL_DATA) config/datastore.xml $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
-	$(INSTALL_DATA) config/netopeer-cfgnetopeer.yin $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
+	$(INSTALL_DATA) $(CFGS) $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/;
