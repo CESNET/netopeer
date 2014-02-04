@@ -10,7 +10,7 @@
 
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
-#include <libnetconf/datastore.h>
+#include <libnetconf.h>
 
 #include "server_operations.h"
 #include "netopeer_operations.h"

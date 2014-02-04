@@ -41,7 +41,6 @@
 #define SERVER_OP_H_
 
 #include <libnetconf_xml.h>
-#include <libnetconf/datastore.h>
 #include <dbus/dbus.h>
 #include <libxml/tree.h>
 

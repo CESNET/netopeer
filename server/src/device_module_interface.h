@@ -39,7 +39,6 @@
  */
 
 #include <libnetconf.h>
-#include <libnetconf/datastore.h>
 
 /**
  * @brief Parse operation and decide what to do than return result of operation
