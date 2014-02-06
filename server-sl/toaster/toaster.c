@@ -224,7 +224,7 @@ nc_reply * rpc_make_toast (xmlNodePtr input[])
 	if (toasterDoneness == NULL) { /* doneness not specified, use default*/
 		doneness = 5;
 	} else { /* get doneness value */
-		doneness = atoi (xmlNodeGetContent(toasterDoneness));
+		doneness = atoi ((char*)xmlNodeGetContent(toasterDoneness));
 	}
 
 	pthread_mutex_lock(&status->toaster_mutex);
