@@ -4,6 +4,7 @@
 * Do NOT alter function signatures or any structure until you exactly know what you are doing.
 */
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
