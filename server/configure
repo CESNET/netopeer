@@ -619,6 +619,8 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+SRCS_COMM
+HDRS_COMM
 DISTRO
 CONFIGURE_PARAMS
 REQS
@@ -701,6 +703,7 @@ with_distro
 enable_debug
 with_group
 with_user
+enable_dbus
 with_libnetconf
 with_libdbus
 with_dbus_config_dir
@@ -1332,6 +1335,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
+  --disable-dbus          Use UNIX sockets instead of DBus.
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2419,6 +2423,26 @@ $as_echo "$USER" >&6; }
 
 
 
+
+# Check whether --enable-dbus was given.
+if test "${enable_dbus+set}" = set; then :
+  enableval=$enable_dbus; if test "$enableval" = "no"; then
+		dbus="no"
+		CPPFLAGS="$CPPFLAGS -DDISABLE_DBUS"
+	else
+		dbus="yes"
+	fi
+
+else
+  # use DBus by default
+	dbus="yes"
+
+fi
+
+if test "$dbus" = "yes"; then
+	HDRS_COMM="src/netopeer_dbus.h src/server_operations_dbus.h"
+	SRCS_COMM="src/netopeer_dbus.c src/server_operations_dbus.c"
+fi
 
 ############################ Check for programs ################################
 
@@ -3743,17 +3767,18 @@ REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
-# - library
+if test "$dbus" = "yes"; then
+	# - library
 
 # Check whether --with-libdbus was given.
 if test "${with_libdbus+set}" = set; then :
   withval=$with_libdbus; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
+		LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
 
 else
 
-	# get info from pkg-config about installed package
+		# get info from pkg-config about installed package
 
 pkg_failed=no
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for LIBDBUS" >&5
@@ -3845,12 +3870,12 @@ else
 $as_echo "yes" >&6; }
 
 fi
-	CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
-	LIBS="$LIBDBUS_LIBS $LIBS"
+		CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
+		LIBS="$LIBDBUS_LIBS $LIBS"
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dbus_bus_get" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dbus_bus_get" >&5
 $as_echo_n "checking for library containing dbus_bus_get... " >&6; }
 if ${ac_cv_search_dbus_bus_get+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -3909,7 +3934,7 @@ else
 fi
 
 
-# - configuration directory
+	# - configuration directory
 
 # Check whether --with-dbus-config-dir was given.
 if test "${with_dbus_config_dir+set}" = set; then :
@@ -3920,58 +3945,58 @@ else
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus configuration directory $DBUSCONF" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus configuration directory $DBUSCONF" >&5
 $as_echo_n "checking for existence of D-Bus configuration directory $DBUSCONF... " >&6; }
-if test ! -d "$DBUSCONF"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
+	if test ! -d "$DBUSCONF"; then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
 $as_echo "missing" >&6; }
-	as_fn_error $? "Wrong D-Bus configuration path, $DBUSCONF does not exist." "$LINENO" 5
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+		as_fn_error $? "Wrong D-Bus configuration path, $DBUSCONF does not exist." "$LINENO" 5
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
 $as_echo "ok" >&6; }
 
-fi
+	fi
 
-# - services directory
+	# - services directory
 
 # Check whether --with-dbus-services was given.
 if test "${with_dbus_services+set}" = set; then :
   withval=$with_dbus_services; if test "$withval" = "yes"; then
-			DBUSSERVICES="/usr/share/dbus-1/system-services/"
-		else
-			DBUSSERVICES="$withval"
-		fi
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus services directory $DBUSSERVICES" >&5
+				DBUSSERVICES="/usr/share/dbus-1/system-services/"
+			else
+				DBUSSERVICES="$withval"
+			fi
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus services directory $DBUSSERVICES" >&5
 $as_echo_n "checking for existence of D-Bus services directory $DBUSSERVICES... " >&6; }
-		if test ! -d "$DBUSSERVICES"; then
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
+			if test ! -d "$DBUSSERVICES"; then
+				{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
 $as_echo "missing" >&6; }
-			as_fn_error $? "Wrong D-Bus service path
+				as_fn_error $? "Wrong D-Bus service path
 else
   $DBUSSERVICES does not exist." "$LINENO" 5
-		else
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+			else
+				{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
 $as_echo "ok" >&6; }
 
-		fi
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+			fi
+			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
 
 fi
 
 
-# - spec file dependencies
-case $DISTRO in
-	suse )
-		BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
-		REQS="$REQS dbus-1 >= 1.0.0"
-		;;
-	* )
-		# RH distros
-		BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
-		REQS="$REQS dbus >= 1.0.0"
-		;;
-esac
-
+	# - spec file dependencies
+	case $DISTRO in
+		suse )
+			BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
+			REQS="$REQS dbus-1 >= 1.0.0"
+			;;
+		* )
+			# RH distros
+			BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
+			REQS="$REQS dbus >= 1.0.0"
+			;;
+	esac
+fi
 
 ###################### Check for configure parameters ##########################
 
@@ -4509,6 +4534,8 @@ done
 
 
 ############################### Set output #####################################
+
+
 
 
 

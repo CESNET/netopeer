@@ -43,7 +43,6 @@
 #include <errno.h>
 #include <libgen.h>
 #include <signal.h>
-#include <dbus/dbus.h>
 #include <limits.h>
 #include <syslog.h>
 
@@ -52,8 +51,13 @@
 
 #include <libnetconf_xml.h>
 
+#ifndef DISABLE_DBUS
+#	include <dbus/dbus.h>
+#	include "netopeer_dbus.h"
+#	include "server_operations_dbus.h"
+#endif
 #include "server_operations.h"
-#include "netopeer_dbus.h"
+
 
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
@@ -122,8 +126,11 @@ void signal_handler (int sig)
 
 int main (int argc, char** argv)
 {
+#ifdef DISABLE_DBUS
+#else
 	DBusConnection * conn = NULL;
 	DBusMessage * msg = NULL;
+#endif
 
 	struct sigaction action;
 	sigset_t block_mask;
@@ -197,12 +204,15 @@ int main (int argc, char** argv)
 		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
 
+#ifdef DISABLE_DBUS
+#else
 	/* connect server to dbus */
 	conn = ns_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
 	if (conn == NULL) {
 		nc_verb_error("Connecting to DBus failed.");
 		return (EXIT_FAILURE);
 	}
+#endif
 
 	/*
 	 * this initialize the library and check potential ABI mismatches
@@ -233,6 +243,9 @@ restart:
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
+
+#ifdef DISABLE_DBUS
+#else
 		/* blocking read of the next available message */
 		dbus_connection_read_write (conn, 1000);
 
@@ -283,6 +296,7 @@ restart:
 			/* free the message */
 			dbus_message_unref(msg);
 		}
+#endif
 	}
 
 	/* unload Netopeer module -> unload all modules */
@@ -291,6 +305,8 @@ restart:
 	/* main cleanup */
 
 	if (!restart_soft) {
+#ifdef DISABLE_DBUS
+#else
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
 		if (conn != NULL) {
 			dbus_connection_flush(conn);
@@ -298,6 +314,7 @@ restart:
 			dbus_connection_unref(conn);
 
 		}
+#endif
 		server_sessions_destroy_all ();
 		nc_close (1);
 	}

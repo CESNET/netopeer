@@ -37,51 +37,12 @@
  *
  */
 
-#ifndef SERVER_OP_H_
-#define SERVER_OP_H_
+#ifndef SERVER_OP_DBUS_H_
+#define SERVER_OP_DBUS_H_
 
 #include <libnetconf_xml.h>
+#include <dbus/dbus.h>
 #include <libxml/tree.h>
-
-#ifndef DISABLE_DBUS
-#	include "server_operations_dbus.h"
-#endif
-
-/**
- * Environment variabe with settings for verbose level
- */
-#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
-
-/* VERBOSE macro */
-char err_msg[4096];
-#define VERB(level,format,args...) if(verbose>=level){snprintf(err_msg,4095,format,##args); clb_print(level,err_msg);}
-
-#define NETOPEER_MODULE_NAME "Netopeer"
-
-struct session_info {
-	/**
-	 * String identifying netopeer agent on D-BUS
-	 */
-	char *dbus_id;
-	/**
-	 * Pointer to library provided session.
-	 * In our architecture are sessions are dummy
-	 * and can not be used for communication.
-	 * We use dbus instead.
-	 */
-	struct nc_session * session;
-	/**
-	 * Doubly linked list links.
-	 */
-	struct session_info *next, *prev;
-};
-
-struct module {
-	char * name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
-	struct ncds_ds * ds; /**< pointer to datastore returned by libnetconf */
-	ncds_id id; /**< Related datastore ID */
-	struct module *prev,*next;
-};
 
 /**
  * @ingroup dbus
@@ -131,95 +92,5 @@ void kill_session (DBusConnection *conn, DBusMessage *msg);
  * @param msg DBus message from the Netopeer agent
  */
 void process_operation (DBusConnection *conn, DBusMessage *msg);
-
-/**
- * @brief Free all session info structures.
- */
-void server_sessions_destroy_all (void);
-
-/**
- * @brief Apply rpc to all device modules which qualify for it
- *
- * @param[in] session Session that sends rpc
- * @param[in] rpc RPC to apply
- *
- * @return nc_reply with response to rpc
- */
-nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc);
-
-/* server session management functions */
-
-/**
- * @brief Returns constant pointer to session info structure specified by session id
- *
- * @param session_id Key for searching
- *
- * @return Constant pointer to session info structure or NULL on error
- */
-const struct session_info* server_sessions_get_by_id (const char* session_id);
-
-/**
- * @brief Add session to server internal list
- *
- * @param[in] session_id Assigned session ID
- * @param[in] username Name of user owning the session
- * @param[in] cpblts List of capabilities session supports
- * @param[in] dbus_is D-BUS identification of agent providing communication for session
- */
-void server_sessions_add (const char * session_id, const char * username, struct nc_cpblts * cpblts, const char * dbus_id);
-
-/**
- * @brief Close and remove session and stop agent
- *
- * @param session Session to stop.
- */
-void server_sessions_stop (struct session_info *session);
-
-/**
- * @brief Close and remove all sessions
- */
-void server_sessions_destroy_all (void);
-
-/**
- * @brief Returns constant pointer to session info structure specified by D-BUS id
- *
- * @param session_dbus_id Key for searching
- *
- * @return Constant pointer to session info structure or NULL on error
- */
-const struct session_info* server_sessions_get_by_dbusid (const char* session_dbus_id);
-
-/* Datastore */
-
-/**
- * @brief Load module configuration, add module to library (and enlink to list)
- *
- * @param module Module to enable
- * @param add Enlink module to list of active modules?
- *
- * @return EXIT_SUCCES or EXIT_FAILURE
- */
-int module_enable(struct module * module, int add);
-
-/**
- * @breif Stop module, remove it from library (and destroy)
- *
- * @param module Module to disable
- * @param destroy Unlink and free module?
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-int module_disable(struct module * module, int destroy);
-
-/**
- * @brief Print verbose message to syslog
- *
- */
-void clb_print (NC_VERB_LEVEL, const char *);
-
-/**
- * @ Print debug messages to syslog
- */
-void print_debug(const char*, ...);
 
 #endif

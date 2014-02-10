@@ -38,7 +38,6 @@
 
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <dbus/dbus.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -59,8 +58,10 @@
 
 #include <libnetconf_xml.h>
 
-#include "../src/netopeer_dbus.h"
-
+#ifndef DISABLE_DBUS
+#	include <dbus/dbus.h>
+#	include "../src/netopeer_dbus.h"
+#endif
 
 volatile int done = 0;
 
@@ -125,6 +126,8 @@ void signal_handler (int sig)
 	}
 }
 
+#ifdef DISABLE_DBUS
+#else
 int process_message (struct nc_session *netconf_conn, DBusConnection *conn, const nc_rpc *rpc);
 
 DBusConnection * nc_agent_dbus_connect()
@@ -294,113 +297,6 @@ int send_session_info (DBusConnection * conn, struct nc_session * session)
 	dbus_message_unref(reply);
 
 	return EXIT_SUCCESS;
-}
- 
-int main ()
-{
-	DBusConnection * dbus_con;
-	struct nc_session * netconf_con;
-	nc_rpc * rpc = NULL;
-	struct nc_cpblts * capabilities;
-	int ret;
-	int timeout = 500; /* ms, poll timeout */
-	struct pollfd fds;
-	struct sigaction action;
-
-	/* set signal handler */
-	sigfillset (&action.sa_mask);
-	action.sa_handler = signal_handler;
-	action.sa_flags = 0;
-	sigaction (SIGINT, &action, NULL);
-	sigaction (SIGQUIT, &action, NULL);
-	sigaction (SIGABRT, &action, NULL);
-	sigaction (SIGTERM, &action, NULL);
-	sigaction (SIGKILL, &action, NULL);
-
-#ifdef DEBUG
-	nc_verbosity(NC_VERB_DEBUG);
-#endif
-	openlog("netopeer-agent", LOG_PID, LOG_DAEMON);
-	nc_callback_print(clb_print);
-
-	/* initialize library */
-	if (nc_init (NC_INIT_ALL) < 0) {
-		clb_print (NC_VERB_ERROR, "Library initialization failed");
-		return EXIT_FAILURE;
-	} 
-
-	/* connect to server (dbus) */
-	if ((dbus_con = nc_agent_dbus_connect()) == NULL) {
-		clb_print(NC_VERB_ERROR, "Cannot connect to DBus.");
-		return EXIT_FAILURE;
-	}
-	clb_print(NC_VERB_VERBOSE, "Dbus connected");
-
-	/* get server capabilities */
-	if ((capabilities = nc_agent_get_server_capabilities(dbus_con)) == NULL) {
-		clb_print(NC_VERB_ERROR, "Cannot get server capabilities.");
-		return EXIT_FAILURE;
-	}
-	clb_print(NC_VERB_VERBOSE, "Dbus get capas");
-
-	/* accept client session and handle capabilities */
-	netconf_con = nc_session_accept(capabilities);
-	if(netconf_con == NULL){
-		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
-		return EXIT_FAILURE;
-	}
-	nc_cpblts_free(capabilities);
-
-	/* monitor this session and build statistics */
-	nc_session_monitor (netconf_con);
-	
-	if (send_session_info (dbus_con, netconf_con)) {
-		clb_print (NC_VERB_ERROR, "Failed to comunicate with server.");
-		return EXIT_FAILURE;
-	}
-
-	clb_print(NC_VERB_VERBOSE, "Handshake finished");
-
-	fds.fd = nc_session_get_eventfd (netconf_con);
-	fds.events = POLLIN;
-
-	while (!done) {
-		ret = poll (&fds, 1, timeout);
-		if (ret < 0 && errno != EINTR) { /* poll error */
-			clb_print (NC_VERB_ERROR, "poll failed.");
-			goto cleanup;
-		} else if (ret == 0) { /* timeout */
-			continue;
-		} else if (ret > 0) { /* event occured */
-			if (fds.revents & POLLHUP) { /* client hung up */
-				clb_print (NC_VERB_VERBOSE, "Connection closed by client");
-				goto cleanup;
-			} else if (fds.revents & POLLERR) { /* I/O error */
-				clb_print (NC_VERB_ERROR, "I/O error.");
-				goto cleanup;
-			} else if (fds.revents & POLLIN) { /* data ready */
-				/* read data from input */
-				if (nc_session_recv_rpc(netconf_con, -1, &rpc) == 0) {
-					clb_print(NC_VERB_ERROR, "Failed to receive clinets message");
-					goto cleanup;
-				}
-
-				clb_print (NC_VERB_VERBOSE, "Processing client message");
-				if (process_message (netconf_con, dbus_con, rpc)) {
-					clb_print (NC_VERB_WARNING, "Message processing failed");
-				}
-				nc_rpc_free(rpc);
-				rpc = NULL;
-			}
-		}
-	}
-
-cleanup:
-	nc_rpc_free(rpc);
-	nc_session_free (netconf_con);
-	nc_close (0);
-
-	return (EXIT_SUCCESS);
 }
 
 nc_reply * send_operation (DBusConnection * conn, char * operation, struct nc_err ** err)
@@ -714,3 +610,125 @@ send_reply:
 	nc_reply_free (reply);
 	return EXIT_SUCCESS;
 }
+#endif
+
+int main ()
+{
+#ifdef DISABLE_DBUS
+#else
+	DBusConnection * dbus_con;
+#endif
+	struct nc_session * netconf_con;
+	nc_rpc * rpc = NULL;
+	struct nc_cpblts * capabilities = NULL;
+	int ret;
+	int timeout = 500; /* ms, poll timeout */
+	struct pollfd fds;
+	struct sigaction action;
+
+	/* set signal handler */
+	sigfillset (&action.sa_mask);
+	action.sa_handler = signal_handler;
+	action.sa_flags = 0;
+	sigaction (SIGINT, &action, NULL);
+	sigaction (SIGQUIT, &action, NULL);
+	sigaction (SIGABRT, &action, NULL);
+	sigaction (SIGTERM, &action, NULL);
+	sigaction (SIGKILL, &action, NULL);
+
+#ifdef DEBUG
+	nc_verbosity(NC_VERB_DEBUG);
+#endif
+	openlog("netopeer-agent", LOG_PID, LOG_DAEMON);
+	nc_callback_print(clb_print);
+
+	/* initialize library */
+	if (nc_init (NC_INIT_ALL) < 0) {
+		clb_print (NC_VERB_ERROR, "Library initialization failed");
+		return EXIT_FAILURE;
+	}
+
+#ifdef DISABLE_DBUS
+#else
+	/* connect to server (dbus) */
+	if ((dbus_con = nc_agent_dbus_connect()) == NULL) {
+		clb_print(NC_VERB_ERROR, "Cannot connect to DBus.");
+		return EXIT_FAILURE;
+	}
+	clb_print(NC_VERB_VERBOSE, "Dbus connected");
+
+	/* get server capabilities */
+	if ((capabilities = nc_agent_get_server_capabilities(dbus_con)) == NULL) {
+		clb_print(NC_VERB_ERROR, "Cannot get server capabilities.");
+		return EXIT_FAILURE;
+	}
+	clb_print(NC_VERB_VERBOSE, "Dbus get capas");
+#endif
+
+	/* accept client session and handle capabilities */
+	netconf_con = nc_session_accept(capabilities);
+	if(netconf_con == NULL){
+		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
+		return EXIT_FAILURE;
+	}
+	nc_cpblts_free(capabilities);
+
+	/* monitor this session and build statistics */
+	nc_session_monitor (netconf_con);
+
+#ifdef DISABLE_DBUS
+#else
+	if (send_session_info (dbus_con, netconf_con)) {
+		clb_print (NC_VERB_ERROR, "Failed to comunicate with server.");
+		return EXIT_FAILURE;
+	}
+#endif
+
+	clb_print(NC_VERB_VERBOSE, "Handshake finished");
+
+	fds.fd = nc_session_get_eventfd (netconf_con);
+	fds.events = POLLIN;
+
+	while (!done) {
+		ret = poll (&fds, 1, timeout);
+		if (ret < 0 && errno != EINTR) { /* poll error */
+			clb_print (NC_VERB_ERROR, "poll failed.");
+			goto cleanup;
+		} else if (ret == 0) { /* timeout */
+			continue;
+		} else if (ret > 0) { /* event occured */
+			if (fds.revents & POLLHUP) { /* client hung up */
+				clb_print (NC_VERB_VERBOSE, "Connection closed by client");
+				goto cleanup;
+			} else if (fds.revents & POLLERR) { /* I/O error */
+				clb_print (NC_VERB_ERROR, "I/O error.");
+				goto cleanup;
+			} else if (fds.revents & POLLIN) { /* data ready */
+				/* read data from input */
+				if (nc_session_recv_rpc(netconf_con, -1, &rpc) == 0) {
+					clb_print(NC_VERB_ERROR, "Failed to receive clinets message");
+					goto cleanup;
+				}
+
+				clb_print (NC_VERB_VERBOSE, "Processing client message");
+#ifdef DISABLE_DBUS
+				{
+#else
+				if (process_message (netconf_con, dbus_con, rpc)) {
+#endif
+					clb_print (NC_VERB_WARNING, "Message processing failed");
+				}
+				nc_rpc_free(rpc);
+				rpc = NULL;
+			}
+		}
+	}
+
+cleanup:
+	nc_rpc_free(rpc);
+	nc_session_free (netconf_con);
+	nc_close (0);
+
+	return (EXIT_SUCCESS);
+}
+

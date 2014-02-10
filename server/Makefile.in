@@ -74,10 +74,12 @@ SRCS =  src/server.c \
 	src/cfgnetopeer-transapi.c\
 	src/server_sessions.c \
 	src/netopeer_dbus.c \
-	src/server_operations.c
+	src/server_operations.c \
+	@SRCS_COMM@
 
 HDRS = src/server_operations.h \
-	src/netopeer_dbus.h
+	src/netopeer_dbus.h \
+	@HDRS_COMM@
 
 CFGS = config/datastore.xml \
 	config/netopeer-cfgnetopeer.yin \

@@ -49,11 +49,6 @@
 #define NTPR_DBUS_TIMEOUT -1
 
 /**
- * Environment variabe with settings for verbose level
- */
-#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
-
-/**
  * DBus bus name for the Netopeer server
  */
 #define NTPR_DBUS_SRV_BUS_NAME "org.liberouter.netopeer2.server"

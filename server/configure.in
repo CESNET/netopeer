@@ -109,6 +109,23 @@ AC_MSG_RESULT([$USER])
 AC_SUBST(USER)
 AC_SUBST(GROUP)
 
+AC_ARG_ENABLE([dbus],
+	AC_HELP_STRING([--disable-dbus], [Use UNIX sockets instead of DBus.]),
+	if test "$enableval" = "no"; then
+		dbus="no"
+		CPPFLAGS="$CPPFLAGS -DDISABLE_DBUS"
+	else
+		dbus="yes"
+	fi
+	,
+	# use DBus by default
+	dbus="yes"
+)
+if test "$dbus" = "yes"; then
+	HDRS_COMM="src/netopeer_dbus.h src/server_operations_dbus.h"
+	SRCS_COMM="src/netopeer_dbus.c src/server_operations_dbus.c"
+fi
+	
 ############################ Check for programs ################################
 
 # in case of cross-compilation, try to gues cross-compiler if not set
@@ -201,73 +218,74 @@ REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
-# - library
-AC_ARG_WITH([libdbus],
-	AC_HELP_STRING([--with-libdbus=PATH],[Set explicit installation prefix to the libdbus library]),
-	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
-	],[
-	# get info from pkg-config about installed package
-	PKG_CHECK_MODULES(LIBDBUS, [dbus-1 >= 1.0.0])
-	CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
-	LIBS="$LIBDBUS_LIBS $LIBS"]
-)
-AC_SEARCH_LIBS([dbus_bus_get], [dbus-1], [], AC_MSG_ERROR([libdbus not found.]))
+if test "$dbus" = "yes"; then
+	# - library
+	AC_ARG_WITH([libdbus],
+		AC_HELP_STRING([--with-libdbus=PATH],[Set explicit installation prefix to the libdbus library]),
+		[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+		LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
+		],[
+		# get info from pkg-config about installed package
+		PKG_CHECK_MODULES(LIBDBUS, [dbus-1 >= 1.0.0])
+		CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
+		LIBS="$LIBDBUS_LIBS $LIBS"]
+	)
+	AC_SEARCH_LIBS([dbus_bus_get], [dbus-1], [], AC_MSG_ERROR([libdbus not found.]))
 
-# - configuration directory
-AC_ARG_WITH([dbus-config-dir],
-	AC_HELP_STRING([--with-dbus-config-dir=DIR],[path to D-Bus config files (/etc/dbus-1/system.d/ by default)]),
-	DBUSCONF="$withval"
-	,
-	DBUSCONF="/etc/dbus-1/system.d/"
-)
-AC_MSG_CHECKING([for existence of D-Bus configuration directory $DBUSCONF])
-if test ! -d "$DBUSCONF"; then
-	AC_MSG_RESULT([missing])
-	AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
-else
-	AC_MSG_RESULT([ok])
-	AC_SUBST(DBUSCONF)
-fi
-
-# - services directory
-AC_ARG_WITH([dbus-services],
-	AC_HELP_STRING([--with-dbus-services@<:@=DIR@:>@],
-		[path to D-Bus services directory (/usr/share/dbus-1/system-services/ by default), \
-		if this parameter is not used, service file for netopeer-server is not installed!]),
-		if test "$withval" = "yes"; then
-			DBUSSERVICES="/usr/share/dbus-1/system-services/"
-		else
-			DBUSSERVICES="$withval"
-		fi
-		AC_MSG_CHECKING([for existence of D-Bus services directory $DBUSSERVICES])
-		if test ! -d "$DBUSSERVICES"; then
-			AC_MSG_RESULT([missing])
-			AC_MSG_ERROR([Wrong D-Bus service path, $DBUSSERVICES does not exist.])
-		else
-			AC_MSG_RESULT([ok])
-			AC_SUBST(DBUSSERVICES)
-		fi
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+	# - configuration directory
+	AC_ARG_WITH([dbus-config-dir],
+		AC_HELP_STRING([--with-dbus-config-dir=DIR],[path to D-Bus config files (/etc/dbus-1/system.d/ by default)]),
+		DBUSCONF="$withval"
 		,
-		# do not install DBus service file anywhere
-		DBUSSERVICES=""
-)
+		DBUSCONF="/etc/dbus-1/system.d/"
+	)
+	AC_MSG_CHECKING([for existence of D-Bus configuration directory $DBUSCONF])
+	if test ! -d "$DBUSCONF"; then
+		AC_MSG_RESULT([missing])
+		AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
+	else
+		AC_MSG_RESULT([ok])
+		AC_SUBST(DBUSCONF)
+	fi
 
-# - spec file dependencies
-case $DISTRO in
-	suse )
-		BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
-		REQS="$REQS dbus-1 >= 1.0.0"
-		;;
-	* )
-		# RH distros
-		BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
-		REQS="$REQS dbus >= 1.0.0"
-		;;
-esac
+	# - services directory
+	AC_ARG_WITH([dbus-services],
+		AC_HELP_STRING([--with-dbus-services@<:@=DIR@:>@],
+			[path to D-Bus services directory (/usr/share/dbus-1/system-services/ by default), \
+			if this parameter is not used, service file for netopeer-server is not installed!]),
+			if test "$withval" = "yes"; then
+				DBUSSERVICES="/usr/share/dbus-1/system-services/"
+			else
+				DBUSSERVICES="$withval"
+			fi
+			AC_MSG_CHECKING([for existence of D-Bus services directory $DBUSSERVICES])
+			if test ! -d "$DBUSSERVICES"; then
+				AC_MSG_RESULT([missing])
+				AC_MSG_ERROR([Wrong D-Bus service path, $DBUSSERVICES does not exist.])
+			else
+				AC_MSG_RESULT([ok])
+				AC_SUBST(DBUSSERVICES)
+			fi
+			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+			,
+			# do not install DBus service file anywhere
+			DBUSSERVICES=""
+	)
 
+	# - spec file dependencies
+	case $DISTRO in
+		suse )
+			BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
+			REQS="$REQS dbus-1 >= 1.0.0"
+			;;
+		* )
+			# RH distros
+			BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
+			REQS="$REQS dbus >= 1.0.0"
+			;;
+	esac
+fi
 
 ###################### Check for configure parameters ##########################
 
@@ -288,6 +306,8 @@ AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
 AC_SUBST(DISTRO)
+AC_SUBST(HDRS_COMM)
+AC_SUBST(SRCS_COMM)
 
 AC_SUBST(DOXYGEN)
 if test -z "$DOXYGEN"; then
