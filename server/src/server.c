@@ -283,7 +283,12 @@ restart:
 
 	if (!restart_soft) {
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		if (conn != NULL) dbus_connection_unref (conn);
+		if (conn != NULL) {
+			dbus_connection_flush(conn);
+			dbus_connection_close(conn);
+			dbus_connection_unref(conn);
+
+		}
 		server_sessions_destroy_all ();
 		nc_close (1);
 	}

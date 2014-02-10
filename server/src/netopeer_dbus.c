@@ -66,7 +66,7 @@ DBusConnection * ns_dbus_init(DBusBusType bus, const char* name, unsigned int fl
 	dbus_error_init(&dbus_err);
 
 	/* connect to the D-Bus */
-	ret = dbus_bus_get(bus, &dbus_err);
+	ret = dbus_bus_get_private(bus, &dbus_err);
 	if (dbus_error_is_set(&dbus_err)) {
 		nc_verb_verbose("D-Bus connection error (%s)", dbus_err.message);
 		dbus_error_free(&dbus_err);
@@ -76,6 +76,8 @@ DBusConnection * ns_dbus_init(DBusBusType bus, const char* name, unsigned int fl
 		return ret;
 	}
 
+	dbus_connection_set_exit_on_disconnect(ret, FALSE);
+
 	if (name != NULL) {
 		/* request a name on the bus */
 		i = dbus_bus_request_name(ret, name, flags, &dbus_err);
@@ -83,6 +85,7 @@ DBusConnection * ns_dbus_init(DBusBusType bus, const char* name, unsigned int fl
 			nc_verb_verbose("D-Bus name error (%s)", dbus_err.message);
 			dbus_error_free(&dbus_err);
 			if (ret != NULL) {
+				dbus_connection_close(ret);
 				dbus_connection_unref(ret);
 				ret = NULL;
 			}
@@ -91,6 +94,7 @@ DBusConnection * ns_dbus_init(DBusBusType bus, const char* name, unsigned int fl
 			nc_verb_verbose("Unable to became primary owner of the %s", name);
 			/* VERBOSE(-1, "Maybe another instance of the %s is running.", getprogname()); */
 			if (ret != NULL) {
+				dbus_connection_close(ret);
 				dbus_connection_unref(ret);
 				ret = NULL;
 			}
