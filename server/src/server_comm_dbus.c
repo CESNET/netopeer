@@ -390,7 +390,7 @@ static void set_new_session (DBusConnection *conn, DBusMessage *msg)
  * @param conn DBus connection to the Netopeer agent
  * @param msg KillSession DBus message from the Netopeer agent
  */
-void close_session (DBusMessage *msg)
+static void close_session (DBusMessage *msg)
 {
 	struct session_info *sender_session;
 	/*
@@ -413,7 +413,7 @@ void close_session (DBusMessage *msg)
  * @param conn DBus connection to the Netopeer agent
  * @param msg KillSession DBus message from the Netopeer agent
  */
-void kill_session (DBusConnection *conn, DBusMessage *msg)
+static void kill_session (DBusConnection *conn, DBusMessage *msg)
 {
 	char *aux_string = NULL, *session_id = NULL;
 	DBusMessageIter args;
@@ -512,7 +512,7 @@ send_reply:
  * @param conn DBus connection to the Netopeer agent
  * @param msg DBus message from the Netopeer agent
  */
-void process_operation (DBusConnection *conn, DBusMessage *msg)
+static void process_operation (DBusConnection *conn, DBusMessage *msg)
 {
 	char * msg_pass, *reply_string;
 	DBusMessageIter args;
