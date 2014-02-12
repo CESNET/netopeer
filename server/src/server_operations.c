@@ -57,13 +57,8 @@
 #include <libnetconf.h>
 
 #include "server_operations.h"
-#include "netopeer_operations.h"
 #include "netopeer_dbus.h"
 
-struct device_related_config {
-	struct server_module * device;
-	char * config;
-};
 
 void clb_print(NC_VERB_LEVEL level, const char* msg)
 {
@@ -412,96 +407,6 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 
 nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
 {
-	nc_reply *reply = NCDS_RPC_NOT_APPLICABLE, * old_reply = NULL, *new_reply;
-	struct server_module_list * destroy, *list;
-	const struct server_module * dm;
-	ncds_id *ids = NULL;
-	int i;
-
-	switch (nc_rpc_get_op (rpc)) {
-	case NC_OP_UNKNOWN:
-		/* send to device module */
-		destroy = list = server_modules_get_all();
-		for (; list != NULL; list = list->next) {
-			if (list->dev->transapi) { /* ncds_apply_rpc is covering  custom RPCs for transapi module */
-				reply = ncds_apply_rpc(list->dev->repo_id, session, rpc);
-			} else if (list->dev->execute_operation) { /* old style modules */
-				reply = list->dev->execute_operation (session, rpc);
-			} else { /* none -> some weird module */
-				nc_verb_warning("Module %s has no functionality.", list->dev->name);
-				continue;
-			}
-			/* merge results from the previous runs */
-			if (old_reply == NULL) {
-				old_reply = reply;
-			} else if (old_reply != (void*)(-1) || reply != (void*)(-1)) {
-				if ((new_reply = nc_reply_merge(2, old_reply, reply)) == NULL) {
-					if (nc_reply_get_type(old_reply) == NC_REPLY_ERROR) {
-						return (old_reply);
-					} else if (nc_reply_get_type(reply) == NC_REPLY_ERROR) {
-						return (reply);
-					} else {
-						return (nc_reply_error(nc_err_new(NC_ERR_OP_FAILED)));
-					}
-				}
-				old_reply = reply = new_reply;
-			}
-		}
-		server_modules_free_list(destroy);
-		break;
-	default:
-		/* just apply */
-		old_reply = reply = ncds_apply_rpc2all(session, rpc, &ids);
-
-		if (nc_rpc_get_type(rpc) == NC_RPC_DATASTORE_WRITE &&
-				nc_rpc_get_target(rpc) == NC_DATASTORE_RUNNING &&
-				nc_reply_get_type(reply) == NC_REPLY_OK) {
-			for (i = 0; ids[i] != ((ncds_id) -1); i++) {
-				if (ids[i] == 0) {
-					/* skip libnetconf internal datastores */
-					continue;
-				}
-				if ((dm = server_modules_get_by_repoid(ids[i])) == NULL) {
-					nc_verb_verbose("Module with datastore ID %d not found.", ids[i]);
-				} else if (dm->transapi == 0 && dm->execute_operation) { /* old style module */
-					reply = dm->execute_operation(session, rpc);
-					reply = old_reply = nc_reply_merge(2, old_reply, reply);
-				}
-			}
-		}
-		break;
-	}
-
-	return reply;
-}
-
-nc_reply * device_process_rpc (int dmid, const struct nc_session * session, const nc_rpc * rpc)
-{
-	struct server_module_list * list = calloc (1, sizeof (struct server_module_list));
-	nc_reply * reply = NULL, * dev_reply;
-	static const nc_rpc * last_rpc = NULL;
-	struct nc_err * err;
-
-	if (rpc == last_rpc) {
-		nc_verb_error("Potentialy infinite loop detected.");
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, "Potentialy infinite loop detected.");
-		return nc_reply_error(err);
-	}
-	last_rpc = rpc;
-
-	list->dev = (struct server_module*)server_modules_get_by_dmid (dmid);
-
-	if (nc_rpc_get_op(rpc) != NC_OP_UNKNOWN) {
-		reply = ncds_apply_rpc(list->dev->repo_id, session, rpc);
-	}
-	if (nc_rpc_get_type(rpc) == NC_RPC_DATASTORE_WRITE && nc_rpc_get_target(rpc) == NC_DATASTORE_RUNNING) {
-		dev_reply = list->dev->execute_operation(session, rpc);
-		reply = nc_reply_merge(2, dev_reply, reply);
-	}
-
-	last_rpc = NULL;
-	free (list);
-	return reply;
+	 return(ncds_apply_rpc2all(session, rpc, NULL));
 }
 

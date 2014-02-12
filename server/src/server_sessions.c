@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "server_operations.h"
-#include "netopeer_operations.h"
 
 /**
  * Internal list of NETCONF sessions - agents connected via DBus

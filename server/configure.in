@@ -234,10 +234,10 @@ fi
 # - services directory
 AC_ARG_WITH([dbus-services],
 	AC_HELP_STRING([--with-dbus-services@<:@=DIR@:>@],
-		[path to D-Bus services directory (/usr/share/dbus-1/services/ by default), \
+		[path to D-Bus services directory (/usr/share/dbus-1/system-services/ by default), \
 		if this parameter is not used, service file for netopeer-server is not installed!]),
 		if test "$withval" = "yes"; then
-			DBUSSERVICES="/usr/share/dbus-1/services/"
+			DBUSSERVICES="/usr/share/dbus-1/system-services/"
 		else
 			DBUSSERVICES="$withval"
 		fi
@@ -249,6 +249,7 @@ AC_ARG_WITH([dbus-services],
 			AC_MSG_RESULT([ok])
 			AC_SUBST(DBUSSERVICES)
 		fi
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
 		,
 		# do not install DBus service file anywhere
 		DBUSSERVICES=""

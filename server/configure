@@ -1351,8 +1351,8 @@ Optional Packages:
                           default)
   --with-dbus-services[=DIR]
                           path to D-Bus services directory
-                          (/usr/share/dbus-1/services/ by default), if this
-                          parameter is not used, service file for
+                          (/usr/share/dbus-1/system-services/ by default), if
+                          this parameter is not used, service file for
                           netopeer-server is not installed!
 
 Some influential environment variables:
@@ -3937,7 +3937,7 @@ fi
 # Check whether --with-dbus-services was given.
 if test "${with_dbus_services+set}" = set; then :
   withval=$with_dbus_services; if test "$withval" = "yes"; then
-			DBUSSERVICES="/usr/share/dbus-1/services/"
+			DBUSSERVICES="/usr/share/dbus-1/system-services/"
 		else
 			DBUSSERVICES="$withval"
 		fi
@@ -3954,6 +3954,7 @@ else
 $as_echo "ok" >&6; }
 
 		fi
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
 
 fi
 

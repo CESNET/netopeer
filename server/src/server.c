@@ -132,6 +132,7 @@ int main (int argc, char** argv)
 	int next_option;
 	int daemonize = 0, len;
 	int verbose = 0;
+	struct module * netopeer_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
@@ -219,7 +220,12 @@ int main (int argc, char** argv)
 restart:
 	/* start netopeer device module - it will start all modules that are
 	 * in its configuration and in server configuration */
-	if (server_modules_allow ("Netopeer")) {
+	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
+		nc_verb_error("Creating necessary plugin Netopeer failed!");
+		return(EXIT_FAILURE);
+	}
+	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
+	if (module_enable(netopeer_module, 0)) {
 		nc_verb_error("Starting necessary plugin Netopeer failed!");
 		return EXIT_FAILURE;
 	}
@@ -279,6 +285,9 @@ restart:
 		}
 	}
 
+	/* unload Netopeer module -> unload all modules */
+	module_disable(netopeer_module, 1);
+
 	/* main cleanup */
 
 	if (!restart_soft) {
@@ -298,9 +307,6 @@ restart:
 	 *have been allocated by the parser.
 	 */
 	xmlCleanupParser ();
-
-	/* Unload all loaded modules */
-	server_modules_free_list (NULL);
 
 	if (restart_soft) {
 		nc_verb_verbose("Server is going to soft restart.");
