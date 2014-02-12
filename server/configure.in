@@ -249,6 +249,7 @@ AC_ARG_WITH([dbus-services],
 			AC_MSG_RESULT([ok])
 			AC_SUBST(DBUSSERVICES)
 		fi
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
 		,
 		# do not install DBus service file anywhere
 		DBUSSERVICES=""

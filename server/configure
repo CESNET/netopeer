@@ -3954,6 +3954,7 @@ else
 $as_echo "ok" >&6; }
 
 		fi
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
 
 fi
 
