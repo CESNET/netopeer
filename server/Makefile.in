@@ -71,16 +71,12 @@ SUBDIRS = agent \
 	  dm_manager
 
 SRCS =  src/server.c \
-	src/netopeer-cfgnetopeer.c\
+	src/cfgnetopeer-transapi.c\
 	src/server_sessions.c \
-	src/server_modules.c \
 	src/netopeer_dbus.c \
 	src/server_operations.c
 
 HDRS = src/server_operations.h \
-	src/netopeer_operations.h \
-	src/device_module_interface.h\
-	src/netopeer_operations.h \
 	src/netopeer_dbus.h
 
 CFGS = config/datastore.xml \
