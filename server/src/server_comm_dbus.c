@@ -1,7 +1,7 @@
 /**
- * \file server_operations.c
- * \author Radek Krejci <rkrejci@cesent.cz>
- * \brief Netopeer server operations.
+ * \file netopeer_dbus.h
+ * \author David Kupka <dkupka@cesnet.cz>
+ * \brief Netopeer's DBus communication macros.
  *
  * Copyright (C) 2011 CESNET, z.s.p.o.
  *
@@ -36,32 +36,243 @@
  * if advised of the possibility of such damage.
  *
  */
+
 #define _GNU_SOURCE
-#include <stdio.h>
-#include <stddef.h>
-#include <signal.h>
-#include <errno.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <syslog.h>
-
-#include <libxml/tree.h>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
-#include <libxml/xpathInternals.h>
-
 #include <libnetconf_xml.h>
-#include <libnetconf.h>
+#include <stdbool.h>
+#include <string.h>
 
 #include <dbus/dbus.h>
-
+#include "comm.h"
 #include "netopeer_dbus.h"
 #include "server_operations.h"
-#include "server_operations_dbus.h"
-#include "netopeer_operations.h"
 
-void get_capabilities (DBusConnection *conn, DBusMessage *msg)
+#define BUS_FLAGS DBUS_NAME_FLAG_DO_NOT_QUEUE
+
+conn_t* comm_init()
+{
+	int i;
+	DBusConnection *ret = NULL;
+	DBusError dbus_err;
+
+	/* initialise the errors */
+	dbus_error_init(&dbus_err);
+
+	/* connect to the D-Bus */
+	ret = dbus_bus_get_private(DBUS_BUS_SYSTEM, &dbus_err);
+	if (dbus_error_is_set(&dbus_err)) {
+		nc_verb_verbose("D-Bus connection error (%s)", dbus_err.message);
+		dbus_error_free(&dbus_err);
+	}
+	if (NULL == ret) {
+		nc_verb_verbose("Unable to connect to system bus");
+		return ret;
+	}
+
+	dbus_connection_set_exit_on_disconnect(ret, FALSE);
+
+	/* request a name on the bus */
+	i = dbus_bus_request_name(ret, NTPR_DBUS_SRV_BUS_NAME, BUS_FLAGS, &dbus_err);
+	if (dbus_error_is_set(&dbus_err)) {
+		nc_verb_verbose("D-Bus name error (%s)", dbus_err.message);
+		dbus_error_free(&dbus_err);
+		if (ret != NULL) {
+			dbus_connection_close(ret);
+			dbus_connection_unref(ret);
+			ret = NULL;
+		}
+	}
+	if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != i) {
+		nc_verb_verbose("Unable to became primary owner of the %s", NTPR_DBUS_SRV_BUS_NAME);
+		/* VERBOSE(-1, "Maybe another instance of the %s is running.", getprogname()); */
+		if (ret != NULL) {
+			dbus_connection_close(ret);
+			dbus_connection_unref(ret);
+			ret = NULL;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * @brief Send error reply message back to sender
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ * @param error_name     error name according to the syntax given in the D-Bus specification,
+ *                       if NULL then DBUS_ERROR_FAILED is used
+ * @param error_message  the error message string
+ *
+ * @return               zero on success, nonzero else
+ */
+static int _dbus_error_reply(DBusMessage *msg, DBusConnection * conn,
+        const char *error_name, const char *error_message)
+{
+	DBusMessage *reply;
+	dbus_uint32_t serial = 0;
+
+	/* create a error reply from the message */
+	if (error_name == NULL) {
+		error_name = DBUS_ERROR_FAILED;
+	}
+	reply = dbus_message_new_error(msg, error_name, error_message);
+
+	/* send the reply && flush the connection */
+	if (!dbus_connection_send(conn, reply, &serial)) {
+		nc_verb_verbose("Unable to send D-Bus reply message due to lack of memory");
+		return -1;
+	}
+	dbus_connection_flush(conn);
+
+	/* free the reply */
+	dbus_message_unref(reply);
+
+	return 0;
+}
+
+/**
+ * @brief Send positive (method return message with boolean argument set to true) reply message back to sender
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ *
+ * @return               zero on success, nonzero else
+ */
+static int _dbus_positive_reply(DBusMessage *msg, DBusConnection *conn)
+{
+	DBusMessage *reply;
+	DBusMessageIter args;
+	dbus_uint32_t serial = 0;
+	dbus_bool_t stat = true;
+
+	/* create a reply from the message */
+	reply = dbus_message_new_method_return(msg);
+
+	/* add the arguments to the reply */
+	dbus_message_iter_init_append(reply, &args);
+	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_BOOLEAN, &stat)) {
+		nc_verb_verbose("Unable process D-Bus message due to lack of memory");
+		return -1;
+	}
+
+	/* send the reply && flush the connection */
+	if (!dbus_connection_send(conn, reply, &serial)) {
+		nc_verb_verbose("Unable send D-Bus reply message due to lack of memory");
+		return -1;
+	}
+	dbus_connection_flush(conn);
+
+	/* free the reply */
+	dbus_message_unref(reply);
+
+	return 0;
+}
+
+/**
+ * @brief Handle standard D-Bus methods on standard interfaces
+ * org.freedesktop.DBus.Peer, org.freedesktop.DBus.Introspectable
+ * and org.freedesktop.DBus.Properties
+ *
+ * @param msg            received message with request
+ * @param conn           opened connection to the D-Bus
+ * @return               zero when message doesn't contain message call
+ *                       of standard method, nonzero if one of standard
+ *                       method was received
+ */
+static int _dbus_handlestdif(DBusMessage *msg, DBusConnection *conn)
+{
+	DBusMessage *reply;
+	DBusMessageIter args;
+	dbus_uint32_t serial = 0;
+	char *machine_uuid;
+	char *introspect;
+	int ret = 0;
+
+	/* check if message is a method-call for my interface */
+	if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
+		if (dbus_message_has_interface(msg, "org.freedesktop.DBus.Peer")) {
+			/* perform requested operation */
+			if (dbus_message_has_member(msg, "Ping")) {
+				_dbus_positive_reply(msg, conn);
+
+				ret = 1;
+			} else if (dbus_message_has_member(msg, "GetMachineId")) {
+				/* create a reply from the message */
+				reply = dbus_message_new_method_return(msg);
+
+				/* get machine UUID */
+				machine_uuid = dbus_get_local_machine_id();
+
+				/* add the arguments to the reply */
+				dbus_message_iter_init_append(reply, &args);
+				if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &machine_uuid)) {
+					nc_verb_verbose("Unable process D-Bus message due to lack of memory");
+					return -1;
+				}
+
+				/* send the reply && flush the connection */
+				if (!dbus_connection_send(conn, reply, &serial)) {
+					nc_verb_verbose("Unable send D-Bus reply message due to lack of memory");
+					return -1;
+				}
+				dbus_connection_flush(conn);
+
+				/* free the reply */
+				dbus_free(machine_uuid);
+				dbus_message_unref(reply);
+
+				ret = 1;
+			} else {
+				nc_verb_verbose("Calling with unknown member (%s) of org.freedesktop.DBus.Peer received", dbus_message_get_member(msg));
+				_dbus_error_reply(msg, conn, DBUS_ERROR_UNKNOWN_METHOD, "Unknown method invoked");
+				ret = -1;
+			}
+		} else if (dbus_message_has_interface(msg, "org.freedesktop.DBus.Introspectable")) {
+			/* perform requested operation */
+			if (dbus_message_has_member(msg, "Introspect")) {
+
+				/* default value - TODO true structure */
+				introspect = "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"\n\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">\n<node/>";
+
+				/* create a reply from the message */
+				reply = dbus_message_new_method_return(msg);
+
+				/* add the arguments to the reply */
+				dbus_message_iter_init_append(reply, &args);
+				if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &introspect)) {
+					nc_verb_verbose("Unable process D-Bus message due to lack of memory");
+					return -1;
+				}
+
+				/* send the reply && flush the connection */
+				nc_verb_verbose("sending introspect information (%s)", introspect);
+				if (!dbus_connection_send(conn, reply, &serial)) {
+					nc_verb_verbose("Unable send D-Bus reply message due to lack of memory");
+					return -1;
+				}
+				dbus_connection_flush(conn);
+
+				/* free the reply */
+				dbus_message_unref(reply);
+
+				ret = 1;
+			} else {
+				nc_verb_verbose("Calling with unknown member (%s) of org.freedesktop.DBus.Introspectable received", dbus_message_get_member(msg));
+				_dbus_error_reply(msg, conn, DBUS_ERROR_UNKNOWN_METHOD, "Unknown method invoked");
+				ret = -1;
+			}
+		} else if (dbus_message_has_interface(msg, "org.freedesktop.DBus.Properties")) {
+			nc_verb_verbose("Calling for Not used interface %s with method %s", dbus_message_get_interface(msg), dbus_message_get_member(msg));
+			_dbus_error_reply(msg, conn, DBUS_ERROR_UNKNOWN_METHOD, "Not used interface org.freedesktop.DBus.Properties");
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static void get_capabilities (DBusConnection *conn, DBusMessage *msg)
 {
 	DBusMessage *reply = NULL;
 	DBusMessageIter args;
@@ -115,7 +326,7 @@ void get_capabilities (DBusConnection *conn, DBusMessage *msg)
  * @param conn DBus connection to the Netopeer agent
  * @param msg SetSessionParams DBus message from the Netopeer agent
  */
-void set_new_session (DBusConnection *conn, DBusMessage *msg)
+static void set_new_session (DBusConnection *conn, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	char *aux_string = NULL, * session_id = NULL, * username = NULL, *dbus_id;
@@ -124,7 +335,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 
 	if (!dbus_message_iter_init (msg, &args)) {
 		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_SET_SESSION);
-		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
+		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
 		return;
 	} else {
 		/* dbus session-id */
@@ -147,12 +358,12 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 		for (i = 0; i < cpblts_count; i++) {
 			if (!dbus_message_iter_next(&args)) {
 				nc_verb_error("D-Bus message has too few arguments");
-				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
+				_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
 			} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
 				nc_verb_error("TODO");
-				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
+				_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
 				nc_cpblts_free (cpblts);
 				return;
 			} else {
@@ -169,7 +380,7 @@ void set_new_session (DBusConnection *conn, DBusMessage *msg)
 	nc_cpblts_free (cpblts);
 
 	/* send reply */
-	ns_dbus_positive_reply (msg, conn);
+	_dbus_positive_reply (msg, conn);
 }
 
 /**
@@ -186,7 +397,7 @@ void close_session (DBusMessage *msg)
 	 * get session information about sender which will be removed from active
 	 * sessions
 	 */
-	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
+	sender_session = (struct session_info *)srv_get_session (dbus_message_get_sender(msg));
 	if (sender_session == NULL) {
 		nc_verb_warning("Unable to close session - session is not in the list of active sessions");
 		return;
@@ -240,7 +451,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 		}
 	} else {
 		nc_verb_error("kill_session(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
+		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (msg parameter is NULL).");
 		reply = nc_reply_error (err);
@@ -258,7 +469,7 @@ void kill_session (DBusConnection *conn, DBusMessage *msg)
 	}
 
 	/* check if the request does not relate to the current session */
-	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
+	sender_session = (struct session_info *)srv_get_session (dbus_message_get_sender(msg));
 	if (sender_session != NULL) {
 		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
 			nc_verb_verbose("Request to kill own session.");
@@ -313,19 +524,19 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 	struct nc_err * err;
 
 	if (msg) {
-		session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
+		session = (struct session_info *)srv_get_session (dbus_message_get_sender(msg));
 		if (session == NULL) {/* in case session was closed but client/agent is still sending messages */
 			err = nc_err_new (NC_ERR_INVALID_VALUE);
 			nc_err_set(err, NC_ERR_PARAM_MSG, "Your session is no longer valid!");
 			reply = nc_reply_error (err);
 		} else if (!dbus_message_iter_init(msg, &args)) { /* can not initialize message iterator */
 			nc_verb_error("process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
-			ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
+			_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
 			return;
 		} else { /* everything seems fine */
 			if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) { /* message is not formated as expected */
 				nc_verb_error("process_operation(): Second parameter of D-Bus message is not a NETCONF operation.");
-				ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
+				_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
 				return;
 			} else { /* message looks alright, build it to nc_rpc "object" */
 				dbus_message_iter_get_basic(&args, &msg_pass);
@@ -335,7 +546,7 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 		}
 	} else {
 		nc_verb_error("process_operation(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		ns_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
+		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
 		return;
 	}
 
@@ -357,7 +568,7 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 	dbus_reply = dbus_message_new_method_return(msg);
 	if (dbus_reply == NULL || reply_string == NULL) {
 		nc_verb_error("process_operation(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
-		ns_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
+		_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
 		free(reply_string);
 		return;
 	}
@@ -374,3 +585,59 @@ void process_operation (DBusConnection *conn, DBusMessage *msg)
 	return;
 }
 
+void comm_loop(conn_t* conn, int timeout)
+{
+	DBusMessage* msg;
+
+	/* blocking read of the next available message */
+	dbus_connection_read_write(conn, timeout);
+
+	while ((msg = dbus_connection_pop_message(conn)) != NULL) {
+		if (_dbus_handlestdif(msg, conn) != 0) {
+			/* free the message */
+			dbus_message_unref(msg);
+
+			/* go for next message */
+			continue;
+		}
+
+		nc_verb_verbose("Some message received");
+
+		/* check if message is a method-call */
+		if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
+			/* process specific members in interface NTPR_DBUS_SRV_IF */
+			if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_GET_CAPABILITIES) == TRUE) {
+				/* GetCapabilities request */
+				get_capabilities(conn, msg);
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_SET_SESSION) == TRUE) {
+				/* SetSessionParams request */
+				set_new_session(conn, msg);
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CLOSE_SESSION) == TRUE) {
+				/* CloseSession request */
+				close_session(msg);
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
+				/* KillSession request */
+				kill_session(conn, msg);
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_PROCESS_OP) == TRUE) {
+				/* All other requests */
+				process_operation(conn, msg);
+			} else {
+				nc_verb_warning("Unsupported DBus request received (interface %s, member %s)", dbus_message_get_destination(msg), dbus_message_get_member(msg));
+			}
+		} else {
+			nc_verb_warning("Unsupported DBus message type received.");
+		}
+
+		/* free the message */
+		dbus_message_unref(msg);
+	}
+}
+
+void comm_destroy(conn_t *conn)
+{
+	if (conn != NULL) {
+		dbus_connection_flush(conn);
+		dbus_connection_close(conn);
+		dbus_connection_unref(conn);
+	}
+}

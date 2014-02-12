@@ -51,13 +51,9 @@
 
 #include <libnetconf_xml.h>
 
-#ifndef DISABLE_DBUS
-#	include <dbus/dbus.h>
-#	include "netopeer_dbus.h"
-#	include "server_operations_dbus.h"
-#endif
+#include "common.c"
+#include "comm.h"
 #include "server_operations.h"
-
 
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
@@ -126,11 +122,7 @@ void signal_handler (int sig)
 
 int main (int argc, char** argv)
 {
-#ifdef DISABLE_DBUS
-#else
-	DBusConnection * conn = NULL;
-	DBusMessage * msg = NULL;
-#endif
+	conn_t* conn = NULL;
 
 	struct sigaction action;
 	sigset_t block_mask;
@@ -204,15 +196,12 @@ int main (int argc, char** argv)
 		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
 
-#ifdef DISABLE_DBUS
-#else
-	/* connect server to dbus */
-	conn = ns_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
+	/* Initiate communication subsystem for communicate with agents */
+	conn = comm_init();
 	if (conn == NULL) {
-		nc_verb_error("Connecting to DBus failed.");
+		nc_verb_error("Communication subsystem not initiated.");
 		return (EXIT_FAILURE);
 	}
-#endif
 
 	/*
 	 * this initialize the library and check potential ABI mismatches
@@ -243,60 +232,7 @@ restart:
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
-
-#ifdef DISABLE_DBUS
-#else
-		/* blocking read of the next available message */
-		dbus_connection_read_write (conn, 1000);
-
-		while (!done && (msg = dbus_connection_pop_message (conn)) != NULL) {
-			print_debug("message is a method-call");
-			print_debug("message path: %s", dbus_message_get_path (msg));
-			print_debug("message interface: %s", dbus_message_get_interface (msg));
-			print_debug("message member: %s", dbus_message_get_member (msg));
-			print_debug("message destination: %s", dbus_message_get_destination (msg));
-
-			if (ns_dbus_handlestdif (msg, conn) != 0) {
-				print_debug("D-Bus standard interface message");
-
-				/* free the message */
-				dbus_message_unref(msg);
-
-				/* go for next message */
-				continue;
-			}
-
-			nc_verb_verbose("Some message received");
-
-			/* check if message is a method-call */
-			if (dbus_message_get_type (msg) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
-				/* process specific members in interface NTPR_DBUS_SRV_IF */
-				if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_GET_CAPABILITIES) == TRUE) {
-					/* GetCapabilities request */
-					get_capabilities (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_SET_SESSION) == TRUE) {
-					/* SetSessionParams request */
-					set_new_session (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CLOSE_SESSION) == TRUE) {
-					/* CloseSession request */
-					close_session (msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
-					/* KillSession request */
-					kill_session (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_PROCESS_OP) == TRUE) {
-					/* All other requests */
-					process_operation (conn, msg);
-				} else {
-					nc_verb_warning("Unsupported DBus request received (interface %s, member %s)", dbus_message_get_destination(msg), dbus_message_get_member(msg));
-				}
-			} else {
-				nc_verb_warning("Unsupported DBus message type received.");
-			}
-
-			/* free the message */
-			dbus_message_unref(msg);
-		}
-#endif
+		comm_loop(conn, 500);
 	}
 
 	/* unload Netopeer module -> unload all modules */
@@ -305,16 +241,8 @@ restart:
 	/* main cleanup */
 
 	if (!restart_soft) {
-#ifdef DISABLE_DBUS
-#else
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		if (conn != NULL) {
-			dbus_connection_flush(conn);
-			dbus_connection_close(conn);
-			dbus_connection_unref(conn);
-
-		}
-#endif
+		comm_destroy(conn);
 		server_sessions_destroy_all ();
 		nc_close (1);
 	}

@@ -39,6 +39,8 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT([netopeer-server], m4_esyscmd([cut -f1 ./VERSION | tr -d '\n']))
 
+m4_include([m4/ax_pthread.m4])
+
 PACKAGE_VERSION=`cut -f1 ./VERSION | tr -d '\n'`
 AC_SUBST(PACKAGE_VERSION)
 
@@ -124,6 +126,11 @@ AC_ARG_ENABLE([dbus],
 if test "$dbus" = "yes"; then
 	HDRS_COMM="src/netopeer_dbus.h src/server_operations_dbus.h"
 	SRCS_COMM="src/netopeer_dbus.c src/server_operations_dbus.c"
+	HDRS_AGENT_COMM="comm_dbus.h"
+	SRCS_AGENT_COMM="comm_dbus.c"
+else
+	HDRS_AGENT_COMM="comm_socket.h"
+	SRCS_AGENT_COMM="comm_socket.c"
 fi
 	
 ############################ Check for programs ################################
@@ -219,6 +226,12 @@ BUILDREQS="$BUILDREQS libnetconf-devel"
 
 # libdbus
 if test "$dbus" = "yes"; then
+
+	AGENT_SRCS_COMM="src/agent_comm_dbus.c"
+	SERVER_SRCS_COMM="src/server_comm_dbus.c"
+	AGENT_HDRS_COMM="src/netopeer_dbus.h"
+	SERVER_HDRS_COMM="src/netopeer-dbus.h"
+
 	# - library
 	AC_ARG_WITH([libdbus],
 		AC_HELP_STRING([--with-libdbus=PATH],[Set explicit installation prefix to the libdbus library]),
@@ -287,6 +300,16 @@ if test "$dbus" = "yes"; then
 	esac
 fi
 
+SERVER_LIBS=$LIBS
+
+# pthread
+AX_PTHREAD([
+	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
+	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+	CC="$PTHREAD_CC"],
+	AC_MSG_ERROR([Missing POSIX threads support.])
+)
+
 ###################### Check for configure parameters ##########################
 
 ######################### Checks for header files ##############################
@@ -306,8 +329,12 @@ AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
 AC_SUBST(DISTRO)
-AC_SUBST(HDRS_COMM)
-AC_SUBST(SRCS_COMM)
+AC_SUBST(AGENT_SRCS_COMM)
+AC_SUBST(SERVER_SRCS_COMM)
+AC_SUBST(AGENT_HDRS_COMM)
+AC_SUBST(SERVER_HDRS_COMM)
+AC_SUBST(SERVER_LIBS)
+AC_SUBST(AGENT_LIBS)
 
 AC_SUBST(DOXYGEN)
 if test -z "$DOXYGEN"; then
@@ -320,7 +347,6 @@ if test -z "$RPMBUILD"; then
 fi
 
 AC_CONFIG_FILES(Makefile)
-AC_CONFIG_FILES(agent/Makefile)
 AC_CONFIG_FILES(dm_manager/Makefile)
 AC_CONFIG_FILES(config/org.liberouter.netopeer2.conf)
 AC_CONFIG_FILES(config/org.liberouter.netopeer2.server.service)
