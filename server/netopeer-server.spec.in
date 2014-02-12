@@ -60,4 +60,7 @@ fi
 %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin
 %{_sysconfdir}/init.d/netopeer.rc
 %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer-data.rng
+%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer-gdefs.rng
+%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer-schematron.xsl
 
