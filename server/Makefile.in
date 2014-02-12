@@ -83,8 +83,6 @@ HDRS = src/server_operations.h \
 	src/netopeer_operations.h \
 	src/netopeer_dbus.h
 
-HDRS_DEVEL = src/device_module_interface.h
-
 CFGS = config/datastore.xml \
 	config/netopeer-cfgnetopeer.yin \
 	config/netopeer-cfgnetopeer-data.rng \
@@ -157,7 +155,7 @@ distclean:
 	rm -rf $(RPMDIR)
 
 .PHONY: install
-install: install-devel
+install:
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(NAME) $(DESTDIR)/$(bindir)/;
 	for i in $(SUBDIRS) ; do \
@@ -176,11 +174,6 @@ install: install-devel
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/;
 	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
-
-.PHONY: install-devel
-install-devel:
-	[ -d $(DESTDIR)/$(includedir) ] || mkdir -p $(DESTDIR)/$(includedir);\
-	for i in $(HDRS_DEVEL) ; do cp $$i $(DESTDIR)/$(includedir)/ ; done
 
 .PHONY: clean
 clean:

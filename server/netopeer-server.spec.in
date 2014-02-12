@@ -61,5 +61,3 @@ fi
 %{_sysconfdir}/init.d/netopeer.rc
 %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
 
-%files devel
-%{_prefix}/include/device_module_interface.h
