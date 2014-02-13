@@ -31,23 +31,20 @@
   <container name="netopeer">
     <container name="modules">
       <list name="module">
-        <key value="module-name"/>
-        <leaf name="module-name">
+        <key value="name"/>
+        <leaf name="name">
           <type name="string"/>
           <description>
             <text>Name of module</text>
           </description>
         </leaf>
-        <leaf name="module-allowed">
+        <leaf name="enabled">
           <type name="boolean"/>
+          <default value="false"/>
           <description>
             <text>Specify whether or not the module is allowed to be managed over server.</text>
           </description>
         </leaf>
-        <leaf-list name="implemented-rpc">
-          <config value="false"/>
-          <type name="string"/>
-        </leaf-list>
       </list>
     </container>
   </container>
@@ -56,13 +53,12 @@
       <text>Operation allowing privileged user to restart netopeer-server.</text>
     </description>
     <input>
-      <leaf name="method">
+      <leaf name="type">
         <type name="enumeration">
           <enum name="soft"/>
           <enum name="hard"/>
         </type>
         <default value="soft"/>
-        <mandatory value="false"/>
         <description>
           <text>Soft restart only unplugs all device modules and reloads configuration.
 Hard restart also abort all connections and reload the binary.</text>
@@ -72,14 +68,16 @@ Hard restart also abort all connections and reload the binary.</text>
   </rpc>
   <rpc name="reload-module">
     <description>
-      <text>Reload module. More operation may be added in future.</text>
+      <text>Unload and load any loaded module.</text>
     </description>
     <input>
       <leaf name="module">
-        <type name="string"/>
+        <type name="leafref">
+          <path value="/netopeer/modules/module/name"/>
+        </type>
         <mandatory value="true"/>
         <description>
-          <text>Name of module to manage.</text>
+          <text>Name of module to reload.</text>
         </description>
       </leaf>
     </input>

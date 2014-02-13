@@ -341,7 +341,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 
 	tmp = node->children;
 	while(tmp) {
-		if (xmlStrEqual(tmp->name, BAD_CAST "module-name")) {
+		if (xmlStrEqual(tmp->name, BAD_CAST "name")) {
 			module_name = (char*)xmlNodeGetContent(tmp);
 		}
 		tmp = tmp->next;
@@ -349,7 +349,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 
 	if (module_name == NULL) {
 		*error = nc_err_new(NC_ERR_MISSING_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "module-name");
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "name");
 		nc_verb_error("%s: Missing key element 'name'.", __FUNCTION__);
 		return(EXIT_FAILURE);
 	}
@@ -379,7 +379,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 
 		tmp = node->children;
 		while(tmp) {
-			if (xmlStrEqual(tmp->name, BAD_CAST "module-allowed")) {
+			if (xmlStrEqual(tmp->name, BAD_CAST "enabled")) {
 				module_allowed = (char*)xmlNodeGetContent(tmp);
 				if (strcmp(module_allowed, "true") == 0) {
 					if (module_enable(module, 1)) {
@@ -416,7 +416,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module_n_module_allowed (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** UNUSED(error))
+int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** UNUSED(error))
 {
 	xmlNodePtr tmp;
 	char *module_name = NULL;
@@ -428,7 +428,7 @@ int callback_n_netopeer_n_modules_n_module_n_module_allowed (void ** UNUSED(data
 
 	tmp = node->parent->children;
 	while(tmp) {
-		if (xmlStrEqual(tmp->name, BAD_CAST "module-name")) {
+		if (xmlStrEqual(tmp->name, BAD_CAST "name")) {
 			module_name = (char*)xmlNodeGetContent(tmp);
 			break;
 		}
@@ -472,7 +472,7 @@ struct transapi_data_callbacks clbks =  {
 	.callbacks = {
 		{.path = "/n:netopeer", .func = callback_n_netopeer},
 		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
-		{.path = "/n:netopeer/n:modules/n:module/n:module-allowed", .func = callback_n_netopeer_n_modules_n_module_n_module_allowed}
+		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled}
 	}
 };
 
@@ -486,25 +486,25 @@ struct transapi_data_callbacks clbks =  {
 
 nc_reply * rpc_netopeer_reboot (xmlNodePtr input[])
 {
-	xmlNodePtr method_node = input[0];
-	char * method_str = NULL;
+	xmlNodePtr type_node = input[0];
+	char * type_str = NULL;
 
-	if (method_node) {
-		method_str = (char*)xmlNodeGetContent(method_node);
+	if (type_node) {
+		type_str = (char*)xmlNodeGetContent(type_node);
 	}
 
-	if (method_node == NULL || strcmp(method_str, "soft") == 0) {
+	if (type_str == NULL || strcmp(type_str, "soft") == 0) {
 		restart_soft = 1;
 		done = 1;
-	} else if (!strcmp (method_str, "hard")) {
+	} else if (strcmp (type_str, "hard")) {
 		restart_hard = 1;
 		done = 1;
 	} else {
-		free(method_str);
+		free(type_str);
 		return(nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE)));
 	}
 
-	free(method_str);
+	free(type_str);
 
 	return(nc_reply_ok()); 
 }
@@ -547,7 +547,7 @@ nc_reply * rpc_reload_module (xmlNodePtr input[])
 struct transapi_rpc_callbacks rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
-		{.name="netopeer-reboot", .func=rpc_netopeer_reboot, .arg_count=1, .arg_order={"method"}},
+		{.name="netopeer-reboot", .func=rpc_netopeer_reboot, .arg_count=1, .arg_order={"type"}},
 		{.name="reload-module", .func=rpc_reload_module, .arg_count=1, .arg_order={"module"}}
 	}
 };

@@ -24,20 +24,17 @@ module netopeer-cfgnetopeer {
   container netopeer {
     container modules {
       list module {
-        key "module-name";
-        leaf module-name {
+        key "name";
+        leaf name {
           type string;
           description
             "Name of module";
         }
-        leaf module-allowed {
+        leaf enabled {
           type boolean;
+          default false;
           description
             "Specify whether or not the module is allowed to be managed over server.";
-        }
-        leaf-list implemented-rpc {
-          config false;
-          type string;
         }
       }
     }
@@ -46,13 +43,12 @@ module netopeer-cfgnetopeer {
     description
       "Operation allowing privileged user to restart netopeer-server.";
     input {
-      leaf method {
+      leaf type {
         type enumeration {
           enum "soft";
           enum "hard";
         }
         default "soft";
-        mandatory false;
         description
           "Soft restart only unplugs all device modules and reloads configuration.
            Hard restart also abort all connections and reload the binary.";
@@ -61,13 +57,15 @@ module netopeer-cfgnetopeer {
   }
   rpc reload-module {
     description
-      "Reload module. More operation may be added in future.";
+      "Unload and load any loaded module." ;
     input {
       leaf module {
-        type string;
+        type leafref {
+          path "/netopeer/modules/module/name";
+        }
         mandatory true;
         description
-          "Name of module to manage.";
+          "Name of module to reload.";
       }
     }
   }
