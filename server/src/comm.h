@@ -45,7 +45,7 @@
 #ifndef DISABLE_DBUS
 #	include "netopeer_dbus.h"
 #else
-#	include "netopeer_sockets.h"
+#	include "netopeer_socket.h"
 #endif
 
 /*

@@ -4134,6 +4134,11 @@ fi
 			REQS="$REQS dbus >= 1.0.0"
 			;;
 	esac
+else
+	AGENT_SRCS_COMM="src/agent_comm_socket.c"
+	SERVER_SRCS_COMM="src/server_comm_socket.c"
+	AGENT_HDRS_COMM="src/netopeer_socket.h"
+	SERVER_HDRS_COMM="src/netopeer-socket.h"
 fi
 
 SERVER_LIBS=$LIBS
