@@ -329,7 +329,8 @@ static void get_capabilities (DBusConnection *conn, DBusMessage *msg)
 static void set_new_session (DBusConnection *conn, DBusMessage *msg)
 {
 	DBusMessageIter args;
-	char *aux_string = NULL, * session_id = NULL, * username = NULL, *dbus_id;
+	char *aux_string = NULL, * session_id = NULL, * username = NULL;
+	const char* dbus_id;
 	struct nc_cpblts * cpblts;
 	int i = 0, cpblts_count = 0;
 
@@ -339,7 +340,7 @@ static void set_new_session (DBusConnection *conn, DBusMessage *msg)
 		return;
 	} else {
 		/* dbus session-id */
-		dbus_id = strdup (dbus_message_get_sender(msg));
+		dbus_id = dbus_message_get_sender(msg);
 
 		/* parse message */
 		/* session ID */
@@ -374,10 +375,11 @@ static void set_new_session (DBusConnection *conn, DBusMessage *msg)
 	}
 
 	/* add session to the list */
-	server_sessions_add (session_id, username, cpblts, dbus_id);
+	server_sessions_add(session_id, username, cpblts, dbus_id);
 	/* clean */
-	free (dbus_id);
 	nc_cpblts_free (cpblts);
+
+	nc_verb_verbose("New agent ID set to %s.", dbus_id);
 
 	/* send reply */
 	_dbus_positive_reply (msg, conn);
@@ -393,17 +395,20 @@ static void set_new_session (DBusConnection *conn, DBusMessage *msg)
 static void close_session (DBusMessage *msg)
 {
 	struct session_info *sender_session;
+	const char* id;
+
 	/*
 	 * get session information about sender which will be removed from active
 	 * sessions
 	 */
-	sender_session = (struct session_info *)srv_get_session (dbus_message_get_sender(msg));
+	sender_session = (struct session_info *)srv_get_session (id = dbus_message_get_sender(msg));
 	if (sender_session == NULL) {
 		nc_verb_warning("Unable to close session - session is not in the list of active sessions");
 		return;
 	}
 
 	server_sessions_stop (sender_session);
+	nc_verb_verbose("Agent %s removed.", id);
 }
 
 /**
@@ -457,7 +462,7 @@ static void kill_session (DBusConnection *conn, DBusMessage *msg)
 		reply = nc_reply_error (err);
 		goto send_reply;
 	}
-	if ((session = (struct session_info *)server_sessions_get_by_id (session_id)) == NULL) {
+	if ((session = (struct session_info *)server_sessions_get_by_ncid (session_id)) == NULL) {
 		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
@@ -479,7 +484,7 @@ static void kill_session (DBusConnection *conn, DBusMessage *msg)
 		}
 	}
 
-	server_sessions_stop (session);
+	server_sessions_kill(session);
 
 	reply = nc_reply_ok();
 	boolean = 1;

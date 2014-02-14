@@ -104,6 +104,12 @@ char** comm_get_srv_cpblts(conn_t* conn);
  */
 int comm_session_info(conn_t* conn, struct nc_session* session);
 
+/*
+ * internal function for comm_session_info(), only comm_session_info_send()
+ * is supposed to be implemented by specific communication implementation
+ */
+int comm_session_info_send(conn_t* conn, const char* username, const char* sid, int cpblts_count, struct nc_cpblts* cpblts);
+
 /**
  * @brief Perform Netopeer operation
  * @param[in] conn Connection handler
@@ -118,13 +124,13 @@ nc_reply* comm_operation(conn_t* conn, const nc_rpc *rpc);
  * @param[in] sid NETCONF session identifier
  * @return NETCONF rpc-reply message with the result.
  */
-nc_reply* comm_kill_session(conn_t *conn, char* sid);
+nc_reply* comm_kill_session(conn_t *conn, const char* sid);
 
 /**
  * @brief Close communication with the server
  * @param[in] conn Connection handler
- * @return NULL on success, NETCONF error structure in case of failure
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-struct nc_err* comm_close(conn_t *conn);
+int comm_close(conn_t *conn);
 
 #endif /* COMM_H_ */

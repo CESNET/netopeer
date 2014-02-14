@@ -63,6 +63,7 @@ RPMDIR = RPMBUILD
 AGENT = netopeer-agent
 AGENT_LIBS = @AGENT_LIBS@
 AGENT_SRCS =  src/agent.c \
+	src/agent_comm.c \
 	@AGENT_SRCS_COMM@
 AGENT_HDRS = src/comm.h \
 	@AGENT_HDRS_COMM@

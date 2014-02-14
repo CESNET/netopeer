@@ -88,6 +88,7 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	char** cpblts = NULL;
 
 	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
 		return (NULL);
 	}
 
@@ -97,7 +98,7 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	/* done, now get the result */
 	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 	if (op != result) {
-		nc_verb_error("Communication failed, response mismatch (%s).", __func__);
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
 		return (NULL);
 	}
 
@@ -114,31 +115,154 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	return(cpblts);
 }
 
-int comm_session_info (conn_t* conn, struct nc_session * session)
+int comm_session_info_send(conn_t* conn, const char* username, const char* sid, int cpblts_count, struct nc_cpblts* cpblts)
 {
-	return EXIT_FAILURE;
+	msgtype_t op = COMM_SOCKET_OP_SET_SESSION;
+	msgtype_t result = 0;
+	const char* cpblt;
+	unsigned int len;
+
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		return (EXIT_FAILURE);
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* send session attributes */
+	len = strlen(sid) + 1;
+	send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(*conn, sid, len, COMM_SOCKET_SEND_FLAGS);
+
+	len = strlen(username) + 1;
+	send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(*conn, username, len, COMM_SOCKET_SEND_FLAGS);
+
+	send(*conn, &cpblts_count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+	while ((cpblt = nc_cpblts_iter_next(cpblts)) != NULL) {
+		len = strlen(cpblt) + 1;
+		send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		send(*conn, cpblt, len, COMM_SOCKET_SEND_FLAGS);
+	}
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		return (EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
 }
 
 nc_reply* comm_operation(conn_t* conn, const nc_rpc *rpc)
 {
-	return NULL;
+	msgtype_t result = 0, op = COMM_SOCKET_OP_GENERIC;
+	struct nc_err* err;
+	nc_reply* reply;
+	char *msg_dump;
+	unsigned int len;
+
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		return (nc_reply_error(err));
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* rpc */
+	msg_dump = nc_rpc_dump(rpc);
+	len = strlen(msg_dump) + 1;
+	send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(*conn, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+	free(msg_dump);
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "agent-server communication failed.");
+		return (nc_reply_error(err));
+	}
+
+	/* get the reply message */
+	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	msg_dump = malloc(sizeof(char) * len);
+	recv(*conn, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+	reply = nc_reply_build(msg_dump);
+
+	/* cleanup */
+	free(msg_dump);
+
+	return (reply);
 }
 
-struct nc_err * comm_close (conn_t* conn)
+int comm_close(conn_t* conn)
 {
-	struct nc_err * err;
+	msgtype_t result = 0, op = COMM_SOCKET_OP_CLOSE_SESSION;
 
-fill_error:
-	err =  nc_err_new (NC_ERR_OP_FAILED);
-	return err;
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		return (EXIT_FAILURE);
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
 }
 
-nc_reply * comm_kill_session (conn_t* conn, char * sid)
+nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 {
-	struct nc_err * err;
+	struct nc_err* err;
+	msgtype_t result = 0, op = COMM_SOCKET_OP_CLOSE_SESSION;
+	unsigned int len;
+	char* reply_dump;
+	nc_reply *reply;
 
-fill_error:
-	err =  nc_err_new (NC_ERR_OP_FAILED);
-	return nc_reply_error(err);
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		return (nc_reply_error(err));
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* session to kill */
+	len = strlen(sid) + 1;
+	send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(*conn, sid, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "agent-server communication failed.");
+		return (nc_reply_error(err));
+	}
+
+	/* get the reply message */
+	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	reply_dump = malloc(sizeof(char) * len);
+	recv(*conn, reply_dump, len, COMM_SOCKET_SEND_FLAGS);
+	reply = nc_reply_build(reply_dump);
+
+	/* cleanup */
+	free(reply_dump);
+
+	return (reply);
 }
 

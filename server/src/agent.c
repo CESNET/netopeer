@@ -145,10 +145,16 @@ int process_message (struct nc_session *session, conn_t *conn, const nc_rpc *rpc
 	xmlNodePtr op;
 	char * sid;
 
+	if (rpc == NULL) {
+		nc_verb_error("Invalid RPC to process.");
+		return (EXIT_FAILURE);
+	}
+
 	/* close-session message */
 	switch (nc_rpc_get_op(rpc)) {
 	case NC_OP_CLOSESESSION:
-		if ((err = comm_close(conn)) != NULL) {
+		if (comm_close(conn) != EXIT_SUCCESS) {
+			err = nc_err_new(NC_ERR_OP_FAILED);
 			reply = nc_reply_error (err);
 		} else {
 			reply = nc_reply_ok ();
@@ -236,6 +242,7 @@ int main ()
 	nc_rpc * rpc = NULL;
 	struct nc_cpblts * capabilities = NULL;
 	int ret;
+	NC_MSG_TYPE rpc_type;
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
@@ -306,23 +313,40 @@ int main ()
 		} else if (ret > 0) { /* event occured */
 			if (fds.revents & POLLHUP) { /* client hung up */
 				clb_print (NC_VERB_VERBOSE, "Connection closed by client");
+				comm_close(con);
 				goto cleanup;
 			} else if (fds.revents & POLLERR) { /* I/O error */
 				clb_print (NC_VERB_ERROR, "I/O error.");
 				goto cleanup;
 			} else if (fds.revents & POLLIN) { /* data ready */
 				/* read data from input */
-				if (nc_session_recv_rpc(netconf_con, -1, &rpc) == 0) {
-					clb_print(NC_VERB_ERROR, "Failed to receive clinets message");
-					goto cleanup;
+				rpc_type = nc_session_recv_rpc(netconf_con, -1, &rpc);
+				if (rpc_type != NC_MSG_RPC) {
+					switch (rpc_type) {
+					case NC_MSG_NONE:
+						/* the request was already processed by libnetconf or no message available */
+						/* continue in main while loop */
+						break;
+					case NC_MSG_UNKNOWN:
+						if (nc_session_get_status(netconf_con) != NC_SESSION_STATUS_WORKING) {
+							/* something really bad happened, and communication is not possible anymore */
+							clb_print(NC_VERB_ERROR, "Failed to receive clinets message");
+							goto cleanup;
+						}
+						/* continue in main while loop */
+						break;
+					default:
+						/* continue in main while loop */
+						break;
+					}
+				} else {
+					clb_print (NC_VERB_VERBOSE, "Processing client message");
+					if (process_message (netconf_con, con, rpc) != EXIT_SUCCESS) {
+						clb_print (NC_VERB_WARNING, "Message processing failed");
+					}
+					nc_rpc_free(rpc);
+					rpc = NULL;
 				}
-
-				clb_print (NC_VERB_VERBOSE, "Processing client message");
-				if (process_message (netconf_con, con, rpc)) {
-					clb_print (NC_VERB_WARNING, "Message processing failed");
-				}
-				nc_rpc_free(rpc);
-				rpc = NULL;
 			}
 		}
 	}

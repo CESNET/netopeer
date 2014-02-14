@@ -56,9 +56,9 @@ char err_msg[4096];
 
 struct session_info {
 	/**
-	 * String identifying netopeer agent on D-BUS
+	 * String identifying netopeer agent
 	 */
-	char *dbus_id;
+	char *id;
 	/**
 	 * Pointer to library provided session.
 	 * In our architecture are sessions are dummy
@@ -99,11 +99,21 @@ nc_reply * server_process_rpc(struct nc_session * session, const nc_rpc * rpc);
 /**
  * @brief Returns constant pointer to session info structure specified by session id
  *
- * @param session_id Key for searching
+ * @param id Key for searching
  *
  * @return Constant pointer to session info structure or NULL on error
  */
-const struct session_info* server_sessions_get_by_id(const char* session_id);
+const struct session_info* server_sessions_get_by_ncid(const char* id);
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list. The session is specified by its session ID.
+ *
+ * @param id ID of agent holding the session
+ *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* server_sessions_get_by_agentid(const char* id);
 
 /**
  * @brief Add session to server internal list
@@ -113,7 +123,7 @@ const struct session_info* server_sessions_get_by_id(const char* session_id);
  * @param[in] cpblts List of capabilities session supports
  * @param[in] id ID of the agent providing communication for session
  */
-void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char * id);
+void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id);
 
 /**
  * @brief Close and remove session and stop agent
@@ -121,6 +131,13 @@ void server_sessions_add(const char * session_id, const char * username, struct 
  * @param session Session to stop.
  */
 void server_sessions_stop(struct session_info *session);
+
+/**
+ * @brief Force stopping the agent
+ *
+ * @param session Session to kill.
+ */
+void server_sessions_kill(struct session_info *session);
 
 /**
  * @brief Close and remove all sessions

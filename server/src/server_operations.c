@@ -17,12 +17,34 @@ static struct session_info *sessions = NULL;
  *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* server_sessions_get_by_id(const char* session_id)
+const struct session_info* server_sessions_get_by_id(const char* id)
 {
 	struct session_info *aux_session = sessions;
 
 	while (aux_session != NULL) {
-		if (strncmp(session_id, nc_session_get_id(aux_session->session), sizeof(session_id) + 1) == 0) {
+		if (strcmp(id, nc_session_get_id(aux_session->session)) == 0) {
+			break;
+		}
+		aux_session = aux_session->next;
+	}
+
+	return (aux_session);
+}
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list. The session is specified by its session ID.
+ *
+ * @param id ID of agent holding the session
+ *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* server_sessions_get_by_agentid(const char* id)
+{
+	struct session_info *aux_session = sessions;
+
+	while (aux_session != NULL) {
+		if (strcmp(id, aux_session->id) == 0) {
 			break;
 		}
 		aux_session = aux_session->next;
@@ -37,8 +59,7 @@ const struct session_info* server_sessions_get_by_id(const char* session_id)
  *
  * @param session Session information structure to add.
  */
-void server_sessions_add(const char * session_id, const char * username,
-        struct nc_cpblts * cpblts, const char * dbus_id)
+void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id)
 {
 	struct session_info *session, *session_iter = sessions;
 
@@ -47,8 +68,8 @@ void server_sessions_add(const char * session_id, const char * username,
 	session->session = nc_session_dummy(session_id, username, NULL, cpblts);
 	/* add to monitored session list, library will connect this dummy session with real session in agent */
 	nc_session_monitor(session->session);
-	/* remember login time */
-	session->dbus_id = strdup(dbus_id);
+	/* agent id */
+	session->id = strdup(id);
 
 	if (sessions == NULL) {
 		/* first session */
@@ -94,7 +115,7 @@ int server_sessions_remove(const char* session_id)
 	/* close & free libnetconf session */
 	nc_session_free(session->session);
 	/* free session structure */
-	free(session->dbus_id);
+	free(session->id);
 	free(session);
 
 	return (EXIT_SUCCESS);
@@ -103,17 +124,25 @@ int server_sessions_remove(const char* session_id)
 void server_sessions_stop(struct session_info *session)
 {
 	const char * sid = NULL;
-	int agent_pid;
 
 	if (session) {
 		sid = nc_session_get_id(session->session);
+		server_sessions_remove(sid);
+	}
+}
+
+void server_sessions_kill(struct session_info *session)
+{
+	const char * sid = NULL;
+	int agent_pid;
+
+	if (session) {
+		server_sessions_stop(session);
 
 		if ((agent_pid = atoi(sid)) != 0) {
 			/* ask agent to quit */
 			kill(agent_pid, SIGTERM);
 		}
-
-		server_sessions_remove(sid);
 	}
 }
 
@@ -146,7 +175,7 @@ const struct session_info* srv_get_session(const char* session_id)
 
 	struct session_info *aux_session = sessions;
 	while (aux_session != NULL) {
-		if ((aux_session->dbus_id != NULL) && (strncmp(session_id, aux_session->dbus_id, sizeof(session_id) + 1) == 0)) {
+		if ((aux_session->id != NULL) && (strncmp(session_id, aux_session->id, sizeof(session_id) + 1) == 0)) {
 			break;
 		}
 		aux_session = aux_session->next;

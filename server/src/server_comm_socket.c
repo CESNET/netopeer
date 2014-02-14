@@ -126,6 +126,10 @@ static void get_capabilities(int socket)
 	struct nc_cpblts* cpblts;
 	unsigned int len;
 	int count;
+	msgtype_t result;
+
+	result = COMM_SOCKET_OP_GET_CPBLTS;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 
 	cpblts = nc_session_get_cpblts_default();
 	count = nc_cpblts_count(cpblts);
@@ -140,12 +144,197 @@ static void get_capabilities(int socket)
 	nc_cpblts_free(cpblts);
 }
 
+static void set_new_session(int socket)
+{
+	char *session_id = NULL, *username = NULL;
+	struct nc_cpblts *cpblts;
+	char** cpblts_list;
+	char id[6];
+	int i, cpblts_count;
+	unsigned int len;
+	msgtype_t result;
+
+	/* session ID*/
+	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	session_id = malloc(sizeof(char) * len);
+	recv(socket, session_id, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* username */
+	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	username = malloc(sizeof(char) * len);
+	recv(socket, username, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* capabilities */
+	recv(socket, &cpblts_count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+	cpblts_list = calloc(cpblts_count + 1, sizeof(char*));
+	cpblts_list[cpblts_count] = NULL;
+	for (i = 0; i < cpblts_count; i++) {
+		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		cpblts_list[i] = malloc(sizeof(char) * len);
+		recv(socket, cpblts_list[i], len, COMM_SOCKET_SEND_FLAGS);
+	}
+	cpblts = nc_cpblts_new((const char* const*)cpblts_list);
+
+	/* add session to the list */
+	snprintf(id, sizeof(id), "%d", socket);
+	server_sessions_add(session_id, username, cpblts, id);
+
+	nc_verb_verbose("New agent ID set to %s.", id);
+
+	/* clean */
+	free(session_id);
+	free(username);
+	nc_cpblts_free (cpblts);
+	for (i = 0; cpblts_list != NULL && cpblts_list[i] != NULL; i++) {
+		free(cpblts_list[i]);
+	}
+	free(cpblts_list);
+
+	/* send reply */
+	result = COMM_SOCKET_OP_SET_SESSION;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+}
+
+static void close_session(int socket)
+{
+	char id[6];
+	struct session_info *sender_session;
+	msgtype_t result;
+
+	snprintf(id, sizeof(id), "%d", socket);
+	sender_session = (struct session_info *) srv_get_session(id);
+	if (sender_session == NULL) {
+		nc_verb_warning("Unable to close session - session is not in the list of active sessions");
+		return;
+	}
+	server_sessions_stop(sender_session);
+
+	/* send reply */
+	result = COMM_SOCKET_OP_CLOSE_SESSION;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	nc_verb_verbose("Agent %s removed.", id);
+}
+
+static void kill_session (int socket)
+{
+	struct session_info *session, *sender_session;
+	struct nc_err* err;
+	char *session_id = NULL, *aux_string = NULL;
+	unsigned int len;
+	char id[6];
+	nc_reply *reply;
+	msgtype_t result;
+
+	/* session ID*/
+	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	session_id = malloc(sizeof(char) * len);
+	recv(socket, session_id, len, COMM_SOCKET_SEND_FLAGS);
+
+
+	if ((session = (struct session_info *)server_sessions_get_by_agentid(session_id)) == NULL) {
+		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
+		err = nc_err_new (NC_ERR_OP_FAILED);
+		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
+			nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
+			free (aux_string);
+		}
+		reply = nc_reply_error(err);
+		goto send_reply;
+	}
+
+	/* check if the request does not relate to the current session */
+	snprintf(id, sizeof(id), "%d", socket);
+	sender_session = (struct session_info *)srv_get_session(id);
+	if (sender_session != NULL) {
+		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
+			nc_verb_verbose("Request to kill own session.");
+			err = nc_err_new (NC_ERR_INVALID_VALUE);
+			reply = nc_reply_error (err);
+			goto send_reply;
+		}
+	}
+
+	server_sessions_kill(session);
+	reply = nc_reply_ok();
+
+send_reply:
+	aux_string = nc_reply_dump(reply);
+	nc_reply_free (reply);
+
+	/* send reply */
+	result = COMM_SOCKET_OP_CLOSE_SESSION;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	len = strlen(aux_string) + 1;
+	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(socket, aux_string, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* cleanup */
+	free (aux_string);
+}
+
+static void process_operation (int socket)
+{
+	struct session_info *session;
+	struct nc_err* err;
+	char *msg_dump = NULL;
+	unsigned int len;
+	char id[6];
+	nc_reply *reply;
+	nc_rpc *rpc;
+	msgtype_t result;
+
+	/* RPC dump */
+	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	msg_dump = malloc(sizeof(char) * len);
+	recv(socket, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+
+	snprintf(id, sizeof(id), "%d", socket);
+	if ((session = (struct session_info *)server_sessions_get_by_agentid(id)) == NULL) {
+		nc_verb_error("%s: internal error - invalid session (%s).", __func__, id);
+		err = nc_err_new (NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "internal server error - request from invalid agent");
+		reply = nc_reply_error(err);
+		goto send_reply;
+	}
+
+	rpc = nc_rpc_build(msg_dump, session->session);
+	free(msg_dump);
+
+	if ((reply = server_process_rpc (session->session, rpc)) == NULL) {
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "For unknown reason no reply was returned by device/server/library.");
+		reply = nc_reply_error(err);
+	} else if (reply == NCDS_RPC_NOT_APPLICABLE) {
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "There is no device/data that could be affected.");
+		reply = nc_reply_error(err);
+	}
+	nc_rpc_free (rpc);
+
+send_reply:
+	msg_dump = nc_reply_dump(reply);
+	nc_reply_free (reply);
+
+	/* send reply */
+	result = COMM_SOCKET_OP_GENERIC;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	len = strlen(msg_dump) + 1;
+	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(socket, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* cleanup */
+	free (msg_dump);
+}
+
 int comm_loop(conn_t* conn, int timeout)
 {
 	int ret, i, new_sock, c;
 	msgtype_t op, result;
 
-	if (sock == -1) {
+	if (*conn == -1) {
 		return (EXIT_FAILURE);
 	}
 
@@ -183,9 +372,30 @@ poll_restart:
 				}
 				switch(op) {
 				case COMM_SOCKET_OP_GET_CPBLTS:
-					result = COMM_SOCKET_OP_GET_CPBLTS;
-					send(agents[i].fd, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 					get_capabilities(agents[i].fd);
+					break;
+				case COMM_SOCKET_OP_SET_SESSION:
+					set_new_session(agents[i].fd);
+					break;
+				case COMM_SOCKET_OP_CLOSE_SESSION:
+					close_session(agents[i].fd);
+
+					/* close the socket */
+					close(agents[i].fd);
+					agents[i].fd = -1;
+
+					/* if disabled accepting new clients, enable it */
+					connected_agents--;
+					if (agents[0].fd == -1) {
+						agents[0].fd = *conn;
+					}
+
+					break;
+				case COMM_SOCKET_OP_KILL_SESSION:
+					kill_session(agents[i].fd);
+					break;
+				case COMM_SOCKET_OP_GENERIC:
+					process_operation(agents[i].fd);
 					break;
 				default:
 					nc_verb_warning("Unsupported DBus message type received.");
@@ -236,6 +446,10 @@ poll_restart:
 void comm_destroy(conn_t *conn)
 {
 	int i;
+
+	if (*conn == -1) {
+		return;
+	}
 
 	if (connected_agents > 0) {
 		for (i = 1; i <= AGENTS_QUEUE; i++) {

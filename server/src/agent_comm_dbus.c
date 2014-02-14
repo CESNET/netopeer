@@ -136,15 +136,13 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	return (caps);
 }
 
-int comm_session_info(conn_t* conn, struct nc_session * session)
+int comm_session_info_send(conn_t* conn, const char* username, const char* sid, int cpblts_count, struct nc_cpblts* cpblts)
 {
 	DBusError err;
 	DBusMessage * msg, *reply;
 	DBusMessageIter args;
-	int32_t i = 0, cpblts_count;
-	struct passwd * user = getpwuid(getuid());
-	struct nc_cpblts * cpblts;
-	const char * sid, *cpblt;
+	int32_t i = 0;
+	const char *cpblt;
 
 	dbus_error_init(&err);
 
@@ -154,27 +152,12 @@ int comm_session_info(conn_t* conn, struct nc_session * session)
 		return EXIT_FAILURE;
 	}
 
-	/* get session id */
-	if ((sid = nc_session_get_id(session)) == NULL) {
-		clb_print(NC_VERB_ERROR, "nc_session_get_id failed.");
-		return EXIT_FAILURE;
-	}
-
-	/* get capabilities list */
-	if ((cpblts = nc_session_get_cpblts(session)) == NULL) {
-		clb_print(NC_VERB_ERROR, "nc_session_get_cpblts failed.");
-		return EXIT_FAILURE;
-	}
-
-	/* capabilities count */
-	cpblts_count = nc_cpblts_count(cpblts);
-
 	/* initialize argument list */
 	dbus_message_iter_init_append(msg, &args);
 	/* append session id */
 	dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &sid);
 	/* append name of user invoking agent */
-	dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &(user->pw_name));
+	dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &(username));
 	/* append number of following capabilities */
 	dbus_message_iter_append_basic(&args, DBUS_TYPE_UINT16, &cpblts_count);
 
@@ -184,7 +167,6 @@ int comm_session_info(conn_t* conn, struct nc_session * session)
 	while ((cpblt = nc_cpblts_iter_next(cpblts)) != NULL) {
 		dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &cpblt);
 	}
-	nc_cpblts_free(cpblts);
 
 	if ((reply = dbus_connection_send_with_reply_and_block(conn, msg, -1, &err)) == NULL) {
 		clb_print(NC_VERB_ERROR, "Cannot send message over DBus.");
@@ -302,38 +284,30 @@ nc_reply* comm_operation(conn_t* conn, const nc_rpc *rpc)
 	return (nc_reply_error(err));
 }
 
-struct nc_err* comm_close(conn_t* conn)
+int comm_close(conn_t* conn)
 {
 	DBusMessage *msg;
 	DBusError dbus_err;
-	struct nc_err * err;
-	char * message;
 
 	dbus_error_init(&dbus_err);
 
 	if ((msg = dbus_message_new_method_call(NTPR_DBUS_SRV_BUS_NAME, NTPR_DBUS_SRV_OP_PATH, NTPR_DBUS_SRV_IF, NTPR_SRV_CLOSE_SESSION)) == NULL) {
-		clb_print(NC_VERB_ERROR, "Creating message failed.");
-		message = "Creating DBus message failed";
-		goto fill_error;
+		nc_verb_error("Creating message failed (%s:%d).", __FILE__, __LINE__);
+		return (EXIT_FAILURE);
 	}
 
 	if (!dbus_connection_send(conn, msg, NULL)) {
-		clb_print(NC_VERB_ERROR, "send_close_session(): Cannot send message over DBus.");
-		message = "Sending message to the server via DBus failed";
+		nc_verb_error("%s: Cannot send message over DBus.", __func__);
 		dbus_message_unref(msg);
-		goto fill_error;
+		return (EXIT_FAILURE);
 	}
 	dbus_connection_flush(conn);
 	dbus_message_unref(msg);
 
-	return (NULL);
-
-	fill_error: err = nc_err_new(NC_ERR_OP_FAILED);
-	nc_err_set(err, NC_ERR_PARAM_MSG, message);
-	return err;
+	return (EXIT_SUCCESS);
 }
 
-nc_reply* comm_kill_session(conn_t* conn, char * sid)
+nc_reply* comm_kill_session(conn_t* conn, const char* sid)
 {
 	DBusMessage *msg, *reply;
 	DBusError dbus_err;
