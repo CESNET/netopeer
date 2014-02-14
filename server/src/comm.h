@@ -67,8 +67,10 @@ conn_t* comm_init();
  * @brief Communication loop
  * @param[in] conn Connection handler
  * @param[in] timeout Timeout in milliseconds
+ * @return EXIT_FAILURE on fatal error (communication is broken), EXIT_SUCCESS
+ * otherwise
  */
-void comm_loop(conn_t* conn, int timeout);
+int comm_loop(conn_t* conn, int timeout);
 
 /**
  * @brief Destroy all communication structures

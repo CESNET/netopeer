@@ -585,7 +585,7 @@ static void process_operation (DBusConnection *conn, DBusMessage *msg)
 	return;
 }
 
-void comm_loop(conn_t* conn, int timeout)
+int comm_loop(conn_t* conn, int timeout)
 {
 	DBusMessage* msg;
 
@@ -631,6 +631,8 @@ void comm_loop(conn_t* conn, int timeout)
 		/* free the message */
 		dbus_message_unref(msg);
 	}
+
+	return (EXIT_SUCCESS);
 }
 
 void comm_destroy(conn_t *conn)
