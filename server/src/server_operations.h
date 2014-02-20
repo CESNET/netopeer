@@ -41,8 +41,12 @@
 #define SERVER_OP_H_
 
 #include <libnetconf_xml.h>
-#include <dbus/dbus.h>
 #include <libxml/tree.h>
+
+/**
+ * Environment variabe with settings for verbose level
+ */
+#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
 
 /* VERBOSE macro */
 char err_msg[4096];
@@ -52,9 +56,9 @@ char err_msg[4096];
 
 struct session_info {
 	/**
-	 * String identifying netopeer agent on D-BUS
+	 * String identifying netopeer agent
 	 */
-	char *dbus_id;
+	char *id;
 	/**
 	 * Pointer to library provided session.
 	 * In our architecture are sessions are dummy
@@ -72,62 +76,13 @@ struct module {
 	char * name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
 	struct ncds_ds * ds; /**< pointer to datastore returned by libnetconf */
 	ncds_id id; /**< Related datastore ID */
-	struct module *prev,*next;
+	struct module *prev, *next;
 };
-
-/**
- * @ingroup dbus
- * @brief Set new NETCONF session connected to the server via Netopeer agent and
- * its DBus connection. The function sends reply to the Netopeer agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg SetSessionParams DBus message from the Netopeer agent
- */
-void set_new_session (DBusConnection *conn, DBusMessage *msg);
-
-/**
- * @ingroup dbus
- * @brief Provide agent with list of capabilities currently supported by server.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg SetSessionParams DBus message from the Netopeer agent
- */
-void get_capabilities (DBusConnection *conn, DBusMessage *msg);
-
-/**
- * @ingroup dbus
- * @brief Perform NETCONF <close-session> operation requested by client via
- * Netopeer agent. This function do not require any reply sent to the agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg KillSession DBus message from the Netopeer agent
- */
-void close_session (DBusMessage *msg);
-
-/**
- * @ingroup dbus
- * @brief Perform NETCONF <kill-session> operation requested by client via
- * Netopeer agent. The function sends reply to the Netopeer agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg KillSession DBus message from the Netopeer agent
- */
-void kill_session (DBusConnection *conn, DBusMessage *msg);
-
-/**
- * @ingroup dbus
- * @brief Take care of all others NETCONF operation. Based on namespace
- * associated to operation decide to which device module pass the message.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg DBus message from the Netopeer agent
- */
-void process_operation (DBusConnection *conn, DBusMessage *msg);
 
 /**
  * @brief Free all session info structures.
  */
-void server_sessions_destroy_all (void);
+void server_sessions_destroy_all(void);
 
 /**
  * @brief Apply rpc to all device modules which qualify for it
@@ -137,18 +92,28 @@ void server_sessions_destroy_all (void);
  *
  * @return nc_reply with response to rpc
  */
-nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc);
+nc_reply * server_process_rpc(struct nc_session * session, const nc_rpc * rpc);
 
 /* server session management functions */
 
 /**
  * @brief Returns constant pointer to session info structure specified by session id
  *
- * @param session_id Key for searching
+ * @param id Key for searching
  *
  * @return Constant pointer to session info structure or NULL on error
  */
-const struct session_info* server_sessions_get_by_id (const char* session_id);
+const struct session_info* server_sessions_get_by_ncid(const char* id);
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list. The session is specified by its session ID.
+ *
+ * @param id ID of agent holding the session
+ *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* server_sessions_get_by_agentid(const char* id);
 
 /**
  * @brief Add session to server internal list
@@ -156,30 +121,37 @@ const struct session_info* server_sessions_get_by_id (const char* session_id);
  * @param[in] session_id Assigned session ID
  * @param[in] username Name of user owning the session
  * @param[in] cpblts List of capabilities session supports
- * @param[in] dbus_is D-BUS identification of agent providing communication for session
+ * @param[in] id ID of the agent providing communication for session
  */
-void server_sessions_add (const char * session_id, const char * username, struct nc_cpblts * cpblts, const char * dbus_id);
+void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id);
 
 /**
  * @brief Close and remove session and stop agent
  *
  * @param session Session to stop.
  */
-void server_sessions_stop (struct session_info *session);
+void server_sessions_stop(struct session_info *session);
+
+/**
+ * @brief Force stopping the agent
+ *
+ * @param session Session to kill.
+ */
+void server_sessions_kill(struct session_info *session);
 
 /**
  * @brief Close and remove all sessions
  */
-void server_sessions_destroy_all (void);
+void server_sessions_destroy_all(void);
 
 /**
  * @brief Returns constant pointer to session info structure specified by D-BUS id
  *
- * @param session_dbus_id Key for searching
+ * @param id Key for searching
  *
  * @return Constant pointer to session info structure or NULL on error
  */
-const struct session_info* server_sessions_get_by_dbusid (const char* session_dbus_id);
+const struct session_info* srv_get_session(const char* id);
 
 /* Datastore */
 
@@ -207,7 +179,7 @@ int module_disable(struct module * module, int destroy);
  * @brief Print verbose message to syslog
  *
  */
-void clb_print (NC_VERB_LEVEL, const char *);
+void clb_print(NC_VERB_LEVEL, const char *);
 
 /**
  * @ Print debug messages to syslog

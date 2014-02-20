@@ -34,6 +34,8 @@
 #
 
 NAME = @PACKAGE_NAME@
+VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')
+RELEASE = @RELEASE@
 
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
 prefix = @prefix@
@@ -57,27 +59,34 @@ INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 RPMDIR = RPMBUILD
-LIBS = @LIBS@
+
+AGENT = netopeer-agent
+AGENT_LIBS = @AGENT_LIBS@
+AGENT_SRCS =  src/agent.c \
+	src/agent_comm.c \
+	@AGENT_SRCS_COMM@
+AGENT_HDRS = src/comm.h \
+	@AGENT_HDRS_COMM@
+AGENT_OBJS = $(AGENT_SRCS:%.c=$(OBJDIR)/%.o)
+
+SERVER = netopeer-server
+SERVER_LIBS = @SERVER_LIBS@
+SERVER_SRCS =  src/server.c \
+	src/server_operations.c \
+	src/cfgnetopeer-transapi.c \
+	@SERVER_SRCS_COMM@
+SERVER_HDRS = src/comm.h \
+	src/server_operations.h \
+	@SERVER_HDRS_COMM@
+SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
+
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/liberouter/netopeer2/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/netopeer/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
-VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')
-RELEASE = @RELEASE@
-
 TOPDIR = @CONFIGURE_PWD@
-SUBDIRS = agent \
-	  dm_manager
-
-SRCS =  src/server.c \
-	src/cfgnetopeer-transapi.c\
-	src/server_sessions.c \
-	src/netopeer_dbus.c \
-	src/server_operations.c
-
-HDRS = src/server_operations.h \
-	src/netopeer_dbus.h
+SUBDIRS = dm_manager
 
 CFGS = config/datastore.xml \
 	config/netopeer-cfgnetopeer.yin \
@@ -86,26 +95,32 @@ CFGS = config/datastore.xml \
 	config/netopeer-cfgnetopeer-schematron.xsl
 	
 CFGS_TAR = $(CFGS) \
-	config/org.liberouter.netopeer2.conf.in \
-	config/org.liberouter.netopeer2.server.service.in
+	config/org.liberouter.netopeer.conf.in \
+	config/org.liberouter.netopeer.server.service.in
 
-OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
-
-all: $(NAME) $(SUBDIRS)
+all: $(AGENT) $(SERVER) $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-
 $(SUBDIRS):
 	@$(MAKE) -C $@
 
-$(NAME): $(OBJS)
+$(SERVER): $(SERVER_OBJS)
 	@rm -f $@;
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(OBJS) $(LIBS) -ldl -o $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(SERVER_OBJS) $(SERVER_LIBS) -o $@;
+
+$(AGENT): $(AGENT_OBJS)
+	@rm -f $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
 $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \
 		(mkdir -p $$(dirname $@))
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
+
+.PHONY: clean
+clean:
+	for i in $(SUBDIRS) ; do $(MAKE) -C $$i clean ; done
+	rm -rf $(AGENT) $(SERVER) $(OBJDIR) doxygen/
 
 .PHONY: doc
 doc: $(DOXYGEN_CONFIG)
@@ -122,11 +137,11 @@ doc: $(DOXYGEN_CONFIG)
 dist: $(NAME).spec tarball rpm
 
 .PHONY: tarball
-tarball: $(SRCS) $(HEADERS)
+tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
 	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
-	for i in $(SRCS) $(HDRS) $(CFGS_TAR) configure.in configure \
+	for i in $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) configure.in configure \
 	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh; do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
@@ -153,26 +168,26 @@ distclean:
 .PHONY: install
 install:
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
-	$(INSTALL_PROGRAM) $(NAME) $(DESTDIR)/$(bindir)/;
+	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
+	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
 	for i in $(SUBDIRS) ; do \
 		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C $$i install \
 		|| exit 1; \
 	done
 	$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/
-	$(INSTALL_DATA) config/org.liberouter.netopeer2.conf $(DESTDIR)/$(dbusconfdir)/
+	$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer2.server.service $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
-	$(INSTALL_DATA) $(CFGS) $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
+	$(INSTALL_DATA) $(CFGS) $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/;
-	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 -d $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -r file $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/cfgnetopeer/datastore.xml -f $(DESTDIR)/$(sysconfdir)/liberouter/netopeer2/modules.conf.d/
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/;
+	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 \
+		-d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/netopeer-cfgnetopeer.yin \
+		-r file $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/datastore.xml \
+		-f $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/
 
-.PHONY: clean
-clean:
-	for i in $(SUBDIRS) ; do $(MAKE) -C $$i clean ; done
-	rm -rf $(NAME) $(OBJDIR) doxygen/
 
