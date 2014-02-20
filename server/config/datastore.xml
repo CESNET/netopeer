@@ -4,8 +4,8 @@
 		<netopeer xmlns="urn:cesnet:tmc:netopeer:1.0">
 		   <modules>
 		      <module>
-		         <module-name>Netopeer</module-name>
-		         <module-allowed>true</module-allowed>
+		         <name>Netopeer</name>
+		         <allowed>true</allowed>
 		      </module>
 		   </modules>
 	   	</netopeer>
