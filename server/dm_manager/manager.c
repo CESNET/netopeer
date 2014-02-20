@@ -7,7 +7,7 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
-#define DEFAULT_CONFIG "/etc/liberouter/netopeer2/modules.conf.d/"
+#define DEFAULT_CONFIG "/etc/netopeer/modules.conf.d/"
 
 void print_usage (char *prog_name)
 {
