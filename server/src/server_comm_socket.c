@@ -49,6 +49,8 @@
 #include <sys/un.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include "comm.h"
 #include "netopeer_socket.h"
@@ -58,12 +60,15 @@
 int sock = -1;
 struct pollfd agents[AGENTS_QUEUE + 1];
 static int connected_agents = 0;
+static struct sockaddr_un server;
 
 conn_t* comm_init()
 {
-	struct sockaddr_un server;
 	int i, flags;
 	mode_t mask;
+	uid_t uid;
+	struct passwd *pwd;
+	struct group *grp;
 
 	if (sock != -1) {
 		return (&sock);
@@ -82,27 +87,43 @@ conn_t* comm_init()
 	strncpy(server.sun_path, COMM_SOCKET_PATH, sizeof(server.sun_path) - 1);
 	unlink(server.sun_path);
 
+	/* set socket permission using umask */
+	mask = umask(~COMM_SOCKET_PERM);
+	/* bind socket to the file path */
 	if (bind(sock, (struct sockaddr*)&server, sizeof(server)) == -1) {
-		nc_verb_error("Unable to bind to a UNIX socket %s (%s).", server.sun_path, strerror(errno));
-
-		/* cleanup */
-		close(sock);
-		sock = -1;
-
-		return (NULL);
+		nc_verb_error("Unable to bind to a UNIX socket \'%s\' (%s).", server.sun_path, strerror(errno));
+		goto error_cleanup;
 	}
-	mask = umask(0000);
-	chmod(COMM_SOCKET_PATH, COMM_SOCKET_PERM);
 	umask(mask);
 
+	/* check owner and set group to apply permissions */
+	pwd = getpwnam(COMM_SOCKET_OWNER);
+	if (pwd == NULL) {
+		nc_verb_error("Setting communication socket permissions failed (getpwnam(): %s).", strerror(errno));
+		goto error_cleanup;
+	}
+	if ((uid = geteuid()) != 0 && uid != pwd->pw_uid) {
+		nc_verb_error("Insufficient permission to run netopeer-server, only \'%s\' is allowed to run it.", COMM_SOCKET_OWNER);
+		goto error_cleanup;
+	}
+
+	grp = getgrnam(COMM_SOCKET_GROUP);
+	if (grp == NULL) {
+		nc_verb_error("Setting communication socket permissions failed (getgrnam(): %s).", strerror(errno));
+		goto error_cleanup;
+	}
+	if (chown(server.sun_path, -1, grp->gr_gid) == -1) {
+		nc_verb_error("Setting communication socket permissions failed (fchown(): %s).", strerror(errno));
+		if (errno == EPERM) {
+			nc_verb_error("Check that user \'%s\' is memeber of the greoup \'%s\'.", COMM_SOCKET_OWNER, COMM_SOCKET_GROUP);
+		}
+		goto error_cleanup;
+	}
+
+	/* start listening */
 	if (listen(sock, AGENTS_QUEUE) == -1) {
 		nc_verb_error("Unable to switch a socket into a listening mode (%s).", strerror(errno));
-
-		/* cleanup */
-		close(sock);
-		sock = -1;
-
-		return (NULL);
+		goto error_cleanup;
 	}
 
 	/* the first agent is actually server's listen socket */
@@ -118,6 +139,12 @@ conn_t* comm_init()
 	}
 
 	return(&sock);
+
+error_cleanup:
+	close(sock);
+	sock = -1;
+	unlink(server.sun_path);
+	return (NULL);
 }
 
 static void get_capabilities(int socket)
@@ -460,4 +487,6 @@ void comm_destroy(conn_t *conn)
 	/* close listen socket */
 	close(sock);
 	sock = -1;
+
+	unlink(server.sun_path);
 }

@@ -5185,6 +5185,8 @@ ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
 
+ac_config_files="$ac_config_files src/netopeer_socket.h"
+
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5898,6 +5900,7 @@ do
     "config/org.liberouter.netopeer.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.server.service" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
+    "src/netopeer_socket.h") CONFIG_FILES="$CONFIG_FILES src/netopeer_socket.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
