@@ -5,7 +5,7 @@
 		   <modules>
 		      <module>
 		         <name>Netopeer</name>
-		         <allowed>true</allowed>
+		         <enabled>true</enabled>
 		      </module>
 		   </modules>
 	   	</netopeer>
