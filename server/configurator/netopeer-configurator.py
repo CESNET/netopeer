@@ -73,15 +73,11 @@ class netopeer_configuration:
 			return(True)
 
 def cli(stdscr, config):
-	#define colors
-	# selected item
-	curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
-	# commands
-	curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_BLUE)
-	# enabled 
-	curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
-	# disabled
-	curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_RED)
+	# use default terminal colors
+	curses.use_default_colors()
+	for i in range(0, curses.COLORS):
+		curses.init_pair(i, i, -1);
+
 	# cursor invsible
 	curses.curs_set(0)
 
