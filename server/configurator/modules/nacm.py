@@ -134,27 +134,27 @@ class nacm(nc_module.nc_module):
 			self.x_default = acm.action.PERMIT
 
 		for group_name in nacm_group_names:
-			group_users = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\''+group_name+'\']/n:user-name'))
+			group_users = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'{s}\']/n:user-name'.format(s=group_name)))
 			self.groups.append(nacm_group(group_name, group_users))
 
 		for rule_list_name in nacm_rule_lists:
 			rule_list = nacm_rule_list(rule_list_name)
 
-			rule_list.groups = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:group'))
+			rule_list.groups = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:group'.format(s=rule_list_name)))
 			if '*' in rule_list.groups:
 				rule_list.groups = ['*']
 
-			rule_names = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule/n:name'))
+			rule_names = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:rule/n:name'.format(s=rule_list_name)))
 			for rule_name in rule_names:
 				rule = nacm_rule(rule_name)
 
-				module_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:module-name'))
-				rpc_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:protocol-operation/n:rpc-name'))
-				notification_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:notification/n:notification-name'))
-				data_path = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:data-node/n:path'))
-				access_operation = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:access-operation'))
-				action = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:action'))
-				comment = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\''+rule_list_name+'\']/n:rule[\''+rule_name+'\']/n:comment'))
+				module_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:module-name'.format(list=rule_list_name,rule=rule_name)))
+				rpc_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:protocol-operation/n:rpc-name'.format(list=rule_list_name,rule=rule_name)))
+				notification_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:notification/n:notification-name'.format(list=rule_list_name,rule=rule_name)))
+				data_path = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:data-node/n:path'.format(list=rule_list_name,rule=rule_name)))
+				access_operation = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:access-operation'.format(list=rule_list_name,rule=rule_name)))
+				action = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:action'.format(list=rule_list_name,rule=rule_name)))
+				comment = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:comment'.format(list=rule_list_name,rule=rule_name)))
 
 				if module_name:
 					rule.module = module_name[0]
@@ -192,7 +192,7 @@ class nacm(nc_module.nc_module):
 				elif action and action[1] == 'deny':
 					rule.action = acm.action.DENY
 				else:
-					messages.append('Missing mandatory element \'action\' in rule \''+rule_name+'\'. The rule will be skipped.')
+					messages.append('Missing mandatory element \'action\' in rule \'{s}\'. The rule will be skipped.'.format(s=rule_name))
 					continue
 
 				if comment:
@@ -330,10 +330,10 @@ class nacm(nc_module.nc_module):
 		window.addstr('Path to NACM datastore:\n')
 		tools = []
 		if focus and self.selected == 0:
-			window.addstr(str(self.datastore_path)+'\n', curses.color_pair(1))
+			window.addstr('{s}\n'.format(s=self.datastore_path), curses.color_pair(1))
 			tools.append(('e','edit'))
 		else:
-			window.addstr(str(self.datastore_path)+'\n', curses.color_pair(2))
+			window.addstr('{s}\n'.format(s=self.datastore_path), curses.color_pair(2))
 		window.addstr('\n')
 		if focus and self.selected == 1:
 			if self.enabled:
@@ -417,12 +417,12 @@ class nacm(nc_module.nc_module):
 
 		for user in self.almighty_users:
 			if focus and self.selected == (self.almighty_users.index(user)+7):
-				window.addstr(user+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s=user), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(user+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s=user), curses.color_pair(2))
 		window.addstr('\n')
 
 		if focus and self.selected == 7+len(self.almighty_users):
@@ -440,12 +440,12 @@ class nacm(nc_module.nc_module):
 
 		for group in self.almighty_groups:
 			if focus and self.selected == (self.almighty_groups.index(group)+len(self.almighty_users)+8):
-				window.addstr(group+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s=group), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(group+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s=group), curses.color_pair(2))
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
@@ -488,7 +488,7 @@ class nacm(nc_module.nc_module):
 						self.datastore_path = tmp_nacm_var
 						self.get()
 					except IOError:
-						messages.append(tmp_nacm_var+' is not valid file and can not be created.')
+						messages.append('{s} is not valid file and can not be created.'.format(s=tmp_nacm_var))
 			elif self.selected in range(7,7+len(self.almighty_users)):
 				# edit user
 				pos = self.selected-7
@@ -496,7 +496,7 @@ class nacm(nc_module.nc_module):
 				if tmp_nacm_var:
 					self.almighty_users[pos] = tmp_nacm_var
 				else:
-					messages.append(tmp_nacm_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s=tmp_nacm_var))
 			elif self.selected in range(8+len(self.almighty_users), 8+len(self.almighty_users)+len(self.almighty_groups)):
 				# edit group
 				pos = self.selected-(8+len(self.almighty_users))
@@ -504,7 +504,7 @@ class nacm(nc_module.nc_module):
 				if tmp_nacm_var:
 					self.almighty_groups[pos] = tmp_nacm_var
 				else:
-					messages.append(tmp_nacm_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s=tmp_nacm_var))
 			else:
 				curses.flash()
 		elif key == ord('a'):
@@ -514,7 +514,7 @@ class nacm(nc_module.nc_module):
 				if tmp_nacm_var:
 					self.almighty_users.append(tmp_nacm_var)
 				else:
-					messages.append(tmp_nacm_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s=tmp_nacm_var))
 			elif self.selected in range(7+len(self.almighty_users), 8+len(self.almighty_users)+len(self.almighty_groups)):
 				# add group
 				pos = self.selected-(8+len(self.almighty_users))
@@ -522,7 +522,7 @@ class nacm(nc_module.nc_module):
 				if tmp_nacm_var:
 					self.almighty_groups.append(tmp_nacm_var)
 				else:
-					messages.append(tmp_nacm_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s=tmp_nacm_var))
 			else:
 				curses.flash()
 		elif key == ord('d'):

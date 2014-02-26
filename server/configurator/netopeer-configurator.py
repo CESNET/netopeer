@@ -169,11 +169,11 @@ def cli(stdscr, config):
 		for module in config.nc_modules:
 			if module is config.nc_modules[module_selected]:
 				if windows[window] == 'Menu':
-					menu.addstr(module.name+'\n', curses.color_pair(1))
+					menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(1))
 				else:
-					menu.addstr(module.name+'\n', curses.color_pair(2))
+					menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(2))
 			else:	
-				menu.addstr(module.name+'\n', curses.color_pair(0))
+				menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
 
 		# Content window
 		focus = windows[window] == 'Content'
@@ -202,7 +202,7 @@ def cli(stdscr, config):
 			# Print module tools
 			for (key,desc) in module_tools:
 				tools.addstr(key, curses.color_pair(1))
-				tools.addstr(' - %s ' % desc, curses.color_pair(0))
+				tools.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
 
 		stdscr.refresh()
 

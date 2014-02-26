@@ -99,7 +99,7 @@ class dbus(nc_module.nc_module):
 			dbus_service.close()
 
 			if not netopeer_service:
-				messages.append(self.service_path+' file does not configure netopeer service.')
+				messages.append('{s} file does not configure netopeer service.'.format(s = self.service_path))
 
 		return(True)
 
@@ -144,24 +144,24 @@ class dbus(nc_module.nc_module):
 			dbus_service = open(self.service_path, 'w')
 			dbus_service.write('[D-BUS Service]\n')
 			dbus_service.write('Name=org.liberouter.netopeer2.server\n')
-			dbus_service.write('Exec='+self.service_exe+'\n')
-			dbus_service.write('User='+self.service_user+'\n')
+			dbus_service.write('Exec={s}\n'.format(s=self.service_exe))
+			dbus_service.write('User={s}\n'.format(s=self.service_user))
 			dbus_service.close()
 
 	def paint(self, window, focus, height, width):
 		tools = []
 		window.addstr('Path to DBus user permission for netopeer service:\n')
 		if focus and self.selected == 0:
-			window.addstr(str(self.permission_path)+'\n', curses.color_pair(1))
+			window.addstr('{s}\n'.format(s = self.permission_path), curses.color_pair(1))
 			tools.append(('e','edit'))
 		else:
-			window.addstr(str(self.permission_path)+'\n', curses.color_pair(2))
+			window.addstr('{s}\n'.format(s = self.permission_path), curses.color_pair(2))
 		window.addstr('Path to DBus autostart configuration for netopeer service:\n')
 		if focus and self.selected == 1:
-			window.addstr(str(self.service_path)+'\n', curses.color_pair(1))
+			window.addstr('{s}\n'.format(s = self.service_path), curses.color_pair(1))
 			tools.append(('e','edit'))
 		else:
-			window.addstr(str(self.service_path)+'\n', curses.color_pair(2))
+			window.addstr('{s}\n'.format(s = self.service_path), curses.color_pair(2))
 		window.addstr('\n')
 
 		if self.own_users:
@@ -179,12 +179,12 @@ class dbus(nc_module.nc_module):
 
 		for user in self.own_users:
 			if focus and self.selected == (self.own_users.index(user)+3):
-				window.addstr(user+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s = user), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(user+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s = user), curses.color_pair(2))
 
 		window.addstr('\n')
 		if self.access_users:
@@ -202,12 +202,12 @@ class dbus(nc_module.nc_module):
 
 		for user in self.access_users:
 			if focus and self.selected == (self.access_users.index(user)+4+len(self.own_users)):
-				window.addstr(user+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s = user), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(user+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s = user), curses.color_pair(2))
 
 		window.addstr('\n')
 		if self.own_groups:
@@ -225,12 +225,12 @@ class dbus(nc_module.nc_module):
 
 		for group in self.own_groups:
 			if focus and self.selected == (self.own_groups.index(group)+5+len(self.own_users)+len(self.access_users)):
-				window.addstr(group+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s = group), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(group+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s = group), curses.color_pair(2))
 
 		window.addstr('\n')
 		if self.access_groups:
@@ -248,12 +248,12 @@ class dbus(nc_module.nc_module):
 
 		for group in self.access_groups:
 			if focus and self.selected == (self.access_groups.index(group)+6+len(self.own_users)+len(self.access_users)+len(self.own_groups)):
-				window.addstr(group+'\n', curses.color_pair(1))
+				window.addstr('{s}\n'.format(s = group), curses.color_pair(1))
 				tools.append(('a','add'))
 				tools.append(('d','delete'))
 				tools.append(('e','edit'))
 			else:
-				window.addstr(group+'\n', curses.color_pair(2))
+				window.addstr('{s}\n'.format(s = group), curses.color_pair(2))
 
 		return(tools)
 
@@ -269,14 +269,14 @@ class dbus(nc_module.nc_module):
 					self.permission_path = tmp_dbus_var
 					self.get()
 				else:
-					messages.append(tmp_dbus_var+' is not valid file.')
+					messages.append('{s} is not valid file.'.format(s = tmp_dbus_var))
 			elif self.selected == 1:
 				tmp_dbus_var = self.get_editable(3,0, stdscr, window, self.service_path, curses.color_pair(1))
 				if tmp_dbus_var and os.path.isfile(tmp_dbus_var):
 					self.service_path = tmp_dbus_var
 					self.get()
 				else:
-					messages.append(tmp_dbus_var+' is not valid file.')
+					messages.append('{s} is not valid file.'.format(s = tmp_dbus_var))
 			elif self.selected > 2 and self.selected <= (2+len(self.own_users)):
 				pos = self.selected-3
 				line = self.selected + 3
@@ -284,7 +284,7 @@ class dbus(nc_module.nc_module):
 				if tmp_dbus_var:
 					self.own_users[pos] = tmp_dbus_var
 				else:
-					messages.append(tmp_dbus_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s = tmp_dbus_var))
 			elif self.selected > (3+len(self.own_users)) and self.selected <= (3+len(self.own_users)+len(self.access_users)):
 				pos = self.selected-4-len(self.own_users)
 				line = self.selected + 4
@@ -292,7 +292,7 @@ class dbus(nc_module.nc_module):
 				if tmp_dbus_var:
 					self.access_users[pos] = tmp_dbus_var
 				else:
-					messages.append(tmp_dbus_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s = tmp_dbus_var))
 			elif self.selected > (4+len(self.own_users)+len(self.access_users)) and self.selected <= (4+len(self.own_users)+len(self.access_users)+len(self.own_groups)):
 				pos = self.selected-5-len(self.own_users)-len(self.access_users)
 				line = self.selected + 5
@@ -300,7 +300,7 @@ class dbus(nc_module.nc_module):
 				if tmp_dbus_var:
 					self.own_groups[pos] = tmp_dbus_var
 				else:
-					messages.append(tmp_dbus_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s = tmp_dbus_var))
 			elif self.selected > (5+len(self.own_users)+len(self.access_users)+len(self.own_groups)) and self.selected <= (5+len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)):
 				pos = self.selected-6-len(self.own_users)-len(self.access_users)-len(self.own_groups)
 				line = self.selected + 6
@@ -308,7 +308,7 @@ class dbus(nc_module.nc_module):
 				if tmp_dbus_var:
 					self.access_groups[pos] = tmp_dbus_var
 				else:
-					messages.append(tmp_dbus_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s = tmp_dbus_var))
 			else:
 				curses.flash()
 		elif key == ord('a'):
@@ -318,28 +318,28 @@ class dbus(nc_module.nc_module):
 				if tmp_dbus_var:
 					self.own_users.append(tmp_dbus_var)
 				else:
-					messages.append(tmp_dbus_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s = tmp_dbus_var))
 			elif self.selected >= (3+len(self.own_users)) and self.selected <= (3+len(self.own_users)+len(self.access_users)):
 				line = 8 + len(self.own_users) + len(self.access_users)
 				tmp_dbus_var = self.get_editable(line,0, stdscr, window, '', curses.color_pair(1))
 				if tmp_dbus_var:
 					self.access_users.append(tmp_dbus_var)
 				else:
-					messages.append(tmp_dbus_var+' is not valid username.')
+					messages.append('{s} is not valid username.'.format(s = tmp_dbus_var))
 			elif self.selected >= (4+len(self.own_users)+len(self.access_users)) and self.selected <= (4+len(self.own_users)+len(self.access_users)+len(self.own_groups)):
 				line = 10 + len(self.own_users) + len(self.access_users) + len(self.own_groups)
 				tmp_dbus_var = self.get_editable(line,0, stdscr, window, '', curses.color_pair(1))
 				if tmp_dbus_var:
 					self.own_groups.append(tmp_dbus_var)
 				else:
-					messages.append(tmp_dbus_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s = tmp_dbus_var))
 			elif self.selected >= (5+len(self.own_users)+len(self.access_users)+len(self.own_groups)) and self.selected <= (5+len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)):
 				line = 12 + len(self.own_users) + len(self.access_users) + len(self.own_groups) + len(self.access_groups)
 				tmp_dbus_var = self.get_editable(line,0, stdscr, window, '', curses.color_pair(1))
 				if tmp_dbus_var:
 					self.access_groups.append(tmp_dbus_var)
 				else:
-					messages.append(tmp_dbus_var+' is not valid groupname.')
+					messages.append('{s} is not valid groupname.'.format(s = tmp_dbus_var))
 			else:
 				curses.flash()
 		elif key == ord('d'):

@@ -31,7 +31,7 @@ class sshd(nc_module.nc_module):
 					break
 
 		if self.binary_path:
-			sshd_output = subprocess.check_output(self.binary_path+' -d -d -t', stderr=subprocess.STDOUT, shell=True).split(os.linesep)
+			sshd_output = subprocess.check_output('{s} -d -d -t'.format(s=self.binary_path), stderr=subprocess.STDOUT, shell=True).split(os.linesep)
 			for line in sshd_output:
 				config = re.match(r'.*load_server_config:\s*filename\s*(.*)', line)
 				if config is not None:
@@ -96,16 +96,16 @@ class sshd(nc_module.nc_module):
 				if (not ports_done) and re.match(r'#\s*Port', line):
 					ports_done = True
 					for port in self.ports:
-						sshd_lines.insert(sshd_lines.index(line)+1, 'Port '+str(port)+'\n')
+						sshd_lines.insert(sshd_lines.index(line)+1, 'Port {d}\n'.format(d=port))
 				elif (not subsystem_done) and re.match(r'#?\s*Subsystem', line):
 					subsystem_done = True
-					sshd_lines.insert(sshd_lines.index(line)+1, 'Subsystem netconf '+self.agent+'\n')
+					sshd_lines.insert(sshd_lines.index(line)+1, 'Subsystem netconf {s}\n'.format(s=self.agent))
 
 			if not ports_done:
 				for port in self.ports:
-					sshd_lines.append('Port '+str(port)+'\n')
+					sshd_lines.append('Port {d}\n'.format(d=port))
 			if not subsystem_done:
-				sshd_lines.append('Subsystem netconf '+self.agent+'\n')
+				sshd_lines.append('Subsystem netconf {s}\n'.format(s=self.agent))
 
 			sshd_file = open(self.config_path, 'w')
 			sshd_file.writelines(sshd_lines)
@@ -116,18 +116,18 @@ class sshd(nc_module.nc_module):
 		tools = []
 		window.addstr('Using SSH daemon configuration in file:\n')
 		if focus and self.selected == 0:
-			window.addstr(str(self.config_path)+'\n', curses.color_pair(1))
+			window.addstr('{s}\n'.format(s=self.config_path), curses.color_pair(1))
 			tools.append(('e','edit'))
 		else:
-			window.addstr(str(self.config_path)+'\n', curses.color_pair(2))
+			window.addstr('{s}\n'.format(s=self.config_path), curses.color_pair(2))
 		window.addstr('\n')
 
 		window.addstr('As netconf subsystem will used:\n')
 		if focus and self.selected == 1:
-			window.addstr(str(self.agent)+'\n', curses.color_pair(1))
+			window.addstr('{s}\n'.format(s=self.agent), curses.color_pair(1))
 			tools.append(('e','edit'))
 		else:
-			window.addstr(str(self.agent)+'\n', curses.color_pair(2))
+			window.addstr('{s}\n'.format(s=self.agent), curses.color_pair(2))
 		window.addstr('\n')
 
 		if self.ports:
@@ -138,12 +138,12 @@ class sshd(nc_module.nc_module):
 				window.addstr('Curently there are these port configured to be used by SSH daemon:\n', curses.color_pair(2))
 			for port in self.ports:
 				if focus and (self.ports.index(port)+3) == self.selected:
-					window.addstr(str(port)+'\n', curses.color_pair(1))
+					window.addstr('{d}\n'.format(d=port), curses.color_pair(1))
 					tools.append(('a','add'))
 					tools.append(('d','delete'))
 					tools.append(('e','edit'))
 				else:
-					window.addstr(str(port)+'\n', curses.color_pair(2))
+					window.addstr('{d}\n'.format(d=port), curses.color_pair(2))
 		else:
 			if focus and self.selected == 2:
 				window.addstr('There are no configured ports for SSH daemon. The default one (22) will be used.', curses.color_pair(1))
@@ -166,34 +166,34 @@ class sshd(nc_module.nc_module):
 					self.config_path = tmp_ssh_var
 					self.get()
 				else:
-					messages.append('\''+tmp_ssh_var+'\' is not valid file.')
+					messages.append('\'{s}\' is not valid file.'.format(s=tmp_ssh_var))
 		elif key == ord('e') and self.selected == 1:
 			tmp_ssh_var = self.get_editable(4,0, stdscr, window, self.agent, curses.color_pair(1))
 			if tmp_ssh_var:
 				if os.path.exists(tmp_ssh_var):
 					self.agent = tmp_ssh_var
 				else:
-					messages.append('\''+tmp_ssh_var+'\' is not valid file.')
+					messages.append('\'{s}\' is not valid file.'.format(s=tmp_ssh_var))
 		elif key == ord('e') and self.selected > 2:
 			# edit port
 			tmp_ssh_var = self.get_editable(self.selected+4,0, stdscr, window, str(self.ports[self.selected-3]), curses.color_pair(1))
 			if tmp_ssh_var and tmp_ssh_var.isdigit() and int(tmp_ssh_var) in range(1,2**16):
 				if int(tmp_ssh_var) in self.ports:
-					messages.append('Port '+tmp_ssh_var+' already is in the list of configured ports.')
+					messages.append('Port {d} already is in the list of configured ports.'.format(d=tmp_ssh_var))
 				else:
 					self.ports[self.selected-3] = int(tmp_ssh_var)
 			else:
-				messages.append(tmp_ssh_var+' is not valid port number.')
+				messages.append('{d} is not valid port number.'.format(d=tmp_ssh_var))
 		elif key == ord('a') and self.selected > 1:
 			# add new port
 			tmp_ssh_var = self.get_editable(len(self.ports)+7,0, stdscr, window, '', curses.color_pair(1))
 			if tmp_ssh_var and tmp_ssh_var.isdigit() and int(tmp_ssh_var) in range(1,2**16):
 				if int(tmp_ssh_var) in self.ports:
-					messages.append('Port '+tmp_ssh_var+' already is in the list of configured ports.')
+					messages.append('Port {d} already is in the list of configured ports.'.format(d=tmp_ssh_var))
 				else:
 					self.ports.append(int(tmp_ssh_var))
 			else:
-				messages.append(tmp_ssh_var+' is not valid port number.')
+				messages.append('{d} is not valid port number.'.format(d=tmp_ssh_var))
 
 		elif key == ord('d') and self.selected > 2:
 			self.ports.remove(self.ports[self.selected-3])
