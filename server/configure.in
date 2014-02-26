@@ -267,6 +267,16 @@ case $DISTRO in
 		;;
 esac
 
+# specify netopeer modules location
+AC_ARG_WITH([modules-dir],
+	AC_HELP_STRING([--with-modules-dir=DIR],
+		[path to directory where netopeer modules configuration will be stored
+		(${sysconfdir}/liberouter/netopeer2/modules.conf.d/ by default)])
+	,
+	MODULESDIR="$withval"
+	,
+	MODULESDIR="${sysconfdir}/liberouter/netopeer2/modules.conf.d/"
+)
 
 ###################### Check for configure parameters ##########################
 
@@ -287,6 +297,7 @@ AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
 AC_SUBST(DISTRO)
+AC_SUBST(MODULESDIR)
 
 AC_SUBST(DOXYGEN)
 if test -z "$DOXYGEN"; then
@@ -305,5 +316,6 @@ AC_CONFIG_FILES(config/org.liberouter.netopeer2.conf)
 AC_CONFIG_FILES(config/org.liberouter.netopeer2.server.service)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
+AC_CONFIG_FILES(configurator/modules/config.py)
 
 AC_OUTPUT

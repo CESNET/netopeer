@@ -619,6 +619,7 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+MODULESDIR
 DISTRO
 CONFIGURE_PARAMS
 REQS
@@ -705,6 +706,7 @@ with_libnetconf
 with_libdbus
 with_dbus_config_dir
 with_dbus_services
+with_modules_dir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1354,6 +1356,11 @@ Optional Packages:
                           (/usr/share/dbus-1/services/ by default), if this
                           parameter is not used, service file for
                           netopeer-server is not installed!
+  --with-modules-dir=DIR  path to directory where netopeer modules
+                          configuration will be stored
+                          (${sysconfdir}/liberouter/netopeer2/modules.conf.d/
+                          by default)
+
 
 Some influential environment variables:
   CC          C compiler command
@@ -3971,6 +3978,17 @@ case $DISTRO in
 		;;
 esac
 
+# specify netopeer modules location
+
+# Check whether --with-modules-dir was given.
+if test "${with_modules_dir+set}" = set; then :
+  withval=$with_modules_dir; MODULESDIR="$withval"
+
+else
+  MODULESDIR="${sysconfdir}/liberouter/netopeer2/modules.conf.d/"
+
+fi
+
 
 ###################### Check for configure parameters ##########################
 
@@ -4514,6 +4532,7 @@ done
 
 
 
+
 if test -z "$DOXYGEN"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing doxygen you will not able to generate Doxygen documentation." >&5
 $as_echo "$as_me: WARNING: Due to missing doxygen you will not able to generate Doxygen documentation." >&2;}
@@ -4538,6 +4557,8 @@ ac_config_files="$ac_config_files config/org.liberouter.netopeer2.server.service
 ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
+
+ac_config_files="$ac_config_files configurator/modules/config.py"
 
 
 cat >confcache <<\_ACEOF
@@ -5253,6 +5274,7 @@ do
     "config/org.liberouter.netopeer2.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer2.server.service" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
+    "configurator/modules/config.py") CONFIG_FILES="$CONFIG_FILES configurator/modules/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

@@ -28,22 +28,22 @@ class dbus(nc_module.nc_module):
 
 	def find(self):
 		"""Try to find DBus configuration files."""
-		if os.path.exists(os.path.join(config.DBUSCONFDIR,'org.liberouter.netopeer2.conf')):
-			self.permission_path = os.path.join(config.DBUSCONFDIR,'org.liberouter.netopeer2.conf')
+		if os.path.exists(os.path.join(config.paths['dbusconfdir'],'org.liberouter.netopeer2.conf')):
+			self.permission_path = os.path.join(config.paths['dbusconfdir'],'org.liberouter.netopeer2.conf')
 		else:
 			try:
-				open(os.path.join(config.DBUSCONFDIR, 'org.liberouter.netopeer2.conf'), 'w').close()
-				self.permission_path = os.path.join(config.DBUSCONFDIR, 'org.liberouter.netopeer2.conf')
+				open(os.path.join(config.paths['dbusconfdir'], 'org.liberouter.netopeer2.conf'), 'w').close()
+				self.permission_path = os.path.join(config.paths['dbusconfdir'], 'org.liberouter.netopeer2.conf')
 			except IOError:
 				self.permission_path = None
 				messages.append('netopeer DBus service permissions file not found. Specify path.')
 
-		if os.path.exists(os.path.join(config.DBUSSERVICES,'org.liberouter.netopeer2.server.service')):
-			self.service_path = os.path.join(config.DBUSSERVICES,'org.liberouter.netopeer2.server.service')
+		if os.path.exists(os.path.join(config.paths['dbusservices'],'org.liberouter.netopeer2.server.service')):
+			self.service_path = os.path.join(config.paths['dbusservices'],'org.liberouter.netopeer2.server.service')
 		else:
 			try:
-				open(os.path.join(config.DBUSSERVICES,'org.liberouter.netopeer2.server.service'), 'w').close()
-				self.service_path = os.path.join(config.DBUSSERVICES,'org.liberouter.netopeer2.server.service')
+				open(os.path.join(config.paths['dbusservices'],'org.liberouter.netopeer2.server.service'), 'w').close()
+				self.service_path = os.path.join(config.paths['dbusservices'],'org.liberouter.netopeer2.server.service')
 			except IOError:
 				self.service_path = None
 				messages.append('netopeer DBus service autostart file not found. Specify path.')

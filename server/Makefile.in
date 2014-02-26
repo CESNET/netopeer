@@ -47,6 +47,7 @@ mandir = @mandir@
 sysconfdir = @sysconfdir@
 dbusconfdir = @DBUSCONF@
 dbusservices = @DBUSSERVICES@
+modulesdir = @MODULESDIR@
 
 CC = @CC@
 DOXYGEN = @DOXYGEN@
@@ -60,7 +61,7 @@ RPMDIR = RPMBUILD
 LIBS = @LIBS@
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/liberouter/netopeer2/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
 VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')

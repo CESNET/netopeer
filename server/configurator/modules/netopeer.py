@@ -35,14 +35,14 @@ class netopeer(nc_module.nc_module):
 	selected = 0
 
 	def find(self):
-		for path in list(set([config.BINDIR] + (os.environ['PATH'].split(os.pathsep)))):
+		for path in list(set([config.paths['bindir']] + (os.environ['PATH'].split(os.pathsep)))):
 			if not self.server_path and os.path.exists(os.path.join(path,'netopeer-server')):
 				self.server_path = os.path.join(path,'netopeer-server')
 			if not self.agent_path and os.path.exists(os.path.join(path,'netopeer-agent')):
 				self.agent_path = os.path.join(path,'netopeer-agent')
 
-		if os.path.exists(config.MODULESDIR):
-			self.modules_path = config.MODULESDIR
+		if os.path.exists(config.paths['modulesdir']):
+			self.modules_path = config.paths['modulesdir']
 		else:
 			messages.append('Netopeer modules directory not fount. No modules can be configured.')
 		return(True)
