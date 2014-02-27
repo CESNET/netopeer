@@ -233,7 +233,10 @@ int module_enable(struct module * module, int add)
 		return(EXIT_FAILURE);
 	}
 
-	ncds_consolidate();
+	if (ncds_consolidate() != 0) {
+		nc_verb_warning("%s: consolidating libnetconf datastores failed for module %s.", __func__, module->name);
+		return (EXIT_FAILURE);
+	}
 
 	ncds_device_init(&module->id, NULL, 1);
 
@@ -252,8 +255,11 @@ int module_disable(struct module * module, int destroy)
 {
 	ncds_free(module->ds);
 	module->ds = NULL;
-	ncds_consolidate();
 	
+	if (ncds_consolidate() != 0) {
+		nc_verb_warning("%s: consolidating libnetconf datastores failed for module %s.", __func__, module->name);
+	}
+
 	if (destroy) {
 		if (module->next) {
 			module->next->prev = module->prev;
@@ -297,6 +303,7 @@ int transapi_init(xmlDocPtr * UNUSED(running))
  */
 void transapi_close(void)
 {
+	nc_verb_verbose("Netopeer module cleanup.");
 	while (modules) {
 		module_disable(modules, 1);
 	}
