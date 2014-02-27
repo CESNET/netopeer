@@ -152,18 +152,38 @@ int module_enable(struct module * module, int add)
 
 	if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0) {
 		if (repo_type == -1 || main_model_path == NULL || repo_path == NULL) {
+			free(main_model_path);
+			free(transapi_path);
+			free(repo_path);
+			xmlXPathFreeContext(xpath_ctxt);
+			xmlFreeDoc(module_config);
 			return(EXIT_FAILURE);
 		}
 
 		if ((module->ds = ncds_new_transapi_static(repo_type, main_model_path, &netopeer_transapi)) == NULL) {
+			free(main_model_path);
+			free(transapi_path);
+			free(repo_path);
+			xmlXPathFreeContext(xpath_ctxt);
+			xmlFreeDoc(module_config);
 			return(EXIT_FAILURE);
 		}
 	} else {
 		if (repo_type == -1 || main_model_path == NULL || transapi_path == NULL || repo_path == NULL) {
+			free(main_model_path);
+			free(transapi_path);
+			free(repo_path);
+			xmlXPathFreeContext(xpath_ctxt);
+			xmlFreeDoc(module_config);
 			return(EXIT_FAILURE);
 		}
 
 		if ((module->ds = ncds_new_transapi(repo_type, main_model_path, transapi_path)) == NULL) {
+			free(main_model_path);
+			free(transapi_path);
+			free(repo_path);
+			xmlXPathFreeContext(xpath_ctxt);
+			xmlFreeDoc(module_config);
 			return(EXIT_FAILURE);
 		}
 	}
@@ -173,6 +193,11 @@ int module_enable(struct module * module, int add)
 
 	if (repo_type == NCDS_TYPE_FILE) {
 		if (ncds_file_set_path(module->ds, repo_path)) {
+			free(repo_path);
+			ncds_free(module->ds);
+			module->ds = NULL;
+			xmlXPathFreeContext(xpath_ctxt);
+			xmlFreeDoc(module_config);
 			return(EXIT_FAILURE);
 		}
 	}
@@ -200,11 +225,11 @@ int module_enable(struct module * module, int add)
 	xmlXPathFreeObject(xpath_obj);
 
 	xmlXPathFreeContext(xpath_ctxt);
-
 	xmlFreeDoc(module_config);
 
 	if ((module->id = ncds_init(module->ds)) < 0) {
 		ncds_free(module->ds);
+		module->ds = NULL;
 		return(EXIT_FAILURE);
 	}
 
@@ -383,6 +408,9 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 				module_allowed = (char*)xmlNodeGetContent(tmp);
 				if (strcmp(module_allowed, "true") == 0) {
 					if (module_enable(module, 1)) {
+						free(module_allowed);
+						free(module->name);
+						free(module);
 						return(EXIT_FAILURE);
 					}
 				}
