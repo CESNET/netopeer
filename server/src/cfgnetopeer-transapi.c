@@ -375,6 +375,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 	while(tmp) {
 		if (xmlStrEqual(tmp->name, BAD_CAST "name")) {
 			module_name = (char*)xmlNodeGetContent(tmp);
+			break;
 		}
 		tmp = tmp->next;
 	}
