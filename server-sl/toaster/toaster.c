@@ -16,7 +16,7 @@
 #include <sys/shm.h>
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 3;
+int transapi_version = 4;
 
 /*
  * Signal to libnetconf that configuration data were modified by any callback.
@@ -24,6 +24,14 @@ int transapi_version = 3;
  * 1 - data have been modified
  */
 int config_modified = 0;
+
+/*
+ * Determines the callbacks order.\n'
+ * Set this variable before compilation and DO NOT modify it in runtime.\n'
+ * TRANSAPI_CLBCKS_LEAF_TO_ROOT (default)\n'
+ * TRANSAPI_CLBCKS_ROOT_TO_LEAF\n'
+ */
+const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
 Feel free to use it to distinguish module behavior for different error-option values.
