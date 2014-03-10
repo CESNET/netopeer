@@ -92,9 +92,9 @@ class dbus(nc_module.nc_module):
 				if 'Name=org.liberouter.netopeer2.server' in line:
 					netopeer_service = True
 				elif 'Exec=' == line[:len('Exec=')]:
-					self.service_exe = line[len('Exec='):]
+					self.service_exe = line[len('Exec='):].strip()
 				elif 'User=' == line[:len('User=')]:
-					self.service_user = line[len('User='):]
+					self.service_user = line[len('User='):].strip()
 
 			dbus_service.close()
 
