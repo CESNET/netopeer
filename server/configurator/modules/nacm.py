@@ -77,11 +77,26 @@ class nacm(nc_module.nc_module):
 		except:
 			return(False)
 
-		if os.path.exists(os.path.join(ncworkingdir,'datastore-acm.xml')):
-			self.datastore_path = os.path.join(ncworkingdir,'datastore-acm.xml')
-			return(True)
-		else:
+		try:
+			os.makedirs(ncworkingdir)
+		except OSError as e:
+			if e.errno == 17:
+				# File exists
+				pass
+			else:
+				# permission denied or filesystem error
+				return(False)
+		except:
 			return(False)
+
+		if not os.access(os.path.join(ncworkingdir, 'datastore-acm.xml'), os.W_OK):
+			try:
+				open(os.path.join(ncworkingdir, 'datastore-acm.xml'), 'w').close()
+			except:
+				return(False)
+
+		self.datastore_path = os.path.join(ncworkingdir, 'datastore-acm.xml')
+		return(True)
 
 	def get(self):
 		if not self.datastore_path:
@@ -92,7 +107,7 @@ class nacm(nc_module.nc_module):
 			nacm_doc = libxml2.readFile(self.datastore_path, None, libxml2.XML_PARSE_NOERROR|libxml2.XML_PARSE_NOWARNING)
 		except:
 			messages.append('Can not parse Access Control configuration. File %s is probably corrupted.' % self.datastore_path)
-			return(False)
+			return(True)
 
 		nacm_ctxt = nacm_doc.xpathNewContext()
 		nacm_ctxt.xpathRegisterNs('d', 'urn:cesnet:tmc:datastores:file')
