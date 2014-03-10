@@ -72,50 +72,66 @@ class netopeer_configuration:
 		else:
 			return(True)
 
-def cli(stdscr, config):
-	# use default terminal colors
-	curses.use_default_colors()
-	for i in range(0, curses.COLORS):
-		curses.init_pair(i, i, -1);
+# LAYOUT
+#
+# +---------------------+------------------------------------------------+
+# |                     |                                                |
+# | Menu                | Content                                        |
+# | ( rest_y x menu_x ) | ( rest_y x rest_x )                            |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# +---------------------+------------------------------------------------+
+# |                                                                      |
+# | Messages box (w_messages_y x maxx)                                   |
+# |                                                                      |
+# |                                                                      |
+# |                                                                      |
+# +----------------------------------------------------------------------+
+# | Available tools (tools_y x maxx)                                     |
+# +----------------------------------------------------------------------+
+#
+class configurator_window:
+	window = None
+	wrapper = None
+	pos = {'y':0,'x':0}
+	size = {'y':0,'x':0}
 
-	# cursor invsible
-	curses.curs_set(0)
+	def __init__(self, parent, size_y, size_x, pos_y, pos_x):
+		self.wrapper = parent.derwin(size_y, size_x, pos_y, pos_x)
+		self.window = self.wrapper.derwin(size_y-2, size_x-2, 1, 1)
+		self.pos['y'] = pos_y
+		self.pos['x'] = pos_x
+		self.size['y'] = size_y
+		self.size['x'] = size_x
 
+	def __del__(self):
+		if self.window:
+			del(self.window)
+		if self.wrapper:
+			del(self.wrapper)
 
-	# LAYOUT
-	#
-	# +---------------------+------------------------------------------------+
-	# |                     |                                                |
-	# | Menu                | Content                                        |
-	# | ( rest_y x menu_x ) | ( rest_y x rest_x )                            |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# |                     |                                                |
-	# +---------------------+------------------------------------------------+
-	# |                                                                      |
-	# | Messages box (w_messages_y x maxx)                                     |
-	# |                                                                      |
-	# |                                                                      |
-	# |                                                                      |
-	# +----------------------------------------------------------------------+
-	# | Available tools (tools_y x maxx)                                     |
-	# +----------------------------------------------------------------------+
-	#
+	def erase(self):
+		if self.window:
+			self.window.erase()
+		if self.wrapper:
+			self.wrapper.erase()
 
+def create_windows(stdscr):
 	#get 'window' size
 	(maxy,maxx) = stdscr.getmaxyx()
 	# window sizes
@@ -128,17 +144,25 @@ def cli(stdscr, config):
 	content_x = maxx-menu_x
 	content_y = maxy-w_messages_y-tools_y
 	# left subwindow with menu items
-	menu_wrapper = stdscr.derwin(menu_y,menu_x, 0,0)
-	menu = menu_wrapper.derwin(menu_y-2,menu_x-4, 1,2)
+	menu = configurator_window(stdscr, menu_y,menu_x, 0,0)
 	# right window with content depending on selected menu item
-	content_wrapper = stdscr.derwin(content_y,content_x, 0,menu_x)
-	content = content_wrapper.derwin(content_y-2,content_x-4, 1,2)
+	content = configurator_window(stdscr, content_y,content_x, 0,menu_x)
 	# bottom window with error and other messages
-	w_messages_wrapper = stdscr.derwin(w_messages_y,w_messages_x, maxy-tools_y-w_messages_y,0)
-	w_messages = w_messages_wrapper.derwin(w_messages_y-2,w_messages_x-4, 1,2)
+	messages = configurator_window(stdscr, w_messages_y,w_messages_x, maxy-tools_y-w_messages_y,0)
 	# bottom line with avaliable tools/commands
-	tools_wrapper = stdscr.derwin(tools_y,tools_x, maxy-tools_y,0)
-	tools = tools_wrapper.derwin(tools_y-2,tools_x-4, 1,2)
+	tools = configurator_window(stdscr, tools_y,tools_x, maxy-tools_y,0)
+	return(menu, content,  messages, tools)
+
+def cli(stdscr, config):
+	# use default terminal colors
+	curses.use_default_colors()
+	for i in range(0, curses.COLORS):
+		curses.init_pair(i, i, -1);
+
+	# cursor invsible
+	curses.curs_set(0)
+
+	(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
 
 	# Defined windows
 	windows = ['Menu', 'Content']
@@ -149,62 +173,68 @@ def cli(stdscr, config):
 
 	while True:
 		# erase all windows
-		menu.erase()
-		content.erase()
-		tools.erase()
+		w_menu.erase()
+		w_content.erase()
+		w_tools.erase()
 		w_messages.erase()
 		stdscr.erase()
 		# paint window borders
 		stdscr.box()
-		menu_wrapper.box()
-		content_wrapper.box()
-		w_messages_wrapper.box()
-		tools_wrapper.box()
+		w_menu.wrapper.box()
+		w_content.wrapper.box()
+		w_messages.wrapper.box()
+		w_tools.wrapper.box()
 
 		# Menu window
 		for module in config.nc_modules:
 			if module is config.nc_modules[module_selected]:
 				if windows[window] == 'Menu':
-					menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(1))
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(1))
 				else:
-					menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(2))
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(2))
 			else:	
-				menu.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
+				w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
 
 		# Content window
 		focus = windows[window] == 'Content'
-		module_tools = config.nc_modules[module_selected].paint(content, focus, content_y, content_x)
+		module_tools = config.nc_modules[module_selected].paint(w_content.window, focus, w_content.size['y'], w_content.size['x'])
 
 		# Messages window
-		last_messages = messages.last(w_messages_y-2)
+		last_messages = messages.last(w_messages.size['y']-2)
 		for message in reversed(last_messages):
-			w_messages.addstr(message, curses.color_pair(4))
+			w_messages.window.addstr(message, curses.color_pair(4))
 			if not message is last_messages[0]:
-				w_messages.addstr('\n')
+				w_messages.window.addstr('\n')
 
 		# Tools widow
-		tools.addstr('UP', curses.color_pair(1))
-		tools.addstr(' - next ', curses.color_pair(0))
-		tools.addstr('DOWN', curses.color_pair(1))
-		tools.addstr(' - previous ', curses.color_pair(0))
+		w_tools.window.addstr('UP', curses.color_pair(1))
+		w_tools.window.addstr(' - next ', curses.color_pair(0))
+		w_tools.window.addstr('DOWN', curses.color_pair(1))
+		w_tools.window.addstr(' - previous ', curses.color_pair(0))
 		if windows[window] == 'Menu':
-			tools.addstr('TAB', curses.color_pair(1))
-			tools.addstr(' - select ', curses.color_pair(0))
-			tools.addstr('F10', curses.color_pair(1))
-			tools.addstr(' - save ', curses.color_pair(0))
+			w_tools.window.addstr('TAB', curses.color_pair(1))
+			w_tools.window.addstr(' - select ', curses.color_pair(0))
+			w_tools.window.addstr('F10', curses.color_pair(1))
+			w_tools.window.addstr(' - save ', curses.color_pair(0))
 		else:
-			tools.addstr('TAB', curses.color_pair(1))
-			tools.addstr(' - back ', curses.color_pair(0))
+			w_tools.window.addstr('TAB', curses.color_pair(1))
+			w_tools.window.addstr(' - back ', curses.color_pair(0))
 			# Print module tools
 			for (key,desc) in module_tools:
-				tools.addstr(key, curses.color_pair(1))
-				tools.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
+				w_tools.window.addstr(key, curses.color_pair(1))
+				w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
 
 		stdscr.refresh()
 
 		c = stdscr.getch()
 		if c == ord('q'):
 			break
+		elif c == curses.KEY_RESIZE:
+			del(w_menu)
+			del(w_content)
+			del(w_messages)
+			del(w_tools)
+			(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
 		elif c == ord('\t'):
 			window = (window + 1) % len(windows)
 		elif windows[window] == 'Menu':
