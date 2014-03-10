@@ -15,9 +15,9 @@ def consolidate_paths(paths):
 		changed = False
 		for name,path in paths.iteritems():
 			for pattern,new in paths.iteritems():
-				if '${{s}}'.format(s=pattern) in path:
+				if '${{{s}}}'.format(s=pattern) in path:
 					changed = True
-				path = path.replace('${{s}}'.format(s=pattern), new)
+				path = path.replace('${{{s}}}'.format(s=pattern), new)
 			paths[name] = path
 		if not changed:
 			break
