@@ -23,7 +23,7 @@ class netopeer_configuration:
 			exit(1)
 		try:
 			import modules.sshd
-			self.nc_modules.append(modules.sshd.sshd())
+			self.nc_modules.append(modules.sshd.sshd(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
@@ -31,7 +31,7 @@ class netopeer_configuration:
 
 		try:
 			import modules.dbus
-			self.nc_modules.append(modules.dbus.dbus())
+			self.nc_modules.append(modules.dbus.dbus(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
@@ -39,7 +39,7 @@ class netopeer_configuration:
 
 		try:
 			import modules.sock
-			self.nc_modules.append(modules.sock.sock())
+			self.nc_modules.append(modules.sock.sock(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
@@ -47,7 +47,7 @@ class netopeer_configuration:
 
 		try:
 			import modules.nacm
-			self.nc_modules.append(modules.nacm.nacm())
+			self.nc_modules.append(modules.nacm.nacm(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
@@ -55,7 +55,7 @@ class netopeer_configuration:
 
 		try:
 			import modules.netopeer
-			self.nc_modules.append(modules.netopeer.netopeer())
+			self.nc_modules.append(modules.netopeer.netopeer(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:

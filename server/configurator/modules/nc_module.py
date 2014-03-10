@@ -22,9 +22,11 @@ class NCModuleError(Exception):
 class nc_module:
 	# every module should define its name
 	name = None
+	all_modules = []
 
 	# call methods to find files and get current settings
-	def __init__(self):
+	def __init__(self, modules = []):
+		self.all_modules = modules
 		if not self.find() or not self.get():
 			raise(NCModuleError(self.name, 'Module init failed.'))
 	
