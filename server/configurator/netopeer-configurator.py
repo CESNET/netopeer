@@ -22,8 +22,8 @@ class netopeer_configuration:
 			print('Script must be run with as a root.')
 			exit(1)
 		try:
-			import modules.sshd
-			self.nc_modules.append(modules.sshd.sshd(self.nc_modules))
+			import modules.netopeer
+			self.nc_modules.append(modules.netopeer.netopeer(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
@@ -54,8 +54,8 @@ class netopeer_configuration:
 			messages.append(str(e))
 
 		try:
-			import modules.netopeer
-			self.nc_modules.append(modules.netopeer.netopeer(self.nc_modules))
+			import modules.sshd
+			self.nc_modules.append(modules.sshd.sshd(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e))
 		except NCModuleError as e:
