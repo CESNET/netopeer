@@ -247,7 +247,7 @@ def cli(stdscr, config):
 			else:
 				curses.flash()
 		elif windows[window] == 'Content':
-			config.nc_modules[module_selected].handle(stdscr, content, content_y, content_x, c)
+			config.nc_modules[module_selected].handle(stdscr, w_content.window, w_content.size['y'], w_content.size['x'], c)
 
 
 if __name__ == '__main__':
