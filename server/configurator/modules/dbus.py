@@ -98,6 +98,14 @@ class dbus(nc_module.nc_module):
 
 			dbus_service.close()
 
+			if not self.service_exe:
+				for module in self.all_modules:
+					if module.name == 'Netopeer':
+						self.service_exe = module.server_path
+			if not self.service_user:
+				if self.own_users:
+					self.service_user = self.own_users[0]
+
 			if not netopeer_service:
 				messages.append('{s} file does not configure netopeer service.'.format(s = self.service_path))
 
@@ -140,13 +148,15 @@ class dbus(nc_module.nc_module):
 
 		if not self.service_path:
 			messages.append('Dbus service file location not specified.')
-		else:
+		elif self.service_exe and self.service_user:
 			dbus_service = open(self.service_path, 'w')
 			dbus_service.write('[D-BUS Service]\n')
 			dbus_service.write('Name=org.liberouter.netopeer2.server\n')
 			dbus_service.write('Exec={s}\n'.format(s=self.service_exe))
 			dbus_service.write('User={s}\n'.format(s=self.service_user))
 			dbus_service.close()
+		else:
+			messages.append('Can not create valid service file. Not enough information specified.')
 
 	def paint(self, window, focus, height, width):
 		tools = []
