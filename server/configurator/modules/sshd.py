@@ -63,6 +63,11 @@ class sshd(nc_module.nc_module):
 
 			self.agent = subsystems[0] if subsystems else None
 
+		if not self.agent:
+			for module in self.all_modules:
+				if module.name == 'Netopeer':
+					self.agent = module.agent_path
+
 		return(True)
 
 	def update(self):
