@@ -255,12 +255,28 @@ class dbus(nc_module.nc_module):
 			else:
 				window.addstr('{s}\n'.format(s = group), curses.color_pair(2))
 
+		window.addstr('\n')
+		window.addstr('DBus service\nExecutable that will be started by DBus:\n')
+		if focus and self.selected == (6+len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)):
+				window.addstr('{s}\n'.format(s=self.service_exe), curses.color_pair(1))
+				tools.append(('e','edit'))
+		else:
+				window.addstr('{s}\n'.format(s=self.service_exe), curses.color_pair(2))
+
+		window.addstr('Executable will run with priviledges of user:\n')
+		if focus and self.selected == (7+len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)):
+				window.addstr('{s}\n'.format(s=self.service_user), curses.color_pair(1))
+				tools.append(('e','edit'))
+		else:
+				window.addstr('{s}\n'.format(s=self.service_user), curses.color_pair(2))
+
+
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 			self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < (len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)+5):
+		elif key == curses.KEY_DOWN and self.selected < (len(self.own_users)+len(self.access_users)+len(self.own_groups)+len(self.access_groups)+7):
 			self.selected = self.selected+1
 		elif key == ord('e'):
 			if self.selected == 0:
@@ -309,6 +325,18 @@ class dbus(nc_module.nc_module):
 					self.access_groups[pos] = tmp_dbus_var
 				else:
 					messages.append('{s} is not valid groupname.'.format(s = tmp_dbus_var))
+			elif self.selected == 6 + len(self.own_users) + len(self.access_users) + len(self.own_groups) + len(self.access_groups):
+				tmp_dbus_var = self.get_editable(15+len(self.own_users) + len(self.access_users) + len(self.own_groups) + len(self.access_groups), 0, stdscr, window, self.service_exe, curses.color_pair(1))
+				if os.access(tmp_dbus_var, os.X_OK):
+					self.service_exe = tmp_dbus_var
+				else:
+					messages.append('{s} is not executable.'.format(s = tmp_dbus_var))
+			elif self.selected == 7 + len(self.own_users) + len(self.access_users) + len(self.own_groups) + len(self.access_groups):
+				tmp_dbus_var = self.get_editable(17+len(self.own_users) + len(self.access_users) + len(self.own_groups) + len(self.access_groups), 0, stdscr, window, self.service_user, curses.color_pair(1))
+				if tmp_dbus_var:
+					self.service_user = tmp_dbus_var
+				else:
+					messages.append('{s} is not valid username'.format(s = tmp_dbus_var))
 			else:
 				curses.flash()
 		elif key == ord('a'):

@@ -151,18 +151,12 @@ class netopeer(nc_module.nc_module):
 
 	def paint(self, window, focus, height, width):
 		tools = []
-		window.addstr('This netopeer server binary will be used:\n')
-		if focus and self.selected == 0:
-			window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(1))
-			tools.append(('e','edit'))
-		else:
-			window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(2))
-		window.addstr('This netopeer agent binary will be used:\n')
-		if focus and self.selected == 1:
-			window.addstr('{s}\n'.format(s=self.agent_path), curses.color_pair(1));
-			tools.append(('e','edit'))
-		else:
-			window.addstr('{s}\n'.format(s=self.agent_path), curses.color_pair(2));
+		window.addstr('First netopeer-server binary found in path:\n')
+		window.addstr('{s}\n'.format(s=self.server_path))
+		window.addstr('\n')
+
+		window.addstr('First netopeer-agent binary found in path:\n')
+		window.addstr('{s}\n'.format(s=self.agent_path))
 		window.addstr('\n')
 
 		window.addstr('Using modules instaled in path:\n')
@@ -171,7 +165,7 @@ class netopeer(nc_module.nc_module):
 
 		window.addstr('Curently installed modules:\n')
 		for module in self.modules:
-			if focus and self.selected > 1 and module is self.modules[self.selected-2]:
+			if focus and module is self.modules[self.selected]:
 				window.addstr('{s}\n'.format(s=module.name), curses.color_pair(1))
 				if module.enabled:
 					tools.append(('c','disable'))
@@ -187,24 +181,8 @@ class netopeer(nc_module.nc_module):
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 				self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < 1+len(self.modules):
+		elif key == curses.KEY_DOWN and self.selected < len(self.modules)-1:
 				self.selected = self.selected+1
-		elif key == ord('e'):
-			if self.selected == 0:
-				tmp_netopeer_var = self.get_editable(1,0, stdscr, window, str(self.server_path), curses.color_pair(1))
-				if tmp_netopeer_var and os.path.isfile(tmp_netopeer_var) and os.access(tmp_netopeer_var, os.X_OK):
-					self.server_path = tmp_netopeer_var
-				else:
-					messages.append('{s} is not valid executable file.'.format(s=tmp_netopeer_var))
-
-			elif self.selected == 1:
-				tmp_netopeer_var = self.get_editable(3,0, stdscr, window, str(self.agent_path), curses.color_pair(1))
-				if tmp_netopeer_var and os.path.isfile(tmp_netopeer_var) and os.access(tmp_netopeer_var, os.X_OK):
-					 self.agent_path = tmp_netopeer_var
-				else:
-					messages.append('{s} is not valid executable file.'.format(s=tmp_netopeer_var))
-			else:
-				curses.flash()
 		elif key == ord('c'):
 			if self.selected > 1 and self.selected < (len(self.modules)+2):
 				self.modules[self.selected-2].enabled = not self.modules[self.selected-2].enabled
