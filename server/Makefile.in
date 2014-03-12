@@ -185,6 +185,10 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
 		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
+	if test -f config/Netopeer.xml; then \
+		$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+		$(INSTALL_DATA) config/Netopeer.xml $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+	fi
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
 	for i in $(CFGS); do \
 		$(INSTALL_DATA) $$i $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/; \
