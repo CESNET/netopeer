@@ -17,7 +17,7 @@ static struct session_info *sessions = NULL;
  *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* server_sessions_get_by_id(const char* id)
+const struct session_info* server_sessions_get_by_ncid(const char* id)
 {
 	struct session_info *aux_session = sessions;
 
@@ -97,7 +97,7 @@ int server_sessions_remove(const char* session_id)
 	struct session_info *session;
 
 	/* get required session */
-	session = (struct session_info *) server_sessions_get_by_id(session_id);
+	session = (struct session_info *) server_sessions_get_by_ncid(session_id);
 	if (session == NULL) {
 		return (EXIT_FAILURE);
 	}
