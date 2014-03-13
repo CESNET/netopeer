@@ -57,6 +57,9 @@
 #include <pthread.h>
 #endif
 
+#include <libnetconf.h>
+#include <libnetconf_ssh.h>
+
 #include "commands.h"
 #include "configuration.h"
 #include "mreadline.h"
@@ -84,6 +87,7 @@ struct nc_session* session = NULL;
 COMMAND commands[] = {
 		{"help", cmd_help, "Display this text"},
 		{"connect", cmd_connect, "Connect to a NETCONF server"},
+		{"listen", cmd_listen, "Listen for a NETCONF Reverse SSH"},
 		{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
 		{"commit", cmd_commit, "NETCONF <commit> operation"},
 		{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
@@ -1688,6 +1692,85 @@ int cmd_lock (char *arg)
 int cmd_unlock (char *arg)
 {
 	return cmd_un_lock (UNLOCK_OP, arg);
+}
+
+void cmd_listen_help ()
+{
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+}
+
+int cmd_listen (char* arg)
+{
+	static int listening = 0;
+	char *user = NULL;
+	unsigned short port = 6666;
+	int c;
+	struct arglist cmd;
+	struct option long_options[] = {
+			{"help", 0, 0, 'h'},
+			{"port", 1, 0, 'p'},
+			{"login", 1, 0, 'l'},
+			{0, 0, 0, 0}
+	};
+	int option_index = 0;
+
+	/* set back to start to be able to use getopt() repeatedly */
+	optind = 0;
+
+	if (session != NULL) {
+		ERROR("listen", "already connected to %s.", nc_session_get_host (session));
+		return (EXIT_FAILURE);
+	}
+
+	/* process given arguments */
+	init_arglist (&cmd);
+	addargs (&cmd, "%s", arg);
+
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
+		switch (c) {
+		case 'h':
+			cmd_listen_help ();
+			clear_arglist(&cmd);
+			return (EXIT_SUCCESS);
+			break;
+		case 'p':
+			port = (unsigned short) atoi (optarg);
+			break;
+		case 'l':
+			user = optarg;
+			break;
+		default:
+			ERROR("listen", "unknown option -%c.", c);
+			cmd_listen_help ();
+			clear_arglist(&cmd);
+			return (EXIT_FAILURE);
+		}
+	}
+
+	/* create the session */
+	if (!listening) {
+		if (nc_callhome_listen(port) == EXIT_FAILURE) {
+			ERROR("listen", "unable to start listening for incoming Reverse SSH");
+			clear_arglist(&cmd);
+			return (EXIT_FAILURE);
+		}
+		listening = 1;
+	}
+	while(1) {
+		if (verb_level == 0) {
+			fprintf(stdout, "\tWaiting for call home on port %d...\n", port);
+		}
+		session = nc_callhome_accept(user, client_supported_cpblts);
+		if (session == NULL) {
+			ERROR("listen", "accepting Reverse SSH failed.");
+			continue;
+		} else {
+			break;
+		}
+	}
+
+	clear_arglist(&cmd);
+	return (EXIT_SUCCESS);
 }
 
 void cmd_connect_help ()

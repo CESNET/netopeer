@@ -44,6 +44,7 @@
 #include <readline/history.h>
 
 #include <libnetconf.h>
+#include <libnetconf_ssh.h>
 
 #include "commands.h"
 #include "mreadline.h"
