@@ -40,6 +40,7 @@ try:
 	import argparse
 	import os
 	import string
+	import xml
 	from xml.dom import minidom
 	from xml.dom.minidom import getDOMImplementation
 except ImportError as e:
@@ -160,7 +161,18 @@ try:
 				print(item[0]+' ('+item[1]+')')
 				
 	elif args.subcommand == 'add':
-		config = minidom.parse(netopeer_config)
+		try:
+			config = minidom.parse(netopeer_config)
+		except xml.parsers.expat.ExpatError:
+			impl = getDOMImplementation()
+			config = impl.createDocument(None, None, None)
+			datastores = config.appendChild(config.createElementNS('urn:cesnet:tmc:datastores:file', 'datastores'))
+			datastores.setAttribute('xmlns', 'urn:cesnet:tmc:datastores:file')
+			startup = datastores.appendChild(config.createElement('startup'))
+			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
+			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
+			modules = netopeer.appendChild(config.createElement('modules'))
+			
 		list = listModules(config)
 		for i in list:
 			if i[0] == args.name:
