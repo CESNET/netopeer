@@ -122,7 +122,10 @@ static struct nc_cpblts* get_server_capabilities(conn_t* conn)
 	char **cpblts_list = NULL;
 	int i;
 
-	cpblts_list = comm_get_srv_cpblts(conn);
+	if ((cpblts_list = comm_get_srv_cpblts(conn)) == NULL) {
+		clb_print(NC_VERB_ERROR, "Cannot get server capabilities!");
+		return(NULL);
+	}
 
 	/* Fill server capabilities structure */
 	srv_cpblts = nc_cpblts_new((const char* const*)cpblts_list);

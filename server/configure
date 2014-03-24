@@ -5175,11 +5175,13 @@ fi
 
 ac_config_files="$ac_config_files Makefile"
 
-ac_config_files="$ac_config_files dm_manager/Makefile"
+ac_config_files="$ac_config_files manager/Makefile"
 
 ac_config_files="$ac_config_files config/org.liberouter.netopeer.conf"
 
 ac_config_files="$ac_config_files config/org.liberouter.netopeer.server.service"
+
+ac_config_files="$ac_config_files config/Netopeer.xml"
 
 ac_config_files="$ac_config_files netopeer-server.spec"
 
@@ -5895,9 +5897,10 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "dm_manager/Makefile") CONFIG_FILES="$CONFIG_FILES dm_manager/Makefile" ;;
+    "manager/Makefile") CONFIG_FILES="$CONFIG_FILES manager/Makefile" ;;
     "config/org.liberouter.netopeer.conf") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.conf" ;;
     "config/org.liberouter.netopeer.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.server.service" ;;
+    "config/Netopeer.xml") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/netopeer_socket.h") CONFIG_FILES="$CONFIG_FILES src/netopeer_socket.h" ;;

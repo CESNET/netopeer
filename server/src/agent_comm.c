@@ -68,5 +68,5 @@ int comm_session_info(conn_t* conn, struct nc_session * session)
 	cpblts_count = nc_cpblts_count(cpblts);
 	ret = comm_session_info_send(conn, user->pw_name, sid, cpblts_count, cpblts);
 
-	return EXIT_SUCCESS;
+	return (ret);
 }

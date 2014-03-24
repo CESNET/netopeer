@@ -86,7 +86,7 @@ CPPFLAGS = @CPPFLAGS@
 DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/netopeer/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
-SUBDIRS = dm_manager
+SUBDIRS = manager
 
 CFGS =	config/datastore.xml \
 	config/netopeer-cfgnetopeer.yin \
@@ -185,6 +185,10 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
 		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
+	if test -f config/Netopeer.xml; then \
+		$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+		$(INSTALL_DATA) config/Netopeer.xml $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+	fi
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
 	for i in $(CFGS); do \
 		$(INSTALL_DATA) $$i $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/; \
@@ -192,9 +196,5 @@ install: $(SERVER) $(AGENT) $(CFGS)
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/;
-	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 \
-		-d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/netopeer-cfgnetopeer.yin \
-		-r file $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/datastore.xml \
-		-f $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/
 
 

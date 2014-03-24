@@ -41,19 +41,17 @@ make DESTDIR=$RPM_BUILD_ROOT install
 %post
 if [ `grep -i "Subsystem netconf" %{_sysconfdir}/ssh/sshd_config | wc -l` -le 0 ]; then echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/ssh/sshd_config; fi
 
-netopeer-dm-manager add -n Netopeer -d %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -c urn:cesnet:tmc:netopeer:1.0 -r file %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
-
 %postun
 #delete device module from configuration only when erasing, not on update.
 #https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Running_scriptlets_only_in_certain_situations
-if [ $1 -eq 0 ] ; then
-	netopeer-dm-manager del -n Netopeer -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
-fi
+#if [ $1 -eq 0 ] ; then
+#	netopeer-dm-manager del -n Netopeer -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+#fi
 
 %files
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
-%{_bindir}/netopeer-dm-manager
+%{_bindir}/netopeer-manager
 %{_sysconfdir}/dbus-1/system.d/org.liberouter.netopeer2.conf
 %{_datadir}/dbus-1/system-services/org.liberouter.netopeer2.server.service
 %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml
