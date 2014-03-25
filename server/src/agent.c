@@ -52,11 +52,16 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <libxml/tree.h>
 #include <libxml/HTMLtree.h>
 
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+
 #include <libnetconf_xml.h>
+#include <libnetconf_tls.h>
 
 #include "common.c"
 #include "comm.h"
@@ -238,7 +243,54 @@ send_reply:
 	return EXIT_SUCCESS;
 }
 
-int main ()
+X509 *get_cert(void)
+{
+	X509 *cert;
+	FILE *certf;
+	char *auxstr;
+	const EVP_MD *fprint_type = NULL;
+	unsigned int i, fprint_size;
+	unsigned char fprint[EVP_MAX_MD_SIZE];
+
+	auxstr = getenv("SSL_CLIENT_CERT");
+	if (!auxstr) {
+		/* we have no info about certificate location */
+		return (NULL);
+	}
+
+	certf = fopen(auxstr, "r");
+	if (!certf) {
+		clb_print(NC_VERB_ERROR, "Unable to open client certificate file.");
+		clb_print(NC_VERB_ERROR, strerror(errno));
+		return (NULL);
+	}
+	unlink(auxstr);
+
+	cert = PEM_read_X509_AUX(certf, NULL, NULL, NULL );
+	fclose(certf);
+
+	fprint_type = EVP_sha1();
+	X509_digest(cert, fprint_type, fprint, &fprint_size);
+	auxstr = malloc((fprint_size + 1) * 3);
+	/* According to ietf-x509-cert-to-name YANG data model, 1st
+	 * octet of the fingerprint value contains hashing algorithm
+	 * identifier from [1]. 02 means SHA1
+	 *
+	 * [1] http://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-18
+	 */
+	snprintf(&(auxstr[0]), 4, "02:");
+	for (i = 0; i < fprint_size; ++i) {
+		snprintf(&(auxstr[i * 3]), 4, "%02x:", fprint[i]);
+	}
+	auxstr[(fprint_size * 3) - 1] = '\0';
+	clb_print(NC_VERB_ERROR, auxstr);
+	free(auxstr);
+	auxstr = NULL;
+
+	return (cert);
+}
+
+int main()
 {
 	conn_t *con;
 	struct nc_session * netconf_con;
@@ -249,6 +301,8 @@ int main ()
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
+	struct passwd *pw;
+	X509 *cert;
 
 	/* set signal handler */
 	sigfillset(&action.sa_mask);
@@ -285,13 +339,47 @@ int main ()
 		return EXIT_FAILURE;
 	}
 
-	/* accept client session and handle capabilities */
-	netconf_con = nc_session_accept(capabilities);
-	if(netconf_con == NULL){
+	/*
+	 * Are we running with the TLS transport? If yes, the TLS server shoudl
+	 * provide SSL_CLIENT_DN environment variable for us.
+	 */
+	if (getnenv("SSL_CLIENT_DN")) {
+		/* try to get client certificate from stunnel */
+		cert = get_cert();
+
+		/* accept client session and handle capabilities */
+		netconf_con = nc_session_accept_tls(capabilities, cert);
+		nc_cpblts_free(capabilities);
+		X509_free(cert);
+	} else {
+		/* there is probably SSH transport */
+		netconf_con = nc_session_accept(capabilities);
+		nc_cpblts_free(capabilities);
+	}
+	if (netconf_con == NULL) {
 		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
 		return EXIT_FAILURE;
 	}
-	nc_cpblts_free(capabilities);
+
+	/* switch user if possible/needed */
+	/*
+	 * OpenSSH (sshd) does this automatically, but TLS server (stunnel) does not,
+	 * so in case of SSH transport, we already have different UID, in case of
+	 * TLS transport, we are going to try to switch UID if we can
+	 */
+	if (getuid() == 0) {
+		/* we are going to drop privileges forever */
+		pw = getpwnam(nc_session_get_user(netconf_con));
+		if (pw) {
+			setuid(pw->pw_uid);
+		}
+
+		/*
+		 * if this part fails, we still can continue as user 0 - username is
+		 * stored in the NETCONF session information and all actions are (should
+		 * be) taken according to this value.
+		 */
+	}
 
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);
