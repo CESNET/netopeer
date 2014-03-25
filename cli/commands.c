@@ -59,6 +59,7 @@
 
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
+#include <libnetconf_tls.h>
 
 #include "commands.h"
 #include "configuration.h"
@@ -1775,20 +1776,24 @@ int cmd_listen (char* arg)
 
 void cmd_connect_help ()
 {
-	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls <cert_path> [--key <key_path>]] host\n");
 }
 
+#define DEFAULT_PORT_SSH 830
+#define DEFAULT_PORT_TLS 6513
 int cmd_connect (char* arg)
 {
-	char *host = NULL, *user = NULL;
+	char *host = NULL, *user = NULL, *cert = NULL, *key = NULL;
 	int hostfree = 0;
-	unsigned short port = 830;
+	unsigned short port = 0;
 	int c;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
+			{"tls", 1, 0, 't'},
+			{"key", 1, 0, 'k'},
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1815,13 +1820,33 @@ int cmd_connect (char* arg)
 		case 'p':
 			port = (unsigned short) atoi (optarg);
 			break;
+		case 'k':
+			key = optarg;
+			break;
 		case 'l':
 			user = optarg;
+			break;
+		case 't':
+			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
+				if (port == 0) {
+					port = DEFAULT_PORT_TLS;
+				}
+			}
+			cert = optarg;
 			break;
 		default:
 			ERROR("connect", "unknown option -%c.", c);
 			cmd_connect_help ();
 			clear_arglist(&cmd);
+			return (EXIT_FAILURE);
+		}
+	}
+	if (port == 0) {
+		port = DEFAULT_PORT_SSH;
+	}
+	if (cert) {
+		if (nc_tls_cert(cert, key) != EXIT_SUCCESS) {
+			ERROR("connect", "Providing client certificate failed.");
 			return (EXIT_FAILURE);
 		}
 	}
