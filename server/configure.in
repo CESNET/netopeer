@@ -375,5 +375,6 @@ AC_CONFIG_FILES(config/Netopeer.xml)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
 AC_CONFIG_FILES(src/netopeer_socket.h)
+AC_CONFIG_FILES(stunnel/stunnel.conf)
 
 AC_OUTPUT
