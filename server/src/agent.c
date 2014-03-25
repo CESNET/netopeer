@@ -57,8 +57,10 @@
 #include <libxml/tree.h>
 #include <libxml/HTMLtree.h>
 
-#include <openssl/x509.h>
-#include <openssl/pem.h>
+#ifdef ENABLE_TLS
+#	include <openssl/x509.h>
+#	include <openssl/pem.h>
+#endif
 
 #include <libnetconf_xml.h>
 #include <libnetconf_tls.h>
@@ -243,6 +245,7 @@ send_reply:
 	return EXIT_SUCCESS;
 }
 
+#ifdef ENABLE_TLS
 X509 *get_cert(void)
 {
 	X509 *cert;
@@ -289,6 +292,7 @@ X509 *get_cert(void)
 
 	return (cert);
 }
+#endif /* ENABLE_TLS */
 
 int main()
 {
@@ -301,8 +305,10 @@ int main()
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
+#ifdef ENABLE_TLS
 	struct passwd *pw;
 	X509 *cert;
+#endif
 
 	/* set signal handler */
 	sigfillset(&action.sa_mask);
@@ -339,11 +345,12 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+#ifdef ENABLE_TLS
 	/*
 	 * Are we running with the TLS transport? If yes, the TLS server shoudl
 	 * provide SSL_CLIENT_DN environment variable for us.
 	 */
-	if (getnenv("SSL_CLIENT_DN")) {
+	if (getenv("SSL_CLIENT_DN")) {
 		/* try to get client certificate from stunnel */
 		cert = get_cert();
 
@@ -352,6 +359,9 @@ int main()
 		nc_cpblts_free(capabilities);
 		X509_free(cert);
 	} else {
+#else
+	{
+#endif
 		/* there is probably SSH transport */
 		netconf_con = nc_session_accept(capabilities);
 		nc_cpblts_free(capabilities);
@@ -361,6 +371,7 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+#ifdef ENABLE_TLS
 	/* switch user if possible/needed */
 	/*
 	 * OpenSSH (sshd) does this automatically, but TLS server (stunnel) does not,
@@ -380,6 +391,7 @@ int main()
 		 * be) taken according to this value.
 		 */
 	}
+#endif
 
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);
