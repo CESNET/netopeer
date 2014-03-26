@@ -226,7 +226,7 @@ nc_reply * rpc_make_toast (xmlNodePtr input[])
 
 	struct nc_err * err;
 	nc_reply * reply;
-	int doneness; 
+	static int doneness;
 	pthread_t tid;
 
 	if (toasterDoneness == NULL) { /* doneness not specified, use default*/
