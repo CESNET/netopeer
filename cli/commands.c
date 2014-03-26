@@ -238,10 +238,22 @@ int cmd_status (char* UNUSED(arg))
 		fprintf (stdout, "Client is not connected to any NETCONF server.\n");
 	} else {
 		fprintf (stdout, "Current NETCONF session:\n");
-		fprintf (stdout, "  ID          : %s\n", nc_session_get_id (session));
-		fprintf (stdout, "  Host        : %s\n", nc_session_get_host (session));
-		fprintf (stdout, "  Port        : %s\n", nc_session_get_port (session));
-		fprintf (stdout, "  User        : %s\n", nc_session_get_user (session));
+		fprintf (stdout, "  ID          : %s\n", nc_session_get_id(session));
+		fprintf (stdout, "  Host        : %s\n", nc_session_get_host(session));
+		fprintf (stdout, "  Port        : %s\n", nc_session_get_port(session));
+		fprintf (stdout, "  User        : %s\n", nc_session_get_user(session));
+		switch(nc_session_get_transport(session)) {
+		case NC_TRANSPORT_SSH:
+			s = "SSH";
+			break;
+		case NC_TRANSPORT_TLS:
+			s = "TLS";
+			break;
+		default:
+			s = "Unknown";
+			break;
+		}
+		fprintf (stdout, "  Protocol    : %s\n", s);
 		fprintf (stdout, "  Capabilities:\n");
 		cpblts = nc_session_get_cpblts (session);
 		if (cpblts != NULL) {
