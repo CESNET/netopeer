@@ -21,3 +21,20 @@ patch -p0 -i ../stunnel_netconf.patch
 ./configure
 make
 sudo make install
+
+
+Generating certificates
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Note: All certificates in this directory are only examples!
+
+Create self-signed CA certificate:
+openssl genrsa -out rootCA.key 2048
+openssl genrsa -out rootCA.key 2048 -des3
+openssl req -x509 -new -nodes -key rootCA.key -days 1024 -out rootCA.pem
+
+Create a peer certificate signed by own CA:
+openssl genrsa -out peer.key 2048
+openssl req -new -key peer.key -out peer.csr
+openssl x509 -req -in peer.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out peer.crt -days 500
+
