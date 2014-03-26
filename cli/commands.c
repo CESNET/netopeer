@@ -88,7 +88,7 @@ struct nc_session* session = NULL;
 COMMAND commands[] = {
 		{"help", cmd_help, "Display this text"},
 		{"connect", cmd_connect, "Connect to a NETCONF server"},
-		{"listen", cmd_listen, "Listen for a NETCONF Reverse SSH"},
+		{"listen", cmd_listen, "Listen for a NETCONF Call Home"},
 		{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
 		{"commit", cmd_commit, "NETCONF <commit> operation"},
 		{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
@@ -1709,20 +1709,24 @@ int cmd_unlock (char *arg)
 
 void cmd_listen_help ()
 {
-	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+	fprintf (stdout, "listen [--help] [--tls <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
 }
 
+#define DEFAULT_PORT_CH_SSH 6666
+#define DEFAULT_PORT_CH_TLS 6667
 int cmd_listen (char* arg)
 {
 	static int listening = 0;
-	char *user = NULL;
-	unsigned short port = 6666;
+	char *user = NULL, *cert = NULL, *key = NULL;
+	unsigned short port = 0;
 	int c;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
+			{"tls", 1, 0, 't'},
+			{"key", 1, 0, 'k'},
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1734,6 +1738,9 @@ int cmd_listen (char* arg)
 		ERROR("listen", "already connected to %s.", nc_session_get_host (session));
 		return (EXIT_FAILURE);
 	}
+
+	/* set default transport protocol */
+	nc_session_transport(NC_TRANSPORT_SSH);
 
 	/* process given arguments */
 	init_arglist (&cmd);
@@ -1749,8 +1756,19 @@ int cmd_listen (char* arg)
 		case 'p':
 			port = (unsigned short) atoi (optarg);
 			break;
+		case 'k':
+			key = optarg;
+			break;
 		case 'l':
 			user = optarg;
+			break;
+		case 't':
+			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
+				if (port == 0) {
+					port = DEFAULT_PORT_CH_TLS;
+				}
+			}
+			cert = optarg;
 			break;
 		default:
 			ERROR("listen", "unknown option -%c.", c);
@@ -1759,11 +1777,20 @@ int cmd_listen (char* arg)
 			return (EXIT_FAILURE);
 		}
 	}
+	if (port == 0) {
+		port = DEFAULT_PORT_CH_SSH;
+	}
+	if (cert) {
+		if (nc_tls_cert(cert, key) != EXIT_SUCCESS) {
+			ERROR("listen", "Providing client certificate failed.");
+			return (EXIT_FAILURE);
+		}
+	}
 
 	/* create the session */
 	if (!listening) {
 		if (nc_callhome_listen(port) == EXIT_FAILURE) {
-			ERROR("listen", "unable to start listening for incoming Reverse SSH");
+			ERROR("listen", "unable to start listening for incoming Call Home");
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
@@ -1775,7 +1802,7 @@ int cmd_listen (char* arg)
 		}
 		session = nc_callhome_accept(user, client_supported_cpblts);
 		if (session == NULL) {
-			ERROR("listen", "accepting Reverse SSH failed.");
+			ERROR("listen", "accepting Call Home failed.");
 			continue;
 		} else {
 			break;
@@ -1817,6 +1844,9 @@ int cmd_connect (char* arg)
 		ERROR("connect", "already connected to %s.", nc_session_get_host (session));
 		return (EXIT_FAILURE);
 	}
+
+	/* set default transport protocol */
+	nc_session_transport(NC_TRANSPORT_SSH);
 
 	/* process given arguments */
 	init_arglist (&cmd);
