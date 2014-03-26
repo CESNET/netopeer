@@ -125,7 +125,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	xmlSetNs(root, ns);
 	xmlNewChild(root, ns, BAD_CAST "toasterManufacturer", BAD_CAST "CESNET, z.s.p.o.");
 	xmlNewChild(root, ns, BAD_CAST "toasterModelNumber", BAD_CAST "toaster");
-	xmlNewChild(root, ns, BAD_CAST "toasterStatus", BAD_CAST (status->toasting ? "up" : "down" ));
+	xmlNewChild(root, ns, BAD_CAST "toasterStatus", BAD_CAST (status->toasting ? "down" : "up"));
 
 	return (state);
 }
