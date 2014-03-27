@@ -1714,12 +1714,14 @@ void cmd_listen_help ()
 
 #define DEFAULT_PORT_CH_SSH 6666
 #define DEFAULT_PORT_CH_TLS 6667
+#define ACCEPT_TIMEOUT 60000 /* 1 minute */
 int cmd_listen (char* arg)
 {
 	static int listening = 0;
 	char *user = NULL, *cert = NULL, *key = NULL;
 	unsigned short port = 0;
 	int c;
+	int timeout = ACCEPT_TIMEOUT;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
@@ -1796,16 +1798,16 @@ int cmd_listen (char* arg)
 		}
 		listening = 1;
 	}
-	while(1) {
-		if (verb_level == 0) {
-			fprintf(stdout, "\tWaiting for call home on port %d...\n", port);
-		}
-		session = nc_callhome_accept(user, client_supported_cpblts);
-		if (session == NULL) {
-			ERROR("listen", "accepting Call Home failed.");
-			continue;
+
+	if (verb_level == 0) {
+		fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
+	}
+	session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
+	if (session == NULL ) {
+		if (timeout == 0) {
+			ERROR("listen", "no call home")
 		} else {
-			break;
+			ERROR("listen", "receiving call Home failed.");
 		}
 	}
 
