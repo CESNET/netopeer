@@ -253,7 +253,7 @@ int cmd_status (char* UNUSED(arg))
 			s = "Unknown";
 			break;
 		}
-		fprintf (stdout, "  Protocol    : %s\n", s);
+		fprintf (stdout, "  Transport   : %s\n", s);
 		fprintf (stdout, "  Capabilities:\n");
 		cpblts = nc_session_get_cpblts (session);
 		if (cpblts != NULL) {
