@@ -1783,8 +1783,8 @@ int cmd_listen (char* arg)
 		port = DEFAULT_PORT_CH_SSH;
 	}
 	if (cert) {
-		if (nc_tls_cert(cert, key) != EXIT_SUCCESS) {
-			ERROR("listen", "Providing client certificate failed.");
+		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
+			ERROR("listen", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
 	}
@@ -1889,8 +1889,8 @@ int cmd_connect (char* arg)
 		port = DEFAULT_PORT_SSH;
 	}
 	if (cert) {
-		if (nc_tls_cert(cert, key) != EXIT_SUCCESS) {
-			ERROR("connect", "Providing client certificate failed.");
+		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
+			ERROR("connect", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
 	}
