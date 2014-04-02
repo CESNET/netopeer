@@ -57,11 +57,6 @@
 #include <libxml/tree.h>
 #include <libxml/HTMLtree.h>
 
-#ifdef ENABLE_TLS
-#	include <openssl/x509.h>
-#	include <openssl/pem.h>
-#endif
-
 #include <libnetconf_xml.h>
 #include <libnetconf_tls.h>
 
@@ -246,52 +241,48 @@ send_reply:
 }
 
 #ifdef ENABLE_TLS
-X509 *get_cert(void)
+char *get_tls_username(void)
 {
-	X509 *cert;
-	FILE *certf;
-	char *auxstr;
-	const EVP_MD *fprint_type = NULL;
-	unsigned int i, fprint_size;
-	unsigned char fprint[EVP_MAX_MD_SIZE];
+#ifndef PATCHED_STUNNEL
+	char *subj, *cn, *aux;
+	int len;
 
-	auxstr = getenv("SSL_CLIENT_CERT");
-	if (!auxstr) {
-		/* we have no info about certificate location */
+	/* try to get information from environment variable commonly provided by stunnel(1) */
+	subj = getenv("SSL_CLIENT_DN");
+	if (!subj) {
+		/* we are not able to get correct username */
+		clb_print(NC_VERB_ERROR, "Missing \'SSL_CLIENT_DN\' enviornment variable, unable to get username.");
 		return (NULL);
 	}
-
-	certf = fopen(auxstr, "r");
-	if (!certf) {
-		clb_print(NC_VERB_ERROR, "Unable to open client certificate file.");
-		clb_print(NC_VERB_ERROR, strerror(errno));
+	/* parse subject to get CN */
+	cn = strstr(subj, "CN=");
+	if (!cn) {
+		clb_print(NC_VERB_ERROR, "Client certificate does not include commonName, unable to get username.");
 		return (NULL);
 	}
-	unlink(auxstr);
+	cn = cn + 3;
+	/* detect if the CN is followed by another item */
+	aux = strchr(cn, '/');
+	/* get the length of the CN value */
+	if (aux != NULL) {
+		len = aux - cn;
+	} else {
+		len = strlen(cn);
+	}
+	/* store (only) the CN value into the resulting string */
+	aux = malloc(len * sizeof(char));
+	strncpy(aux, cn, len);
+	aux[len] = '\0';
 
-	cert = PEM_read_X509_AUX(certf, NULL, NULL, NULL );
-	fclose(certf);
-
-	fprint_type = EVP_sha1();
-	X509_digest(cert, fprint_type, fprint, &fprint_size);
-	auxstr = malloc((fprint_size + 1) * 3);
-	/* According to ietf-x509-cert-to-name YANG data model, 1st
-	 * octet of the fingerprint value contains hashing algorithm
-	 * identifier from [1]. 02 means SHA1
-	 *
-	 * [1] http://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-18
+	return (aux);
+#else
+	/*
+	 * we are running with patched stunnel(1) which provides much more info
+	 * from the client certificate
 	 */
-	snprintf(&(auxstr[0]), 4, "02:");
-	for (i = 0; i < fprint_size; ++i) {
-		snprintf(&(auxstr[i * 3]), 4, "%02x:", fprint[i]);
-	}
-	auxstr[(fprint_size * 3) - 1] = '\0';
-	clb_print(NC_VERB_ERROR, auxstr);
-	free(auxstr);
-	auxstr = NULL;
-
-	return (cert);
+#endif
 }
+
 #endif /* ENABLE_TLS */
 
 int main()
@@ -305,9 +296,10 @@ int main()
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
+
 #ifdef ENABLE_TLS
 	struct passwd *pw;
-	X509 *cert;
+	char* username;
 #endif
 
 	/* set signal handler */
@@ -347,17 +339,38 @@ int main()
 
 #ifdef ENABLE_TLS
 	/*
-	 * Are we running with the TLS transport? If yes, the TLS server shoudl
+	 * Are we running with the TLS transport? If yes, the TLS server should
 	 * provide SSL_CLIENT_DN environment variable for us.
 	 */
 	if (getenv("SSL_CLIENT_DN")) {
 		/* try to get client certificate from stunnel */
-		cert = get_cert();
+		username = get_tls_username();
 
 		/* accept client session and handle capabilities */
-		netconf_con = nc_session_accept_tls(capabilities, cert);
+		netconf_con = nc_session_accept_username(capabilities, username);
 		nc_cpblts_free(capabilities);
-		X509_free(cert);
+
+		/* switch user if possible/needed */
+		/*
+		 * OpenSSH (sshd) does this automatically, but TLS server (stunnel) does not,
+		 * so in case of SSH transport, we already have different UID, in case of
+		 * TLS transport, we are going to try to switch UID if we can
+		 */
+		if (getuid() == 0) {
+			/* we are going to drop privileges forever */
+			pw = getpwnam(username);
+			if (pw) {
+				setuid(pw->pw_uid);
+			}
+
+			/*
+			 * if this part fails, we still can continue as user 0 - username is
+			 * stored in the NETCONF session information and all NETCONF actions
+			 * are (should be) taken according to this value.
+			 */
+		}
+
+		free(username);
 	} else {
 #else
 	{
@@ -370,28 +383,6 @@ int main()
 		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
 		return EXIT_FAILURE;
 	}
-
-#ifdef ENABLE_TLS
-	/* switch user if possible/needed */
-	/*
-	 * OpenSSH (sshd) does this automatically, but TLS server (stunnel) does not,
-	 * so in case of SSH transport, we already have different UID, in case of
-	 * TLS transport, we are going to try to switch UID if we can
-	 */
-	if (getuid() == 0) {
-		/* we are going to drop privileges forever */
-		pw = getpwnam(nc_session_get_user(netconf_con));
-		if (pw) {
-			setuid(pw->pw_uid);
-		}
-
-		/*
-		 * if this part fails, we still can continue as user 0 - username is
-		 * stored in the NETCONF session information and all actions are (should
-		 * be) taken according to this value.
-		 */
-	}
-#endif
 
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);

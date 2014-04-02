@@ -329,13 +329,6 @@ fi
 
 SERVER_LIBS=$LIBS
 
-# agent specific test
-if test "$tls" = "yes"; then
-	### OpenSSL ###
-	AC_CHECK_LIB([crypto], [X509_free], [], AC_MSG_ERROR([Missing OpenSSL library (libcrypto).]))
-	AC_CHECK_HEADERS([openssl/x509.h openssl/pem.h], [], AC_MSG_ERROR([Missing OpenSSL headers.]))
-fi
-
 # pthread
 AX_PTHREAD([
 	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
