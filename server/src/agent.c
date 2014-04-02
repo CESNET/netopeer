@@ -36,29 +36,19 @@
  *
  */
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <libgen.h>
 #include <errno.h>
 #include <poll.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
-#include <pthread.h>
-#include <syslog.h>
-#include <stdint.h>
 #include <string.h>
+#include <sys/types.h>
+#include <syslog.h>
+#include <unistd.h>
 
 #include <libxml/tree.h>
-#include <libxml/HTMLtree.h>
 
 #include <libnetconf_xml.h>
-#include <libnetconf_tls.h>
 
 #include "common.c"
 #include "comm.h"
