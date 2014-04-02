@@ -139,6 +139,19 @@ AC_ARG_ENABLE([tls],
 	if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+		# check stunnel
+		AC_CHECK_PROG(STUNNEL, [stunnel], [yes], [no])
+		if test "$STUNNEL" = "no"; then
+			AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
+		else
+			AC_MSG_CHECKING([for NETCONF support in stunnel])
+			if test ! -z "`stunnel -version 2>&1 | grep NETCONF`"; then
+				AC_MSG_RESULT([yes])
+				CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
+			else
+				AC_MSG_RESULT([no])
+			fi
+		fi
 	fi
 )
 
@@ -320,7 +333,7 @@ SERVER_LIBS=$LIBS
 if test "$tls" = "yes"; then
 	### OpenSSL ###
 	AC_CHECK_LIB([crypto], [X509_free], [], AC_MSG_ERROR([Missing OpenSSL library (libcrypto).]))
-#	AC_CHECK_HEADERS([openssl/x509.h openssl/pem.h], [], AC_MSG_ERROR([Missing OpenSSL headers.]))
+	AC_CHECK_HEADERS([openssl/x509.h openssl/pem.h], [], AC_MSG_ERROR([Missing OpenSSL headers.]))
 fi
 
 # pthread
