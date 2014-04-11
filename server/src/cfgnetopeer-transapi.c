@@ -64,13 +64,13 @@
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 3;
+/* int transapi_version = 3; */
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
  * 1 - data have been modified
  */
-int config_modified = 0;
+int netopeer_config_modified = 0;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
 Feel free to use it to distinguish module behavior for different error-option values.
@@ -81,12 +81,13 @@ Feel free to use it to distinguish module behavior for different error-option va
  * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
                          executed again with previous configuration data to roll it back.
  */
-NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
+NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
 static struct module * modules = NULL;
 
 extern int restart_soft, restart_hard, done;
 
+extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
 
 void module_free(struct module * module)
@@ -107,6 +108,13 @@ static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, N
 	xmlNodePtr node;
 	char *transapi_path, *model_path, *feature, *name, *aux;
 	int i;
+	struct transapi *st = NULL;
+
+	if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0) {
+		st = &netopeer_transapi;
+	} else if (strcmp(module->name, NCSERVER_MODULE_NAME) == 0) {
+		st = &server_transapi;
+	}
 
 	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 		model_path = NULL;
@@ -123,19 +131,32 @@ static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, N
 			}
 		}
 		/* Netopeer module is something extra */
-		if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0 && model_path) {
-			/* internal static Netopeer module */
-			if ((module->ds = ncds_new_transapi_static(repo_type, model_path, &netopeer_transapi)) == NULL) {
-				free(model_path);
-				free(transapi_path);
-				return (EXIT_FAILURE);
+		if (st != NULL && model_path) {
+			/* internal static server (Netopeer) module */
+			if (repo_type == -1 && transapi_path) {
+				/* augment transapi module */
+				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
+				ncds_add_augment_transapi(model_path, transapi_path);
+			} else if (repo_type == -1) {
+				/* augment model */
+				nc_verb_verbose("Adding augment model \"%s\"", model_path);
+				ncds_add_model(model_path);
+			} else {
+				nc_verb_verbose("Adding static transapi \"%s\"", model_path);
+				if ((module->ds = ncds_new_transapi_static(repo_type, model_path, st)) == NULL) {
+					free(model_path);
+					free(transapi_path);
+					return (EXIT_FAILURE);
+				}
 			}
 		} else if (model_path && transapi_path) {
 			if (repo_type == -1) {
 				/* augment transapi module */
+				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
 				ncds_add_augment_transapi(model_path, transapi_path);
 			} else {
 				/* base transapi module for datastore */
+				nc_verb_verbose("Adding transapi \"%s\"", model_path);
 				if ((module->ds = ncds_new_transapi(repo_type, model_path, transapi_path)) == NULL) {
 					free(model_path);
 					free(transapi_path);
@@ -145,9 +166,11 @@ static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, N
 		} else if (model_path) {
 			if (repo_type == -1) {
 				/* augment model */
+				nc_verb_verbose("Adding augment model \"%s\"", model_path);
 				ncds_add_model(model_path);
 			} else {
 				/* base model for datastore */
+				nc_verb_verbose("Adding base model \"%s\"", model_path);
 				if ((module->ds = ncds_new2(repo_type, model_path, NULL)) == NULL) {
 					free(model_path);
 					return (EXIT_FAILURE);
@@ -246,6 +269,16 @@ int module_enable(struct module * module, int add)
 	}
 	xmlXPathFreeObject(xpath_obj);
 
+	/* models augmenting the datastore */
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model", xpath_ctxt)) == NULL ||
+			xpath_obj->nodesetval == NULL) {
+		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
+		xmlXPathFreeObject(xpath_obj);
+		goto err_cleanup;
+	}
+	parse_model_cfg(module, xpath_obj, -1);
+	xmlXPathFreeObject(xpath_obj);
+
 	/* main datastore's model */
 	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model-main", xpath_ctxt)) == NULL) {
 		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
@@ -267,20 +300,12 @@ int module_enable(struct module * module, int add)
 	free(repo_path);
 	repo_path = NULL;
 
-	/* models augmenting the datastore */
-	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model", xpath_ctxt)) == NULL ||
-			xpath_obj->nodesetval == NULL) {
-		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
-		goto err_cleanup;
-	}
-	parse_model_cfg(module, xpath_obj, -1);
-	xmlXPathFreeObject(xpath_obj);
-	xmlXPathFreeContext(xpath_ctxt);
-	xmlFreeDoc(module_config);
-
 	if ((module->id = ncds_init(module->ds)) < 0) {
 		goto err_cleanup;
 	}
+
+	xmlXPathFreeContext(xpath_ctxt);
+	xmlFreeDoc(module_config);
 
 	if (ncds_consolidate() != 0) {
 		nc_verb_warning("%s: consolidating libnetconf datastores failed for module %s.", __func__, module->name);
@@ -354,7 +379,7 @@ int module_disable(struct module * module, int destroy)
 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int transapi_init(xmlDocPtr * UNUSED(running))
+int netopeer_transapi_init(xmlDocPtr * UNUSED(running))
 {
 	return(EXIT_SUCCESS);
 }
@@ -362,7 +387,7 @@ int transapi_init(xmlDocPtr * UNUSED(running))
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void transapi_close(void)
+void netopeer_transapi_close(void)
 {
 	nc_verb_verbose("Netopeer module cleanup.");
 	while (modules) {
@@ -378,7 +403,7 @@ void transapi_close(void)
  * @param[out] err  Double pointer to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
+xmlDocPtr netopeer_get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
 {
 	/* no state data */
 	return(NULL);
@@ -387,7 +412,7 @@ xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), st
  * Mapping prefixes with namespaces.
  * Do NOT modify this structure!
  */
-struct ns_pair namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.0"}, {NULL, NULL}};
+struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.0"}, {NULL, NULL}};
 
 /*
 * CONFIGURATION callbacks
@@ -563,7 +588,7 @@ int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLD
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
-struct transapi_data_callbacks clbks =  {
+struct transapi_data_callbacks netopeer_clbks =  {
 	.callbacks_count = 3,
 	.data = NULL,
 	.callbacks = {
@@ -641,7 +666,7 @@ nc_reply * rpc_reload_module (xmlNodePtr input[])
 * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
 * DO NOT alter this structure
 */
-struct transapi_rpc_callbacks rpc_clbks = {
+struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
 		{.name="netopeer-reboot", .func=rpc_netopeer_reboot, .arg_count=1, .arg_order={"type"}},
@@ -650,12 +675,12 @@ struct transapi_rpc_callbacks rpc_clbks = {
 };
 
 struct transapi netopeer_transapi = {
-	.init = transapi_init,
-	.close = transapi_close,
-	.config_modified = &config_modified,
-	.data_clbks = &clbks,
-	.rpc_clbks = &rpc_clbks,
-	.erropt = &erropt,
-	.get_state = get_state_data,
-	.ns_mapping = namespace_mapping,
+	.init = netopeer_transapi_init,
+	.close = netopeer_transapi_close,
+	.config_modified = &netopeer_config_modified,
+	.data_clbks = &netopeer_clbks,
+	.rpc_clbks = &netopeer_rpc_clbks,
+	.erropt = &netopeer_erropt,
+	.get_state = netopeer_get_state_data,
+	.ns_mapping = netopeer_namespace_mapping,
 };
