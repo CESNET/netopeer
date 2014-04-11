@@ -1,0 +1,26 @@
+<device>
+	<name>NETCONF-server</name>
+	<data-models>
+		<model-main>
+			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-netconf-server.yin</path>
+			<feature>ssh</feature>
+			<feature>inbound-ssh</feature>
+<!--
+			<feature>outbound-ssh</feature>
+-->
+			<feature>tls</feature>
+			<feature>inbound-tls</feature>
+<!--
+			<feature>outbound-tls</feature>
+			<feature>tls-map-certificates</feature>
+-->
+		</model-main>
+		<model>
+			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-x509-cert-to-name.yin</path>
+		</model>
+	</data-models>
+	<repo>
+		<type>file</type>
+		<path>@sysconfdir@/netopeer/cfgnetopeer/datastore-server.xml</path>
+	</repo>
+</device>

@@ -131,7 +131,7 @@ int main (int argc, char** argv)
 	int next_option;
 	int daemonize = 0, len;
 	int verbose = 0;
-	struct module * netopeer_module = NULL;
+	struct module * netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
@@ -217,15 +217,32 @@ int main (int argc, char** argv)
 	}
 
 restart:
+	/* start NETCONF server module */
+	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
+		nc_verb_error("Creating necessary NETCONF server plugin failed!");
+		return(EXIT_FAILURE);
+	}
+	server_module->name = strdup(NCSERVER_MODULE_NAME);
+	if (module_enable(server_module, 0)) {
+		nc_verb_error("Starting necessary NETCONF server plugin failed!");
+		free(server_module->name);
+		free(server_module);
+		return EXIT_FAILURE;
+	}
+
 	/* start netopeer device module - it will start all modules that are
 	 * in its configuration and in server configuration */
 	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
-		nc_verb_error("Creating necessary plugin Netopeer failed!");
+		nc_verb_error("Creating necessary Netopeer plugin failed!");
+		module_disable(server_module, 1);
 		return(EXIT_FAILURE);
 	}
 	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
 	if (module_enable(netopeer_module, 0)) {
-		nc_verb_error("Starting necessary plugin Netopeer failed!");
+		nc_verb_error("Starting necessary Netopeer plugin failed!");
+		module_disable(server_module, 1);
+		free(netopeer_module->name);
+		free(netopeer_module);
 		return EXIT_FAILURE;
 	}
 
@@ -236,6 +253,7 @@ restart:
 	}
 
 	/* unload Netopeer module -> unload all modules */
+	module_disable(server_module, 1);
 	module_disable(netopeer_module, 1);
 
 	/* main cleanup */

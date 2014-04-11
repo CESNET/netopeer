@@ -53,6 +53,7 @@ char err_msg[4096];
 #define VERB(level,format,args...) if(verbose>=level){snprintf(err_msg,4095,format,##args); clb_print(level,err_msg);}
 
 #define NETOPEER_MODULE_NAME "Netopeer"
+#define NCSERVER_MODULE_NAME "NETCONF-server"
 
 struct session_info {
 	/**
