@@ -5,7 +5,8 @@
 			<path>@sysconfdir@/netopeer/cfgnetopeer/netopeer-cfgnetopeer.yin</path>
 		</model-main>
 	</data-models>
-	<repo type="file">
+	<repo>
+		<type>file</type>
 		<path>@sysconfdir@/netopeer/cfgnetopeer/datastore.xml</path>
 	</repo>
 </device>
