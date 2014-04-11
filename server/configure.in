@@ -56,10 +56,17 @@ CONFIGURE_PWD=`pwd`
 AC_SUBST(CONFIGURE_PWD)
 
 # Check for pkg-config.
-AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+AC_PATH_PROG(PKG_CONFIG, [pkg-config], [no])
 if test "x$PKG_CONFIG" = "xno"; then
 	AC_MSG_ERROR(['pkgconfig' not found.])
 fi
+
+# Check for sshd (OpenSSH).
+AC_PATH_PROG(SSHD_EXEC, [sshd], [no])
+if test "x$SSHD_EXEC" = "xno"; then
+	AC_MSG_ERROR(['sshd' not found.])
+fi
+
 
 # check for Linux distribution
 AC_ARG_WITH([distro],
@@ -139,21 +146,26 @@ AC_ARG_ENABLE([tls],
 	if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		# check stunnel
-		AC_CHECK_PROG(STUNNEL, [stunnel], [yes], [no])
-		if test "$STUNNEL" = "no"; then
-			AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
+	fi
+	TLS="yes"
+	AC_SUBST(TLS)
+)
+
+if test "$tls" = "yes"; then
+	# check stunnel
+	AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
+	if test "x$STUNNEL_EXEC" = "xno"; then
+		AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
+	else
+		AC_MSG_CHECKING([for NETCONF support in stunnel])
+		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
+			AC_MSG_RESULT([yes])
+			CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
 		else
-			AC_MSG_CHECKING([for NETCONF support in stunnel])
-			if test ! -z "`stunnel -version 2>&1 | grep NETCONF`"; then
-				AC_MSG_RESULT([yes])
-				CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
-			else
-				AC_MSG_RESULT([no])
-			fi
+			AC_MSG_RESULT([no])
 		fi
 	fi
-)
+fi
 
 ############################ Check for programs ################################
 
@@ -352,6 +364,8 @@ AC_FUNC_MALLOC
 AC_CHECK_FUNCS([select strdup strerror])
 
 ############################### Set output #####################################
+AC_SUBST(SSHD_EXEC)
+AC_SUBST(STUNNEL_EXEC)
 AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
@@ -378,9 +392,10 @@ AC_CONFIG_FILES(manager/Makefile)
 AC_CONFIG_FILES(config/org.liberouter.netopeer.conf)
 AC_CONFIG_FILES(config/org.liberouter.netopeer.server.service)
 AC_CONFIG_FILES(config/Netopeer.xml)
+AC_CONFIG_FILES(config/NETCONF-server.xml)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
-AC_CONFIG_FILES(src/netopeer_socket.h)
+AC_CONFIG_FILES(src/config.h)
 AC_CONFIG_FILES(stunnel/stunnel.conf)
 
 AC_OUTPUT
