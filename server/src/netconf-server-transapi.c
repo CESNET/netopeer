@@ -154,7 +154,10 @@ void server_transapi_close(void)
 {
 	/* kill transport daemons */
 	kill_sshd();
+
+#ifdef ENABLE_TLS
 	kill_tlsd();
+#endif
 
 	return;
 }
