@@ -83,7 +83,7 @@ SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/etc/netopeer/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
 SUBDIRS = dm_manager
