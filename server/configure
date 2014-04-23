@@ -619,6 +619,7 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+NCSERVER_FEATURES
 AGENT_LIBS
 SERVER_LIBS
 SERVER_HDRS_COMM
@@ -2630,11 +2631,13 @@ else
 fi
 
 tls="no"
+NCSERVER_FEATURES=""
 # Check whether --enable-tls was given.
 if test "${enable_tls+set}" = set; then :
   enableval=$enable_tls; if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature>"
 	fi
 	TLS="yes"
 
@@ -5275,6 +5278,7 @@ done
 
 
 ############################### Set output #####################################
+
 
 
 

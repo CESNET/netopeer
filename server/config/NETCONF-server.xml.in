@@ -8,8 +8,7 @@
 <!--
 			<feature>outbound-ssh</feature>
 -->
-			<feature>tls</feature>
-			<feature>inbound-tls</feature>
+			@NCSERVER_FEATURES@
 <!--
 			<feature>outbound-tls</feature>
 			<feature>tls-map-certificates</feature>
