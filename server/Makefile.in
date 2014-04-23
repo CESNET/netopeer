@@ -60,6 +60,9 @@ RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL@ -m 600
+ifeq ($(shell id -u $(USER)),0)
+  INSTALL_OWNER = -o @USER@ -g @GROUP@
+endif
 RPMDIR = RPMBUILD
 
 AGENT = netopeer-agent
@@ -175,9 +178,6 @@ distclean:
 
 .PHONY: install
 install: $(SERVER) $(AGENT) $(CFGS)
-	if test "`id -u $(USER)`" = "0"; then \
-		INSTALL_OWNER = -o @USER@ -g @GROUP@ \
-	fi;
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
@@ -219,19 +219,18 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
 	fi
 	chmod 600 $(CFGDIR)/sshd_config;
-	chown @USER@ $(CFGDIR)/sshd_config;
+	if test -n "$(INSTALL_OWNER)"; then \
+		chown @USER@ $(CFGDIR)/sshd_config; \
+	fi
 	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
 	@if test -n "@TLS@"; then \
 		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
 		$(INSTALL_DATA) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
+		rm -rf config/stunnel_config; \
 		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
 		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
-		chmod -R 600 $(CFGDIR)/stunnel_config $(CFGDIR)/stunnel/*; \
-		if test -n "$(INSTALL_OWNER)"; then \
-			chown -R @USER@ $(CFGDIR)/stunnel_config $(CFGDIR)/stunnel; \
-		fi; \
-		echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration."; \
+		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
 	fi
 
 
