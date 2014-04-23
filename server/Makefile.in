@@ -194,20 +194,20 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
 	if test -f config/Netopeer.xml; then \
-		$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/Netopeer.xml $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/Netopeer.xml $(CFGDIR)/modules.conf.d/; \
 	fi
 	if test -f config/NETCONF-server.xml; then \
-		$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/NETCONF-server.xml $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/; \
+		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/NETCONF-server.xml $(CFGDIR)/modules.conf.d/; \
 	fi
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
+	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
 	for i in $(CFGS); do \
-		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/;
+	$(INSTALL) -d $(CFGDIR)/modules.conf.d/;
 	@if test ! -f $(CFGDIR)/sshd_config; then \
 		if test -f /etc/ssh/sshd_config; then \
 			grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
