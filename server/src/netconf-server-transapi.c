@@ -123,46 +123,6 @@ static void kill_tlsd(void)
 #endif /* ENABLE_TLS */
 
 /**
- * @brief Initialize plugin after loaded and before any other functions are called.
-
- * This function should not apply any configuration data to the controlled device. If no
- * running is returned (it stays *NULL), complete startup configuration is consequently
- * applied via module callbacks. When a running configuration is returned, libnetconf
- * then applies (via module's callbacks) only the startup configuration data that
- * differ from the returned running configuration data.
-
- * Please note, that copying startup data to the running is performed only after the
- * libnetconf's system-wide close - see nc_close() function documentation for more
- * information.
-
- * @param[out] running	Current configuration of managed device.
-
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-int server_transapi_init(xmlDocPtr * UNUSED(running))
-{
-	/* check accessibility if sshd's PID file */
-	/* TODO */
-
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
- */
-void server_transapi_close(void)
-{
-	/* kill transport daemons */
-	kill_sshd();
-
-#ifdef ENABLE_TLS
-	kill_tlsd();
-#endif
-
-	return;
-}
-
-/**
  * @brief Retrieve state data from device and return them as XML document
  *
  * @param model	Device data model. libxml2 xmlDocPtr.
@@ -526,6 +486,88 @@ int callback_srv_netconf_srv_tls_srv_cert_maps (void ** data, XMLDIFF_OP op, xml
 }
 
 #endif /* ENABLE_TLS */
+
+/**
+ * @brief Initialize plugin after loaded and before any other functions are called.
+
+ * This function should not apply any configuration data to the controlled device. If no
+ * running is returned (it stays *NULL), complete startup configuration is consequently
+ * applied via module callbacks. When a running configuration is returned, libnetconf
+ * then applies (via module's callbacks) only the startup configuration data that
+ * differ from the returned running configuration data.
+
+ * Please note, that copying startup data to the running is performed only after the
+ * libnetconf's system-wide close - see nc_close() function documentation for more
+ * information.
+
+ * @param[out] running	Current configuration of managed device.
+
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int server_transapi_init(xmlDocPtr * UNUSED(running))
+{
+	xmlDocPtr doc;
+
+	/* set device according to defaults */
+	nc_verb_verbose("Setting default configuration for ietf-netconf-server module");
+	doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><ssh><listen><port>830</port></listen></ssh></netconf>",
+			NULL, NULL, 0);
+	if (doc == NULL) {
+		nc_verb_error("Unable to parse default configuration.");
+		xmlFreeDoc(doc);
+		return (EXIT_FAILURE);
+	}
+
+	if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+		xmlFreeDoc(doc);
+		return (EXIT_FAILURE);
+	}
+	if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+		xmlFreeDoc(doc);
+		return (EXIT_FAILURE);
+	}
+	xmlFreeDoc(doc);
+
+#ifdef ENABLE_TLS
+	doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
+			NULL, NULL, 0);
+	if (doc == NULL) {
+		nc_verb_error("Unable to parse default configuration.");
+		xmlFreeDoc(doc);
+		kill_sshd();
+		return (EXIT_FAILURE);
+	}
+
+	if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+		xmlFreeDoc(doc);
+		kill_sshd();
+		return (EXIT_FAILURE);
+	}
+	if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+		xmlFreeDoc(doc);
+		kill_sshd();
+		return (EXIT_FAILURE);
+	}
+	xmlFreeDoc(doc);
+#endif
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
+ */
+void server_transapi_close(void)
+{
+	/* kill transport daemons */
+	kill_sshd();
+
+#ifdef ENABLE_TLS
+	kill_tlsd();
+#endif
+
+	return;
+}
 
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
