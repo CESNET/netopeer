@@ -101,8 +101,8 @@ def listAugments(config):
 
 # "main" starts here
 # create argument parser
-parser = argparse.ArgumentParser(description="Manage Netopeer's modules",
-								formatter_class=argparse.RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description="Manage Netopeer's modules", formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('--netopeer', type=argparse.FileType('r'), help='Specify Netopeer\'s datastore file (by default /etc/netopeer/cfgnetopeer/datastore.xml).')
 subparsers = parser.add_subparsers(dest='subcommand')
 parser_add = subparsers.add_parser('add', help='Add a new module.')
 parser_list = subparsers.add_parser('list', help='List all existing modules.')
@@ -134,6 +134,9 @@ netopeer_config = '/etc/netopeer/cfgnetopeer/datastore.xml'
 
 try:
 	args = parser.parse_args()
+
+	if args.netopeer:
+		netopeer_config = args.netopeer.name
 	
 	if not os.path.exists(netopeer_config):
 		print('Missing Netopeer configuration ('+netopeer_config+')')
