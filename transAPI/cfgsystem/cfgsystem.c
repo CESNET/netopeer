@@ -35,13 +35,21 @@
 #define DNS_ATTEMPTS_MAX 5
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 3;
+int transapi_version = 4;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
  * 1 - data have been modified
  */
 int config_modified = 0;
+
+/*
+ * Determines the callbacks order.
+ * Set this variable before compilation and DO NOT modify it in runtime.
+ * TRANSAPI_CLBCKS_LEAF_TO_ROOT (default)
+ * TRANSAPI_CLBCKS_ROOT_TO_LEAF
+ */
+const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
 Feel free to use it to distinguish module behavior for different error-option values.
@@ -443,7 +451,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
  * Mapping prefixes with namespaces.
  * Do NOT modify this structure!
  */
-char * namespace_mapping[] = {"systemns", "urn:ietf:params:xml:ns:yang:ietf-system", NULL, NULL};
+struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"}, {NULL, NULL}};
 
 /*
 * CONFIGURATION callbacks
