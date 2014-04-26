@@ -205,6 +205,8 @@ install: $(SERVER) $(AGENT) $(CFGS)
 	for i in $(CFGS); do \
 		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
+	touch $(CFGDIR)/cfgnetopeer/datastore.xml
+	touch $(CFGDIR)/cfgnetopeer/datastore-server.xml
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
 	$(INSTALL) -d $(CFGDIR)/modules.conf.d/;
