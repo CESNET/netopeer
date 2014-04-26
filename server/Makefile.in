@@ -86,6 +86,8 @@ SERVER_HDRS = src/comm.h \
 	@SERVER_HDRS_COMM@
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
+OPENWRT_MODULES = ietf-system
+
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 DEFINE = -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
@@ -109,11 +111,18 @@ CFGS_TAR = $(CFGS) \
 	config/org.liberouter.netopeer.conf.in \
 	config/org.liberouter.netopeer.server.service.in
 
-all: $(AGENT) $(SERVER) $(SUBDIRS)
+all: $(AGENT) $(SERVER) submakes
 
+.PHONY: submakes
+.PHONY: $(OPENWRT_MODULES)
 .PHONY: $(SUBDIRS)
-$(SUBDIRS):
-	@$(MAKE) -C $@
+submakes:
+	for i in $(SUBDIRS); do \
+		$(MAKE) -C $$i; \
+	done
+	for i in $(OPENWRT_MODULES); do \
+		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
+	done
 
 $(SERVER): $(SERVER_OBJS)
 	@rm -f $@;
@@ -123,10 +132,14 @@ $(AGENT): $(AGENT_OBJS)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
+src/openwrt/%.so: $(OBJDIR)/src/openwrt/%.o
+	@rm -f $@
+	$(CC) -shared $< $(LIBS) -Wl,-soname -Wl,$@ -o $@;
+
 $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \
 		(mkdir -p $$(dirname $@))
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -c $< -o $@
 
 .PHONY: clean
 clean:
@@ -232,5 +245,8 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
 		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
 	fi
-
+	for i in $(OPENWRT_MODULES); do \
+		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
+		|| exit 1; \
+	done
 

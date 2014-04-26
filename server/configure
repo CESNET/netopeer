@@ -5325,6 +5325,11 @@ ac_config_files="$ac_config_files src/config.h"
 ac_config_files="$ac_config_files stunnel/stunnel.conf"
 
 
+ac_config_files="$ac_config_files src/openwrt/ietf-system.xml"
+
+ac_config_files="$ac_config_files src/openwrt/Makefile.ietf-system"
+
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -6041,6 +6046,8 @@ do
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
     "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
+    "src/openwrt/ietf-system.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system.xml" ;;
+    "src/openwrt/Makefile.ietf-system") CONFIG_FILES="$CONFIG_FILES src/openwrt/Makefile.ietf-system" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

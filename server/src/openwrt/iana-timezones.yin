@@ -1,0 +1,1906 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="iana-timezones"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:ianatz="urn:ietf:params:xml:ns:yang:iana-timezones">
+  <namespace uri="urn:ietf:params:xml:ns:yang:iana-timezones"/>
+  <prefix value="ianatz"/>
+  <organization>
+    <text>IANA</text>
+  </organization>
+  <contact>
+    <text>        Internet Assigned Numbers Authority
+
+Postal: ICANN
+        4676 Admiralty Way, Suite 330
+        Marina del Rey, CA 90292
+
+Tel:    +1 310 823 9358
+E-Mail: iana&amp;iana.org</text>
+  </contact>
+  <description>
+    <text>This YANG module defines the iana-timezone typedef, which
+contains YANG definitions for IANA-registered timezones.
+
+This YANG module is maintained by IANA, and reflects the
+IANA Time Zone Database.
+(http://www.iana.org/time-zones)
+
+The latest revision of this YANG module can be obtained from
+the IANA web site.
+
+Copyright (c) 2011 IETF Trust and the persons identified as
+authors of the code.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, is permitted pursuant to, and subject
+to the license terms contained in, the Simplified BSD License
+set forth in Section 4.c of the IETF Trust's Legal Provisions
+Relating to IETF Documents
+(http://trustee.ietf.org/license-info).
+
+This version of this YANG module is part of RFC XXXX; see
+the RFC itself for full legal notices.</text>
+  </description>
+  <revision date="2012-07-09">
+    <description>
+      <text>Initial revision. Using IANA Time Zone Data v. 2012c
+(Released 2012-03-27)</text>
+    </description>
+    <reference>
+      <text>RFC XXXX: TITLE</text>
+    </reference>
+  </revision>
+  <typedef name="iana-timezone">
+    <description>
+      <text>A timezone location as defined by the IANA timezone
+database (http://www.iana.org/time-zones)</text>
+    </description>
+    <type name="enumeration">
+      <enum name="Europe/Andorra">
+        <value value="0"/>
+      </enum>
+      <enum name="Asia/Dubai">
+        <value value="1"/>
+      </enum>
+      <enum name="Asia/Kabul">
+        <value value="2"/>
+      </enum>
+      <enum name="America/Antigua">
+        <value value="3"/>
+      </enum>
+      <enum name="America/Anguilla">
+        <value value="4"/>
+      </enum>
+      <enum name="Europe/Tirane">
+        <value value="5"/>
+      </enum>
+      <enum name="Asia/Yerevan">
+        <value value="6"/>
+      </enum>
+      <enum name="Africa/Luanda">
+        <value value="7"/>
+      </enum>
+      <enum name="Antarctica/McMurdo">
+        <value value="8"/>
+        <description>
+          <text>McMurdo Station, Ross Island</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/South_Pole">
+        <value value="9"/>
+        <description>
+          <text>Amundsen-Scott Station, South Pole</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Rothera">
+        <value value="10"/>
+        <description>
+          <text>Rothera Station, Adelaide Island</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Palmer">
+        <value value="11"/>
+        <description>
+          <text>Palmer Station, Anvers Island</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Mawson">
+        <value value="12"/>
+        <description>
+          <text>Mawson Station, Holme Bay</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Davis">
+        <value value="13"/>
+        <description>
+          <text>Davis Station, Vestfold Hills</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Casey">
+        <value value="14"/>
+        <description>
+          <text>Casey Station, Bailey Peninsula</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Vostok">
+        <value value="15"/>
+        <description>
+          <text>Vostok Station, Lake Vostok</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/DumontDUrville">
+        <value value="16"/>
+        <description>
+          <text>Dumont-d'Urville Station, Terre Adelie</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Syowa">
+        <value value="17"/>
+        <description>
+          <text>Syowa Station, E Ongul I</text>
+        </description>
+      </enum>
+      <enum name="Antarctica/Macquarie">
+        <value value="18"/>
+        <description>
+          <text>Macquarie Island Station, Macquarie Island</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Buenos_Aires">
+        <value value="19"/>
+        <description>
+          <text>Buenos Aires (BA, CF)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Cordoba">
+        <value value="20"/>
+        <description>
+          <text>most locations (CB, CC, CN, ER, FM, MN, SE, SF)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Salta">
+        <value value="21"/>
+        <description>
+          <text>(SA, LP, NQ, RN)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Jujuy">
+        <value value="22"/>
+        <description>
+          <text>Jujuy (JY)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Tucuman">
+        <value value="23"/>
+        <description>
+          <text>Tucuman (TM)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Catamarca">
+        <value value="24"/>
+        <description>
+          <text>Catamarca (CT), Chubut (CH)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/La_Rioja">
+        <value value="25"/>
+        <description>
+          <text>La Rioja (LR)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/San_Juan">
+        <value value="26"/>
+        <description>
+          <text>San Juan (SJ)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Mendoza">
+        <value value="27"/>
+        <description>
+          <text>Mendoza (MZ)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/San_Luis">
+        <value value="28"/>
+        <description>
+          <text>San Luis (SL)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Rio_Gallegos">
+        <value value="29"/>
+        <description>
+          <text>Santa Cruz (SC)</text>
+        </description>
+      </enum>
+      <enum name="America/Argentina/Ushuaia">
+        <value value="30"/>
+        <description>
+          <text>Tierra del Fuego (TF)</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Pago_Pago">
+        <value value="31"/>
+      </enum>
+      <enum name="Europe/Vienna">
+        <value value="32"/>
+      </enum>
+      <enum name="Australia/Lord_Howe">
+        <value value="33"/>
+        <description>
+          <text>Lord Howe Island</text>
+        </description>
+      </enum>
+      <enum name="Australia/Hobart">
+        <value value="34"/>
+        <description>
+          <text>Tasmania - most locations</text>
+        </description>
+      </enum>
+      <enum name="Australia/Currie">
+        <value value="35"/>
+        <description>
+          <text>Tasmania - King Island</text>
+        </description>
+      </enum>
+      <enum name="Australia/Melbourne">
+        <value value="36"/>
+        <description>
+          <text>Victoria</text>
+        </description>
+      </enum>
+      <enum name="Australia/Sydney">
+        <value value="37"/>
+        <description>
+          <text>New South Wales - most locations</text>
+        </description>
+      </enum>
+      <enum name="Australia/Broken_Hill">
+        <value value="38"/>
+        <description>
+          <text>New South Wales - Yancowinna</text>
+        </description>
+      </enum>
+      <enum name="Australia/Brisbane">
+        <value value="39"/>
+        <description>
+          <text>Queensland - most locations</text>
+        </description>
+      </enum>
+      <enum name="Australia/Lindeman">
+        <value value="40"/>
+        <description>
+          <text>Queensland - Holiday Islands</text>
+        </description>
+      </enum>
+      <enum name="Australia/Adelaide">
+        <value value="41"/>
+        <description>
+          <text>South Australia</text>
+        </description>
+      </enum>
+      <enum name="Australia/Darwin">
+        <value value="42"/>
+        <description>
+          <text>Northern Territory</text>
+        </description>
+      </enum>
+      <enum name="Australia/Perth">
+        <value value="43"/>
+        <description>
+          <text>Western Australia - most locations</text>
+        </description>
+      </enum>
+      <enum name="Australia/Eucla">
+        <value value="44"/>
+        <description>
+          <text>Western Australia - Eucla area</text>
+        </description>
+      </enum>
+      <enum name="America/Aruba">
+        <value value="45"/>
+      </enum>
+      <enum name="Europe/Mariehamn">
+        <value value="46"/>
+      </enum>
+      <enum name="Asia/Baku">
+        <value value="47"/>
+      </enum>
+      <enum name="Europe/Sarajevo">
+        <value value="48"/>
+      </enum>
+      <enum name="America/Barbados">
+        <value value="49"/>
+      </enum>
+      <enum name="Asia/Dhaka">
+        <value value="50"/>
+      </enum>
+      <enum name="Europe/Brussels">
+        <value value="51"/>
+      </enum>
+      <enum name="Africa/Ouagadougou">
+        <value value="52"/>
+      </enum>
+      <enum name="Europe/Sofia">
+        <value value="53"/>
+      </enum>
+      <enum name="Asia/Bahrain">
+        <value value="54"/>
+      </enum>
+      <enum name="Africa/Bujumbura">
+        <value value="55"/>
+      </enum>
+      <enum name="Africa/Porto-Novo">
+        <value value="56"/>
+      </enum>
+      <enum name="America/St_Barthelemy">
+        <value value="57"/>
+      </enum>
+      <enum name="Atlantic/Bermuda">
+        <value value="58"/>
+      </enum>
+      <enum name="Asia/Brunei">
+        <value value="59"/>
+      </enum>
+      <enum name="America/La_Paz">
+        <value value="60"/>
+      </enum>
+      <enum name="America/Kralendijk">
+        <value value="61"/>
+      </enum>
+      <enum name="America/Noronha">
+        <value value="62"/>
+        <description>
+          <text>Atlantic islands</text>
+        </description>
+      </enum>
+      <enum name="America/Belem">
+        <value value="63"/>
+        <description>
+          <text>Amapa, E Para</text>
+        </description>
+      </enum>
+      <enum name="America/Fortaleza">
+        <value value="64"/>
+        <description>
+          <text>NE Brazil (MA, PI, CE, RN, PB)</text>
+        </description>
+      </enum>
+      <enum name="America/Recife">
+        <value value="65"/>
+        <description>
+          <text>Pernambuco</text>
+        </description>
+      </enum>
+      <enum name="America/Araguaina">
+        <value value="66"/>
+        <description>
+          <text>Tocantins</text>
+        </description>
+      </enum>
+      <enum name="America/Maceio">
+        <value value="67"/>
+        <description>
+          <text>Alagoas, Sergipe</text>
+        </description>
+      </enum>
+      <enum name="America/Bahia">
+        <value value="68"/>
+        <description>
+          <text>Bahia</text>
+        </description>
+      </enum>
+      <enum name="America/Sao_Paulo">
+        <value value="69"/>
+        <description>
+          <text>S &amp; SE Brazil (GO, DF, MG, ES, RJ, SP, PR, SC, RS)</text>
+        </description>
+      </enum>
+      <enum name="America/Campo_Grande">
+        <value value="70"/>
+        <description>
+          <text>Mato Grosso do Sul</text>
+        </description>
+      </enum>
+      <enum name="America/Cuiaba">
+        <value value="71"/>
+        <description>
+          <text>Mato Grosso</text>
+        </description>
+      </enum>
+      <enum name="America/Santarem">
+        <value value="72"/>
+        <description>
+          <text>W Para</text>
+        </description>
+      </enum>
+      <enum name="America/Porto_Velho">
+        <value value="73"/>
+        <description>
+          <text>Rondonia</text>
+        </description>
+      </enum>
+      <enum name="America/Boa_Vista">
+        <value value="74"/>
+        <description>
+          <text>Roraima</text>
+        </description>
+      </enum>
+      <enum name="America/Manaus">
+        <value value="75"/>
+        <description>
+          <text>E Amazonas</text>
+        </description>
+      </enum>
+      <enum name="America/Eirunepe">
+        <value value="76"/>
+        <description>
+          <text>W Amazonas</text>
+        </description>
+      </enum>
+      <enum name="America/Rio_Branco">
+        <value value="77"/>
+        <description>
+          <text>Acre</text>
+        </description>
+      </enum>
+      <enum name="America/Nassau">
+        <value value="78"/>
+      </enum>
+      <enum name="Asia/Thimphu">
+        <value value="79"/>
+      </enum>
+      <enum name="Africa/Gaborone">
+        <value value="80"/>
+      </enum>
+      <enum name="Europe/Minsk">
+        <value value="81"/>
+      </enum>
+      <enum name="America/Belize">
+        <value value="82"/>
+      </enum>
+      <enum name="America/St_Johns">
+        <value value="83"/>
+        <description>
+          <text>Newfoundland Time, including SE Labrador</text>
+        </description>
+      </enum>
+      <enum name="America/Halifax">
+        <value value="84"/>
+        <description>
+          <text>Atlantic Time - Nova Scotia (most places), PEI</text>
+        </description>
+      </enum>
+      <enum name="America/Glace_Bay">
+        <value value="85"/>
+        <description>
+          <text>Atlantic Time - Nova Scotia - places that did not observe
+DST 1966-1971</text>
+        </description>
+      </enum>
+      <enum name="America/Moncton">
+        <value value="86"/>
+        <description>
+          <text>Atlantic Time - New Brunswick</text>
+        </description>
+      </enum>
+      <enum name="America/Goose_Bay">
+        <value value="87"/>
+        <description>
+          <text>Atlantic Time - Labrador - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Blanc-Sablon">
+        <value value="88"/>
+        <description>
+          <text>Atlantic Standard Time - Quebec - Lower North Shore</text>
+        </description>
+      </enum>
+      <enum name="America/Montreal">
+        <value value="89"/>
+        <description>
+          <text>Eastern Time - Quebec - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Toronto">
+        <value value="90"/>
+        <description>
+          <text>Eastern Time - Ontario - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Nipigon">
+        <value value="91"/>
+        <description>
+          <text>Eastern Time - Ontario &amp; Quebec - places that did not
+observe DST 1967-1973</text>
+        </description>
+      </enum>
+      <enum name="America/Thunder_Bay">
+        <value value="92"/>
+        <description>
+          <text>Eastern Time - Thunder Bay, Ontario</text>
+        </description>
+      </enum>
+      <enum name="America/Iqaluit">
+        <value value="93"/>
+        <description>
+          <text>Eastern Time - east Nunavut - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Pangnirtung">
+        <value value="94"/>
+        <description>
+          <text>Eastern Time - Pangnirtung, Nunavut</text>
+        </description>
+      </enum>
+      <enum name="America/Resolute">
+        <value value="95"/>
+        <description>
+          <text>Central Standard Time - Resolute, Nunavut</text>
+        </description>
+      </enum>
+      <enum name="America/Atikokan">
+        <value value="96"/>
+        <description>
+          <text>Eastern Standard Time - Atikokan, Ontario and Southampton I,
+Nunavut</text>
+        </description>
+      </enum>
+      <enum name="America/Rankin_Inlet">
+        <value value="97"/>
+        <description>
+          <text>Central Time - central Nunavut</text>
+        </description>
+      </enum>
+      <enum name="America/Winnipeg">
+        <value value="98"/>
+        <description>
+          <text>Central Time - Manitoba &amp; west Ontario</text>
+        </description>
+      </enum>
+      <enum name="America/Rainy_River">
+        <value value="99"/>
+        <description>
+          <text>Central Time - Rainy River &amp; Fort Frances, Ontario</text>
+        </description>
+      </enum>
+      <enum name="America/Regina">
+        <value value="100"/>
+        <description>
+          <text>Central Standard Time - Saskatchewan - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Swift_Current">
+        <value value="101"/>
+        <description>
+          <text>Central Standard Time - Saskatchewan - midwest</text>
+        </description>
+      </enum>
+      <enum name="America/Edmonton">
+        <value value="102"/>
+        <description>
+          <text>Mountain Time - Alberta, east British Columbia &amp; west
+Saskatchewan</text>
+        </description>
+      </enum>
+      <enum name="America/Cambridge_Bay">
+        <value value="103"/>
+        <description>
+          <text>Mountain Time - west Nunavut</text>
+        </description>
+      </enum>
+      <enum name="America/Yellowknife">
+        <value value="104"/>
+        <description>
+          <text>Mountain Time - central Northwest Territories</text>
+        </description>
+      </enum>
+      <enum name="America/Inuvik">
+        <value value="105"/>
+        <description>
+          <text>Mountain Time - west Northwest Territories</text>
+        </description>
+      </enum>
+      <enum name="America/Creston">
+        <value value="106"/>
+        <description>
+          <text>Mountain Standard Time - Creston, British Columbia</text>
+        </description>
+      </enum>
+      <enum name="America/Dawson_Creek">
+        <value value="107"/>
+        <description>
+          <text>Mountain Standard Time - Dawson Creek &amp; Fort Saint John,
+British Columbia</text>
+        </description>
+      </enum>
+      <enum name="America/Vancouver">
+        <value value="108"/>
+        <description>
+          <text>Pacific Time - west British Columbia</text>
+        </description>
+      </enum>
+      <enum name="America/Whitehorse">
+        <value value="109"/>
+        <description>
+          <text>Pacific Time - south Yukon</text>
+        </description>
+      </enum>
+      <enum name="America/Dawson">
+        <value value="110"/>
+        <description>
+          <text>Pacific Time - north Yukon</text>
+        </description>
+      </enum>
+      <enum name="Indian/Cocos">
+        <value value="111"/>
+      </enum>
+      <enum name="Africa/Kinshasa">
+        <value value="112"/>
+        <description>
+          <text>west Dem. Rep. of Congo</text>
+        </description>
+      </enum>
+      <enum name="Africa/Lubumbashi">
+        <value value="113"/>
+        <description>
+          <text>east Dem. Rep. of Congo</text>
+        </description>
+      </enum>
+      <enum name="Africa/Bangui">
+        <value value="114"/>
+      </enum>
+      <enum name="Africa/Brazzaville">
+        <value value="115"/>
+      </enum>
+      <enum name="Europe/Zurich">
+        <value value="116"/>
+      </enum>
+      <enum name="Africa/Abidjan">
+        <value value="117"/>
+      </enum>
+      <enum name="Pacific/Rarotonga">
+        <value value="118"/>
+      </enum>
+      <enum name="America/Santiago">
+        <value value="119"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Easter">
+        <value value="120"/>
+        <description>
+          <text>Easter Island &amp; Sala y Gomez</text>
+        </description>
+      </enum>
+      <enum name="Africa/Douala">
+        <value value="121"/>
+      </enum>
+      <enum name="Asia/Shanghai">
+        <value value="122"/>
+        <description>
+          <text>east China - Beijing, Guangdong, Shanghai, etc.</text>
+        </description>
+      </enum>
+      <enum name="Asia/Harbin">
+        <value value="123"/>
+        <description>
+          <text>Heilongjiang (except Mohe), Jilin</text>
+        </description>
+      </enum>
+      <enum name="Asia/Chongqing">
+        <value value="124"/>
+        <description>
+          <text>central China - Sichuan, Yunnan, Guangxi, Shaanxi, Guizhou,
+etc.</text>
+        </description>
+      </enum>
+      <enum name="Asia/Urumqi">
+        <value value="125"/>
+        <description>
+          <text>most of Tibet &amp; Xinjiang</text>
+        </description>
+      </enum>
+      <enum name="Asia/Kashgar">
+        <value value="126"/>
+        <description>
+          <text>west Tibet &amp; Xinjiang</text>
+        </description>
+      </enum>
+      <enum name="America/Bogota">
+        <value value="127"/>
+      </enum>
+      <enum name="America/Costa_Rica">
+        <value value="128"/>
+      </enum>
+      <enum name="America/Havana">
+        <value value="129"/>
+      </enum>
+      <enum name="Atlantic/Cape_Verde">
+        <value value="130"/>
+      </enum>
+      <enum name="America/Curacao">
+        <value value="131"/>
+      </enum>
+      <enum name="Indian/Christmas">
+        <value value="132"/>
+      </enum>
+      <enum name="Asia/Nicosia">
+        <value value="133"/>
+      </enum>
+      <enum name="Europe/Prague">
+        <value value="134"/>
+      </enum>
+      <enum name="Europe/Berlin">
+        <value value="135"/>
+      </enum>
+      <enum name="Africa/Djibouti">
+        <value value="136"/>
+      </enum>
+      <enum name="Europe/Copenhagen">
+        <value value="137"/>
+      </enum>
+      <enum name="America/Dominica">
+        <value value="138"/>
+      </enum>
+      <enum name="America/Santo_Domingo">
+        <value value="139"/>
+      </enum>
+      <enum name="Africa/Algiers">
+        <value value="140"/>
+      </enum>
+      <enum name="America/Guayaquil">
+        <value value="141"/>
+        <description>
+          <text>mainland</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Galapagos">
+        <value value="142"/>
+        <description>
+          <text>Galapagos Islands</text>
+        </description>
+      </enum>
+      <enum name="Europe/Tallinn">
+        <value value="143"/>
+      </enum>
+      <enum name="Africa/Cairo">
+        <value value="144"/>
+      </enum>
+      <enum name="Africa/El_Aaiun">
+        <value value="145"/>
+      </enum>
+      <enum name="Africa/Asmara">
+        <value value="146"/>
+      </enum>
+      <enum name="Europe/Madrid">
+        <value value="147"/>
+        <description>
+          <text>mainland</text>
+        </description>
+      </enum>
+      <enum name="Africa/Ceuta">
+        <value value="148"/>
+        <description>
+          <text>Ceuta &amp; Melilla</text>
+        </description>
+      </enum>
+      <enum name="Atlantic/Canary">
+        <value value="149"/>
+        <description>
+          <text>Canary Islands</text>
+        </description>
+      </enum>
+      <enum name="Africa/Addis_Ababa">
+        <value value="150"/>
+      </enum>
+      <enum name="Europe/Helsinki">
+        <value value="151"/>
+      </enum>
+      <enum name="Pacific/Fiji">
+        <value value="152"/>
+      </enum>
+      <enum name="Atlantic/Stanley">
+        <value value="153"/>
+      </enum>
+      <enum name="Pacific/Chuuk">
+        <value value="154"/>
+        <description>
+          <text>Chuuk (Truk) and Yap</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Pohnpei">
+        <value value="155"/>
+        <description>
+          <text>Pohnpei (Ponape)</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Kosrae">
+        <value value="156"/>
+        <description>
+          <text>Kosrae</text>
+        </description>
+      </enum>
+      <enum name="Atlantic/Faroe">
+        <value value="157"/>
+      </enum>
+      <enum name="Europe/Paris">
+        <value value="158"/>
+      </enum>
+      <enum name="Africa/Libreville">
+        <value value="159"/>
+      </enum>
+      <enum name="Europe/London">
+        <value value="160"/>
+      </enum>
+      <enum name="America/Grenada">
+        <value value="161"/>
+      </enum>
+      <enum name="Asia/Tbilisi">
+        <value value="162"/>
+      </enum>
+      <enum name="America/Cayenne">
+        <value value="163"/>
+      </enum>
+      <enum name="Europe/Guernsey">
+        <value value="164"/>
+      </enum>
+      <enum name="Africa/Accra">
+        <value value="165"/>
+      </enum>
+      <enum name="Europe/Gibraltar">
+        <value value="166"/>
+      </enum>
+      <enum name="America/Godthab">
+        <value value="167"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Danmarkshavn">
+        <value value="168"/>
+        <description>
+          <text>east coast, north of Scoresbysund</text>
+        </description>
+      </enum>
+      <enum name="America/Scoresbysund">
+        <value value="169"/>
+        <description>
+          <text>Scoresbysund / Ittoqqortoormiit</text>
+        </description>
+      </enum>
+      <enum name="America/Thule">
+        <value value="170"/>
+        <description>
+          <text>Thule / Pituffik</text>
+        </description>
+      </enum>
+      <enum name="Africa/Banjul">
+        <value value="171"/>
+      </enum>
+      <enum name="Africa/Conakry">
+        <value value="172"/>
+      </enum>
+      <enum name="America/Guadeloupe">
+        <value value="173"/>
+      </enum>
+      <enum name="Africa/Malabo">
+        <value value="174"/>
+      </enum>
+      <enum name="Europe/Athens">
+        <value value="175"/>
+      </enum>
+      <enum name="Atlantic/South_Georgia">
+        <value value="176"/>
+      </enum>
+      <enum name="America/Guatemala">
+        <value value="177"/>
+      </enum>
+      <enum name="Pacific/Guam">
+        <value value="178"/>
+      </enum>
+      <enum name="Africa/Bissau">
+        <value value="179"/>
+      </enum>
+      <enum name="America/Guyana">
+        <value value="180"/>
+      </enum>
+      <enum name="Asia/Hong_Kong">
+        <value value="181"/>
+      </enum>
+      <enum name="America/Tegucigalpa">
+        <value value="182"/>
+      </enum>
+      <enum name="Europe/Zagreb">
+        <value value="183"/>
+      </enum>
+      <enum name="America/Port-au-Prince">
+        <value value="184"/>
+      </enum>
+      <enum name="Europe/Budapest">
+        <value value="185"/>
+      </enum>
+      <enum name="Asia/Jakarta">
+        <value value="186"/>
+        <description>
+          <text>Java &amp; Sumatra</text>
+        </description>
+      </enum>
+      <enum name="Asia/Pontianak">
+        <value value="187"/>
+        <description>
+          <text>west &amp; central Borneo</text>
+        </description>
+      </enum>
+      <enum name="Asia/Makassar">
+        <value value="188"/>
+        <description>
+          <text>east &amp; south Borneo, Sulawesi (Celebes), Bali, Nusa
+Tengarra, west Timor</text>
+        </description>
+      </enum>
+      <enum name="Asia/Jayapura">
+        <value value="189"/>
+        <description>
+          <text>west New Guinea (Irian Jaya) &amp; Malukus (Moluccas)</text>
+        </description>
+      </enum>
+      <enum name="Europe/Dublin">
+        <value value="190"/>
+      </enum>
+      <enum name="Asia/Jerusalem">
+        <value value="191"/>
+      </enum>
+      <enum name="Europe/Isle_of_Man">
+        <value value="192"/>
+      </enum>
+      <enum name="Asia/Kolkata">
+        <value value="193"/>
+      </enum>
+      <enum name="Indian/Chagos">
+        <value value="194"/>
+      </enum>
+      <enum name="Asia/Baghdad">
+        <value value="195"/>
+      </enum>
+      <enum name="Asia/Tehran">
+        <value value="196"/>
+      </enum>
+      <enum name="Atlantic/Reykjavik">
+        <value value="197"/>
+      </enum>
+      <enum name="Europe/Rome">
+        <value value="198"/>
+      </enum>
+      <enum name="Europe/Jersey">
+        <value value="199"/>
+      </enum>
+      <enum name="America/Jamaica">
+        <value value="200"/>
+      </enum>
+      <enum name="Asia/Amman">
+        <value value="201"/>
+      </enum>
+      <enum name="Asia/Tokyo">
+        <value value="202"/>
+      </enum>
+      <enum name="Africa/Nairobi">
+        <value value="203"/>
+      </enum>
+      <enum name="Asia/Bishkek">
+        <value value="204"/>
+      </enum>
+      <enum name="Asia/Phnom_Penh">
+        <value value="205"/>
+      </enum>
+      <enum name="Pacific/Tarawa">
+        <value value="206"/>
+        <description>
+          <text>Gilbert Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Enderbury">
+        <value value="207"/>
+        <description>
+          <text>Phoenix Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Kiritimati">
+        <value value="208"/>
+        <description>
+          <text>Line Islands</text>
+        </description>
+      </enum>
+      <enum name="Indian/Comoro">
+        <value value="209"/>
+      </enum>
+      <enum name="America/St_Kitts">
+        <value value="210"/>
+      </enum>
+      <enum name="Asia/Pyongyang">
+        <value value="211"/>
+      </enum>
+      <enum name="Asia/Seoul">
+        <value value="212"/>
+      </enum>
+      <enum name="Asia/Kuwait">
+        <value value="213"/>
+      </enum>
+      <enum name="America/Cayman">
+        <value value="214"/>
+      </enum>
+      <enum name="Asia/Almaty">
+        <value value="215"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Asia/Qyzylorda">
+        <value value="216"/>
+        <description>
+          <text>Qyzylorda (Kyzylorda, Kzyl-Orda)</text>
+        </description>
+      </enum>
+      <enum name="Asia/Aqtobe">
+        <value value="217"/>
+        <description>
+          <text>Aqtobe (Aktobe)</text>
+        </description>
+      </enum>
+      <enum name="Asia/Aqtau">
+        <value value="218"/>
+        <description>
+          <text>Atyrau (Atirau, Gur'yev), Mangghystau (Mankistau)</text>
+        </description>
+      </enum>
+      <enum name="Asia/Oral">
+        <value value="219"/>
+        <description>
+          <text>West Kazakhstan</text>
+        </description>
+      </enum>
+      <enum name="Asia/Vientiane">
+        <value value="220"/>
+      </enum>
+      <enum name="Asia/Beirut">
+        <value value="221"/>
+      </enum>
+      <enum name="America/St_Lucia">
+        <value value="222"/>
+      </enum>
+      <enum name="Europe/Vaduz">
+        <value value="223"/>
+      </enum>
+      <enum name="Asia/Colombo">
+        <value value="224"/>
+      </enum>
+      <enum name="Africa/Monrovia">
+        <value value="225"/>
+      </enum>
+      <enum name="Africa/Maseru">
+        <value value="226"/>
+      </enum>
+      <enum name="Europe/Vilnius">
+        <value value="227"/>
+      </enum>
+      <enum name="Europe/Luxembourg">
+        <value value="228"/>
+      </enum>
+      <enum name="Europe/Riga">
+        <value value="229"/>
+      </enum>
+      <enum name="Africa/Tripoli">
+        <value value="230"/>
+      </enum>
+      <enum name="Africa/Casablanca">
+        <value value="231"/>
+      </enum>
+      <enum name="Europe/Monaco">
+        <value value="232"/>
+      </enum>
+      <enum name="Europe/Chisinau">
+        <value value="233"/>
+      </enum>
+      <enum name="Europe/Podgorica">
+        <value value="234"/>
+      </enum>
+      <enum name="America/Marigot">
+        <value value="235"/>
+      </enum>
+      <enum name="Indian/Antananarivo">
+        <value value="236"/>
+      </enum>
+      <enum name="Pacific/Majuro">
+        <value value="237"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Kwajalein">
+        <value value="238"/>
+        <description>
+          <text>Kwajalein</text>
+        </description>
+      </enum>
+      <enum name="Europe/Skopje">
+        <value value="239"/>
+      </enum>
+      <enum name="Africa/Bamako">
+        <value value="240"/>
+      </enum>
+      <enum name="Asia/Rangoon">
+        <value value="241"/>
+      </enum>
+      <enum name="Asia/Ulaanbaatar">
+        <value value="242"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Asia/Hovd">
+        <value value="243"/>
+        <description>
+          <text>Bayan-Olgiy, Govi-Altai, Hovd, Uvs, Zavkhan</text>
+        </description>
+      </enum>
+      <enum name="Asia/Choibalsan">
+        <value value="244"/>
+        <description>
+          <text>Dornod, Sukhbaatar</text>
+        </description>
+      </enum>
+      <enum name="Asia/Macau">
+        <value value="245"/>
+      </enum>
+      <enum name="Pacific/Saipan">
+        <value value="246"/>
+      </enum>
+      <enum name="America/Martinique">
+        <value value="247"/>
+      </enum>
+      <enum name="Africa/Nouakchott">
+        <value value="248"/>
+      </enum>
+      <enum name="America/Montserrat">
+        <value value="249"/>
+      </enum>
+      <enum name="Europe/Malta">
+        <value value="250"/>
+      </enum>
+      <enum name="Indian/Mauritius">
+        <value value="251"/>
+      </enum>
+      <enum name="Indian/Maldives">
+        <value value="252"/>
+      </enum>
+      <enum name="Africa/Blantyre">
+        <value value="253"/>
+      </enum>
+      <enum name="America/Mexico_City">
+        <value value="254"/>
+        <description>
+          <text>Central Time - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Cancun">
+        <value value="255"/>
+        <description>
+          <text>Central Time - Quintana Roo</text>
+        </description>
+      </enum>
+      <enum name="America/Merida">
+        <value value="256"/>
+        <description>
+          <text>Central Time - Campeche, Yucatan</text>
+        </description>
+      </enum>
+      <enum name="America/Monterrey">
+        <value value="257"/>
+        <description>
+          <text>Mexican Central Time - Coahuila, Durango, Nuevo Leon,
+Tamaulipas away from US border</text>
+        </description>
+      </enum>
+      <enum name="America/Matamoros">
+        <value value="258"/>
+        <description>
+          <text>US Central Time - Coahuila, Durango, Nuevo Leon, Tamaulipas
+near US border</text>
+        </description>
+      </enum>
+      <enum name="America/Mazatlan">
+        <value value="259"/>
+        <description>
+          <text>Mountain Time - S Baja, Nayarit, Sinaloa</text>
+        </description>
+      </enum>
+      <enum name="America/Chihuahua">
+        <value value="260"/>
+        <description>
+          <text>Mexican Mountain Time - Chihuahua away from US border</text>
+        </description>
+      </enum>
+      <enum name="America/Ojinaga">
+        <value value="261"/>
+        <description>
+          <text>US Mountain Time - Chihuahua near US border</text>
+        </description>
+      </enum>
+      <enum name="America/Hermosillo">
+        <value value="262"/>
+        <description>
+          <text>Mountain Standard Time - Sonora</text>
+        </description>
+      </enum>
+      <enum name="America/Tijuana">
+        <value value="263"/>
+        <description>
+          <text>US Pacific Time - Baja California near US border</text>
+        </description>
+      </enum>
+      <enum name="America/Santa_Isabel">
+        <value value="264"/>
+        <description>
+          <text>Mexican Pacific Time - Baja California away from US border</text>
+        </description>
+      </enum>
+      <enum name="America/Bahia_Banderas">
+        <value value="265"/>
+        <description>
+          <text>Mexican Central Time - Bahia de Banderas</text>
+        </description>
+      </enum>
+      <enum name="Asia/Kuala_Lumpur">
+        <value value="266"/>
+        <description>
+          <text>peninsular Malaysia</text>
+        </description>
+      </enum>
+      <enum name="Asia/Kuching">
+        <value value="267"/>
+        <description>
+          <text>Sabah &amp; Sarawak</text>
+        </description>
+      </enum>
+      <enum name="Africa/Maputo">
+        <value value="268"/>
+      </enum>
+      <enum name="Africa/Windhoek">
+        <value value="269"/>
+      </enum>
+      <enum name="Pacific/Noumea">
+        <value value="270"/>
+      </enum>
+      <enum name="Africa/Niamey">
+        <value value="271"/>
+      </enum>
+      <enum name="Pacific/Norfolk">
+        <value value="272"/>
+      </enum>
+      <enum name="Africa/Lagos">
+        <value value="273"/>
+      </enum>
+      <enum name="America/Managua">
+        <value value="274"/>
+      </enum>
+      <enum name="Europe/Amsterdam">
+        <value value="275"/>
+      </enum>
+      <enum name="Europe/Oslo">
+        <value value="276"/>
+      </enum>
+      <enum name="Asia/Kathmandu">
+        <value value="277"/>
+      </enum>
+      <enum name="Pacific/Nauru">
+        <value value="278"/>
+      </enum>
+      <enum name="Pacific/Niue">
+        <value value="279"/>
+      </enum>
+      <enum name="Pacific/Auckland">
+        <value value="280"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Chatham">
+        <value value="281"/>
+        <description>
+          <text>Chatham Islands</text>
+        </description>
+      </enum>
+      <enum name="Asia/Muscat">
+        <value value="282"/>
+      </enum>
+      <enum name="America/Panama">
+        <value value="283"/>
+      </enum>
+      <enum name="America/Lima">
+        <value value="284"/>
+      </enum>
+      <enum name="Pacific/Tahiti">
+        <value value="285"/>
+        <description>
+          <text>Society Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Marquesas">
+        <value value="286"/>
+        <description>
+          <text>Marquesas Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Gambier">
+        <value value="287"/>
+        <description>
+          <text>Gambier Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Port_Moresby">
+        <value value="288"/>
+      </enum>
+      <enum name="Asia/Manila">
+        <value value="289"/>
+      </enum>
+      <enum name="Asia/Karachi">
+        <value value="290"/>
+      </enum>
+      <enum name="Europe/Warsaw">
+        <value value="291"/>
+      </enum>
+      <enum name="America/Miquelon">
+        <value value="292"/>
+      </enum>
+      <enum name="Pacific/Pitcairn">
+        <value value="293"/>
+      </enum>
+      <enum name="America/Puerto_Rico">
+        <value value="294"/>
+      </enum>
+      <enum name="Asia/Gaza">
+        <value value="295"/>
+        <description>
+          <text>Gaza Strip</text>
+        </description>
+      </enum>
+      <enum name="Asia/Hebron">
+        <value value="296"/>
+        <description>
+          <text>West Bank</text>
+        </description>
+      </enum>
+      <enum name="Europe/Lisbon">
+        <value value="297"/>
+        <description>
+          <text>mainland</text>
+        </description>
+      </enum>
+      <enum name="Atlantic/Madeira">
+        <value value="298"/>
+        <description>
+          <text>Madeira Islands</text>
+        </description>
+      </enum>
+      <enum name="Atlantic/Azores">
+        <value value="299"/>
+        <description>
+          <text>Azores</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Palau">
+        <value value="300"/>
+      </enum>
+      <enum name="America/Asuncion">
+        <value value="301"/>
+      </enum>
+      <enum name="Asia/Qatar">
+        <value value="302"/>
+      </enum>
+      <enum name="Indian/Reunion">
+        <value value="303"/>
+      </enum>
+      <enum name="Europe/Bucharest">
+        <value value="304"/>
+      </enum>
+      <enum name="Europe/Belgrade">
+        <value value="305"/>
+      </enum>
+      <enum name="Europe/Kaliningrad">
+        <value value="306"/>
+        <description>
+          <text>Moscow-01 - Kaliningrad</text>
+        </description>
+      </enum>
+      <enum name="Europe/Moscow">
+        <value value="307"/>
+        <description>
+          <text>Moscow+00 - west Russia</text>
+        </description>
+      </enum>
+      <enum name="Europe/Volgograd">
+        <value value="308"/>
+        <description>
+          <text>Moscow+00 - Caspian Sea</text>
+        </description>
+      </enum>
+      <enum name="Europe/Samara">
+        <value value="309"/>
+        <description>
+          <text>Moscow+00 - Samara, Udmurtia</text>
+        </description>
+      </enum>
+      <enum name="Asia/Yekaterinburg">
+        <value value="310"/>
+        <description>
+          <text>Moscow+02 - Urals</text>
+        </description>
+      </enum>
+      <enum name="Asia/Omsk">
+        <value value="311"/>
+        <description>
+          <text>Moscow+03 - west Siberia</text>
+        </description>
+      </enum>
+      <enum name="Asia/Novosibirsk">
+        <value value="312"/>
+        <description>
+          <text>Moscow+03 - Novosibirsk</text>
+        </description>
+      </enum>
+      <enum name="Asia/Novokuznetsk">
+        <value value="313"/>
+        <description>
+          <text>Moscow+03 - Novokuznetsk</text>
+        </description>
+      </enum>
+      <enum name="Asia/Krasnoyarsk">
+        <value value="314"/>
+        <description>
+          <text>Moscow+04 - Yenisei River</text>
+        </description>
+      </enum>
+      <enum name="Asia/Irkutsk">
+        <value value="315"/>
+        <description>
+          <text>Moscow+05 - Lake Baikal</text>
+        </description>
+      </enum>
+      <enum name="Asia/Yakutsk">
+        <value value="316"/>
+        <description>
+          <text>Moscow+06 - Lena River</text>
+        </description>
+      </enum>
+      <enum name="Asia/Vladivostok">
+        <value value="317"/>
+        <description>
+          <text>Moscow+07 - Amur River</text>
+        </description>
+      </enum>
+      <enum name="Asia/Sakhalin">
+        <value value="318"/>
+        <description>
+          <text>Moscow+07 - Sakhalin Island</text>
+        </description>
+      </enum>
+      <enum name="Asia/Magadan">
+        <value value="319"/>
+        <description>
+          <text>Moscow+08 - Magadan</text>
+        </description>
+      </enum>
+      <enum name="Asia/Kamchatka">
+        <value value="320"/>
+        <description>
+          <text>Moscow+08 - Kamchatka</text>
+        </description>
+      </enum>
+      <enum name="Asia/Anadyr">
+        <value value="321"/>
+        <description>
+          <text>Moscow+08 - Bering Sea</text>
+        </description>
+      </enum>
+      <enum name="Africa/Kigali">
+        <value value="322"/>
+      </enum>
+      <enum name="Asia/Riyadh">
+        <value value="323"/>
+      </enum>
+      <enum name="Pacific/Guadalcanal">
+        <value value="324"/>
+      </enum>
+      <enum name="Indian/Mahe">
+        <value value="325"/>
+      </enum>
+      <enum name="Africa/Khartoum">
+        <value value="326"/>
+      </enum>
+      <enum name="Europe/Stockholm">
+        <value value="327"/>
+      </enum>
+      <enum name="Asia/Singapore">
+        <value value="328"/>
+      </enum>
+      <enum name="Atlantic/St_Helena">
+        <value value="329"/>
+      </enum>
+      <enum name="Europe/Ljubljana">
+        <value value="330"/>
+      </enum>
+      <enum name="Arctic/Longyearbyen">
+        <value value="331"/>
+      </enum>
+      <enum name="Europe/Bratislava">
+        <value value="332"/>
+      </enum>
+      <enum name="Africa/Freetown">
+        <value value="333"/>
+      </enum>
+      <enum name="Europe/San_Marino">
+        <value value="334"/>
+      </enum>
+      <enum name="Africa/Dakar">
+        <value value="335"/>
+      </enum>
+      <enum name="Africa/Mogadishu">
+        <value value="336"/>
+      </enum>
+      <enum name="America/Paramaribo">
+        <value value="337"/>
+      </enum>
+      <enum name="Africa/Juba">
+        <value value="338"/>
+      </enum>
+      <enum name="Africa/Sao_Tome">
+        <value value="339"/>
+      </enum>
+      <enum name="America/El_Salvador">
+        <value value="340"/>
+      </enum>
+      <enum name="America/Lower_Princes">
+        <value value="341"/>
+      </enum>
+      <enum name="Asia/Damascus">
+        <value value="342"/>
+      </enum>
+      <enum name="Africa/Mbabane">
+        <value value="343"/>
+      </enum>
+      <enum name="America/Grand_Turk">
+        <value value="344"/>
+      </enum>
+      <enum name="Africa/Ndjamena">
+        <value value="345"/>
+      </enum>
+      <enum name="Indian/Kerguelen">
+        <value value="346"/>
+      </enum>
+      <enum name="Africa/Lome">
+        <value value="347"/>
+      </enum>
+      <enum name="Asia/Bangkok">
+        <value value="348"/>
+      </enum>
+      <enum name="Asia/Dushanbe">
+        <value value="349"/>
+      </enum>
+      <enum name="Pacific/Fakaofo">
+        <value value="350"/>
+      </enum>
+      <enum name="Asia/Dili">
+        <value value="351"/>
+      </enum>
+      <enum name="Asia/Ashgabat">
+        <value value="352"/>
+      </enum>
+      <enum name="Africa/Tunis">
+        <value value="353"/>
+      </enum>
+      <enum name="Pacific/Tongatapu">
+        <value value="354"/>
+      </enum>
+      <enum name="Europe/Istanbul">
+        <value value="355"/>
+      </enum>
+      <enum name="America/Port_of_Spain">
+        <value value="356"/>
+      </enum>
+      <enum name="Pacific/Funafuti">
+        <value value="357"/>
+      </enum>
+      <enum name="Asia/Taipei">
+        <value value="358"/>
+      </enum>
+      <enum name="Africa/Dar_es_Salaam">
+        <value value="359"/>
+      </enum>
+      <enum name="Europe/Kiev">
+        <value value="360"/>
+        <description>
+          <text>most locations</text>
+        </description>
+      </enum>
+      <enum name="Europe/Uzhgorod">
+        <value value="361"/>
+        <description>
+          <text>Ruthenia</text>
+        </description>
+      </enum>
+      <enum name="Europe/Zaporozhye">
+        <value value="362"/>
+        <description>
+          <text>Zaporozh'ye, E Lugansk / Zaporizhia, E Luhansk</text>
+        </description>
+      </enum>
+      <enum name="Europe/Simferopol">
+        <value value="363"/>
+        <description>
+          <text>central Crimea</text>
+        </description>
+      </enum>
+      <enum name="Africa/Kampala">
+        <value value="364"/>
+      </enum>
+      <enum name="Pacific/Johnston">
+        <value value="365"/>
+        <description>
+          <text>Johnston Atoll</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Midway">
+        <value value="366"/>
+        <description>
+          <text>Midway Islands</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Wake">
+        <value value="367"/>
+        <description>
+          <text>Wake Island</text>
+        </description>
+      </enum>
+      <enum name="America/New_York">
+        <value value="368"/>
+        <description>
+          <text>Eastern Time</text>
+        </description>
+      </enum>
+      <enum name="America/Detroit">
+        <value value="369"/>
+        <description>
+          <text>Eastern Time - Michigan - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Kentucky/Louisville">
+        <value value="370"/>
+        <description>
+          <text>Eastern Time - Kentucky - Louisville area</text>
+        </description>
+      </enum>
+      <enum name="America/Kentucky/Monticello">
+        <value value="371"/>
+        <description>
+          <text>Eastern Time - Kentucky - Wayne County</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Indianapolis">
+        <value value="372"/>
+        <description>
+          <text>Eastern Time - Indiana - most locations</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Vincennes">
+        <value value="373"/>
+        <description>
+          <text>Eastern Time - Indiana - Daviess, Dubois, Knox &amp; Martin
+Counties</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Winamac">
+        <value value="374"/>
+        <description>
+          <text>Eastern Time - Indiana - Pulaski County</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Marengo">
+        <value value="375"/>
+        <description>
+          <text>Eastern Time - Indiana - Crawford County</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Petersburg">
+        <value value="376"/>
+        <description>
+          <text>Eastern Time - Indiana - Pike County</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Vevay">
+        <value value="377"/>
+        <description>
+          <text>Eastern Time - Indiana - Switzerland County</text>
+        </description>
+      </enum>
+      <enum name="America/Chicago">
+        <value value="378"/>
+        <description>
+          <text>Central Time</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Tell_City">
+        <value value="379"/>
+        <description>
+          <text>Central Time - Indiana - Perry County</text>
+        </description>
+      </enum>
+      <enum name="America/Indiana/Knox">
+        <value value="380"/>
+        <description>
+          <text>Central Time - Indiana - Starke County</text>
+        </description>
+      </enum>
+      <enum name="America/Menominee">
+        <value value="381"/>
+        <description>
+          <text>Central Time - Michigan - Dickinson, Gogebic, Iron &amp;
+Menominee Counties</text>
+        </description>
+      </enum>
+      <enum name="America/North_Dakota/Center">
+        <value value="382"/>
+        <description>
+          <text>Central Time - North Dakota - Oliver County</text>
+        </description>
+      </enum>
+      <enum name="America/North_Dakota/New_Salem">
+        <value value="383"/>
+        <description>
+          <text>Central Time - North Dakota - Morton County (except Mandan
+area)</text>
+        </description>
+      </enum>
+      <enum name="America/North_Dakota/Beulah">
+        <value value="384"/>
+        <description>
+          <text>Central Time - North Dakota - Mercer County</text>
+        </description>
+      </enum>
+      <enum name="America/Denver">
+        <value value="385"/>
+        <description>
+          <text>Mountain Time</text>
+        </description>
+      </enum>
+      <enum name="America/Boise">
+        <value value="386"/>
+        <description>
+          <text>Mountain Time - south Idaho &amp; east Oregon</text>
+        </description>
+      </enum>
+      <enum name="America/Shiprock">
+        <value value="387"/>
+        <description>
+          <text>Mountain Time - Navajo</text>
+        </description>
+      </enum>
+      <enum name="America/Phoenix">
+        <value value="388"/>
+        <description>
+          <text>Mountain Standard Time - Arizona</text>
+        </description>
+      </enum>
+      <enum name="America/Los_Angeles">
+        <value value="389"/>
+        <description>
+          <text>Pacific Time</text>
+        </description>
+      </enum>
+      <enum name="America/Anchorage">
+        <value value="390"/>
+        <description>
+          <text>Alaska Time</text>
+        </description>
+      </enum>
+      <enum name="America/Juneau">
+        <value value="391"/>
+        <description>
+          <text>Alaska Time - Alaska panhandle</text>
+        </description>
+      </enum>
+      <enum name="America/Sitka">
+        <value value="392"/>
+        <description>
+          <text>Alaska Time - southeast Alaska panhandle</text>
+        </description>
+      </enum>
+      <enum name="America/Yakutat">
+        <value value="393"/>
+        <description>
+          <text>Alaska Time - Alaska panhandle neck</text>
+        </description>
+      </enum>
+      <enum name="America/Nome">
+        <value value="394"/>
+        <description>
+          <text>Alaska Time - west Alaska</text>
+        </description>
+      </enum>
+      <enum name="America/Adak">
+        <value value="395"/>
+        <description>
+          <text>Aleutian Islands</text>
+        </description>
+      </enum>
+      <enum name="America/Metlakatla">
+        <value value="396"/>
+        <description>
+          <text>Metlakatla Time - Annette Island</text>
+        </description>
+      </enum>
+      <enum name="Pacific/Honolulu">
+        <value value="397"/>
+        <description>
+          <text>Hawaii</text>
+        </description>
+      </enum>
+      <enum name="America/Montevideo">
+        <value value="398"/>
+      </enum>
+      <enum name="Asia/Samarkand">
+        <value value="399"/>
+        <description>
+          <text>west Uzbekistan</text>
+        </description>
+      </enum>
+      <enum name="Asia/Tashkent">
+        <value value="400"/>
+        <description>
+          <text>east Uzbekistan</text>
+        </description>
+      </enum>
+      <enum name="Europe/Vatican">
+        <value value="401"/>
+      </enum>
+      <enum name="America/St_Vincent">
+        <value value="402"/>
+      </enum>
+      <enum name="America/Caracas">
+        <value value="403"/>
+      </enum>
+      <enum name="America/Tortola">
+        <value value="404"/>
+      </enum>
+      <enum name="America/St_Thomas">
+        <value value="405"/>
+      </enum>
+      <enum name="Asia/Ho_Chi_Minh">
+        <value value="406"/>
+      </enum>
+      <enum name="Pacific/Efate">
+        <value value="407"/>
+      </enum>
+      <enum name="Pacific/Wallis">
+        <value value="408"/>
+      </enum>
+      <enum name="Pacific/Apia">
+        <value value="409"/>
+      </enum>
+      <enum name="Asia/Aden">
+        <value value="410"/>
+      </enum>
+      <enum name="Indian/Mayotte">
+        <value value="411"/>
+      </enum>
+      <enum name="Africa/Johannesburg">
+        <value value="412"/>
+      </enum>
+      <enum name="Africa/Lusaka">
+        <value value="413"/>
+      </enum>
+      <enum name="Africa/Harare">
+        <value value="414"/>
+      </enum>
+    </type>
+  </typedef>
+</module>
