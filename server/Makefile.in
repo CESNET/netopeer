@@ -51,6 +51,7 @@ dbusconfdir = @DBUSCONF@
 dbusservices = @DBUSSERVICES@
 
 TOPDIR = @CONFIGURE_PWD@
+CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
 CC = @CC@
 DOXYGEN = @DOXYGEN@
 DOXYGEN_CONFIG = Doxyfile
@@ -58,7 +59,10 @@ DOXYGEN_DIR = doxygen
 RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
-INSTALL_DATA = @INSTALL@ -m 644 -o @USER@ -g @GROUP@
+INSTALL_DATA = @INSTALL@ -m 600
+ifeq ($(shell id -u $(USER)),0)
+  INSTALL_OWNER = -o @USER@ -g @GROUP@
+endif
 RPMDIR = RPMBUILD
 
 AGENT = netopeer-agent
@@ -75,6 +79,7 @@ SERVER_LIBS = @SERVER_LIBS@
 SERVER_SRCS =  src/server.c \
 	src/server_operations.c \
 	src/cfgnetopeer-transapi.c \
+	src/netconf-server-transapi.c \
 	@SERVER_SRCS_COMM@
 SERVER_HDRS = src/comm.h \
 	src/server_operations.h \
@@ -83,25 +88,28 @@ SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DMODULES_CFG_DIR=\"$(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
-SUBDIRS = dm_manager
+SUBDIRS = manager
 
-CFGS =	config/datastore.xml \
-	config/netopeer-cfgnetopeer.yin \
+CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/netopeer-cfgnetopeer-data.rng \
 	config/netopeer-cfgnetopeer-gdefs.rng \
-	config/netopeer-cfgnetopeer-schematron.xsl
+	config/netopeer-cfgnetopeer-schematron.xsl \
+	config/ietf-netconf-server.yin \
+	config/ietf-x509-cert-to-name.yin \
+	config/ietf-netconf-server-data.rng \
+	config/ietf-netconf-server-gdefs.rng \
+	config/ietf-netconf-server-schematron.xsl
 	
 CFGS_TAR = $(CFGS) \
+	config/Netopeer.xml.in \
+	config/NETCONF-server.xml.in \
 	config/org.liberouter.netopeer.conf.in \
 	config/org.liberouter.netopeer.server.service.in
 
 all: $(AGENT) $(SERVER) $(SUBDIRS)
-
-config/datastore.xml:
-	touch $@
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
@@ -179,22 +187,50 @@ install: $(SERVER) $(AGENT) $(CFGS)
 	done
 	if test -n "$(dbusconfdir)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
 	fi
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/
+	if test -f config/Netopeer.xml; then \
+		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/Netopeer.xml $(CFGDIR)/modules.conf.d/; \
+	fi
+	if test -f config/NETCONF-server.xml; then \
+		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/NETCONF-server.xml $(CFGDIR)/modules.conf.d/; \
+	fi
+	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
 	for i in $(CFGS); do \
-		$(INSTALL_DATA) $$i $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/;
-	dm_manager/netopeer-dm-manager add -n Netopeer -c urn:cesnet:tmc:netopeer:1.0 \
-		-d $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/netopeer-cfgnetopeer.yin \
-		-r file $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/datastore.xml \
-		-f $(DESTDIR)/$(sysconfdir)/netopeer/modules.conf.d/
+	$(INSTALL) -d $(CFGDIR)/modules.conf.d/;
+	@if test ! -f $(CFGDIR)/sshd_config; then \
+		if test -f /etc/ssh/sshd_config; then \
+			grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
+		else \
+			touch $(CFGDIR)/sshd_config; \
+		fi; \
+		echo "" >> $(CFGDIR)/sshd_config; \
+		echo "# NETCONF SSH Subsystem settings" >> $(CFGDIR)/sshd_config; \
+		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
+	fi
+	chmod 600 $(CFGDIR)/sshd_config;
+	if test -n "$(INSTALL_OWNER)"; then \
+		chown @USER@ $(CFGDIR)/sshd_config; \
+	fi
+	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
+	@if test -n "@TLS@"; then \
+		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
+		rm -rf config/stunnel_config; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
+		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
+		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
+	fi
 
 

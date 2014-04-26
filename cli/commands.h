@@ -15,6 +15,7 @@ char some_msg[4096];
 #endif
 
 int cmd_connect(char* arg);
+int cmd_listen(char* arg);
 int cmd_disconnect(char* arg);
 int cmd_copyconfig (char *arg);
 int cmd_deleteconfig (char *arg);
