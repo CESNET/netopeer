@@ -143,7 +143,7 @@ static char* get_timezone(void)
 	char *line = NULL;
 	size_t len = 0;
 
-	if ((zonename_uci = popen("uci get system.@system[0].zonename", "r")) == NULL) {
+	if ((zonename_uci = popen("uci get system.@system[0].timezone", "r")) == NULL) {
 		return (NULL);
 	}
 
@@ -203,7 +203,7 @@ int transapi_init(xmlDocPtr * running)
 	uname(&uname_s);
 
 	/* get openWRT info */
-	if ((release_f = fopen("/proc/sys/kernel/hostname", "r")) == NULL) {
+	if ((release_f = fopen("/etc/openwrt_release", "r")) == NULL) {
 		return (EXIT_FAILURE);
 	}
 
