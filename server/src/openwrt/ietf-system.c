@@ -143,7 +143,7 @@ static char* get_timezone(void)
 	char *line = NULL;
 	size_t len = 0;
 
-	if ((zonename_uci = popen("uci get system.@system[0].timezone", "r")) == NULL) {
+	if ((zonename_uci = popen("uci get system.@system[0].zonename", "r")) == NULL) {
 		return (NULL);
 	}
 
