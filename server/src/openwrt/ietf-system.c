@@ -13,10 +13,17 @@
 #include <errno.h>
 #include <libnetconf_xml.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/sysinfo.h>
+
+#ifdef __GNUC__
+#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#	define UNUSED(x) UNUSED_ ## x
+#endif
 
 /* transAPI version which must be compatible with libnetconf */
 int transapi_version = 4;
@@ -46,6 +53,55 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
+struct tmz {
+	int minute_offset;
+	char* zonename;
+};
+
+struct tmz timezones[] = {
+//	{-720, "Etc/GMT-12"},
+	{-660, "Pacific/Midway"},     /* -11:00 */
+	{-600, "Pacific/Honolulu"},   /* -10:00 */
+	{-570, "Pacific/Marquesas"},  /* -09:30 */
+	{-540, "Pacific/Gambier"},    /* -09:00 */
+	{-480, "Pacific/Pitcairn"},   /* -08:00 */
+	{-420, "America/Phoenix"},    /* -07:00 */
+	{-360, "America/Belize"},     /* -06:00 */
+	{-300, "America/Bogota"},     /* -05:00 */
+	{-270, "America/Caracas"},    /* -04:30 */
+	{-240, "America/Aruba"},      /* -04:00 */
+	{-210, "Canada/Newfoundland"},/* -03:30 */
+	{-180, "Atlantic/Stanley"},   /* -03:00 */
+	{-120, "America/Noronha"},    /* -02:00 */
+	{-60,  "Atlantic/Cape Verde"},/* -01:00 */
+	{0,    "UTC"},                /*  00:00 */
+	{60,  "Africa/Tunis"},        /* +01:00 */
+	{120, "Africa/Johannesburg"}, /* +02:00 */
+	{180, "Asia/Baghdad"},        /* +03:00 */
+	{210, "Asia/Tehran"},         /* +03:30 */
+	{240, "Asia/Dubai"},          /* +04:00 */
+	{270, "Asia/Kabul"},          /* +04:30 */
+	{300, "Asia/Karachi"},        /* +05:00 */
+	{330, "Asia/Colombo"},        /* +05:30 */
+	{345, "Asia/Kathmandu"},      /* +05:45 */
+	{360, "Asia/Dhaka"},          /* +06:00 */
+	{390, "Asia/Rangoon"},        /* +06:30 */
+	{420, "Asia/Bangkok"},        /* +07:00 */
+	{480, "Asia/Hong Kong"},      /* +08:00 */
+	{525, "Australia/Eucla"},     /* +08:45 */
+	{540, "Asia/Tokyo"},          /* +09:00 */
+	{570, "Australia/Darwin"},    /* +09:30 */
+	{600, "Australia/Brisbane"},  /* +10:00 */
+	{630, "Australia/Lord Howe"}, /* +10:30 */
+	{660, "Pacific/Noumea"},      /* +11:00 */
+	{690, "Pacific/Norfolk"},     /* +11:30 */
+	{720, "Asia/Kamchatka"},      /* +12:00 */
+	{765, "Pacific/Chatham"},     /* +12:45 */
+	{780, "Pacific/Enderbury"},   /* +13:00 */
+	{840, "Pacific/Kiritimati"},  /* +14:00 */
+	{0, NULL}
+};
+
 static int fail(struct nc_err** error, char* msg, int ret) {
 	if (error != NULL) {
 		*error = nc_err_new(NC_ERR_OP_FAILED);
@@ -60,6 +116,71 @@ static int fail(struct nc_err** error, char* msg, int ret) {
 	}
 
 	return ret;
+}
+
+static time_t datetime2time(const char* datetime, long int *offset)
+{
+	struct tm time;
+	char* dt;
+	int i;
+	long int shift, shift_m;
+	time_t retval;
+
+	if (datetime == NULL) {
+		return (-1);
+	} else {
+		dt = strdup(datetime);
+	}
+
+	if (strlen(dt) < 20 || dt[4] != '-' || dt[7] != '-' || dt[13] != ':' || dt[16] != ':') {
+		nc_verb_error("Wrong date time format not compliant to RFC 3339.");
+		free(dt);
+		return (-1);
+	}
+
+	memset(&time, 0, sizeof(struct tm));
+	time.tm_year = atoi(&dt[0]) - 1900;
+	time.tm_mon = atoi(&dt[5]) - 1;
+	time.tm_mday = atoi(&dt[8]);
+	time.tm_hour = atoi(&dt[11]);
+	time.tm_min = atoi(&dt[14]);
+	time.tm_sec = atoi(&dt[17]);
+
+	retval = timegm(&time);
+
+	/* apply offset */
+	i = 19;
+	if (dt[i] == '.') { /* we have fractions to skip */
+		for (i++; isdigit(dt[i]); i++);
+	}
+	if (dt[i] == 'Z' || dt[i] == 'z') {
+		/* zero shift */
+		shift = 0;
+	} else if (dt[i+3] != ':') {
+		/* wrong format */
+		nc_verb_error("Wrong date time shift format not compliant to RFC 3339.");
+		free(dt);
+		return (-1);
+	} else {
+		shift = strtol(&dt[i], NULL, 10);
+		shift = shift * 60 * 60; /* convert from hours to seconds */
+		shift_m = strtol(&dt[i+4], NULL, 10) * 60; /* includes conversion from minutes to seconds */
+		/* correct sign */
+		if (shift < 0) {
+			shift_m *= -1;
+		}
+		/* connect hours and minutes of the shift */
+		shift = shift + shift_m;
+	}
+	/* we have to shift to the opposite way to correct the time */
+	retval -= shift;
+
+	if (offset) {
+		*offset = shift / 60; /* convert shift in seconds to minutes offset */
+	}
+
+	free(dt);
+	return (retval);
 }
 
 static char* time2datetime(time_t time)
@@ -117,6 +238,29 @@ static const char* get_node_content(const xmlNodePtr node) {
 	return ((char*)(node->children->content));
 }
 
+static int set_hostname(const char* name)
+{
+	FILE* hostname_f;
+
+	if (name == NULL || strlen(name) == 0) {
+		return (EXIT_FAILURE);
+	}
+
+	if ((hostname_f = fopen("/proc/sys/kernel/hostname", "w")) == NULL) {
+		return (EXIT_FAILURE);
+	}
+
+	if (fprintf(hostname_f, "%s", name) <= 0) {
+		nc_verb_error("Unable to write hostname");
+		fclose(hostname_f);
+		return (EXIT_FAILURE);
+	}
+
+	fclose(hostname_f);
+
+	return (EXIT_SUCCESS);
+}
+
 static char* get_hostname(void)
 {
 	FILE* hostname_f;
@@ -143,18 +287,41 @@ static char* get_timezone(void)
 	char *line = NULL;
 	size_t len = 0;
 
-	if ((zonename_uci = popen("uci get system.@system[0].zonename", "r")) == NULL) {
+	if ((zonename_uci = popen("uci get system.@system[0].zonename", "r")) == NULL &&
+		(zonename_uci = popen("uci get system.@system[0].timezone", "r")) == NULL) {
 		return (NULL);
 	}
 
 	if (getline(&line, &len, zonename_uci) == -1 || len == 0) {
 		nc_verb_error("Unable to read zonename (%s)", strerror(errno));
 		free(line);
+		pclose(zonename_uci);
 		return (NULL);
 	}
 
 	pclose(zonename_uci);
 	return (line);
+}
+
+static int set_timezone(const char* zone)
+{
+	char* command = NULL;
+	char* result = NULL;
+
+	if (zone == NULL || strlen(zone) == 0) {
+		return (EXIT_FAILURE);
+	}
+
+	asprintf(&command, "uci set system.@system[0].zonename=%s; uci commit system;", zone);
+	system(command);
+
+	result = get_timezone();
+	if (result == NULL) {
+		return (EXIT_FAILURE);
+	}
+	free(result);
+
+	return (EXIT_SUCCESS);
 }
 
 static struct utsname uname_s;
@@ -209,9 +376,11 @@ int transapi_init(xmlDocPtr * running)
 
 	while (getline(&line, &len, release_f) != -1) {
 		if (strncmp(line, "DISTRIB_ID=", 11) == 0) {
+			line[len-1] = '\0'; /* remove newline character */
 			sysname = strdup(line+11);
 			done++;
 		} else if (strncmp(line, "DISTRIB_REVISION=", 17) == 0) {
+			line[len-1] = '\0'; /* remove newline character */
 			release = strdup(line+17);
 			done++;
 		}
@@ -240,21 +409,19 @@ int transapi_init(xmlDocPtr * running)
 	xmlSetNs(running_root, ns);
 
 	/* hostname */
-	if ((hostname = get_hostname()) == NULL) {
-		return (EXIT_FAILURE);
+	if ((hostname = get_hostname()) != NULL) {
+		xmlNewChild(running_root, NULL, BAD_CAST "hostname",BAD_CAST hostname);
+		free(hostname);
 	}
-	xmlNewChild(running_root, NULL, BAD_CAST "hostname",BAD_CAST hostname);
-	free(hostname);
 
 	/* clock */
-	clock = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
 
 	/* timezone-location */
-	if ((zonename = get_timezone()) == NULL) {
-		return (EXIT_FAILURE);
+	if ((zonename = get_timezone()) != NULL) {
+		clock = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
+		xmlNewChild(clock, NULL, BAD_CAST "timezone-location", BAD_CAST zonename);
+		free(zonename);
 	}
-	xmlNewChild(clock, NULL, BAD_CAST "timezone-location", BAD_CAST zonename);
-	free(zonename);
 
 	return EXIT_SUCCESS;
 }
@@ -275,7 +442,7 @@ void transapi_close(void)
  * @param[out] err  Double poiter to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
+xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
 {
 	xmlNodePtr container_cur, state_root;
 	xmlDocPtr state_doc;
@@ -325,27 +492,21 @@ struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_hostname (void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-#if 0
 	const char* hostname;
-	char* msg, *tmp;
+	char* msg;
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD) {
+	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
 		hostname = get_node_content(node);
 
-		if (nclc_set_hostname(hostname) != EXIT_SUCCESS) {
+		if (set_hostname(hostname) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the hostname.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_REM) {
-		/* Nothing for us to do */
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the hostname callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
+
 	}
 
-#endif
 	return EXIT_SUCCESS;
 }
 
@@ -360,29 +521,21 @@ int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xml
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-#if 0
-	int ret;
+	const char* zone;
 	char* msg;
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD) {
-		ret = nclc_set_timezone(get_node_content(node));
-		if (ret == 1) {
-			asprintf(&msg, "Timezone %s was not found.", get_node_content(node));
-			return fail(error, msg, EXIT_FAILURE);
-		} else if (ret == 2) {
-			asprintf(&msg, "Permission to write the new timezone denied.");
+	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
+		zone = get_node_content(node);
+
+		if (set_timezone(zone) != EXIT_SUCCESS) {
+			asprintf(&msg, "Failed to set the timezone.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_REM) {
-		/* Nothing for us to do */
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-location callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
+
 	}
 
-#endif
 	return EXIT_SUCCESS;
 }
 
@@ -397,29 +550,28 @@ int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-#if 0
-	int ret;
+	int offset;
 	char* msg;
+	int i;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		ret = nclc_set_gmt_offset(atoi(get_node_content(node)));
-		if (ret == 1) {
-			asprintf(&msg, "Timezone %s does not exist.", get_node_content(node));
-			return fail(error, msg, EXIT_FAILURE);
-		} else if (ret == 2) {
-			asprintf(&msg, "Permission to write the new timezone denied.");
+	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
+		offset = atoi(get_node_content(node));
+
+		for (i = 0; timezones[i].zonename != NULL; ++i) {
+			if (timezones[i].minute_offset == offset) {
+				break;
+			}
+		}
+
+		if (set_timezone(timezones[i].zonename) != EXIT_SUCCESS) {
+			asprintf(&msg, "Failed to set the timezone.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_REM) {
-		/* Nothing for us to do */
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-utc-offset callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
+
 	}
 
-#endif
 	return EXIT_SUCCESS;
 }
 
@@ -448,170 +600,54 @@ struct transapi_data_callbacks clbks =  {
 
 nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 {
-#if 0
 	struct nc_err* err;
 	xmlNodePtr current_datetime = input[0];
-	char* date = NULL, *time = NULL, *timezone = NULL, *msg, *ptr;
-	int ret, offset;
-
-	switch (nclc_ntp_status()) {
-	case 1:
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_APPTAG, "ntp-active");
-		nc_verb_verbose("RPC set-current-datetime requested with NTP running.");
-		return nc_reply_error(err);
-
-	case 0:
-		/* NTP not running */
-		break;
-
-	case -1:
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_MSG, "Failed to check NTP status.");
-		nc_verb_error("Failed to check NTP status.");
-		return nc_reply_error(err);
-	}
-
-	/* current_datetime format
-
-      1985-04-12T23:20:50.52Z
-
-   This represents 20 minutes and 50.52 seconds after the 23rd hour of
-   April 12th, 1985 in UTC.
-
-      1996-12-19T16:39:57-08:00
-
-   This represents 39 minutes and 57 seconds after the 16th hour of
-   December 19th, 1996 with an offset of -08:00 from UTC (Pacific
-   Standard Time).  Note that this is equivalent to 1996-12-20T00:39:57Z
-   in UTC.
-
-      1990-12-31T23:59:60Z
-
-   This represents the leap second inserted at the end of 1990.
-
-      1990-12-31T15:59:60-08:00
-	*/
-
-	/* Date */
-	date = strdup(get_node_content(current_datetime));
-	if (strchr(date, 'T') == NULL) {
-		asprintf(&msg, "Invalid date-and-time format (%s).", get_node_content(current_datetime));
-		goto error;
-	}
-	*strchr(date, 'T') = '\0';
-	ret = nclc_set_date(date);
-	if (ret == 1 || ret == 2) {
-		asprintf(&msg, "Invalid date format (%s).", date);
-		goto error;
-	} else if (ret == 3) {
-		asprintf(&msg, "Denied permission to change the date.");
-		goto error;
-	}
-	free(date);
-
-	/* Time */
-	time = strdup(strchr(get_node_content(current_datetime), 'T')+1);
-	if (strlen(time) < 8) {
-		asprintf(&msg, "Invalid date-and-time format (%s).", get_node_content(current_datetime));
-		goto error;
-	}
-	time[8] = '\0';
-	ret = nclc_set_time(time);
-	if (ret == 1 || ret == 2) {
-		asprintf(&msg, "Invalid time format (%s).", time);
-		goto error;
-	} else if (ret == 3) {
-		asprintf(&msg, "Denied permission to change the time.");
-		goto error;
-	}
-	free(time);
-
-	/* Timezone */
-	timezone = strdup(strchr(get_node_content(current_datetime), 'T')+9);
-	if (strcmp(timezone, "Z") == 0) {
-		offset = 0;
-	} else if (((timezone[0] != '+') && (timezone[0] != '-')) || (strlen(timezone) != 6)) {
-		asprintf(&msg, "Invalid timezone format (%s).", timezone);
-		goto error;
-	} else {
-		offset = strtol(timezone+1, &ptr, 10);
-		if (*ptr != ':') {
-			asprintf(&msg, "Invalid timezone format (%s).", timezone);
-			goto error;
-		}
-		offset *= 60;
-		offset += strtol(timezone+4, &ptr, 10);
-		if (*ptr != '\0') {
-			asprintf(&msg, "Invalid timezone format (%s).", timezone);
-			goto error;
-		}
-		if (timezone[0] == '-') {
-			offset = -offset;
-		}
-	}
-	ret = nclc_set_gmt_offset(offset);
-	if (ret == 1) {
-		asprintf(&msg, "Could not find the \"localtime\" file.");
-		goto error;
-	} else if (ret == 2) {
-		asprintf(&msg, "Denied permission to change the timezone.");
-		goto error;
-	}
-	free(timezone);
-
-#endif
-	return nc_reply_ok();
-#if 0
-error:
-	if (date != NULL) {
-		free(date);
-	}
-	if (time != NULL) {
-		free(time);
-	}
-	if (timezone != NULL) {
-		free(timezone);
-	}
-	err = nc_err_new(NC_ERR_OP_FAILED);
-	nc_err_set(err, NC_ERR_PARAM_MSG, msg);
-	nc_verb_error(msg);
-	free(msg);
-	return nc_reply_error(err);
-#endif
-}
-nc_reply * rpc_system_restart (xmlNodePtr input[])
-{
-#if 0
+	long int offset = 0;
+	int i;
 	char* msg;
-	struct nc_err* err;
+	time_t t;
 
-	if (run_shutdown(false, &msg) != EXIT_SUCCESS) {
+	/* we suppose, that NTP is not running */
+
+	/* convert input string */
+	t = datetime2time(get_node_content(current_datetime), &offset);
+
+	/* set timezone */
+	for (i = 0; timezones[i].zonename != NULL; ++i) {
+		if (timezones[i].minute_offset == offset) {
+			break;
+		}
+	}
+
+	if (set_timezone(timezones[i].zonename) != EXIT_SUCCESS) {
+		asprintf(&msg, "Failed to set the timezone.");
 		err = nc_err_new(NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_MSG, msg);
 		nc_verb_error(msg);
 		free(msg);
 		return nc_reply_error(err);
 	}
-#endif
-	return nc_reply_ok();
-}
-nc_reply * rpc_system_shutdown (xmlNodePtr input[])
-{
-#if 0
-	char* msg;
-	struct nc_err* err;
 
-	if (run_shutdown(true, &msg) != EXIT_SUCCESS) {
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_MSG, msg);
-		nc_verb_error(msg);
-		free(msg);
-		return nc_reply_error(err);
-	}
-#endif
+	/* set time */
+	stime(&t);
+
 	return nc_reply_ok();
 }
+
+nc_reply * rpc_system_restart (xmlNodePtr UNUSED(input[]))
+{
+	system("reboot -d 1");
+
+	return nc_reply_ok();
+}
+
+nc_reply * rpc_system_shutdown (xmlNodePtr UNUSED(input[]))
+{
+	system("poweroff -d 1");
+
+	return nc_reply_ok();
+}
+
 /*
 * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
 * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
