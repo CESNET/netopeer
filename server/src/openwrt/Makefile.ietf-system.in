@@ -92,13 +92,13 @@ install: $(NAME).so $(CFGS)
 	for i in $(CFGS); do \
 		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/$(NAME)/; \
 	done
-	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/datastore.xml \
+	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/ \
 		add --name $(NAME) \
 		--model $(CFGDIR)/$(NAME)/ietf-system.yin \
 		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
 		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
 		--features 
-	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/cfgnetopeer/datastore.xml \
+	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/ \
 		add-augment --name $(NAME) \
 		--model $(CFGDIR)/$(NAME)/iana-timezones.yin
 
