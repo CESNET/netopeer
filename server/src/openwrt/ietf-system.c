@@ -521,7 +521,7 @@ int callback_systemns_system_systemns_hostname (void** UNUSED(data), XMLDIFF_OP 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_location(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	const char* zone;
 	char* msg;
@@ -550,7 +550,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int offset;
 	char* msg;
@@ -585,8 +585,8 @@ struct transapi_data_callbacks clbks =  {
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-location/systemns:timezone-location", .func = callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset}
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-location", .func = callback_systemns_system_systemns_clock_systemns_timezone_location},
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset}
 	}
 };
 
