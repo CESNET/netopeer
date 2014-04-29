@@ -360,7 +360,6 @@ int transapi_init(xmlDocPtr * running)
 	xmlNsPtr ns;
 	char *hostname, *zonename;
 	char *line = NULL;
-	size_t len = 0;
 	FILE *release_f = NULL;
 	int done = 0;
 	struct sysinfo s_info;
@@ -374,13 +373,13 @@ int transapi_init(xmlDocPtr * running)
 		return (EXIT_FAILURE);
 	}
 
-	while (getline(&line, &len, release_f) != -1) {
+	while (getline(&line, NULL, release_f) != -1) {
 		if (strncmp(line, "DISTRIB_ID=", 11) == 0) {
-			line[len-1] = '\0'; /* remove newline character */
+			line[strlen(line)-1] = '\0'; /* remove newline character */
 			sysname = strdup(line+11);
 			done++;
 		} else if (strncmp(line, "DISTRIB_REVISION=", 17) == 0) {
-			line[len-1] = '\0'; /* remove newline character */
+			line[strlen(line)-1] = '\0'; /* remove newline character */
 			release = strdup(line+17);
 			done++;
 		}
