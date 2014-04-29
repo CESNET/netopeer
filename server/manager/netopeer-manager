@@ -178,6 +178,7 @@ try:
 			running = datastores.appendChild(config.createElement('running'))
 			running.setAttribute('lock', '')
 			startup = datastores.appendChild(config.createElement('startup'))
+			startup.setAttribute('lock', '')
 			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
 			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
 			modules = netopeer.appendChild(config.createElement('modules'))
