@@ -531,9 +531,9 @@ static void process_operation (DBusConnection *conn, DBusMessage *msg)
 	if (msg) {
 		session = (struct session_info *)srv_get_session (dbus_message_get_sender(msg));
 		if (session == NULL) {/* in case session was closed but client/agent is still sending messages */
-			err = nc_err_new (NC_ERR_INVALID_VALUE);
-			nc_err_set(err, NC_ERR_PARAM_MSG, "Your session is no longer valid!");
-			reply = nc_reply_error (err);
+			nc_verb_error("Received message from invalid session.");
+			_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Your session is no longer valid!");
+			return;
 		} else if (!dbus_message_iter_init(msg, &args)) { /* can not initialize message iterator */
 			nc_verb_error("process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
 			_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
