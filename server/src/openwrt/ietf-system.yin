@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module name="ietf-system"
         xmlns="urn:ietf:params:xml:ns:yang:yin:1"
-        xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system">
+        xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system"
+        xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types"
+        xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types"
+        xmlns:nacm="urn:ietf:params:xml:ns:yang:ietf-netconf-acm">
   <namespace uri="urn:ietf:params:xml:ns:yang:ietf-system"/>
   <prefix value="sys"/>
   <import module="ietf-yang-types">
@@ -13,9 +16,6 @@
   <import module="ietf-netconf-acm">
     <prefix value="nacm"/>
   </import>
-  <import module="iana-timezones">
-    <prefix value="ianatz"/>
-  </import>
   <organization>
     <text>IETF NETMOD (NETCONF Data Modeling Language) Working Group</text>
   </organization>
@@ -23,14 +23,17 @@
     <text>WG Web:   &lt;http://tools.ietf.org/wg/netmod/&gt;
 WG List:  &lt;mailto:netmod@ietf.org&gt;
 
-WG Chair: David Kessens
-          &lt;mailto:david.kessens@nsn.com&gt;
+WG Chair: Thomas Nadeau
+          &lt;mailto:tnadeau@lucidvision.com&gt;
 
 WG Chair: Juergen Schoenwaelder
           &lt;mailto:j.schoenwaelder@jacobs-university.de&gt;
 
 Editor:   Andy Bierman
-          &lt;mailto:andy@yumaworks.com&gt;</text>
+          &lt;mailto:andy@yumaworks.com&gt;
+
+Editor:   Martin Bjorklund
+          &lt;mailto:mbj@tail-f.com&gt;</text>
   </contact>
   <description>
     <text>This module contains a collection of YANG definitions for the
@@ -41,7 +44,7 @@ time-of-day management, user management, DNS resolver
 configuration, and some protocol operations for system
 management.
 
-Copyright (c) 2013 IETF Trust and the persons identified as
+Copyright (c) 2014 IETF Trust and the persons identified as
 authors of the code.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or
@@ -54,7 +57,7 @@ Relating to IETF Documents
 This version of this YANG module is part of RFC XXXX; see
 the RFC itself for full legal notices.</text>
   </description>
-  <revision date="2013-11-07">
+  <revision date="2014-02-18">
     <description>
       <text>Initial revision.</text>
     </description>
@@ -62,6 +65,20 @@ the RFC itself for full legal notices.</text>
       <text>RFC XXXX: A YANG Data Model for System Management</text>
     </reference>
   </revision>
+  <typedef name="timezone-name">
+    <type name="string"/>
+    <description>
+      <text>A timezone name as used by the Time Zone Database, sometimes
+referred to as the 'Olson Database'.
+
+The exact set of valid values is an implementation-specific
+matter.  Client discovery of the exact set of time zone names
+for a particular server is out of scope.</text>
+    </description>
+    <reference>
+      <text>RFC 6557: Procedures for Maintaining the Time Zone Database</text>
+    </reference>
+  </typedef>
   <typedef name="crypt-hash">
     <type name="string">
       <pattern value="$0$.*|$1$[a-zA-Z0-9./]{1,8}$[a-zA-Z0-9./]{22}|$5$(rounds=\d+$)?[a-zA-Z0-9./]{1,16}$[a-zA-Z0-9./]{43}|$6$(rounds=\d+$)?[a-zA-Z0-9./]{1,16}$[a-zA-Z0-9./]{86}"/>
@@ -192,16 +209,14 @@ This is a 'feature' since many implementations do not support
 any other port than the default port.</text>
     </description>
   </feature>
-  <feature name="timezone-location">
+  <feature name="timezone-name">
     <description>
       <text>Indicates that the local timezone on the device
 can be configured to use the TZ database
 to set the timezone and manage daylight savings time.</text>
     </description>
     <reference>
-      <text>TZ Database  http://www.twinsun.com/tz/tz-link.htm
-Maintaining the Timezone Database
-  RFC 6557 (BCP 175)</text>
+      <text>RFC 6557: Procedures for Maintaining the Time Zone Database</text>
     </reference>
   </feature>
   <feature name="dns-udp-tcp-port">
@@ -270,9 +285,12 @@ server.</text>
       <type name="string"/>
       <description>
         <text>The administrator contact information for the system.
-The server MAY restrict the size and characters in
-order to maintain compatibility with the sysContact
-MIB object.</text>
+
+A server implementation MAY map this leaf to the sysContact
+MIB object.  Such an implementation needs to use some
+mechanism to handle the differences in size and characters
+allowed between this leaf and sysContact.  The definition of
+such a mechanism is outside the scope of this document.</text>
       </description>
       <reference>
         <text>RFC 3418: Management Information Base (MIB) for the
@@ -290,9 +308,13 @@ label, or the fully qualified domain name of the host.</text>
     <leaf name="location">
       <type name="string"/>
       <description>
-        <text>The system location. The server MAY restrict the size
-and characters in order to maintain compatibility with
-the sysLocation MIB object.</text>
+        <text>The system location.
+
+A server implementation MAY map this leaf to the sysLocation
+MIB object.  Such an implementation needs to use some
+mechanism to handle the differences in size and characters
+allowed between this leaf and sysLocation.  The definition
+of such a mechanism is outside the scope of this document.</text>
       </description>
       <reference>
         <text>RFC 3418: Management Information Base (MIB) for the
@@ -308,13 +330,13 @@ the sysLocation MIB object.</text>
         <description>
           <text>The system timezone information.</text>
         </description>
-        <case name="timezone-location">
-          <if-feature name="timezone-location"/>
-          <leaf name="timezone-location">
-            <type name="ianatz:iana-timezone"/>
+        <case name="timezone-name">
+          <if-feature name="timezone-name"/>
+          <leaf name="timezone-name">
+            <type name="timezone-name"/>
             <description>
-              <text>The TZ database location identifier string
-to use for the system, such as 'Europe/Stockholm'.</text>
+              <text>The TZ database name to use for the system, such
+as 'Europe/Stockholm'.</text>
             </description>
           </leaf>
         </case>
@@ -460,6 +482,7 @@ a host name.</text>
         <ordered-by value="user"/>
         <description>
           <text>List of the DNS servers that the resolver should query.
+
 When the resolver is invoked by a calling application, it
 sends the query to the first name server in this list.  If
 no response has been received within 'timeout' seconds,
@@ -675,11 +698,15 @@ a RADIUS server must be configured.</text>
         </must>
         <ordered-by value="user"/>
         <description>
-          <text>When the device authenticates a user with
-a password, it tries the authentication methods in this
-leaf-list in order.  If authentication with one method
-fails, the next method is used.  If no method succeeds,
-the user is denied access.
+          <text>When the device authenticates a user with a password,
+it tries the authentication methods in this leaf-list in
+order.  If authentication with one method fails, the next
+method is used.  If no method succeeds, the user is
+denied access.
+
+An empty user-authentication-order leaf-list still allows
+authentication of users using mechanisms that do not
+involve a password.
 
 If the 'radius-authentication' feature is advertised by
 the NETCONF server, the 'radius' identity can be added to

@@ -5,9 +5,6 @@
 			<path>@sysconfdir@/netopeer/ietf-system/ietf-system.yin</path>
 			<transapi>@sysconfdir@/netopeer/ietf-system/ietf-system.so</transapi>
 		</model-main>
-		<model>
-			<path>@sysconfdir@/netopeer/ietf-system/iana-timezones.yin</path>
-		</model>
 	</data-models>
 	<repo>
 		<type>file</type>

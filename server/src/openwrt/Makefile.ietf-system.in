@@ -67,7 +67,6 @@ SRCS =	ietf-system.c
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 CFGS =	ietf-system.yin \
-	iana-timezones.yin \
 	ietf-system.xml
 
 all: $(NAME)
@@ -98,7 +97,4 @@ install: $(NAME).so $(CFGS)
 		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
 		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
 		--features 
-	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/ \
-		add-augment --name $(NAME) \
-		--model $(CFGDIR)/$(NAME)/iana-timezones.yin
 
