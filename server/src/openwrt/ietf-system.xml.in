@@ -4,6 +4,7 @@
 		<model-main>
 			<path>@sysconfdir@/netopeer/ietf-system/ietf-system.yin</path>
 			<transapi>@sysconfdir@/netopeer/ietf-system/ietf-system.so</transapi>
+			<feature>timezone-name</feature>
 		</model-main>
 	</data-models>
 	<repo>
