@@ -611,6 +611,7 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 	/* convert input string */
 	t = datetime2time(get_node_content(current_datetime), &offset);
 
+#if 0
 	/* set timezone */
 	for (i = 0; timezones[i].zonename != NULL; ++i) {
 		if (timezones[i].minute_offset == offset) {
@@ -626,6 +627,7 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 		free(msg);
 		return nc_reply_error(err);
 	}
+#endif
 
 	/* set time */
 	stime(&t);
