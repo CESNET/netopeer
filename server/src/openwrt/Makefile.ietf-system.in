@@ -96,5 +96,5 @@ install: $(NAME).so $(CFGS)
 		--model $(CFGDIR)/$(NAME)/ietf-system.yin \
 		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
 		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
-		--features 
+		--features timezone-name
 
