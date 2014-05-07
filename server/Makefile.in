@@ -111,6 +111,9 @@ CFGS_TAR = $(CFGS) \
 
 all: $(AGENT) $(SERVER) $(SUBDIRS)
 
+replace: config/Netopeer.xml
+	sed -i.bak -e 's|$${prefix}|$(prefix)|g' $^
+
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
 	@$(MAKE) -C $@
@@ -177,7 +180,7 @@ distclean:
 	rm -rf $(RPMDIR)
 
 .PHONY: install
-install: $(SERVER) $(AGENT) $(CFGS)
+install: $(SERVER) $(AGENT) $(CFGS) replace
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
