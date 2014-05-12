@@ -179,9 +179,6 @@ try:
 			running.setAttribute('lock', '')
 			startup = datastores.appendChild(config.createElement('startup'))
 			startup.setAttribute('lock', '')
-			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
-			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
-			modules = netopeer.appendChild(config.createElement('modules'))
 			
 		list = listModules(config)
 		for i in list:
@@ -190,7 +187,13 @@ try:
 				exit(1)
 		
 		startup = config.getElementsByTagName('startup')[0]
-		modules = startup.getElementsByTagName('modules')[0]
+		try:
+			modules = startup.getElementsByTagName('modules')[0]
+		except IndexError:
+			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
+			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
+			modules = netopeer.appendChild(config.createElement('modules'))
+
 		module = modules.appendChild(config.createElement('module'))
 		
 		node = module.appendChild(config.createElement('name'))
