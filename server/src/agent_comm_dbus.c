@@ -72,7 +72,7 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	DBusError err;
 	DBusMessage * msg, *reply;
 	DBusMessageIter args;
-	char** caps = NULL;
+	char** caps = NULL, *tmp_cap;
 	uint16_t num_caps = 0;
 	int i = 0;
 	int boolean = 1;
@@ -127,7 +127,8 @@ char** comm_get_srv_cpblts(conn_t* conn)
 		caps[num_caps] = NULL;
 		while (i < num_caps) {
 			dbus_message_iter_next(&args);
-			dbus_message_iter_get_basic(&args, &caps[i]);
+			dbus_message_iter_get_basic(&args, &tmp_cap);
+			caps[i] = strdup(tmp_cap);
 			i++;
 		}
 	}
