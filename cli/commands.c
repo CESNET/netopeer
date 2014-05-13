@@ -59,7 +59,9 @@
 
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
-#include <libnetconf_tls.h>
+#ifdef ENABLE_TLS
+#	include <libnetconf_tls.h>
+#endif
 
 #include "commands.h"
 #include "configuration.h"
@@ -1709,7 +1711,11 @@ int cmd_unlock (char *arg)
 
 void cmd_listen_help ()
 {
+#ifdef ENABLE_TLS
 	fprintf (stdout, "listen [--help] [--tls <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
+#else
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+#endif
 }
 
 #define DEFAULT_PORT_CH_SSH 6666
@@ -1718,7 +1724,10 @@ void cmd_listen_help ()
 int cmd_listen (char* arg)
 {
 	static int listening = 0;
-	char *user = NULL, *cert = NULL, *key = NULL;
+	char *user = NULL;
+#ifdef ENABLE_TLS
+	char *cert = NULL, *key = NULL;
+#endif
 	unsigned short port = 0;
 	int c;
 	int timeout = ACCEPT_TIMEOUT;
@@ -1727,8 +1736,10 @@ int cmd_listen (char* arg)
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
+#ifdef ENABLE_TLS
 			{"tls", 1, 0, 't'},
 			{"key", 1, 0, 'k'},
+#endif
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1758,12 +1769,10 @@ int cmd_listen (char* arg)
 		case 'p':
 			port = (unsigned short) atoi (optarg);
 			break;
-		case 'k':
-			key = optarg;
-			break;
 		case 'l':
 			user = optarg;
 			break;
+#ifdef ENABLE_TLS
 		case 't':
 			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
 				if (port == 0) {
@@ -1772,6 +1781,10 @@ int cmd_listen (char* arg)
 			}
 			cert = optarg;
 			break;
+		case 'k':
+			key = optarg;
+			break;
+#endif
 		default:
 			ERROR("listen", "unknown option -%c.", c);
 			cmd_listen_help ();
@@ -1782,12 +1795,14 @@ int cmd_listen (char* arg)
 	if (port == 0) {
 		port = DEFAULT_PORT_CH_SSH;
 	}
+#ifdef ENABLE_TLS
 	if (cert) {
 		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
 	}
+#endif
 
 	/* create the session */
 	if (!listening) {
@@ -1817,14 +1832,21 @@ int cmd_listen (char* arg)
 
 void cmd_connect_help ()
 {
+#ifdef ENABLE_TLS
 	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls <cert_path> [--key <key_path>]] host\n");
+#else
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
+#endif
 }
 
 #define DEFAULT_PORT_SSH 830
 #define DEFAULT_PORT_TLS 6513
 int cmd_connect (char* arg)
 {
-	char *host = NULL, *user = NULL, *cert = NULL, *key = NULL;
+	char *host = NULL, *user = NULL;
+#ifdef ENABLE_TLS
+	char *cert = NULL, *key = NULL;
+#endif
 	int hostfree = 0;
 	unsigned short port = 0;
 	int c;
@@ -1833,8 +1855,10 @@ int cmd_connect (char* arg)
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
+#ifdef ENABLE_TLS
 			{"tls", 1, 0, 't'},
 			{"key", 1, 0, 'k'},
+#endif
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1864,12 +1888,10 @@ int cmd_connect (char* arg)
 		case 'p':
 			port = (unsigned short) atoi (optarg);
 			break;
-		case 'k':
-			key = optarg;
-			break;
 		case 'l':
 			user = optarg;
 			break;
+#ifdef ENABLE_TLS
 		case 't':
 			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
 				if (port == 0) {
@@ -1878,6 +1900,10 @@ int cmd_connect (char* arg)
 			}
 			cert = optarg;
 			break;
+		case 'k':
+			key = optarg;
+			break;
+#endif
 		default:
 			ERROR("connect", "unknown option -%c.", c);
 			cmd_connect_help ();
@@ -1888,12 +1914,14 @@ int cmd_connect (char* arg)
 	if (port == 0) {
 		port = DEFAULT_PORT_SSH;
 	}
+#ifdef ENABLE_TLS
 	if (cert) {
 		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
 	}
+#endif
 	if (optind == cmd.count) {
 		/* get mandatory argument */
 		host = malloc (sizeof(char) * BUFFER_SIZE);
