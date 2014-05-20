@@ -351,8 +351,9 @@ AX_PTHREAD([
 	AC_MSG_ERROR([Missing POSIX threads support.])
 )
 
-# remove backup file
+# remove backup files
 rm -f config/Netopeer.xml.orig
+rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 

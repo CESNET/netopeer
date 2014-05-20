@@ -114,8 +114,12 @@ all: $(AGENT) $(SERVER) $(SUBDIRS)
 config/Netopeer.xml.orig:
 	@cp config/Netopeer.xml config/Netopeer.xml.orig
 
-replace: config/Netopeer.xml config/Netopeer.xml.orig
+config/NETCONF-server.xml.orig:
+	@cp config/NETCONF-server.xml config/NETCONF-server.xml.orig
+
+replace: config/Netopeer.xml config/Netopeer.xml.orig config/NETCONF-server.xml config/NETCONF-server.xml.orig
 	sed -e 's|$${prefix}|$(prefix)|g' config/Netopeer.xml.orig > config/Netopeer.xml
+	sed -e 's|$${prefix}|$(prefix)|g' config/NETCONF-server.xml.orig > config/NETCONF-server.xml
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
