@@ -5,9 +5,7 @@
 			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-netconf-server.yin</path>
 			<feature>ssh</feature>
 			<feature>inbound-ssh</feature>
-<!--
 			<feature>outbound-ssh</feature>
--->
 			@NCSERVER_FEATURES@
 <!--
 			<feature>outbound-tls</feature>

@@ -46,10 +46,12 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -58,6 +60,8 @@
 
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
+#include <libnetconf_ssh.h>
+#include <libnetconf_tls.h>
 
 #include "config.h"
 
@@ -67,6 +71,21 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
+struct ch_app {
+	char* name;
+	NC_TRANSPORT transport;
+	struct nc_mngmt_server* servers;
+	uint8_t start_server; /* 0 first-listed, 1 last-connected */
+	uint8_t rec_interval;       /* reconnect-strategy/interval-secs */
+	uint8_t rec_count;          /* reconnect-strategy/count-max */
+	uint8_t connection;   /* 0 persistent, 1 periodic */
+	uint8_t rep_timeout;        /* connection-type/periodic/timeout-mins */
+	uint8_t rep_linger;         /* connection-type/periodic/linger-secs */
+	pthread_t thread;
+	struct ch_app *next;
+	struct ch_app *prev;
+};
+static struct ch_app *callhome_apps = NULL;
 
 /* transAPI version which must be compatible with libnetconf */
 /* int transapi_version = 4; */
@@ -318,6 +337,308 @@ err_return:
 	return (EXIT_FAILURE);
 }
 
+static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name)
+{
+	xmlNodePtr child;
+
+	for (child = parent->children; child != NULL; child= child->next) {
+		if (child->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+		if (xmlStrcmp(name, child->name) == 0) {
+			return (child);
+		}
+	}
+
+	return (NULL);
+}
+
+/* close() cleanup handler */
+static void clh_close(void* arg)
+{
+	close(*((int*)(arg)));
+}
+
+static void* app_loop(void* app_v)
+{
+	struct ch_app *app = (struct ch_app*)app_v;
+	struct nc_mngmt_server *start_server = NULL;
+	int pid, sock;
+	int efd, e;
+	int timeout;
+	int sleep_flag;
+	struct epoll_event event_in, event_out;
+	char* const sshd_argv[] = {"/usr/sbin/sshd", "-i", "-f", CFG_DIR"/sshd_config", NULL};
+
+	/* TODO sigmask for the thread? */
+
+	nc_verb_verbose("Starting Call Home thread (%s).", app->name);
+
+	if (app->start_server) {
+		/* last connected */
+		start_server = nc_callhome_mngmt_server_getactive(app->servers);
+	}
+	if (start_server == NULL) {
+		/*
+		 * first-listed start-with's value or the first attempt to
+		 * connect, so use the first listed server specification
+		 */
+		start_server = app->servers;
+	}
+
+	nc_session_transport(app->transport);
+
+	for (;;) {
+		pthread_testcancel();
+
+		sock = -1;
+		pid = -1;
+		pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+		if (pid == -1) {
+			continue;
+		}
+		pthread_cleanup_push(clh_close, &sock);
+		nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
+
+		if (app->start_server) {
+			start_server = nc_callhome_mngmt_server_getactive(app->servers);
+		}
+
+		/* check sock to get information about the connection */
+		/* we have to use epoll API since we need event (not the level) triggering */
+		efd = -1;
+		pthread_cleanup_push(clh_close, &efd);
+		efd = epoll_create(1);
+
+		if (app->connection) {
+			/* periodic connection */
+			event_in.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
+			timeout = 1000 * app->rep_linger;
+		} else {
+			/* persistent connection */
+			event_in.events = EPOLLET | EPOLLRDHUP;
+			timeout = -1; /* indefinite timeout */
+		}
+		event_in.data.fd = sock;
+		epoll_ctl(efd, EPOLL_CTL_ADD, sock, &event_in);
+
+		for (;;) {
+			e = epoll_wait(efd, &event_out, 1, timeout);
+			if (e == 0 && app->connection) {
+				nc_verb_verbose("Call Home (app %s) timeouted. Killing process %d.", app->name, pid);
+				sleep_flag = 1;
+				break;
+			} else if (e == -1) {
+				nc_verb_warning("Call Home (app %s) loop: epoll error (%s)", app->name, strerror(errno));
+				if (errno != EINTR) {
+					sleep_flag = 0;
+					break;
+				}
+			} else {
+				/* some event occurred */
+				/* in case of periodic connection, it is probably EPOLLIN,
+				 * the only reaction is to run epoll_wait() again to start idle
+				 * countdown
+				 */
+				if (event_out.events & EPOLLRDHUP) {
+					nc_verb_verbose("Call Home (app %s) closed.", app->name);
+					sleep_flag = 1;
+					break;
+				}
+			}
+		}
+		pthread_cleanup_pop(1);
+		pthread_cleanup_pop(1);
+
+		/* wait if set so */
+		if (sleep_flag) {
+			/* kill the transport server */
+			kill(pid, SIGTERM);
+			waitpid(pid, NULL, 0);
+			pid = -1;
+
+			/* wait for timeout minutes before another connection */
+			sleep(app->rep_timeout);
+		}
+	}
+
+	return (NULL);
+}
+
+static int app_create(NC_TRANSPORT transport, xmlNodePtr node, struct nc_err** error)
+{
+	struct ch_app *new;
+	xmlNodePtr auxnode, servernode, childnode;
+	xmlChar *port, *host, *auxstr;
+
+	new = malloc(sizeof(struct ch_app));
+	new->transport = transport;
+
+	/* get name */
+	auxnode = find_node(node, BAD_CAST "name");
+	new->name = (char*)xmlNodeGetContent(auxnode);
+	new->servers = NULL;
+
+	/* get servers list */
+	auxnode = find_node(node, BAD_CAST "servers");
+	for (servernode = auxnode->children; servernode != NULL; servernode = servernode->next) {
+		if ((servernode->type != XML_ELEMENT_NODE) || (xmlStrcmp(servernode->name, BAD_CAST "server") != 0)) {
+			continue;
+		}
+		host = NULL;
+		port = NULL;
+		for (childnode = servernode->children; childnode != NULL; childnode = childnode->next) {
+			if (childnode->type != XML_ELEMENT_NODE) {
+				continue;
+			}
+			if (xmlStrcmp(childnode->name, BAD_CAST "address") == 0) {
+				if (!host) {
+					host = xmlNodeGetContent(childnode);
+				} else {
+					nc_verb_error("%s: duplicated address element", __func__);
+					*error = nc_err_new(NC_ERR_BAD_ELEM);
+					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
+					nc_err_set(*error, NC_ERR_PARAM_MSG, "Duplicated address element");
+					free(host);
+					free(port);
+					nc_callhome_mngmt_server_free(new->servers);
+					free(new->name);
+					free(new);
+					return (EXIT_FAILURE);
+				}
+			} else if (xmlStrcmp(childnode->name, BAD_CAST "port") == 0) {
+				port = xmlNodeGetContent(childnode);
+			}
+		}
+		if (host == NULL || port == NULL) {
+			nc_verb_error("%s: invalid address specification (host: %s, port: %s)", __func__, host, port);
+			*error = nc_err_new(NC_ERR_BAD_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
+			free(host);
+			free(port);
+			nc_callhome_mngmt_server_free(new->servers);
+			free(new->name);
+			free(new);
+			return (EXIT_FAILURE);
+		}
+		new->servers = nc_callhome_mngmt_server_add(new->servers,(const char*)host, (const char*)port);
+		free(host);
+		free(port);
+	}
+
+	/* get reconnect settings */
+	auxnode = find_node(node, BAD_CAST "reconnect-strategy");
+	for (childnode = auxnode->children; childnode != NULL; childnode = childnode->next) {
+		if (childnode->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+
+		if (xmlStrcmp(childnode->name, BAD_CAST "start-with") == 0) {
+			auxstr = xmlNodeGetContent(childnode);
+			if (xmlStrcmp(auxstr, BAD_CAST "last-connected") == 0) {
+				new->start_server = 1;
+			} else {
+				new->start_server = 0;
+			}
+			xmlFree(auxstr);
+		} else if (xmlStrcmp(childnode->name, BAD_CAST "interval-secs") == 0) {
+			auxstr = xmlNodeGetContent(childnode);
+			new->rec_interval = atoi((const char*)auxstr);
+			xmlFree(auxstr);
+		} else if (xmlStrcmp(childnode->name, BAD_CAST "count-max") == 0) {
+			auxstr = xmlNodeGetContent(childnode);
+			new->rec_count = atoi((const char*)auxstr);
+			xmlFree(auxstr);
+		}
+	}
+
+	/* get connection settings */
+	new->connection = 0; /* persistent by default */
+	auxnode = find_node(node, BAD_CAST "connection-type");
+	for (childnode = auxnode->children; childnode != NULL; childnode = childnode->next) {
+		if (childnode->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+		if (xmlStrcmp(childnode->name, BAD_CAST "periodic") == 0) {
+			new->connection = 1;
+
+			auxnode = find_node(childnode, BAD_CAST "timeout-mins");
+			auxstr = xmlNodeGetContent(auxnode);
+			new->rep_timeout = atoi((const char*)auxstr);
+			xmlFree(auxstr);
+
+			auxnode = find_node(childnode, BAD_CAST "linger-secs");
+			auxstr = xmlNodeGetContent(auxnode);
+			new->rep_linger = atoi((const char*)auxstr);
+			xmlFree(auxstr);
+
+			break;
+		}
+	}
+
+	pthread_create(&(new->thread), NULL, app_loop, new);
+
+	/* insert the created app structure into the list */
+	if (!callhome_apps) {
+		callhome_apps = new;
+		callhome_apps->next = NULL;
+		callhome_apps->prev = NULL;
+	} else {
+		new->prev = NULL;
+		new->next = callhome_apps;
+		callhome_apps->prev = new;
+		callhome_apps = new;
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+static struct ch_app *app_get(const char* name, NC_TRANSPORT transport)
+{
+	struct ch_app *iter;
+
+	if (name == NULL) {
+		return (NULL);
+	}
+
+	for (iter = callhome_apps; iter != NULL; iter = iter->next) {
+		if (iter->transport == transport && strcmp(iter->name, name) == 0) {
+			break;
+		}
+	}
+
+	return (iter);
+}
+
+static int app_rm(const char* name, NC_TRANSPORT transport)
+{
+	struct ch_app* app;
+
+	if ((app = app_get(name, transport)) == NULL) {
+		return (EXIT_FAILURE);
+	}
+
+	pthread_cancel(app->thread);
+	pthread_join(app->thread, NULL);
+
+	if (app->prev) {
+		app->prev->next = app->next;
+	} else {
+		callhome_apps = app->next;
+	}
+	if (app->next) {
+		app->next->prev = app->prev;
+	} else if (app->prev) {
+		app->prev->next = NULL;
+	}
+
+	free(app->name);
+	nc_callhome_mngmt_server_free(app->servers);
+	free(app);
+
+	return(EXIT_SUCCESS);
+}
+
 /**
  * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application changes
  *
@@ -329,8 +650,28 @@ err_return:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
+	char* name;
+
+	switch (op) {
+	case XMLDIFF_ADD:
+		app_create(NC_TRANSPORT_SSH, node, error);
+		break;
+	case XMLDIFF_REM:
+		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		app_rm(name, NC_TRANSPORT_SSH);
+		free(name);
+		break;
+	case XMLDIFF_MOD:
+		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		app_rm(name, NC_TRANSPORT_SSH);
+		free(name);
+		app_create(NC_TRANSPORT_SSH, node, error);
+		break;
+	default:
+		;/* do nothing */
+	}
 	return EXIT_SUCCESS;
 }
 
@@ -526,11 +867,12 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	return EXIT_SUCCESS;
 }
 
+#if 0
 /**
  * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:cert-maps changes
  *
@@ -542,10 +884,11 @@ int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_cert_maps (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_cert_maps (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	return EXIT_SUCCESS;
 }
+#endif
 
 #endif /* ENABLE_TLS */
 
@@ -648,8 +991,10 @@ struct transapi_data_callbacks server_clbks =  {
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_oneport},
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_manyports},
 		{.path = "/srv:netconf/srv:tls/srv:listen", .func = callback_srv_netconf_srv_tls_srv_listen},
-		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
+//		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
+#if 0
 		{.path = "/srv:netconf/srv:tls/srv:cert-maps", .func = callback_srv_netconf_srv_tls_srv_cert_maps},
+#endif
 #endif /* ENABLE_TLS */
 		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = callback_srv_netconf_srv_ssh_srv_listen_oneport},
 		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = callback_srv_netconf_srv_ssh_srv_listen_manyports},
