@@ -165,7 +165,13 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDI
 	if (op != XMLDIFF_REM) {
 		port = (char*) xmlNodeGetContent(node);
 		nc_verb_verbose("%s: port %s", __func__, port);
-		asprintf(&sshd_listen, "ListenAddress 0.0.0.0:%s", port);
+		if (asprintf(&sshd_listen, "ListenAddress 0.0.0.0:%s", port) == -1) {
+			sshd_listen = NULL;
+			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
+			return (EXIT_FAILURE);
+		}
 		free(port);
 	}
 
@@ -187,10 +193,14 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XML
 {
 	xmlNodePtr n;
 	char *addr = NULL, *port = NULL, *result = NULL;
+	int ret = EXIT_SUCCESS;
 
 	if (op != XMLDIFF_REM) {
 		for (n = node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
-			if (n->type != XML_ELEMENT_NODE) { continue; }
+			if (n->type != XML_ELEMENT_NODE) {
+				continue;
+			}
+
 			if (addr == NULL && xmlStrcmp(n->name, BAD_CAST "address") == 0) {
 				addr = (char*)xmlNodeGetContent(n);
 			} else if (port == NULL && xmlStrcmp(n->name, BAD_CAST "port") == 0) {
@@ -198,14 +208,23 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XML
 			}
 		}
 		nc_verb_verbose("%s: addr %s, port %s", __func__, addr, port);
-		asprintf(&result, "%sListenAddress %s:%s\n", (sshd_listen == NULL) ? "" : sshd_listen, addr, port);
+		if (asprintf(&result, "%sListenAddress %s:%s\n",
+				(sshd_listen == NULL) ? "" : sshd_listen,
+				addr,
+				port) == -1) {
+			result = NULL;
+			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
+			ret = EXIT_FAILURE;
+		}
 		free(addr);
 		free(port);
 		free(sshd_listen);
 		sshd_listen = result;
 	}
 
-	return (EXIT_SUCCESS);
+	return (ret);
 }
 
 /**
@@ -237,10 +256,24 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	 */
 
 	/* prepare sshd_config */
-	cfgfile = open(CFG_DIR"/sshd_config", O_RDONLY);
-	running_cfgfile = open(CFG_DIR"/sshd_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR);
-	fstat(cfgfile, &stbuf);
-	sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size);
+	if ((cfgfile = open(CFG_DIR"/sshd_config", O_RDONLY)) == -1) {
+		nc_verb_error("Unable to open SSH server configuration template (%s)", strerror(errno));
+		goto err_return;
+	}
+
+	if ((running_cfgfile = open(CFG_DIR"/sshd_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
+		nc_verb_error("Unable to prepare SSH server configuration (%s)", strerror(errno));
+		goto err_return;
+	}
+
+	if (fstat(cfgfile, &stbuf) == -1) {
+		nc_verb_error("Unable to get info about SSH server configuration template file (%s)", strerror(errno));
+		goto err_return;
+	}
+	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
+		nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
+		goto err_return;
+	}
 
 	/* append listening settings */
 	dprintf(running_cfgfile, "\n# NETCONF listening settings\n%s", sshd_listen);
@@ -277,6 +310,12 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	}
 
 	return EXIT_SUCCESS;
+
+err_return:
+
+	*error = nc_err_new(NC_ERR_OP_FAILED);
+	nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error - unable to start SSH server.");
+	return (EXIT_FAILURE);
 }
 
 /**
@@ -399,7 +438,7 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
 {
 	int cfgfile, running_cfgfile, pidfd;
 	int pid, r;
