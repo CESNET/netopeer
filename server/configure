@@ -4742,8 +4742,9 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-# remove backup file
+# remove backup files
 rm -f config/Netopeer.xml.orig
+rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 
