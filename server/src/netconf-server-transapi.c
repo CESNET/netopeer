@@ -312,8 +312,8 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* start sshd */
 		pid = fork();
 		if (pid < 0) {
-			nc_verb_error("%s fork failed (%s)", __func__, strerror(errno));
-			return (EXIT_FAILURE);
+			nc_verb_error("fork() for SSH server failed (%s)", strerror(errno));
+			goto err_return;
 		} else if (pid == 0) {
 			/* child */
 			execl(SSHD_EXEC, SSHD_EXEC, "-D", "-f", CFG_DIR"/sshd_config.running", NULL);
@@ -798,10 +798,24 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	 */
 
 	/* prepare sshd_config */
-	cfgfile = open(CFG_DIR"/stunnel_config", O_RDONLY);
-	running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR);
-	fstat(cfgfile, &stbuf);
-	sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size);
+	if ((cfgfile = open(CFG_DIR"/stunnel_config", O_RDONLY)) == -1) {
+		nc_verb_error("Unable to open TLS server configuration template (%s)", strerror(errno));
+		goto err_return;
+	}
+
+	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
+		nc_verb_error("Unable to prepare TLS server configuration (%s)", strerror(errno));
+		goto err_return;
+	}
+
+	if (fstat(cfgfile, &stbuf) == -1) {
+		nc_verb_error("Unable to get info about TLS server configuration template file (%s)", strerror(errno));
+		goto err_return;
+	}
+	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
+		nc_verb_error("Duplicating TLS server configuration template failed (%s)", strerror(errno));
+		goto err_return;
+	}
 
 	/* append listening settings */
 	dprintf(running_cfgfile, "%s", tlsd_listen);
@@ -821,14 +835,14 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* start stunnel */
 		pid = fork();
 		if (pid < 0) {
-			nc_verb_error("%s fork failed (%s)", __func__, strerror(errno));
-			return (EXIT_FAILURE);
+			nc_verb_error("fork() for TLS server failed (%s)", strerror(errno));
+			goto err_return;
 		} else if (pid == 0) {
 			/* child */
 			execl(TLSD_EXEC, TLSD_EXEC, CFG_DIR"/stunnel_config.running", NULL);
 
 			/* wtf ?!? */
-			nc_verb_error("%s: starting \"%s\" failed (%s).", __func__, TLSD_EXEC, strerror(errno));
+			nc_verb_error("Starting \"%s\" failed (%s).", TLSD_EXEC, strerror(errno));
 			exit(1);
 		} else {
 			/*
@@ -841,19 +855,25 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) < 0 || (r = read(pidfd, pidbuf, sizeof(pidbuf))) < 0) {
 				nc_verb_error("Unable to get stunnel's PID from %s (%s)", CFG_DIR"/stunnel/stunnel.pid", strerror(errno));
 				nc_verb_warning("stunnel not started or it is out of control");
-				return (EXIT_FAILURE);
+				goto err_return;
 			}
 
 			if (r > (int) sizeof(pidbuf)) {
 				nc_verb_error("Content of the %s is too big.", CFG_DIR"/stunnel/stunnel.pid");
-				return (EXIT_FAILURE);
+				goto err_return;
 			}
 			pidbuf[r] = 0;
 			tlsd_pid = atoi(pidbuf);
-			nc_verb_verbose("%s: started stunnel (PID %d)", __func__, tlsd_pid);
+			nc_verb_verbose("TLS server (%s) started (PID %d)", TLSD_EXEC, tlsd_pid);
 		}
 	}
 	return EXIT_SUCCESS;
+
+err_return:
+
+	*error = nc_err_new(NC_ERR_OP_FAILED);
+	nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error - unable to start TLS server.");
+	return (EXIT_FAILURE);
 }
 
 /**
