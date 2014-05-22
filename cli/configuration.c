@@ -96,7 +96,7 @@ void load_config (struct nc_cpblts **cpblts)
 		if (errno == ENOENT) {
 			/* directory does not exist */
 			ERROR ("load_config", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
-			if (mkdir (netconf_dir, 0777) != 0) {
+			if (mkdir (netconf_dir, 0700) != 0) {
 				ERROR ("load_config", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
 				free (netconf_dir);
 				return;
@@ -117,7 +117,7 @@ void load_config (struct nc_cpblts **cpblts)
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "History file (%s) does not exist, creating it", history_file);
-				if ((history_fd = creat(history_file, 0666)) == -1) {
+				if ((history_fd = creat(history_file, 0600)) == -1) {
 					ERROR("load_config", "History file cannot be created (%s)", strerror(errno));
 				} else {
 					close(history_fd);
@@ -142,7 +142,7 @@ void load_config (struct nc_cpblts **cpblts)
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "Configuration file (%s) does not exits, creating it", config_file);
-				if ((config_fd = creat(config_file, 0666)) == -1) {
+				if ((config_fd = creat(config_file, 0600)) == -1) {
 					ERROR("load_config", "Configuration file cannot be created (%s)", strerror(errno));
 				} else {
 					close(config_fd);
@@ -254,7 +254,7 @@ void store_config (struct nc_cpblts * cpblts)
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist, create it */
-			if (mkdir (netconf_dir, 0777)) {
+			if (mkdir (netconf_dir, 0700)) {
 				/* directory can not be created */
 				free (netconf_dir);
 				ERROR("store_config", "Storing history failed (mkdir(): %s)", strerror(errno));
@@ -277,7 +277,7 @@ void store_config (struct nc_cpblts * cpblts)
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				/* file does not exit, create it */
-				if ((history_fd = creat(history_file, 0666)) == -1) {
+				if ((history_fd = creat(history_file, 0600)) == -1) {
 					/* history file can not be created */
 				} else {
 					close(history_fd);
