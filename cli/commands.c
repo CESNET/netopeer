@@ -1723,7 +1723,7 @@ void cmd_listen_help ()
 #define ACCEPT_TIMEOUT 60000 /* 1 minute */
 int cmd_listen (char* arg)
 {
-	static int listening = 0;
+	static unsigned short listening = 0;
 	char *user = NULL;
 #ifdef ENABLE_TLS
 	char *cert = NULL, *key = NULL;
@@ -1768,6 +1768,10 @@ int cmd_listen (char* arg)
 			break;
 		case 'p':
 			port = (unsigned short) atoi (optarg);
+			if (listening != port) {
+				nc_callhome_listen_stop();
+				listening = 0;
+			}
 			break;
 		case 'l':
 			user = optarg;
@@ -1811,7 +1815,7 @@ int cmd_listen (char* arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
-		listening = 1;
+		listening = port;
 	}
 
 	if (verb_level == 0) {
