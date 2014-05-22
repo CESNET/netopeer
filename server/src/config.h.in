@@ -50,4 +50,6 @@
 #	define TLSD_EXEC "@STUNNEL_EXEC@"
 #endif
 
+#define AGENT "netopeer-agent"
+
 #endif /* CONFIG_H_ */

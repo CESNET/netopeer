@@ -43,6 +43,7 @@ exec_prefix = @exec_prefix@
 datarootdir = @datarootdir@
 datadir = @datadir@
 bindir = @bindir@
+BINDIR = $(shell eval echo $(bindir))
 includedir = @includedir@
 libdir =  @libdir@
 mandir = @mandir@
@@ -88,7 +89,7 @@ SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
 SUBDIRS = manager

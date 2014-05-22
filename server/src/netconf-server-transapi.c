@@ -315,7 +315,17 @@ int callback_srv_netconf_srv_tls_srv_listen_oneport (void ** UNUSED(data), XMLDI
 	if (op != XMLDIFF_REM) {
 		port = (char*) xmlNodeGetContent(node);
 		nc_verb_verbose("%s: port %s", __func__, port);
-		asprintf(&tlsd_listen, "\n[netconf%s]\naccept = %s\nexec = %s\nexecargs = %s\npty = no\n", port, port, "/usr/local/bin/netopeer-agent", "netopeer-agent");
+		if (asprintf(&tlsd_listen, "\n[netconf%s]\naccept = %s\nexec = %s\nexecargs = %s\npty = no\n",
+				port,
+				port,
+				BINDIR"/"AGENT,
+				AGENT) == -1) {
+			tlsd_listen = NULL;
+			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
+			return (EXIT_FAILURE);
+		}
 		free(port);
 	}
 
@@ -338,6 +348,7 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
 	xmlNodePtr n;
 	char *addr = NULL, *port = NULL, *result = NULL;
 	static int counter = 0;
+	int ret = EXIT_SUCCESS;
 
 	if (tlsd_listen == NULL) {
 		counter = 0;
@@ -355,14 +366,26 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
 			}
 		}
 		nc_verb_verbose("%s: addr %s, port %s", __func__, addr, port);
-		asprintf(&result, "%s\n[netconf%d]\naccept = %s:%s\nexec = %s\nexecargs = %s\npty = no\n", (tlsd_listen == NULL) ? "" : tlsd_listen, counter, addr, port, "/usr/local/bin/netopeer-agent", "netopeer-agent");
+		if (asprintf(&result, "%s\n[netconf%d]\naccept = %s:%s\nexec = %s\nexecargs = %s\npty = no\n",
+				(tlsd_listen == NULL) ? "" : tlsd_listen,
+				counter,
+				addr,
+				port,
+				BINDIR"/"AGENT,
+				AGENT) == -1) {
+			result = NULL;
+			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
+			ret = EXIT_FAILURE;
+		}
 		free(addr);
 		free(port);
 		free(tlsd_listen);
 		tlsd_listen = result;
 	}
 
-	return (EXIT_SUCCESS);
+	return (ret);
 }
 
 /**
