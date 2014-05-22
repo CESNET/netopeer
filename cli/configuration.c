@@ -61,8 +61,8 @@
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
-/* NetConf Client home */
-#define NCC_DIR ".netconf_client"
+/* NetConf Client home (appended to ~/) */
+#define NCC_DIR ".netopeer-cli"
 
 void load_config (struct nc_cpblts **cpblts)
 {
