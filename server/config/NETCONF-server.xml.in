@@ -7,8 +7,7 @@
 			<feature>inbound-ssh</feature>
 			<feature>outbound-ssh</feature>
 			@NCSERVER_FEATURES@
-<!--
-			<feature>outbound-tls</feature>
+<!-- not supported
 			<feature>tls-map-certificates</feature>
 -->
 		</model-main>

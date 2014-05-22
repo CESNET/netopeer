@@ -147,7 +147,7 @@ AC_ARG_ENABLE([tls],
 	if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature>"
+		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
 	fi
 	TLS="yes"
 	AC_SUBST(TLS)

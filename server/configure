@@ -2643,7 +2643,7 @@ if test "${enable_tls+set}" = set; then :
   enableval=$enable_tls; if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature>"
+		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
 	fi
 	TLS="yes"
 

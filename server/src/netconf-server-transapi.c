@@ -889,6 +889,35 @@ err_return:
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
+	char* name;
+
+	/* TODO
+	 * Somehow use environment variables to informa netopeer-agent that it is
+	 * started for NETCONF over TLS. I next step, netopeer-agent will probably
+	 * also need information about certificates and their mapping to usernames.
+	 *
+	 * Just now, netopeer-agent, started by stunnel, is totally blind, and
+	 * starts NETCONF session with username of stunnel's UID (probably root).
+	 */
+
+	switch (op) {
+	case XMLDIFF_ADD:
+		app_create(NC_TRANSPORT_TLS, node, error);
+		break;
+	case XMLDIFF_REM:
+		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		app_rm(name, NC_TRANSPORT_TLS);
+		free(name);
+		break;
+	case XMLDIFF_MOD:
+		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		app_rm(name, NC_TRANSPORT_TLS);
+		free(name);
+		app_create(NC_TRANSPORT_TLS, node, error);
+		break;
+	default:
+		;/* do nothing */
+	}
 	return EXIT_SUCCESS;
 }
 
@@ -1001,7 +1030,7 @@ void server_transapi_close(void)
 */
 struct transapi_data_callbacks server_clbks =  {
 #ifdef ENABLE_TLS
-	.callbacks_count = 9,
+	.callbacks_count = 8, /* WARNING - change to 9 with cert-maps callback !!! */
 #else
 	.callbacks_count = 4,
 #endif
@@ -1011,7 +1040,7 @@ struct transapi_data_callbacks server_clbks =  {
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_oneport},
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_manyports},
 		{.path = "/srv:netconf/srv:tls/srv:listen", .func = callback_srv_netconf_srv_tls_srv_listen},
-//		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
+		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
 #if 0
 		{.path = "/srv:netconf/srv:tls/srv:cert-maps", .func = callback_srv_netconf_srv_tls_srv_cert_maps},
 #endif
