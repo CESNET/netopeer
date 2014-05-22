@@ -50,6 +50,7 @@ mandir = @mandir@
 sysconfdir = @sysconfdir@
 dbusconfdir = @DBUSCONF@
 dbusservices = @DBUSSERVICES@
+modulesdir = @MODULESDIR@
 
 TOPDIR = @CONFIGURE_PWD@
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
@@ -89,7 +90,7 @@ SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
 
 OBJDIR= .obj
 SUBDIRS = manager

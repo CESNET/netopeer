@@ -619,6 +619,7 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+MODULESDIR
 NCSERVER_FEATURES
 AGENT_LIBS
 SERVER_LIBS
@@ -729,6 +730,7 @@ with_libnetconf
 with_libdbus
 with_dbus_config_dir
 with_dbus_services
+with_modules_dir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1385,6 +1387,10 @@ Optional Packages:
                           (/usr/share/dbus-1/system-services/ by default), if
                           this parameter is not used, service file for
                           netopeer-server is not installed!
+  --with-modules-dir=DIR  path to directory where netopeer modules
+                          configuration will be stored
+                          ($(sysconfdir)/netopeer/modules.conf.d/ by default)
+
 
 Some influential environment variables:
   CC          C compiler command
@@ -4742,6 +4748,18 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+# specify netopeer modules location
+
+# Check whether --with-modules-dir was given.
+if test "${with_modules_dir+set}" = set; then :
+  withval=$with_modules_dir; MODULESDIR="$withval"
+
+else
+  MODULESDIR="$(sysconfdir)/netopeer/modules.conf.d/"
+
+fi
+
+
 # remove backup files
 rm -f config/Netopeer.xml.orig
 rm -f config/NETCONF-server.xml.orig
@@ -5297,6 +5315,7 @@ done
 
 
 
+
 if test -z "$DOXYGEN"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing doxygen you will not able to generate Doxygen documentation." >&5
 $as_echo "$as_me: WARNING: Due to missing doxygen you will not able to generate Doxygen documentation." >&2;}
@@ -5327,6 +5346,8 @@ ac_config_files="$ac_config_files netopeer.rc"
 ac_config_files="$ac_config_files src/config.h"
 
 ac_config_files="$ac_config_files stunnel/stunnel.conf"
+
+ac_config_files="$ac_config_files configurator/modules/config.py"
 
 
 cat >confcache <<\_ACEOF
@@ -6045,6 +6066,7 @@ do
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
     "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
+    "configurator/modules/config.py") CONFIG_FILES="$CONFIG_FILES configurator/modules/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
