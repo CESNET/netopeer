@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:ncserver="urn:ietf:params:xml:ns:yang:ietf-netconf-server" xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types" xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types" xmlns:x509c2n="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name" xmlns:nacm="urn:ietf:params:xml:ns:yang:ietf-netconf-acm" name="ietf-netconf-server">
+  <namespace uri="urn:ietf:params:xml:ns:yang:ietf-netconf-server"/>
+  <prefix value="ncserver"/>
+  <import module="ietf-yang-types">
+    <prefix value="yang"/>
+  </import>
+  <import module="ietf-inet-types">
+    <prefix value="inet"/>
+  </import>
+  <import module="ietf-x509-cert-to-name">
+    <prefix value="x509c2n"/>
+  </import>
+  <import module="ietf-netconf-acm">
+    <prefix value="nacm"/>
+  </import>
+  <organization>
+    <text>IETF NETCONF (Network Configuration) Working Group</text>
+  </organization>
+  <contact>
+    <text>WG Web:   &lt;http://tools.ietf.org/wg/netconf/&gt;
+WG List:  &lt;mailto:netconf@ietf.org&gt;
+
+WG Chair: Mehmet Ersue
+          &lt;mailto:mehmet.ersue@nsn.com&gt;
+
+WG Chair: Bert Wijnen
+          &lt;mailto:bertietf@bwijnen.net&gt;
+
+Editor:   Juergen Schoenwaelder
+          &lt;mailto:j.schoenwaelder@jacobs-university.de&gt;
+
+          Kent Watsen
+          &lt;mailto:kwatsen@juniper.net&gt;</text>
+  </contact>
+  <description>
+    <text>This module contains a collection of YANG definitions for
+configuring NETCONF servers.
+
+Copyright (c) 2014 IETF Trust and the persons identified as
+authors of the code. All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, is permitted pursuant to, and subject
+to the license terms contained in, the Simplified BSD
+License set forth in Section 4.c of the IETF Trust's
+Legal Provisions Relating to IETF Documents
+(http://trustee.ietf.org/license-info).
+
+This version of this YANG module is part of RFC XXXX; see
+the RFC itself for full legal notices.</text>
+  </description>
+  <revision date="2014-01-24">
+    <description>
+      <text>Initial version</text>
+    </description>
+    <reference>
+      <text>RFC XXXX: A YANG Data Model for NETCONF Server Configuration</text>
+    </reference>
+  </revision>
+  <feature name="ssh">
+    <description>
+      <text>A server implements this feature if it supports NETCONF
+over Secure Shell (SSH).</text>
+    </description>
+    <reference>
+      <text>RFC 6242: Using the NETCONF Protocol over Secure Shell (SSH)</text>
+    </reference>
+  </feature>
+  <feature name="inbound-ssh">
+    <description>
+      <text>The inbound-ssh feature indicates that the server can
+open a port to listen for incoming client connections.</text>
+    </description>
+  </feature>
+  <feature name="outbound-ssh">
+    <description>
+      <text>The outbound-ssh feature indicates that the server can
+connect to a client.</text>
+    </description>
+    <reference>
+      <text>RFC XXXX: Reverse Secure Shell (Reverse SSH)</text>
+    </reference>
+  </feature>
+  <feature name="tls">
+    <description>
+      <text>A server implements this feature if it supports NETCONF
+over Transport Layer Security (TLS).</text>
+    </description>
+    <reference>
+      <text>RFC XXXX: NETCONF over Transport Layer Security (TLS)</text>
+    </reference>
+  </feature>
+  <feature name="inbound-tls">
+    <description>
+      <text>The inbound-tls feature indicates that the server can
+open a port to listen for incoming client connections.</text>
+    </description>
+  </feature>
+  <feature name="outbound-tls">
+    <description>
+      <text>The outbound-tls feature indicates that the server can
+connect to a client.</text>
+    </description>
+  </feature>
+  <feature name="tls-map-certificates">
+    <description>
+      <text>The tls-map-certificates feature indicates that the
+server implements mapping X.509 certificates to NETCONF
+usernames.</text>
+    </description>
+  </feature>
+  <feature name="tls-map-pre-shared-keys">
+    <description>
+      <text>The tls-map-pre-shared-keys feature indicates that the
+server implements mapping TLS pre-shared keys to NETCONF
+usernames.</text>
+    </description>
+  </feature>
+  <grouping name="listen-config">
+    <description>
+      <text>Provides a choice of configuring one of more ports
+to listen for incoming client connections.</text>
+    </description>
+    <choice name="one-or-many">
+      <default value="one-port"/>
+      <case name="one-port">
+        <leaf name="port">
+          <type name="inet:port-number"/>
+          <description>
+            <text>The port number the server listens on on all
+interfaces.</text>
+          </description>
+        </leaf>
+      </case>
+      <case name="many-ports">
+        <list name="interface">
+          <key value="address"/>
+          <leaf name="address">
+            <type name="inet:ip-address"/>
+            <mandatory value="true"/>
+            <description>
+              <text>The local IP address of the interface to listen
+on.</text>
+            </description>
+          </leaf>
+          <leaf name="port">
+            <type name="inet:port-number"/>
+            <description>
+              <text>The local port number on this interface the
+server listens on.</text>
+            </description>
+          </leaf>
+        </list>
+      </case>
+    </choice>
+  </grouping>
+  <grouping name="call-home-config">
+    <container name="applications">
+      <description>
+        <text>A list of applications the device iniates connections
+to. The configuration for each application specifies
+its details, including its servers, the type of
+connection to maintain, and the reconnection strategy
+to use.</text>
+      </description>
+      <list name="application">
+        <key value="name"/>
+        <leaf name="name">
+          <type name="string">
+            <length value="1..64"/>
+          </type>
+          <mandatory value="true"/>
+          <description>
+            <text>An arbitrary name for the application the device
+is connecting to.</text>
+          </description>
+        </leaf>
+        <leaf name="description">
+          <type name="string"/>
+          <description>
+            <text>An optional description for the application.</text>
+          </description>
+        </leaf>
+        <container name="servers">
+          <description>
+            <text>An ordered listing of the application's servers
+that the device should attempt connecting to.</text>
+          </description>
+          <list name="server">
+            <key value="address"/>
+            <min-elements value="1"/>
+            <ordered-by value="user"/>
+            <leaf name="address">
+              <type name="inet:host"/>
+              <mandatory value="true"/>
+              <description>
+                <text>The address or domain-name of the server.</text>
+              </description>
+            </leaf>
+            <leaf name="port">
+              <type name="inet:port-number"/>
+              <description>
+                <text>The IP port for this server. The device will use
+the IANA-assigned well-known port if not specified.</text>
+              </description>
+            </leaf>
+          </list>
+        </container>
+        <container name="connection-type">
+          <description>
+            <text>Indicates the application's preference for how the
+device's connection is maintained.</text>
+          </description>
+          <choice name="connection-type">
+            <default value="persistent-connection"/>
+            <case name="persistent-connection">
+              <container name="persistent">
+                <description>
+                  <text>Maintain a persistent connection to the
+application. If the connection goes down,
+immediately start trying to reconnect to it,
+using the reconnection strategy.
+
+This connection type minimizes any
+application-to-server data-transfer delay,
+albeit at the expense of holding resources
+longer.</text>
+                </description>
+                <container name="keep-alives">
+                  <leaf name="interval-secs">
+                    <type name="uint8"/>
+                    <units name="seconds"/>
+                    <default value="15"/>
+                    <description>
+                      <text>Sets a timeout interval in seconds after which
+if no data has been received from the
+application, a message will be sent to request
+a response from the application.  A value of
+'0' indicates that no keep-alive messages
+should be sent.</text>
+                    </description>
+                  </leaf>
+                  <leaf name="count-max">
+                    <type name="uint8"/>
+                    <default value="3"/>
+                    <description>
+                      <text>Sets the number of keep-alive messages that may
+be sent without receiving any data from the
+application before assuming the application is
+no longer alive.  If this threshold is reached,
+the transport-level connection will be
+disconnected (thus triggering the reconnection
+strategy).  The interval timer is reset after
+each transmission, thus an unresponsive
+application will be disconnected after
+approximately count-max * interval-secs
+seconds.</text>
+                    </description>
+                  </leaf>
+                </container>
+              </container>
+            </case>
+            <case name="periodic-connection">
+              <container name="periodic">
+                <description>
+                  <text>Periodically connect to application, using the
+reconnection strategy, so it can flush any pending
+data it may be holding. This connection type
+minimizes resources held open, albeit at the
+expense of longer application-to-server
+data-transfer delay.  Note that for
+server-to-application data, the data should be
+sent immediately, connecting to application first
+if not already.</text>
+                </description>
+                <leaf name="timeout-mins">
+                  <type name="uint8"/>
+                  <units name="minutes"/>
+                  <default value="5"/>
+                  <description>
+                    <text>The maximum amount of unconnected time the
+device will wait until establishing a
+connection to the application again. The
+device may establish a connection before this
+time if it has data it needs to send to the
+application. Note: this value differs from
+the reconnection strategy's interval-secs
+value.</text>
+                  </description>
+                </leaf>
+                <leaf name="linger-secs">
+                  <type name="uint8"/>
+                  <units name="seconds"/>
+                  <default value="30"/>
+                  <description>
+                    <text>The amount of time the device should wait after
+last receiving data from or sending data to the
+application before closing its connection to it.
+This is an optimization to prevent unnecessary
+connections.</text>
+                  </description>
+                </leaf>
+              </container>
+            </case>
+          </choice>
+        </container>
+        <container name="reconnect-strategy">
+          <description>
+            <text>The reconnection strategy guides how a device reconnects
+to an application, after losing a connection to it, even
+if due to a reboot.  The device starts with the specified
+server, tries to connect to it count-max times, waiting
+interval-secs between each connection attempt, before
+trying the next server in the list (round robin).</text>
+          </description>
+          <leaf name="start-with">
+            <type name="enumeration">
+              <enum name="first-listed">
+                <value value="1"/>
+              </enum>
+              <enum name="last-connected">
+                <value value="2"/>
+              </enum>
+            </type>
+            <default value="first-listed"/>
+            <description>
+              <text>Specifies which of the application's servers the
+device should start with when trying to connect to
+the application. In the case of newly configured
+application, the first server listed shall be
+considered last-connected.</text>
+            </description>
+          </leaf>
+          <leaf name="interval-secs">
+            <type name="uint8"/>
+            <units name="seconds"/>
+            <default value="5"/>
+            <description>
+              <text>Specifies the time delay between connection attempts
+to the same server.  Note: this value differs from the
+periodic-connection's timeout-mins value.</text>
+            </description>
+          </leaf>
+          <leaf name="count-max">
+            <type name="uint8"/>
+            <default value="3"/>
+            <description>
+              <text>Specifies the number times the device tries to
+connect to a specific server before moving on to
+the next server in the list (round robin).</text>
+            </description>
+          </leaf>
+        </container>
+      </list>
+    </container>
+  </grouping>
+  <grouping name="ssh-config">
+    <description>
+      <text>Provides a reusable grouping for all the ssh config.  This
+is done primarily to enable external modules to reference
+this definition in a &amp;quot;uses&amp;quot; statement.</text>
+    </description>
+    <container name="listen">
+      <if-feature name="inbound-ssh"/>
+      <description>
+        <text>Provides the configuration of the NETCONF server to
+open one or more ports to listen for incoming client
+connections.</text>
+      </description>
+      <uses name="listen-config">
+        <refine target-node="one-or-many/one-port/port">
+          <default value="830"/>
+        </refine>
+        <refine target-node="one-or-many/many-ports/interface/port">
+          <default value="830"/>
+        </refine>
+      </uses>
+    </container>
+    <container name="call-home">
+      <if-feature name="outbound-ssh"/>
+      <description>
+        <text>Provides the configuration of the NETCONF call-home
+clients to connect to, the overall call-home policy,
+and the reconnect strategy.</text>
+      </description>
+      <uses name="call-home-config">
+        <augment target-node="applications/application">
+          <container name="host-keys">
+            <description>
+              <text>An ordered listing of the SSH host keys the
+device should advertise to the application.</text>
+            </description>
+            <list name="host-key">
+              <key value="name"/>
+              <min-elements value="1"/>
+              <ordered-by value="user"/>
+              <leaf name="name">
+                <type name="string">
+                  <length value="1..64"/>
+                </type>
+                <mandatory value="true"/>
+                <description>
+                  <text>The name of a host key the device should
+advertise during the SSH key exchange.</text>
+                </description>
+              </leaf>
+            </list>
+          </container>
+        </augment>
+      </uses>
+    </container>
+  </grouping>
+  <grouping name="tls-config">
+    <description>
+      <text>Provides a reusable grouping for all the tls config.  This
+is done primarily to enable external modules to reference
+this definition in a &amp;quot;uses&amp;quot; statement.</text>
+    </description>
+    <container name="listen">
+      <if-feature name="inbound-tls"/>
+      <description>
+        <text>Provides the configuration of the NETCONF server to
+open one or more ports to listen for incoming client
+connections.</text>
+      </description>
+      <uses name="listen-config">
+        <refine target-node="one-or-many/one-port/port">
+          <default value="6513"/>
+        </refine>
+        <refine target-node="one-or-many/many-ports/interface/port">
+          <default value="6513"/>
+        </refine>
+      </uses>
+    </container>
+    <container name="call-home">
+      <if-feature name="outbound-tls"/>
+      <description>
+        <text>Provides the configuration of the NETCONF call-home
+clients to connect to, the overall call-home policy,
+and the reconnect strategy.</text>
+      </description>
+      <uses name="call-home-config"/>
+    </container>
+    <container name="cert-maps">
+      <if-feature name="tls-map-certificates"/>
+      <uses name="x509c2n:cert-to-name"/>
+      <description>
+        <text>The cert-maps container is used by a NETCONF server to
+map the NETCONF client's presented X.509 certificate to
+a NETCONF username.
+
+If no matching and valid cert-to-name list entry can be
+found, then the NETCONF server MUST close the connection,
+and MUST NOT accept NETCONF messages over it.</text>
+      </description>
+    </container>
+    <container name="psk-maps">
+      <if-feature name="tls-map-pre-shared-keys"/>
+      <description>
+        <text>During the TLS Handshake, the client indicates which
+key to use by including a PSK identity in the TLS
+ClientKeyExchange message. On the server side, this
+PSK identity is used to look up an entry in the psk-map
+list. If such an entry is found, and the pre-shared keys
+match, then the client is authenticated. The server uses
+the value from the user-name leaf in the psk-map list as
+the NETCONF username.  If the server cannot find an entry
+in the psk-map list, or if the pre-shared keys do not
+match, then the server terminates the connection.</text>
+      </description>
+      <reference>
+        <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport Layer
+          Security (TLS)</text>
+      </reference>
+      <list name="psk-map">
+        <key value="psk-identity"/>
+        <leaf name="psk-identity">
+          <type name="string"/>
+          <description>
+            <text>The PSK identity encoded as a UTF-8 string. For
+details how certain common PSK identity formats can
+be encoded in UTF-8, see section 5.1. of RFC 4279.</text>
+          </description>
+          <reference>
+            <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport
+          Layer Security (TLS)</text>
+          </reference>
+        </leaf>
+        <leaf name="user-name">
+          <type name="nacm:user-name-type"/>
+          <mandatory value="true"/>
+          <description>
+            <text>The NETCONF username associated with this PSK
+identity.</text>
+          </description>
+        </leaf>
+        <leaf name="not-valid-before">
+          <type name="yang:date-and-time"/>
+          <description>
+            <text>This PSK identity is not valid before the given date
+and time.</text>
+          </description>
+        </leaf>
+        <leaf name="not-valid-after">
+          <type name="yang:date-and-time"/>
+          <description>
+            <text>This PSK identity is not valid after the given date
+and time.</text>
+          </description>
+        </leaf>
+        <leaf name="key">
+          <type name="yang:hex-string"/>
+          <mandatory value="true"/>
+          <nacm:default-deny-all/>
+          <description>
+            <text>The key associated with the PSK identity</text>
+          </description>
+          <reference>
+            <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport
+Layer Security (TLS)</text>
+          </reference>
+        </leaf>
+      </list>
+    </container>
+  </grouping>
+  <container name="netconf">
+    <description>
+      <text>Top-level container for NETCONF server related
+configuration objects.</text>
+    </description>
+    <container name="ssh">
+      <if-feature name="ssh"/>
+      <uses name="ssh-config"/>
+    </container>
+    <container name="tls">
+      <if-feature name="tls"/>
+      <uses name="tls-config"/>
+    </container>
+  </container>
+</module>

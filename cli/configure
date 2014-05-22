@@ -705,6 +705,7 @@ enable_option_checking
 with_libxml2
 enable_notifications
 enable_debug
+enable_tls
 with_libnetconf
 '
       ac_precious_vars='build_alias
@@ -1336,6 +1337,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-notifications Disable support of NETCONF Notifications (RFC 5277)
   --enable-debug          Compile with debug options
+  --enable-tls            Enable support for NETCONF over TLS.
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2501,6 +2503,16 @@ if test "${enable_debug+set}" = set; then :
 else
   CFLAGS="$CFLAGS -O3"
 	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
+
+fi
+
+
+tls="no"
+# Check whether --enable-tls was given.
+if test "${enable_tls+set}" = set; then :
+  enableval=$enable_tls; if test "$enableval" = "yes"; then
+		tls="yes"
+	fi
 
 fi
 
@@ -4368,13 +4380,12 @@ fi
 
 REQS="$REQS libnetconf"
 if test "$notif" = "yes"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ncntf_dispatch_receive in -lnetconf" >&5
-$as_echo_n "checking for ncntf_dispatch_receive in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_ncntf_dispatch_receive+:} false; then :
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
+$as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -4393,33 +4404,112 @@ return ncntf_dispatch_receive ();
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_ncntf_dispatch_receive=yes
-else
-  ac_cv_lib_netconf_ncntf_dispatch_receive=no
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ncntf_dispatch_receive=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_ncntf_dispatch_receive" >&5
-$as_echo "$ac_cv_lib_netconf_ncntf_dispatch_receive" >&6; }
-if test "x$ac_cv_lib_netconf_ncntf_dispatch_receive" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
+done
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
 
-  LIBS="-lnetconf $LIBS"
+else
+  ac_cv_search_ncntf_dispatch_receive=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ncntf_dispatch_receive" >&5
+$as_echo "$ac_cv_search_ncntf_dispatch_receive" >&6; }
+ac_res=$ac_cv_search_ncntf_dispatch_receive
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
   CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for nc_init in -lnetconf" >&5
-$as_echo_n "checking for nc_init in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_nc_init+:} false; then :
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf does not support NETCONF Notifications, disabling it." >&5
+$as_echo "$as_me: WARNING: libnetconf does not support NETCONF Notifications, disabling it." >&2;}
+
+fi
+
+fi
+if test "$tls" = "yes"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_tls_init" >&5
+$as_echo_n "checking for library containing nc_tls_init... " >&6; }
+if ${ac_cv_search_nc_tls_init+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char nc_tls_init ();
+int
+main ()
+{
+return nc_tls_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_tls_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_tls_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_nc_tls_init+:} false; then :
+
+else
+  ac_cv_search_nc_tls_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_tls_init" >&5
+$as_echo "$ac_cv_search_nc_tls_init" >&6; }
+ac_res=$ac_cv_search_nc_tls_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf does not support TLS transport, disabling it." >&5
+$as_echo "$as_me: WARNING: libnetconf does not support TLS transport, disabling it." >&2;}
+
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_init" >&5
+$as_echo_n "checking for library containing nc_init... " >&6; }
+if ${ac_cv_search_nc_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -4438,80 +4528,50 @@ return nc_init ();
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_nc_init=yes
-else
-  ac_cv_lib_netconf_nc_init=no
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_init=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_init+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_nc_init" >&5
-$as_echo "$ac_cv_lib_netconf_nc_init" >&6; }
-if test "x$ac_cv_lib_netconf_nc_init" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
+done
+if ${ac_cv_search_nc_init+:} false; then :
 
-  LIBS="-lnetconf $LIBS"
+else
+  ac_cv_search_nc_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_init" >&5
+$as_echo "$ac_cv_search_nc_init" >&6; }
+ac_res=$ac_cv_search_nc_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
   as_fn_error $? "libnetconf not found." "$LINENO" 5
 fi
 
 
-fi
-
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for nc_init in -lnetconf" >&5
-$as_echo_n "checking for nc_init in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_nc_init+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char nc_init ();
-int
-main ()
-{
-return nc_init ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_nc_init=yes
-else
-  ac_cv_lib_netconf_nc_init=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_nc_init" >&5
-$as_echo "$ac_cv_lib_netconf_nc_init" >&6; }
-if test "x$ac_cv_lib_netconf_nc_init" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
-
-  LIBS="-lnetconf $LIBS"
-
-else
-  as_fn_error $? "libnetconf not found." "$LINENO" 5
-fi
-
-fi
+#if test "$notif" = "yes"; then
+#	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+#		[],
+#		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+#		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+#	)
+#else
+#	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))
+#fi
 
 ### libreadline ###
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5

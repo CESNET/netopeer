@@ -1,0 +1,36 @@
+; **************************************************************************
+; * Global options                                                         *
+; **************************************************************************
+
+; PID is created inside the chroot jail
+pid = {CFGDIR}/stunnel.pid
+
+; Debugging stuff (may useful for troubleshooting)
+debug = 7
+output = {CFGDIR}/stunnel.log
+
+; **************************************************************************
+; * Service defaults may also be specified in individual service sections  *
+; **************************************************************************
+
+; Certificate/key
+cert = {CFGDIR}/server.pem
+;key = {CFGDIR}/server.key
+
+; Verify peer with locally installed certificate. 
+verify = 3
+
+; CA certificate, with verify level 3, it also includes allowed client
+; certificates.
+CAfile = {CFGDIR}/rootCA.pem
+
+; Disable support for insecure SSLv2 protocol
+options = NO_SSLv2
+
+; **************************************************************************
+; * Service definitions (remove all services for inetd mode)               *
+; **************************************************************************
+
+; SSL server mode services
+
+

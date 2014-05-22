@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <pthread.h>
+#include <string.h>
 
 #include <dbus/dbus.h>
 #include "comm.h"

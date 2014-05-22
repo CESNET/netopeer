@@ -57,6 +57,12 @@
 #include <pthread.h>
 #endif
 
+#include <libnetconf.h>
+#include <libnetconf_ssh.h>
+#ifdef ENABLE_TLS
+#	include <libnetconf_tls.h>
+#endif
+
 #include "commands.h"
 #include "configuration.h"
 #include "mreadline.h"
@@ -84,6 +90,7 @@ struct nc_session* session = NULL;
 COMMAND commands[] = {
 		{"help", cmd_help, "Display this text"},
 		{"connect", cmd_connect, "Connect to a NETCONF server"},
+		{"listen", cmd_listen, "Listen for a NETCONF Call Home"},
 		{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
 		{"commit", cmd_commit, "NETCONF <commit> operation"},
 		{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
@@ -233,10 +240,22 @@ int cmd_status (char* UNUSED(arg))
 		fprintf (stdout, "Client is not connected to any NETCONF server.\n");
 	} else {
 		fprintf (stdout, "Current NETCONF session:\n");
-		fprintf (stdout, "  ID          : %s\n", nc_session_get_id (session));
-		fprintf (stdout, "  Host        : %s\n", nc_session_get_host (session));
-		fprintf (stdout, "  Port        : %s\n", nc_session_get_port (session));
-		fprintf (stdout, "  User        : %s\n", nc_session_get_user (session));
+		fprintf (stdout, "  ID          : %s\n", nc_session_get_id(session));
+		fprintf (stdout, "  Host        : %s\n", nc_session_get_host(session));
+		fprintf (stdout, "  Port        : %s\n", nc_session_get_port(session));
+		fprintf (stdout, "  User        : %s\n", nc_session_get_user(session));
+		switch(nc_session_get_transport(session)) {
+		case NC_TRANSPORT_SSH:
+			s = "SSH";
+			break;
+		case NC_TRANSPORT_TLS:
+			s = "TLS";
+			break;
+		default:
+			s = "Unknown";
+			break;
+		}
+		fprintf (stdout, "  Transport   : %s\n", s);
 		fprintf (stdout, "  Capabilities:\n");
 		cpblts = nc_session_get_cpblts (session);
 		if (cpblts != NULL) {
@@ -1690,22 +1709,160 @@ int cmd_unlock (char *arg)
 	return cmd_un_lock (UNLOCK_OP, arg);
 }
 
-void cmd_connect_help ()
+void cmd_listen_help ()
 {
-	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
+#ifdef ENABLE_TLS
+	fprintf (stdout, "listen [--help] [--tls <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
+#else
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+#endif
 }
 
+#define DEFAULT_PORT_CH_SSH 6666
+#define DEFAULT_PORT_CH_TLS 6667
+#define ACCEPT_TIMEOUT 60000 /* 1 minute */
+int cmd_listen (char* arg)
+{
+	static unsigned short listening = 0;
+	char *user = NULL;
+#ifdef ENABLE_TLS
+	char *cert = NULL, *key = NULL;
+#endif
+	unsigned short port = 0;
+	int c;
+	int timeout = ACCEPT_TIMEOUT;
+	struct arglist cmd;
+	struct option long_options[] = {
+			{"help", 0, 0, 'h'},
+			{"port", 1, 0, 'p'},
+			{"login", 1, 0, 'l'},
+#ifdef ENABLE_TLS
+			{"tls", 1, 0, 't'},
+			{"key", 1, 0, 'k'},
+#endif
+			{0, 0, 0, 0}
+	};
+	int option_index = 0;
+
+	/* set back to start to be able to use getopt() repeatedly */
+	optind = 0;
+
+	if (session != NULL) {
+		ERROR("listen", "already connected to %s.", nc_session_get_host (session));
+		return (EXIT_FAILURE);
+	}
+
+	/* set default transport protocol */
+	nc_session_transport(NC_TRANSPORT_SSH);
+
+	/* process given arguments */
+	init_arglist (&cmd);
+	addargs (&cmd, "%s", arg);
+
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
+		switch (c) {
+		case 'h':
+			cmd_listen_help ();
+			clear_arglist(&cmd);
+			return (EXIT_SUCCESS);
+			break;
+		case 'p':
+			port = (unsigned short) atoi (optarg);
+			if (listening != port) {
+				nc_callhome_listen_stop();
+				listening = 0;
+			}
+			break;
+		case 'l':
+			user = optarg;
+			break;
+#ifdef ENABLE_TLS
+		case 't':
+			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
+				if (port == 0) {
+					port = DEFAULT_PORT_CH_TLS;
+				}
+			}
+			cert = optarg;
+			break;
+		case 'k':
+			key = optarg;
+			break;
+#endif
+		default:
+			ERROR("listen", "unknown option -%c.", c);
+			cmd_listen_help ();
+			clear_arglist(&cmd);
+			return (EXIT_FAILURE);
+		}
+	}
+	if (port == 0) {
+		port = DEFAULT_PORT_CH_SSH;
+	}
+#ifdef ENABLE_TLS
+	if (cert) {
+		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
+			ERROR("listen", "Initiating TLS failed.");
+			return (EXIT_FAILURE);
+		}
+	}
+#endif
+
+	/* create the session */
+	if (!listening) {
+		if (nc_callhome_listen(port) == EXIT_FAILURE) {
+			ERROR("listen", "unable to start listening for incoming Call Home");
+			clear_arglist(&cmd);
+			return (EXIT_FAILURE);
+		}
+		listening = port;
+	}
+
+	if (verb_level == 0) {
+		fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
+	}
+	session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
+	if (session == NULL ) {
+		if (timeout == 0) {
+			ERROR("listen", "no call home")
+		} else {
+			ERROR("listen", "receiving call Home failed.");
+		}
+	}
+
+	clear_arglist(&cmd);
+	return (EXIT_SUCCESS);
+}
+
+void cmd_connect_help ()
+{
+#ifdef ENABLE_TLS
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls <cert_path> [--key <key_path>]] host\n");
+#else
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
+#endif
+}
+
+#define DEFAULT_PORT_SSH 830
+#define DEFAULT_PORT_TLS 6513
 int cmd_connect (char* arg)
 {
 	char *host = NULL, *user = NULL;
+#ifdef ENABLE_TLS
+	char *cert = NULL, *key = NULL;
+#endif
 	int hostfree = 0;
-	unsigned short port = 830;
+	unsigned short port = 0;
 	int c;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
+#ifdef ENABLE_TLS
+			{"tls", 1, 0, 't'},
+			{"key", 1, 0, 'k'},
+#endif
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1717,6 +1874,9 @@ int cmd_connect (char* arg)
 		ERROR("connect", "already connected to %s.", nc_session_get_host (session));
 		return (EXIT_FAILURE);
 	}
+
+	/* set default transport protocol */
+	nc_session_transport(NC_TRANSPORT_SSH);
 
 	/* process given arguments */
 	init_arglist (&cmd);
@@ -1735,6 +1895,19 @@ int cmd_connect (char* arg)
 		case 'l':
 			user = optarg;
 			break;
+#ifdef ENABLE_TLS
+		case 't':
+			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
+				if (port == 0) {
+					port = DEFAULT_PORT_TLS;
+				}
+			}
+			cert = optarg;
+			break;
+		case 'k':
+			key = optarg;
+			break;
+#endif
 		default:
 			ERROR("connect", "unknown option -%c.", c);
 			cmd_connect_help ();
@@ -1742,6 +1915,17 @@ int cmd_connect (char* arg)
 			return (EXIT_FAILURE);
 		}
 	}
+	if (port == 0) {
+		port = DEFAULT_PORT_SSH;
+	}
+#ifdef ENABLE_TLS
+	if (cert) {
+		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
+			ERROR("connect", "Initiating TLS failed.");
+			return (EXIT_FAILURE);
+		}
+	}
+#endif
 	if (optind == cmd.count) {
 		/* get mandatory argument */
 		host = malloc (sizeof(char) * BUFFER_SIZE);

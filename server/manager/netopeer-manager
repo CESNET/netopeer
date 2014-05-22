@@ -1,0 +1,291 @@
+#!/usr/bin/python
+#
+# @file netopeer-manager
+# @author David Kupka <dkupka@cesnet.cz>
+# @author Radek Krejci <rkrejci@cesnet.cz>
+# @brief Netopeer modules manager
+#
+# Copyright (c) 2014 CESNET, z.s.p.o.
+# All rights reserved.
+#
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+# 3. Neither the name of the CESNET, z.s.p.o. nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+try:
+	import argparse
+	import os
+	import string
+	import xml
+	from xml.dom import minidom
+	from xml.dom.minidom import getDOMImplementation
+except ImportError as e:
+	print(e.message+'. Please install missing package.')
+	exit(1)
+
+
+def getText(nodelist):
+    rc = []
+    for node in nodelist:
+        if node.nodeType == node.TEXT_NODE:
+            rc.append(node.data)
+    return ''.join(rc)
+
+def listModules(config):
+	list = []
+	startup = config.getElementsByTagName('startup')[0]
+	modules = startup.getElementsByTagName('module')
+	for module in modules:
+		item = []
+		item.append(getText(module.getElementsByTagName('name')[0].childNodes))
+		if string.lower(getText(module.getElementsByTagName('enabled')[0].childNodes)) == 'true':
+			item.append('enabled')
+		else:
+			item.append('disabled')
+		list.append(item)
+	return list
+
+def getModule(config, name):	
+	startup = config.getElementsByTagName('startup')[0]
+	modules = startup.getElementsByTagName('module')
+	for module in modules:
+		if getText(module.getElementsByTagName('name')[0].childNodes) == name:
+			return module
+	return None
+
+def getModel(config, path):
+	models = config.getElementsByTagName('model')
+	for model in models:
+		node = model.getElementsByTagName('path')[0]
+		if getText(node.childNodes) == path:
+			return model
+	return None
+
+def listAugments(config):
+	list = []
+	augments = config.getElementsByTagName('model')
+	for model in augments:
+		item = []
+		item.append(getText(model.getElementsByTagName('path')[0].childNodes))
+		tapi = getText(model.getElementsByTagName('transapi')[0].childNodes)
+		if tapi == '':
+			item.append('no transAPI module')
+		else:
+			item.append(tapi)
+		list.append(item)
+	return list
+
+# "main" starts here
+# create argument parser
+parser = argparse.ArgumentParser(description="Manage Netopeer's modules", formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('--netopeer', help='Specify Netopeer\'s configuration directory (by default /etc/netopeer/).')
+subparsers = parser.add_subparsers(dest='subcommand')
+parser_add = subparsers.add_parser('add', help='Add a new module.')
+parser_list = subparsers.add_parser('list', help='List all existing modules.')
+parser_rm = subparsers.add_parser('rm', help='Remove an existing module.')
+parser_add_augment = subparsers.add_parser('add-augment', help='Add a new augment model.')
+parser_list_augment = subparsers.add_parser('list-augment', help='List all existing augment models.')
+parser_rm_augment = subparsers.add_parser('rm-augment', help='Remove an existing augment model.')
+
+parser_add.add_argument('--name', required=True, help='Name (ID) of the module.')
+parser_add.add_argument('--model', required=True, type=argparse.FileType('r'), help='File holding the main data model (YIN format).')
+parser_add.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the main data model.')
+parser_add.add_argument('--features', nargs='*', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+parser_add.add_argument('--datastore', help='File path to the datastore location. If not set, datastore will not be able to store configuration data')
+
+parser_rm.add_argument('--name', required=True, help='Name of the module to remove.')
+
+parser_add_augment.add_argument('--name', required=True, help='Name (ID) of the module to edit.')
+parser_add_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
+parser_add_augment.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the augment model.')
+parser_add_augment.add_argument('--features', nargs='*', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+
+parser_list_augment.add_argument('--name', required=True, help='Name of the module.')
+
+parser_rm_augment.add_argument('--name', required=True, help='Name of the module of the augment model to remove.')
+parser_rm_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
+
+modules_path = '/etc/netopeer/modules.conf.d'
+netopeer_config = '/etc/netopeer/cfgnetopeer/datastore.xml'
+
+try:
+	args = parser.parse_args()
+
+	if args.netopeer:
+		netopeer_config = args.netopeer+'/cfgnetopeer/datastore.xml'
+		modules_path = args.netopeer+'/modules.conf.d/'
+	
+	if not os.path.exists(netopeer_config):
+		print('Missing Netopeer configuration ('+netopeer_config+')')
+		exit(1)
+
+	if args.subcommand == 'list':
+		list = listModules(minidom.parse(netopeer_config))
+		if list == []:
+			print('No module installed.')
+		else:
+			print('List of startup Netopeer modules:')
+			for item in list:
+				print(item[0]+' ('+item[1]+')')
+				
+	elif args.subcommand == 'list-augment':
+		module_config = modules_path+'/'+args.name+'.xml'
+		if not os.path.exists(module_config):
+			print('Missing module configuration file ('+module_config+')')
+		list = listAugments(minidom.parse(module_config))
+		if list == []:
+			print('No augment models for '+args.name+' model')
+		else:
+			print('List of '+args.name+'\'s augment models:')
+			for item in list:
+				print(item[0]+' ('+item[1]+')')
+				
+	elif args.subcommand == 'add':
+		try:
+			config = minidom.parse(netopeer_config)
+		except xml.parsers.expat.ExpatError:
+			impl = getDOMImplementation()
+			config = impl.createDocument(None, None, None)
+			datastores = config.appendChild(config.createElementNS('urn:cesnet:tmc:datastores:file', 'datastores'))
+			datastores.setAttribute('xmlns', 'urn:cesnet:tmc:datastores:file')
+			candidate = datastores.appendChild(config.createElement('candidate'))
+			candidate.setAttribute('lock', '')
+			candidate.setAttribute('modified', 'false')
+			running = datastores.appendChild(config.createElement('running'))
+			running.setAttribute('lock', '')
+			startup = datastores.appendChild(config.createElement('startup'))
+			startup.setAttribute('lock', '')
+			
+		list = listModules(config)
+		for i in list:
+			if i[0] == args.name:
+				print('The module you are tryng to add already exists.')
+				exit(1)
+		
+		startup = config.getElementsByTagName('startup')[0]
+		try:
+			modules = startup.getElementsByTagName('modules')[0]
+		except IndexError:
+			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
+			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
+			modules = netopeer.appendChild(config.createElement('modules'))
+
+		module = modules.appendChild(config.createElement('module'))
+		
+		node = module.appendChild(config.createElement('name'))
+		node.appendChild(config.createTextNode(args.name))
+		node = module.appendChild(config.createElement('enabled'))
+		node.appendChild(config.createTextNode('true'))
+		config.writexml(open(netopeer_config, 'w'))
+		
+		impl = getDOMImplementation()
+		config = impl.createDocument(None, 'device', None)
+		root = config.firstChild
+		
+		node = root.appendChild(config.createElement('name'))
+		node.appendChild(config.createTextNode(args.name))
+		models = root.appendChild(config.createElement('data-models'))
+		model = models.appendChild(config.createElement('model-main'))
+		node = model.appendChild(config.createElement('path'))
+		node.appendChild(config.createTextNode(os.path.abspath(args.model.name)))
+		if args.transapi:
+			node = model.appendChild(config.createElement('transapi'))
+			node.appendChild(config.createTextNode(os.path.abspath(args.transapi.name)))
+		
+		if args.features:
+			for l in args.features:
+				for f in l:
+					node = model.appendChild(config.createElement('feature'))
+					node.appendChild(config.createTextNode(f))
+		
+		repo = root.appendChild(config.createElement('repo'))
+		node = repo.appendChild(config.createElement('type'))
+		if args.datastore:
+			node.appendChild(config.createTextNode('file'))
+			node = repo.appendChild(config.createElement('path'))
+			node.appendChild(config.createTextNode(os.path.abspath(args.datastore)))			
+		else:
+			node.appendChild(config.createTextNode('empty'))
+		
+		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
+		
+	elif args.subcommand == 'rm':
+		config = minidom.parse(netopeer_config)
+		module = getModule(config, args.name)
+		
+		if not module:
+			print('No \''+args.name+'\' module found.')
+			exit(1)		
+
+		module.parentNode.removeChild(module)
+		module.unlink
+		config.writexml(open(netopeer_config, 'w'))
+		os.remove(modules_path+'/'+args.name+'.xml')
+		
+	elif args.subcommand == 'rm-augment':
+		config = minidom.parse(modules_path+'/'+args.name+'.xml')
+		
+		model = getModel(config, os.path.abspath(args.model.name))
+		if model is None:
+			print('No such model in \''+args.name+'\' module found.')
+			exit(1)
+		else:
+			model.parentNode.removeChild(model)
+			model.unlink
+
+		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
+		
+	elif args.subcommand == 'add-augment':
+		config = minidom.parse(modules_path+'/'+args.name+'.xml')
+		model = getModel(config, os.path.abspath(args.model.name))
+		if not model is None:
+			print('Such model already exists in \''+args.name+'\' module.')
+			exit(1)
+		
+		models = config.getElementsByTagName('data-models')[0]
+		model = models.appendChild(config.createElement('model'))
+		node = model.appendChild(config.createElement('path'))
+		node.appendChild(config.createTextNode(os.path.abspath(args.model.name)))
+		if args.transapi:
+			node = model.appendChild(config.createElement('transapi'))
+			node.appendChild(config.createTextNode(os.path.abspath(args.transapi.name)))
+		
+		if args.features:
+			for l in args.features:
+				for f in l:
+					node = model.appendChild(config.createElement('feature'))
+					node.appendChild(config.createTextNode(f))
+			
+		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
+			
+except ValueError as e:
+	print (e)
+except IOError as e:
+	print(e[1]+'('+str(e[0])+'): '+e.filename)
+
+os.sys.exit(0)
+

@@ -36,25 +36,17 @@
  *
  */
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <libgen.h>
 #include <errno.h>
 #include <poll.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
-#include <pthread.h>
+#include <string.h>
+#include <sys/types.h>
 #include <syslog.h>
-#include <stdint.h>
+#include <unistd.h>
 
 #include <libxml/tree.h>
-#include <libxml/HTMLtree.h>
 
 #include <libnetconf_xml.h>
 
@@ -88,11 +80,11 @@ static void* notification_thread(void* arg)
  *
  * \param sig 	signal number
  */
-void signal_handler (int sig)
+void signal_handler(int sig)
 {
-	clb_print (NC_VERB_VERBOSE, "Signal received.");
+	clb_print(NC_VERB_VERBOSE, "Signal received.");
 
-	fprintf (stderr, "Signal %d received.\n", sig);
+	fprintf(stderr, "Signal %d received.\n", sig);
 
 	switch (sig) {
 	case SIGINT:
@@ -106,12 +98,12 @@ void signal_handler (int sig)
 		} else {
 			/* second attempt */
 			clb_print(NC_VERB_ERROR, "Hey! I need some time to stop, be patient next time!");
-			exit (EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 		break;
 	default:
 		clb_print(NC_VERB_ERROR, "exiting on signal.");
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 		break;
 	}
 }
@@ -122,7 +114,10 @@ static struct nc_cpblts* get_server_capabilities(conn_t* conn)
 	char **cpblts_list = NULL;
 	int i;
 
-	cpblts_list = comm_get_srv_cpblts(conn);
+	if ((cpblts_list = comm_get_srv_cpblts(conn)) == NULL) {
+		clb_print(NC_VERB_ERROR, "Cannot get server capabilities!");
+		return (NULL);
+	}
 
 	/* Fill server capabilities structure */
 	srv_cpblts = nc_cpblts_new((const char* const*)cpblts_list);
@@ -136,7 +131,7 @@ static struct nc_cpblts* get_server_capabilities(conn_t* conn)
 	return srv_cpblts;
 }
 
-int process_message (struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
+int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
 {
 	nc_reply * reply = NULL;
 	struct nc_err * err;
@@ -155,28 +150,28 @@ int process_message (struct nc_session *session, conn_t *conn, const nc_rpc *rpc
 	case NC_OP_CLOSESESSION:
 		if (comm_close(conn) != EXIT_SUCCESS) {
 			err = nc_err_new(NC_ERR_OP_FAILED);
-			reply = nc_reply_error (err);
+			reply = nc_reply_error(err);
 		} else {
-			reply = nc_reply_ok ();
+			reply = nc_reply_ok();
 		}
 		done = 1;
 		break;
 	case NC_OP_KILLSESSION:
-		if ((op = ncxml_rpc_get_op_content (rpc)) == NULL || op->name == NULL ||
-			xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
+		if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
+				xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
 			clb_print(NC_VERB_ERROR, "Corrupted RPC message.");
-			reply = nc_reply_error (nc_err_new (NC_ERR_OP_FAILED));
+			reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
 			goto send_reply;
 		}
 		if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
 			clb_print(NC_VERB_ERROR, "No session id found.");
-			err = nc_err_new (NC_ERR_MISSING_ELEM);
-			nc_err_set (err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
-			reply = nc_reply_error (err);
-			goto send_reply;			
+			err = nc_err_new(NC_ERR_MISSING_ELEM);
+			nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
+			reply = nc_reply_error(err);
+			goto send_reply;
 		}
 		sid = (char *)xmlNodeGetContent(op->children);
-		reply = comm_kill_session (conn, sid);
+		reply = comm_kill_session(conn, sid);
 		free(sid);
 		break;
 	case NC_OP_CREATESUBSCRIPTION:
@@ -197,7 +192,7 @@ int process_message (struct nc_session *session, conn_t *conn, const nc_rpc *rpc
 		}
 
 		reply = ncntf_subscription_check(rpc);
-		if (nc_reply_get_type (reply) != NC_REPLY_OK) {
+		if (nc_reply_get_type(reply) != NC_REPLY_OK) {
 			goto send_reply;
 		}
 
@@ -225,17 +220,62 @@ int process_message (struct nc_session *session, conn_t *conn, const nc_rpc *rpc
 		break;
 	default:
 		/* other messages */
-		reply = comm_operation (conn, rpc);
+		reply = comm_operation(conn, rpc);
 		break;
 	}
 
 send_reply:
-	nc_session_send_reply (session, rpc, reply);
-	nc_reply_free (reply);
+	nc_session_send_reply(session, rpc, reply);
+	nc_reply_free(reply);
 	return EXIT_SUCCESS;
 }
 
-int main ()
+#ifdef ENABLE_TLS
+char *get_tls_username(void)
+{
+#ifndef PATCHED_STUNNEL
+	char *subj, *cn, *aux;
+	int len;
+
+	/* try to get information from environment variable commonly provided by stunnel(1) */
+	subj = getenv("SSL_CLIENT_DN");
+	if (!subj) {
+		/* we are not able to get correct username */
+		clb_print(NC_VERB_ERROR, "Missing \'SSL_CLIENT_DN\' enviornment variable, unable to get username.");
+		return (NULL);
+	}
+	/* parse subject to get CN */
+	cn = strstr(subj, "CN=");
+	if (!cn) {
+		clb_print(NC_VERB_ERROR, "Client certificate does not include commonName, unable to get username.");
+		return (NULL);
+	}
+	cn = cn + 3;
+	/* detect if the CN is followed by another item */
+	aux = strchr(cn, '/');
+	/* get the length of the CN value */
+	if (aux != NULL) {
+		len = aux - cn;
+	} else {
+		len = strlen(cn);
+	}
+	/* store (only) the CN value into the resulting string */
+	aux = malloc(len * sizeof(char));
+	strncpy(aux, cn, len);
+	aux[len] = '\0';
+
+	return (aux);
+#else
+	/*
+	 * we are running with patched stunnel(1) which provides much more info
+	 * from the client certificate
+	 */
+#endif
+}
+
+#endif /* ENABLE_TLS */
+
+int main()
 {
 	conn_t *con;
 	struct nc_session * netconf_con;
@@ -247,15 +287,20 @@ int main ()
 	struct pollfd fds;
 	struct sigaction action;
 
+#ifdef ENABLE_TLS
+	struct passwd *pw;
+	char* username;
+#endif
+
 	/* set signal handler */
-	sigfillset (&action.sa_mask);
+	sigfillset(&action.sa_mask);
 	action.sa_handler = signal_handler;
 	action.sa_flags = 0;
-	sigaction (SIGINT, &action, NULL);
-	sigaction (SIGQUIT, &action, NULL);
-	sigaction (SIGABRT, &action, NULL);
-	sigaction (SIGTERM, &action, NULL);
-	sigaction (SIGKILL, &action, NULL);
+	sigaction(SIGINT, &action, NULL );
+	sigaction(SIGQUIT, &action, NULL );
+	sigaction(SIGABRT, &action, NULL );
+	sigaction(SIGTERM, &action, NULL );
+	sigaction(SIGKILL, &action, NULL );
 
 #ifdef DEBUG
 	nc_verbosity(NC_VERB_DEBUG);
@@ -264,8 +309,8 @@ int main ()
 	nc_callback_print(clb_print);
 
 	/* initialize library */
-	if (nc_init (NC_INIT_ALL) < 0) {
-		clb_print (NC_VERB_ERROR, "Library initialization failed");
+	if (nc_init(NC_INIT_ALL) < 0) {
+		clb_print(NC_VERB_ERROR, "Library initialization failed");
 		return EXIT_FAILURE;
 	}
 
@@ -282,41 +327,80 @@ int main ()
 		return EXIT_FAILURE;
 	}
 
-	/* accept client session and handle capabilities */
-	netconf_con = nc_session_accept(capabilities);
-	if(netconf_con == NULL){
+#ifdef ENABLE_TLS
+	/*
+	 * Are we running with the TLS transport? If yes, the TLS server should
+	 * provide SSL_CLIENT_DN environment variable for us.
+	 */
+	if (getenv("SSL_CLIENT_DN")) {
+		/* try to get client certificate from stunnel */
+		username = get_tls_username();
+
+		/* accept client session and handle capabilities */
+		netconf_con = nc_session_accept_username(capabilities, username);
+		nc_cpblts_free(capabilities);
+
+		/* switch user if possible/needed */
+		/*
+		 * OpenSSH (sshd) does this automatically, but TLS server (stunnel) does not,
+		 * so in case of SSH transport, we already have different UID, in case of
+		 * TLS transport, we are going to try to switch UID if we can
+		 */
+		if (getuid() == 0) {
+			/* we are going to drop privileges forever */
+			pw = getpwnam(username);
+			if (pw) {
+				setuid(pw->pw_uid);
+			}
+
+			/*
+			 * if this part fails, we still can continue as user 0 - username is
+			 * stored in the NETCONF session information and all NETCONF actions
+			 * are (should be) taken according to this value.
+			 */
+		}
+
+		free(username);
+	} else {
+#else
+	{
+#endif
+		/* there is probably SSH transport */
+		netconf_con = nc_session_accept(capabilities);
+		nc_cpblts_free(capabilities);
+	}
+	if (netconf_con == NULL) {
 		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
 		return EXIT_FAILURE;
 	}
-	nc_cpblts_free(capabilities);
 
 	/* monitor this session and build statistics */
-	nc_session_monitor (netconf_con);
+	nc_session_monitor(netconf_con);
 
-	if (comm_session_info (con, netconf_con)) {
-		clb_print (NC_VERB_ERROR, "Failed to comunicate with server.");
+	if (comm_session_info(con, netconf_con)) {
+		clb_print(NC_VERB_ERROR, "Failed to comunicate with server.");
 		return EXIT_FAILURE;
 	}
 
 	clb_print(NC_VERB_VERBOSE, "Handshake finished");
 
-	fds.fd = nc_session_get_eventfd (netconf_con);
+	fds.fd = nc_session_get_eventfd(netconf_con);
 	fds.events = POLLIN;
 
 	while (!done) {
-		ret = poll (&fds, 1, timeout);
+		ret = poll(&fds, 1, timeout);
 		if (ret < 0 && errno != EINTR) { /* poll error */
-			clb_print (NC_VERB_ERROR, "poll failed.");
+			clb_print(NC_VERB_ERROR, "poll failed.");
 			goto cleanup;
 		} else if (ret == 0) { /* timeout */
 			continue;
 		} else if (ret > 0) { /* event occured */
 			if (fds.revents & POLLHUP) { /* client hung up */
-				clb_print (NC_VERB_VERBOSE, "Connection closed by client");
+				clb_print(NC_VERB_VERBOSE, "Connection closed by client");
 				comm_close(con);
 				goto cleanup;
 			} else if (fds.revents & POLLERR) { /* I/O error */
-				clb_print (NC_VERB_ERROR, "I/O error.");
+				clb_print(NC_VERB_ERROR, "I/O error.");
 				goto cleanup;
 			} else if (fds.revents & POLLIN) { /* data ready */
 				/* read data from input */
@@ -340,9 +424,9 @@ int main ()
 						break;
 					}
 				} else {
-					clb_print (NC_VERB_VERBOSE, "Processing client message");
-					if (process_message (netconf_con, con, rpc) != EXIT_SUCCESS) {
-						clb_print (NC_VERB_WARNING, "Message processing failed");
+					clb_print(NC_VERB_VERBOSE, "Processing client message");
+					if (process_message(netconf_con, con, rpc) != EXIT_SUCCESS) {
+						clb_print(NC_VERB_WARNING, "Message processing failed");
 					}
 					nc_rpc_free(rpc);
 					rpc = NULL;
@@ -353,8 +437,8 @@ int main ()
 
 cleanup:
 	nc_rpc_free(rpc);
-	nc_session_free (netconf_con);
-	nc_close (0);
+	nc_session_free(netconf_con);
+	nc_close(0);
 
 	return (EXIT_SUCCESS);
 }

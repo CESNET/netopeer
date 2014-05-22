@@ -108,6 +108,14 @@ AC_ARG_ENABLE([debug],
 	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 )
 
+tls="no"
+AC_ARG_ENABLE([tls],
+	AC_HELP_STRING([--enable-tls], [Enable support for NETCONF over TLS.]),
+	if test "$enableval" = "yes"; then
+		tls="yes"
+	fi
+)
+
 ############################ Check for programs ################################
 
 # Check for architecture, only x86 and x86_64 are supported
@@ -193,14 +201,29 @@ AC_ARG_WITH([libnetconf],
 )
 REQS="$REQS libnetconf"
 if test "$notif" = "yes"; then
-	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+	AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf],
 		[],
 		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
-		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+		AC_MSG_WARN([libnetconf does not support NETCONF Notifications, disabling it.])]
 	)
-else
-	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))
 fi
+if test "$tls" = "yes"; then
+	AC_SEARCH_LIBS([nc_tls_init], [netconf],
+		[CPPFLAGS="$CPPFLAGS -DENABLE_TLS"],
+		[AC_MSG_WARN([libnetconf does not support TLS transport, disabling it.])]
+	)
+fi
+AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found.]))
+
+#if test "$notif" = "yes"; then
+#	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+#		[],
+#		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+#		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+#	)
+#else
+#	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))
+#fi
 
 ### libreadline ###
 AC_CHECK_LIB([readline], [readline], [], AC_MSG_ERROR([Missing libreadline]))

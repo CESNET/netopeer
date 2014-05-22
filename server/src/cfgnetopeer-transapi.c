@@ -64,13 +64,13 @@
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 3;
+/* int transapi_version = 3; */
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
  * 1 - data have been modified
  */
-int config_modified = 0;
+int netopeer_config_modified = 0;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
 Feel free to use it to distinguish module behavior for different error-option values.
@@ -81,12 +81,13 @@ Feel free to use it to distinguish module behavior for different error-option va
  * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
                          executed again with previous configuration data to roll it back.
  */
-NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
+NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
 static struct module * modules = NULL;
 
 extern int restart_soft, restart_hard, done;
 
+extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
 
 void module_free(struct module * module)
@@ -99,146 +100,219 @@ void module_free(struct module * module)
 	}
 }
 
+/*
+ * if repo_type is -1, then we are working with augment models specifications
+ */
+static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, NCDS_TYPE repo_type)
+{
+	xmlNodePtr node;
+	char *transapi_path, *model_path, *feature, *name, *aux;
+	int i;
+	struct transapi *st = NULL;
+
+	if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0) {
+		st = &netopeer_transapi;
+	} else if (strcmp(module->name, NCSERVER_MODULE_NAME) == 0) {
+		st = &server_transapi;
+	}
+
+	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+		model_path = NULL;
+		transapi_path = NULL;
+		for (node = xpath_obj->nodesetval->nodeTab[i]->children; node != NULL; node = node->next) {
+			if (xmlStrcmp(node->name, BAD_CAST "path") == 0) {
+				model_path = (char*)xmlNodeGetContent(node);
+			}
+			if (xmlStrcmp(node->name, BAD_CAST "transapi") == 0) {
+				transapi_path = (char*)xmlNodeGetContent(node);
+			}
+			if (model_path && transapi_path) {
+				break;
+			}
+		}
+		/* Netopeer module is something extra */
+		if (st != NULL && model_path) {
+			/* internal static server (Netopeer) module */
+			if (repo_type == -1 && transapi_path) {
+				/* augment transapi module */
+				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
+				ncds_add_augment_transapi(model_path, transapi_path);
+			} else if (repo_type == -1) {
+				/* augment model */
+				nc_verb_verbose("Adding augment model \"%s\"", model_path);
+				ncds_add_model(model_path);
+			} else {
+				nc_verb_verbose("Adding static transapi \"%s\"", model_path);
+				if ((module->ds = ncds_new_transapi_static(repo_type, model_path, st)) == NULL) {
+					free(model_path);
+					free(transapi_path);
+					return (EXIT_FAILURE);
+				}
+			}
+		} else if (model_path && transapi_path) {
+			if (repo_type == -1) {
+				/* augment transapi module */
+				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
+				ncds_add_augment_transapi(model_path, transapi_path);
+			} else {
+				/* base transapi module for datastore */
+				nc_verb_verbose("Adding transapi \"%s\"", model_path);
+				if ((module->ds = ncds_new_transapi(repo_type, model_path, transapi_path)) == NULL) {
+					free(model_path);
+					free(transapi_path);
+					return (EXIT_FAILURE);
+				}
+			}
+		} else if (model_path) {
+			if (repo_type == -1) {
+				/* augment model */
+				nc_verb_verbose("Adding augment model \"%s\"", model_path);
+				ncds_add_model(model_path);
+			} else {
+				/* base model for datastore */
+				nc_verb_verbose("Adding base model \"%s\"", model_path);
+				if ((module->ds = ncds_new2(repo_type, model_path, NULL)) == NULL) {
+					free(model_path);
+					return (EXIT_FAILURE);
+				}
+			}
+		} else {
+			nc_verb_error("Configuration mismatch: missing model path in %s config.", module->name);
+		}
+		name = strdup(basename(model_path));
+		/* cut off the .yin suffix */
+		aux = strrchr(name, '.');
+		if (aux) { *aux = '\0';}
+
+		free(model_path);
+		free(transapi_path);
+
+		/* set features */
+		for (node = xpath_obj->nodesetval->nodeTab[i]->children; node != NULL; node = node->next) {
+			if (xmlStrcmp(node->name, BAD_CAST "feature") == 0) {
+				feature = (char*)xmlNodeGetContent(node);
+				if (strcmp(feature, "*") == 0) {
+					ncds_features_enableall(name);
+				} else {
+					ncds_feature_enable(name, feature);
+				}
+				free(feature);
+			}
+		}
+		free(name);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
 int module_enable(struct module * module, int add)
 {
-	char *config_path = NULL, *transapi_path = NULL, *repo_path = NULL, *main_model_path = NULL, *repo_type_str = NULL, *model_path, *feature;
+	char *config_path = NULL, *repo_path = NULL, *repo_type_str = NULL;
 	int repo_type = -1;
 	xmlDocPtr module_config;
+	xmlNodePtr node;
 	xmlXPathContextPtr xpath_ctxt;
 	xmlXPathObjectPtr xpath_obj;
-	int i;
 
 	asprintf(&config_path, "%s/%s.xml", MODULES_CFG_DIR, module->name);
-
 	if ((module_config = xmlReadFile(config_path, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN|XML_PARSE_NOWARNING|XML_PARSE_NOERROR)) == NULL) {
+		nc_verb_error("Reading configuration for %s module failed", module->name);
 		free(config_path);
 		return(EXIT_FAILURE);
 	}
 	free(config_path);
 
-	xpath_ctxt = xmlXPathNewContext(module_config);
-
-	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/transapi", xpath_ctxt);
-	if (xpath_obj && xpath_obj->nodesetval->nodeNr == 1) {
-		transapi_path = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[0]);
+	if ((xpath_ctxt = xmlXPathNewContext(module_config)) == NULL) {
+		nc_verb_error("Creating XPath context failed (%s:%d - module %s)", __FILE__, __LINE__, module->name);
+		return (EXIT_FAILURE);
 	}
-	xmlXPathFreeObject(xpath_obj);
 
-	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model-main/path", xpath_ctxt);
-	if (xpath_obj && xpath_obj->nodesetval->nodeNr == 1) {
-		main_model_path = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[0]);
-	}
-	xmlXPathFreeObject(xpath_obj);
-
-	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/repo/@type", xpath_ctxt);
-	if (xpath_obj && xpath_obj->nodesetval->nodeNr == 1) {
-		repo_type_str = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[0]);
-		if (strcmp(repo_type_str, "empty") == 0) {
-			repo_type = NCDS_TYPE_EMPTY;
-		} else if (strcmp(repo_type_str, "file") == 0) {
-			repo_type = NCDS_TYPE_FILE;
-		}
-		free(repo_type_str);
-	}
-	xmlXPathFreeObject(xpath_obj);
-
-	if (repo_type == NCDS_TYPE_FILE) {
-		xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/repo/path", xpath_ctxt);
-		if (xpath_obj && xpath_obj->nodesetval->nodeNr == 1) {
-			repo_path = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[0]);
-		}
+	/* get datastore information */
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/repo", xpath_ctxt)) == NULL) {
+		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
+		goto err_cleanup;
+	} else if (xpath_obj->nodesetval == NULL || xpath_obj->nodesetval->nodeNr != 1) {
+		nc_verb_verbose("repo is not unique in %s transAPI module configuration.", module->name);
 		xmlXPathFreeObject(xpath_obj);
+		goto err_cleanup;
 	}
 
-	if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0) {
-		if (repo_type == -1 || main_model_path == NULL || repo_path == NULL) {
-			free(main_model_path);
-			free(transapi_path);
-			free(repo_path);
-			xmlXPathFreeContext(xpath_ctxt);
-			xmlFreeDoc(module_config);
-			return(EXIT_FAILURE);
+	for (node = xpath_obj->nodesetval->nodeTab[0]->children; node != NULL; node = node->next) {
+		if (node->type != XML_ELEMENT_NODE) {
+			continue;
 		}
-
-		if ((module->ds = ncds_new_transapi_static(repo_type, main_model_path, &netopeer_transapi)) == NULL) {
-			free(main_model_path);
-			free(transapi_path);
-			free(repo_path);
-			xmlXPathFreeContext(xpath_ctxt);
-			xmlFreeDoc(module_config);
-			return(EXIT_FAILURE);
+		if (xmlStrcmp(node->name, BAD_CAST "type") == 0) {
+			repo_type_str = (char*)xmlNodeGetContent(node);
+		} else if (xmlStrcmp(node->name, BAD_CAST "path") == 0) {
+			repo_path = (char*)xmlNodeGetContent(node);
 		}
+	}
+	if (repo_type_str == NULL) {
+		nc_verb_warning("Missing attribute \'type\' in repo element for %s transAPI module.", module->name);
+		repo_type_str = strdup("unknown");
+	}
+	if (strcmp(repo_type_str, "empty") == 0) {
+		repo_type = NCDS_TYPE_EMPTY;
+	} else if (strcmp(repo_type_str, "file") == 0) {
+		repo_type = NCDS_TYPE_FILE;
 	} else {
-		if (repo_type == -1 || main_model_path == NULL || transapi_path == NULL || repo_path == NULL) {
-			free(main_model_path);
-			free(transapi_path);
-			free(repo_path);
-			xmlXPathFreeContext(xpath_ctxt);
-			xmlFreeDoc(module_config);
-			return(EXIT_FAILURE);
-		}
-
-		if ((module->ds = ncds_new_transapi(repo_type, main_model_path, transapi_path)) == NULL) {
-			free(main_model_path);
-			free(transapi_path);
-			free(repo_path);
-			xmlXPathFreeContext(xpath_ctxt);
-			xmlFreeDoc(module_config);
-			return(EXIT_FAILURE);
-		}
+		nc_verb_warning("Unknown repo type \'%s\' in %s transAPI module configuration", repo_type_str, module->name);
+		nc_verb_warning("Continuing with \'empty\' datastore type.");
+		repo_type = NCDS_TYPE_EMPTY;
 	}
+	free(repo_type_str);
 
-	free(main_model_path);
-	free(transapi_path);
+	if (repo_type == NCDS_TYPE_FILE && repo_path == NULL) {
+		nc_verb_error("Missing path for \'file\' datastore type in %s transAPI module configuration.", module->name);
+		xmlXPathFreeObject(xpath_obj);
+		goto err_cleanup;
+	}
+	xmlXPathFreeObject(xpath_obj);
+
+	/* models augmenting the datastore */
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model", xpath_ctxt)) == NULL ||
+			xpath_obj->nodesetval == NULL) {
+		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
+		xmlXPathFreeObject(xpath_obj);
+		goto err_cleanup;
+	}
+	parse_model_cfg(module, xpath_obj, -1);
+	xmlXPathFreeObject(xpath_obj);
+
+	/* main datastore's model */
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model-main", xpath_ctxt)) == NULL) {
+		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
+		goto err_cleanup;
+	} else if (xpath_obj->nodesetval == NULL || xpath_obj->nodesetval->nodeNr != 1) {
+		nc_verb_verbose("model-main is not unique in %s transAPI module configuration.", module->name);
+		xmlXPathFreeObject(xpath_obj);
+		goto err_cleanup;
+	}
+	parse_model_cfg(module, xpath_obj, repo_type);
+	xmlXPathFreeObject(xpath_obj);
 
 	if (repo_type == NCDS_TYPE_FILE) {
 		if (ncds_file_set_path(module->ds, repo_path)) {
-			free(repo_path);
-			ncds_free(module->ds);
-			module->ds = NULL;
-			xmlXPathFreeContext(xpath_ctxt);
-			xmlFreeDoc(module_config);
-			return(EXIT_FAILURE);
+			nc_verb_verbose("Unable to set path to datastore of the \'%s\' transAPI module.", module->name);
+			goto err_cleanup;
 		}
 	}
-
 	free(repo_path);
+	repo_path = NULL;
 
-	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model/path", xpath_ctxt);
-	if (xpath_obj) {
-		for (i=0; i<xpath_obj->nodesetval->nodeNr; i++) {
-			model_path = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[i]);
-			ncds_add_model(model_path);
-			free(model_path);
-		}
+	if ((module->id = ncds_init(module->ds)) < 0) {
+		goto err_cleanup;
 	}
-	xmlXPathFreeObject(xpath_obj);
-
-	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/*/feature", xpath_ctxt);
-	if (xpath_obj) {
-		for (i=0; i<xpath_obj->nodesetval->nodeNr; i++) {
-			feature = (char*)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[i]);
-			ncds_add_model(feature);
-			free(feature);
-		}
-	}
-	xmlXPathFreeObject(xpath_obj);
 
 	xmlXPathFreeContext(xpath_ctxt);
 	xmlFreeDoc(module_config);
-
-	if ((module->id = ncds_init(module->ds)) < 0) {
-		ncds_free(module->ds);
-		module->ds = NULL;
-		return(EXIT_FAILURE);
-	}
 
 	if (ncds_consolidate() != 0) {
 		nc_verb_warning("%s: consolidating libnetconf datastores failed for module %s.", __func__, module->name);
 		return (EXIT_FAILURE);
 	}
 
-	ncds_device_init(&module->id, NULL, 1);
+	ncds_device_init(&(module->id), NULL, 1);
 
 	if (add) {
 		if (modules) {
@@ -249,6 +323,18 @@ int module_enable(struct module * module, int add)
 	}
 
 	return(EXIT_SUCCESS);
+
+err_cleanup:
+
+	xmlXPathFreeContext(xpath_ctxt);
+	xmlFreeDoc(module_config);
+
+	ncds_free(module->ds);
+	module->ds = NULL;
+
+	free(repo_path);
+
+	return (EXIT_FAILURE);
 }
 
 int module_disable(struct module * module, int destroy)
@@ -293,7 +379,7 @@ int module_disable(struct module * module, int destroy)
 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int transapi_init(xmlDocPtr * UNUSED(running))
+int netopeer_transapi_init(xmlDocPtr * UNUSED(running))
 {
 	return(EXIT_SUCCESS);
 }
@@ -301,7 +387,7 @@ int transapi_init(xmlDocPtr * UNUSED(running))
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void transapi_close(void)
+void netopeer_transapi_close(void)
 {
 	nc_verb_verbose("Netopeer module cleanup.");
 	while (modules) {
@@ -317,7 +403,7 @@ void transapi_close(void)
  * @param[out] err  Double pointer to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
+xmlDocPtr netopeer_get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
 {
 	/* no state data */
 	return(NULL);
@@ -326,7 +412,7 @@ xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), st
  * Mapping prefixes with namespaces.
  * Do NOT modify this structure!
  */
-const char * namespace_mapping[] = {"n", "urn:cesnet:tmc:netopeer:1.0", NULL, NULL};
+struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.0"}, {NULL, NULL}};
 
 /*
 * CONFIGURATION callbacks
@@ -502,7 +588,7 @@ int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLD
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
-struct transapi_data_callbacks clbks =  {
+struct transapi_data_callbacks netopeer_clbks =  {
 	.callbacks_count = 3,
 	.data = NULL,
 	.callbacks = {
@@ -580,7 +666,7 @@ nc_reply * rpc_reload_module (xmlNodePtr input[])
 * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
 * DO NOT alter this structure
 */
-struct transapi_rpc_callbacks rpc_clbks = {
+struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
 		{.name="netopeer-reboot", .func=rpc_netopeer_reboot, .arg_count=1, .arg_order={"type"}},
@@ -589,12 +675,12 @@ struct transapi_rpc_callbacks rpc_clbks = {
 };
 
 struct transapi netopeer_transapi = {
-	.init = transapi_init,
-	.close = transapi_close,
-	.config_modified = &config_modified,
-	.data_clbks = &clbks,
-	.rpc_clbks = &rpc_clbks,
-	.erropt = &erropt,
-	.get_state = get_state_data,
-	.ns_mapping = namespace_mapping,
+	.init = netopeer_transapi_init,
+	.close = netopeer_transapi_close,
+	.config_modified = &netopeer_config_modified,
+	.data_clbks = &netopeer_clbks,
+	.rpc_clbks = &netopeer_rpc_clbks,
+	.erropt = &netopeer_erropt,
+	.get_state = netopeer_get_state_data,
+	.ns_mapping = netopeer_namespace_mapping,
 };
