@@ -359,7 +359,7 @@ AC_ARG_WITH([modules-dir],
 	,
 	MODULESDIR="$withval"
 	,
-	MODULESDIR="$(sysconfdir)/netopeer/modules.conf.d/"
+	MODULESDIR="${sysconfdir}/netopeer/modules.conf.d/"
 )
 
 # remove backup files
