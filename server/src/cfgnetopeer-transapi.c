@@ -58,7 +58,7 @@
 #endif
 
 #ifndef MODULES_CFG_DIR
-#	define MODULES_CFG_DIR "/etc/liberouter/netopeer2/modules.conf.d/"
+#	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
 #endif
 
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
