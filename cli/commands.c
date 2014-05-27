@@ -1055,7 +1055,7 @@ void cmd_get_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get [--help] %s[--filter[=file]]\n", defaults);
+	fprintf (stdout, "get [--help] %s[--filter [file]]\n", defaults);
 }
 
 
@@ -1426,7 +1426,7 @@ void cmd_getconfig_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get-config [--help] %s[--filter[=file]] running", defaults);
+	fprintf (stdout, "get-config [--help] %s[--filter [file]] running", defaults);
 	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
 		fprintf (stdout, "|startup");
 	}
