@@ -97,7 +97,7 @@ tarball: $(SRCS) $(HEADERS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
 	for i in $(SRCS) $(HDRS) configure.in configure \
-	    ltmain.sh Makefile.in VERSION $(NAME).spec.in \
+	    Makefile.in VERSION $(NAME).spec.in \
 	    install-sh config.sub config.guess; do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
