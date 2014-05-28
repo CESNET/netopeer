@@ -70,6 +70,9 @@ if test "x$PKG_CONFIG" = "xno"; then
 	AC_MSG_ERROR(['pkgconfig' not found.])
 fi
 
+# check for roff2html from groff
+AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
+
 AC_ARG_WITH([libxml2],
 	[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
 	[
@@ -252,6 +255,7 @@ AC_CHECK_FUNCS([mkdir munmap strdup strerror strndup strpbrk strtol])
 AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
+AC_SUBST(ROFF2HTML)
 
 AC_SUBST(RPMBUILD)
 if test -z "$RPMBUILD"; then

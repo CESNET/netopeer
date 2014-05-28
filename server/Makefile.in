@@ -61,7 +61,8 @@ DOXYGEN_DIR = doxygen
 RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
-INSTALL_DATA = @INSTALL@ -m 600
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_DATA_PRIVATE = @INSTALL@ -m 600
 ifeq ($(shell id -u $(USER)),0)
   INSTALL_OWNER = -o @USER@ -g @GROUP@
 endif
@@ -111,7 +112,20 @@ CFGS_TAR = $(CFGS) \
 	config/org.liberouter.netopeer.conf.in \
 	config/org.liberouter.netopeer.server.service.in
 
-all: $(AGENT) $(SERVER) $(SUBDIRS)
+MANPAGES = 
+ifneq "@ROFF2HTML@" "no"
+MANHTMLS = $(MANPAGES:%=%.html)
+endif
+
+MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
+define MANINSTALL
+[ -d $(call MANPATH,$(1)) ] || \
+	(mkdir -p $(call MANPATH,$(1)); \
+	chmod 755 $(call MANPATH,$(1))); \
+$(INSTALL_DATA) $(1) $(call MANPATH,$(1))/;
+endef
+
+all: $(AGENT) $(SERVER) $(MANHTMLS) $(SUBDIRS) 
 
 config/Netopeer.xml.orig:
 	@cp config/Netopeer.xml config/Netopeer.xml.orig
@@ -122,6 +136,9 @@ config/NETCONF-server.xml.orig:
 replace: config/Netopeer.xml config/Netopeer.xml.orig config/NETCONF-server.xml config/NETCONF-server.xml.orig
 	sed -e 's|$${prefix}|$(prefix)|g' config/Netopeer.xml.orig > config/Netopeer.xml
 	sed -e 's|$${prefix}|$(prefix)|g' config/NETCONF-server.xml.orig > config/NETCONF-server.xml
+
+%.1.html: %.1
+	@ROFF2HTML@ $< > $@
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
@@ -143,7 +160,7 @@ $(OBJDIR)/%.o: %.c
 .PHONY: clean
 clean:
 	for i in $(SUBDIRS) ; do $(MAKE) -C $$i clean ; done
-	rm -rf $(AGENT) $(SERVER) $(OBJDIR) doxygen/
+	rm -rf $(AGENT) $(SERVER) $(OBJDIR) $(MANHTMLS) doxygen/
 
 .PHONY: doc
 doc: $(DOXYGEN_CONFIG)
@@ -165,7 +182,7 @@ tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS)
 	@mkdir $(NAME)-$(VERSION);
 	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
 	for i in $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) configure.in configure \
-	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh; do \
+	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES); do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
 	done;
@@ -189,7 +206,7 @@ distclean:
 	rm -rf $(RPMDIR)
 
 .PHONY: install
-install: $(SERVER) $(AGENT) $(CFGS)
+install: $(SERVER) $(AGENT) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
@@ -199,23 +216,23 @@ install: $(SERVER) $(AGENT) $(CFGS)
 	done
 	if test -n "$(dbusconfdir)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
 	fi
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
 	if test -f config/Netopeer.xml; then \
 		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/Netopeer.xml $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/Netopeer.xml $(CFGDIR)/modules.conf.d/; \
 	fi
 	if test -f config/NETCONF-server.xml; then \
 		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/NETCONF-server.xml $(CFGDIR)/modules.conf.d/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/NETCONF-server.xml $(CFGDIR)/modules.conf.d/; \
 	fi
 	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
 	for i in $(CFGS); do \
-		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
 	touch $(CFGDIR)/cfgnetopeer/datastore.xml
 	touch $(CFGDIR)/cfgnetopeer/datastore-server.xml
@@ -240,11 +257,17 @@ install: $(SERVER) $(AGENT) $(CFGS)
 	@if test -n "@TLS@"; then \
 		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
 		rm -rf config/stunnel_config; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
+		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
 		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
 	fi
+	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
+	if test -n "$(MANHTMLS)"; then \
+		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
+			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
+	fi
+	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/)
 
 
