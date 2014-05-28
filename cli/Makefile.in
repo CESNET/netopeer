@@ -81,7 +81,7 @@ HDRS = 	commands.h \
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
-MANPAGES = 
+MANPAGES = doc/netopeer-cli.1
 ifneq "@ROFF2HTML@" "no"
 MANHTMLS = $(MANPAGES:%=%.html)
 endif

@@ -1,0 +1,646 @@
+.\" Process this file with
+.\" groff -man -Tascii netopeer-cli.1
+.\"
+.TH "netopeer-cli" 1 "Tue May 27 2014" "Netopeer"
+.SH NAME
+netopeer-cli \- NETCONF client with command line interface 
+.SH DESCRIPTION
+.B netopeer-cli
+serves as a generic NETCONF client providing a simple interactive command line
+interface. It allows user to establish a NETCONF session with a NETCONF-enabled
+device on the network and to obtain and manipulate its configuration data.
+.B netopeer-cli
+is limited to a single NETCONF connection at a time via a forward or a reverse
+(Call Home) connecting method.
+.PP
+Here is the list of NETCONF capabilities supported by
+.BR netopeer-cli :
+.IP \(bu 2
+NETCONF protocol version 1.0 and 1.1 (RFC 6241)
+.IP \(bu 2
+SSH transport (RFC 6242)
+.IP \(bu 2
+TLS transport (RFC 5539bis)
+.IP \(bu 2
+Call Home (reverse SSH/TLS)
+.IP \(bu 2
+Event Notifications (RFC 5277)
+.IP \(bu 2
+Access Control (RFC 6536)
+.IP \(bu 2
+:writable-running capability
+.IP \(bu 2
+:startup capability
+.IP \(bu 2
+:candidate capability
+.IP \(bu 2
+:validate capability version 1.1
+.IP \(bu 2
+:with-defaults capability (RFC 6243)
+.IP \(bu 2
+:url capability
+.SH FILES
+.I ~/.netopeer-cli/config.xml
+.RS
+Per user configuration for NETCONF <hello> message (see RFC 6241 for further
+details).
+.RE
+.PP
+.I ~/.netopeer-cli/history
+.RS
+Per user history of executed commands.
+.RE
+.PP
+.I ~/.ssh/netconf_known_hosts
+.RS
+Alternative known_hosts file if the original file contains libssh2 incompatible
+records.
+.SH COMMANDS
+.SS help
+Display list of commands. \fI\-\-help\fR option is also accepted by all commands
+to show detailed information about the command.
+.SS connect 
+Connect to a NETCONF server.
+.PP
+.B connect
+[\-\-help] [\-\-login \fIusername\fR] [\-\-tls \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-port \fInum\fR]  \fIhost\fR
+.PP
+.RS 4
+.B \-\-login
+\fIusername\fR
+.RS 4
+Specifies the user to log in as on the NETCONF server. If not specified, current
+local username is taken.
+.RE
+.PP
+.B \-\-tls
+\fIcert_path\fR
+.RS 4
+Use NETCONF over TLS transport instead of default SSH. \fIcert_path\fR specifies
+path to the client certificate. If
+.B \-\-key
+option is not specified, \fIcert_path\fR is expected to contain also the private
+key for the client certificate.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-key
+\fIkey_path\fR
+.RS 4
+Specifies path to the private key for the client certificate. If not specified,
+\fIcert_path\fR is expected to contain also the private key for the client
+certificate.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-port
+\fInum\fR
+.RS 4
+Port to connect to on the NETCONF server. By default, port \fI830\fR for SSH or
+\fI6513\fR for TLS transport is used.
+.RE
+.PP
+\fIhost\fR
+.RS 4
+Hostname of the target NETCONF server.
+.RE
+.RE
+.SS listen
+Listen for a NETCONF Call Home.
+.PP
+.B listen
+[\-\-help] [\-\-login \fIusername\fR] [\-\-tls \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-port \fInum\fR]
+.PP
+.RS 4
+.B \-\-login
+\fIusername\fR
+.RS 4
+Specifies the user to log in as on the NETCONF server. If not specified, current
+local username is taken.
+.RE
+.PP
+.B \-\-tls
+\fIcert_path\fR
+.RS 4
+Use NETCONF over TLS transport instead of default SSH. \fIcert_path\fR specifies
+path to the client certificate. If
+.B \-\-key
+option is not specified, \fIcert_path\fR is expected to contain also the private
+key for the client certificate.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-key
+\fIkey_path\fR
+.RS 4
+Specifies path to the private key for the client certificate. If not specified,
+\fIcert_path\fR is expected to contain also the private key for the client
+certificate.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-port
+\fInum\fR
+.RS 4
+Port to listen to for the NETCONF Call Home. By default, port \fI6666\fR for SSH
+or \fI6667\fR for TLS transport is used.
+.RE
+.RE
+.SS disconnect
+Disconnect from a NETCONF server.
+.SS commit
+Perform NETCONF <commit> operation. For more details see \fIRFC 6241 section 8.3.4.1\fR.
+.SS copy\-config
+Perform NETCONF <copy-config> operation. For more details see \fIRFC 6241 section 7.3\fR.
+.PP
+.B copy\-config
+[\-\-help] [\-\-defaults \fImode\fR] [\-\-source \fIdatastore\fR | \-\-config \fIfile\fR] \fItarget_datastore\fR
+.PP
+.RS 4
+.B \-\-defaults
+\fImode\fR
+.RS 4
+Use :with-defaults capability with specified retrieval mode. For more details
+see \fIRFC 6243 section 3\fR or 
+.B WITH\-DEFAULTS
+section of this manual.
+.RE
+.PP
+.B \-\-source
+\fIdatastore\fR
+.RS 4
+Specifies source datastore for the <copy-config> operation. For description of
+the \fIdatastore\fR parameter, see the
+.B DATASTORES
+section of this manual.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-config
+\fIfile\fR
+.RS 4
+Specifies path to a local file containing the complete configuration to copy.
+This option alternates the \fI\-\-source\fR option.
+.RE
+.PP
+\fItarget_datastore\fR
+.RS 4
+Target datastore to be rewritten. For description of possible values, see the
+.B DATASTORES
+section of this manual. 
+.RE
+.SS delete-config   
+Perform NETCONF <delete-config> operation. For more details see \fIRFC 6241 section 7.4\fR.
+.PP
+.B delete\-config
+[\-\-help]  \fItarget_datastore\fR
+.PP
+.RS 4
+\fItarget_datastore\fR
+.RS 4
+Target datastore to delete. For description of possible values, see the
+.B DATASTORES
+section of this manual. Note, that the 
+.I running
+configuration datastore cannot be deleted.
+.RE
+.RE
+.SS discard-changes 
+Perform NETCONF <discard-changes> operation. It reverts the 
+.I candidate
+configuration to the current
+.I running
+configuration. For more details see \fIRFC 6241 section 8.3.4.2\fR.
+.SS edit-config     
+Perform NETCONF <edit-config> operation. For more details see \fIRFC 6241 section 7.2\fR.
+.PP
+.B edit-config
+[\-\-help] [\-\-defop \fIoperation\fR] [\-\-error \fIaction\fR] [\-\-test \fIoption\fR] [\-\-config \fIfile\fR | \-\-url \fIURI\fR] \fItarget_datastore\fR
+.PP
+.RS 4
+.B \-\-defop
+\fIoperation\fR
+.RS 4
+Specifies default operation for applying configuration data.
+.IP merge
+Merge configuration data at the corresponding level. This is the default value.
+.IP replace
+Edit configuration data completely replaces the configuration in the target
+datastore.
+.IP none
+The target datastore is unaffected by the edit configuration data, unless and
+until the edit configuration data contains the 
+.I operation
+attribute to request a different operation. For more info, see the 
+.B EDIT-CONFIG
+section of this document.
+.RE
+.PP
+.B \-\-error
+\fIaction\fR
+.RS 4
+Set reaction to an error.
+.IP stop
+Abort the operation on first error. This is the default value.
+.IP continue
+Continue to process configuration data on error. The error is recorded and
+negative response is returned.
+.IP rollback
+Stop the operation processing on error and restore the configuration to its
+complete state at the start of this operation. This \fIaction\fR is available
+only if the server supports :rollback-on-error capability (see \fIRFC 6241 section 8.5\fR).
+.RE
+.PP
+.B \-\-test
+\fIoption\fR
+.RS 4
+Perform validation of the modified configuration data. This option is available
+only if the server supports :validate:1.1 capability (see \fIRFC 6241 section 8.6\fR).
+.IP set
+Do not perform validation test.
+.IP test-only
+Do not apply the modified data, only perform the validation test.
+.IP test-then-set
+Perform a validation test before attempting to apply modified configuration data.
+This is the default value.
+.RE
+.PP
+.B \-\-config
+\fIfile\fR
+.RS 4
+Specify path to a file containing edit configuration data. The content of the
+file is placed into the <config> element of the \fIedit-config\fR operation.
+Therefore, it don't have to be a well-formed XML document with only a single
+root element. If neither \fI\-\-config\fR nor \fI\-\-url\fR is specified, user 
+is prompted to write edit configuration data manually. For examples, see the
+.B EDIT-CONFIG
+section of this document.
+.RE
+.PP
+.B \-\-url
+\fIURI\fR
+.RS 4
+Specify remote location of the file containing the configuration data hierarchy
+to be modified, encoded in XML under the element <config> in the
+.I urn:ietf:params:xml:ns:netconf:base:1.0
+namespace. Note, that this differs from \fIfile\fR parameter, where the <config>
+element is not expected.
+.RE
+.PP
+\fItarget_datastore\fR
+.RS 4
+Target datastore to modify. For description of possible values, see the
+.B DATASTORES
+section of this manual. Note, that the 
+.I url
+configuration datastore cannot be modified.
+.RE
+.RE
+.SS get             
+Perform NETCONF <get> operation. Receives both status as well as configuration
+data from the current running datastore. For more details see \fIRFC 6241 section 7.7\fR.
+.PP
+.B get
+[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter [\fIfile\fR]]
+.PP
+.RS 4
+.B \-\-defaults
+\fImode\fR
+.RS 4
+Use :with-defaults capability with specified retrieval mode. For more details
+see \fIRFC 6243 section 3\fR or 
+.B WITH\-DEFAULTS
+section of this manual.
+.RE
+.PP
+.B \-\-filter
+[\fIfile\fR]
+.RS 4
+Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
+The option is able to accept path to the \fIfile\fR containing the filter
+specification. If the path is not specified, user is prompted to write the
+filter specification manually.
+.RE
+.RE
+.SS get-config            
+Perform NETCONF <get-config> operation. Retrieves only configuration data from
+the specified \fItarget_datastore\fR. For more details see \fIRFC 6241 section 7.1\fR.
+.PP
+.B get-config
+[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter [\fIfile\fR]] \fItarget_datastore\fR
+.PP
+.RS 4
+.B \-\-defaults
+\fImode\fR
+.RS 4
+Use :with-defaults capability with specified retrieval mode. For more details
+see \fIRFC 6243 section 3\fR or 
+.B WITH\-DEFAULTS
+section of this manual.
+.RE
+.PP
+.B \-\-filter
+[\fIfile\fR]
+.RS 4
+Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
+The option is able to accept path to the \fIfile\fR containing the filter
+specification. If the path is not specified, user is prompted to write the
+filter specification manually.
+.RE
+.PP
+\fItarget_datastore\fR
+.RS 4
+Target datastore to retrieve. For description of possible values, see the
+.B DATASTORES
+section of this manual. Note, that the 
+.I url
+configuration datastore cannot be retrieved.
+.RE
+.RE
+.SS get-schema
+Perform NETCONF <get-schema> operation that retrieves specified data model used
+by the server. This operation is available only if the server implements YANG
+Module for NETCONF Monitoring. The list of available schemas can be retrieved from
+.I /netconf-state/schemas
+subtree via the <get> operation. For more details see \fIRFC 6022 sections 3.1 and 4\fR.
+.PP
+.B get-schema 
+[\-\-help] [\-\-version \fIversion\fR] [\-\-format \fIformat\fR] \fIidentifier\fR
+.PP
+.RS 4
+.B \-\-version
+\fIversion\fR
+.RS 4
+Version of the requested schema.
+.RE
+.B \-\-format
+\fIformat\fR
+.RS 4
+The data modeling language (format) of the requested schema. Default value is
+.IR yang .
+.RE
+\fIidentifier\fR
+.RS 4
+Identifier for the schema list entry.
+.RE
+.RE
+.SS  kill-session
+Perform NETCONF <kill-session> operation to terminate specified NETCONF session.
+To terminate the current session, use the
+.B disconnect
+command. For more details see \fIRFC 6241 section 7.9\fR.
+.PP
+.B kill-session
+[\-\-help] \fIsession-id\fR
+.PP
+.RS 4
+\fIsession-id\fR
+.RS 4
+Session identifier of the NETCONF session to be terminated.
+.RE
+.RE
+.SS lock    
+Perform the NETCONF <lock> operation to lock the entire configuration datastore
+of a server. For more details see \fIRFC 6241 section 7.5\fR.
+.PP
+.B lock
+[\-\-help] \fItarget_datastore\fR
+.PP
+.RS 4
+\fItarget_datastore\fR
+.RS 4
+Target datastore to lock. For description of possible values, see the
+.B DATASTORES
+section of this manual. Note, that the 
+.I url
+configuration datastore cannot be locked.
+.RE
+.RE
+.SS  unlock
+Perform the NETCONF <unlock> operation to release a configuration lock,
+previously obtained with the <lock> operation. For more details see \fIRFC 6241 section 7.6\fR.
+.PP
+.B lock
+[\-\-help] \fItarget_datastore\fR
+.PP
+.RS 4
+\fItarget_datastore\fR
+.RS 4
+Target datastore to unlock. For description of possible values, see the
+.B DATASTORES
+section of this manual. Note, that the 
+.I url
+configuration datastore cannot be unlocked.
+.RE
+.RE
+.SS  validate
+Perform the NETCONF <validate> operation to validate configuration data. For
+more details see \fIRFC 6241 section 8.6.4.1\fR.
+.PP
+.B validate
+[\-\-help] \-\-config [\fIfile\fR] | \fItarget_datastore\fR
+.PP
+.B \-\-config
+\fIfile\fR
+.RS 4
+Validate specified configuration data. If the \fIfile\fR is specified, the
+complete configuration data are taken from the specified file. If the \fIfile\fR
+is not specified, user is prompted to type the configuration data manually.
+.RE
+.PP
+\fItarget_datastore\fR
+.RS 4
+Target datastore to validate. For description of possible values, see the
+.B DATASTORES
+section of this manual.
+.RE
+.PP
+Options \-\-config and \fItarget_datastore\fR are mutually exclusive, but one of
+these options is required.
+.RE
+.SS  subscribe
+Perform NETCONF Event Notifications <create-subscription> operation. For more
+details see \fIRFC 5277 section 2.1.1\fR.
+.PP
+.B subscribe
+[\-\-help] [\-\-filter [file]] [\-\-begin \fItime\fR] [\-\-end \fItime\fR] [\-\-output \fIfile\fR] [\fIstream\fR]
+.PP
+.RS 4
+.B \-\-filter
+[\fIfile\fR]
+.RS 4
+Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
+The option is able to accept path to the \fIfile\fR containing the filter
+specification. If the path is not specified, user is prompted to write the
+filter specification manually.
+.RE
+.PP
+.B \-\-begin
+\fItime\fR
+.RS 4
+Start to replay event notifications from past (future time is not valid).
+If the start time is not specified, replay feature is not activated and only
+new event notifications are received. Format of the \fItime\fR parameter is
+described below.
+.RE
+.PP
+.B \-\-end
+\fItime\fR
+.RS 4
+Specifies when the event replay stops. Format of the \fItime\fR parameter is
+as follows:
+.IP +\fItime\fR
+Current time plus the given number of seconds.
+.IP \fItime\fR
+Absolute time as number of seconds since 1970-01-01.
+.IP -\fItime\fR
+Current time minus the given number of seconds.
+.RE
+.PP
+.B \-\-output
+\fIstream\fR
+.RS 4
+Print received notifications into the specified file instead of printing on 
+terminal.
+.RE
+.PP
+\fIstream\fR
+.RS 4
+Specifies which events stream is of interest. If not specified, default NETCONF
+stream is received. The list of available streams can be retrieved from
+.I /netconf/streams
+subtree via the <get> operation.
+.RE
+.RE
+.SS  status
+Print information about the current NETCONF session.
+.SS  user-rpc
+Send your own content in an RPC envelope. This can be used for RPC operations
+defined in data models not supported by the
+.BR netopeer-cli .
+.PP
+.B user-rpc
+[\-\-help] [\-\-file \fIfile\fR]
+.PP
+.RS 4
+.B \-\-file
+\fIfile\fR
+.RS 4
+Specifies a file containing NETCONF RPC operation in XML format. Only the NETCONF
+<rpc> envelope is added to the file content and then it is sent to a server. If
+the option is omitted, user is prompted to type the RPC content manually.
+.RE
+.RE
+.SS  verbose
+Enable/disable verbose messages.
+.SS debug
+Enable/disable debug messages. Available only if the
+.B netopeer-cli
+is compiled with configure's \-\-enable\-debug option.
+.SS  quit
+Quit the program.
+.SH DATASTORES
+.IP running
+Base NETCONF configuration datastore holding the complete configuration
+currently active on the device. This datastore always exists. 
+.IP startup
+The configuration datastore holding the configuration loaded by the device when
+it boots. Only present on servers that implement :startup capability.
+.IP candidate
+The configuration datastore that can be manipulated without impacting the
+device's current configuration and that can be committed to the running
+configuration datastore. Only present on servers that implement :candidate
+capability.
+.IP url:\fIURI\fR
+Refers to a remote configuration datastore located at \fIURI\fR. The file that
+the \fIURI\fR refers to contains the configuration data hierarchy to be
+modified, encoded in XML under the element <config> in the
+.I urn:ietf:params:xml:ns:netconf:base:1.0
+namespace. This datastore is available only on servers that implement :url
+capability.
+.SH WITH\-DEFAULTS
+This section briefly describes :with-defaults capability retrieval modes used
+in NETCONF operation commands described above. More detailed information about
+the :with-defaults capability can be found in \fIRFC 6243\fR.
+.PP
+Retrieval modes:
+.RS 4
+.PP
+.B report\-all
+.RS 4
+All configuration data including default data nodes are retrieved.
+.RE
+.PP
+.B report\-all\-tagged
+.RS 4
+As \fIreport\-all\fR, but the default data nodes are tagged with XML attribute
+.I default
+in
+.I urn:ietf:params:xml:ns:netconf:default:1.0
+namespace set to value
+.I true.
+.RE
+.PP
+.B trim
+.RS 4
+Only data that do not contain default values are retrieved.
+.RE
+.PP
+.B explicit
+.RS 4
+Only data explicitly set by the client are retrieved despite they contain
+default values or not.
+.RE
+.RE
+.SH "EDIT-CONFIG"
+TBD
+.SH "SEE ALSO"
+.BR netopeer-agent(1),
+.BR netopeer-configurator(1),
+.BR netopeer-manager(1),
+.BR netopeer-server(1),
+.br
+RFC 5277 (Event Notifications)
+.br
+RFC 6241 (NETCONF v1.1)
+.br
+RFC 6242 (NETCONF over SSH)
+.br
+RFC 6243 (With-defaults capability)
+.br
+RFC 6536 (NETCONF Access Control)
+.br
+.na
+http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05 (NETCONF over TLS)
+.br
+http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05 (Call Home)
+.br
+https://libnetconf.googlecode.com (libnetconf homepage)
+.ad
+.SH MAILING LIST
+To discuss various topics about
+.B netopeer-cli,
+join the Netopeer mailing list at <https://groups.google.com/group/netopeer>.
+.SH REPORTING BUGS
+Report bugs to the issue tracker at <https://code.google.com/p/libnetconf/issues/list>.
+.SH AUTHORS
+Radek Krejci <rkrejci@cesnet.cz>
+.SH COPYRIGHT
+Copyright \(co 2012-2014 CESNET, z.s.p.o.
+
+
