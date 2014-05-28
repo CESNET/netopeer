@@ -743,7 +743,7 @@ void cmd_validate_help ()
 			ds_url = "";
 		}
 	}
-	fprintf (stdout, "validate [--help] [--config <file> | running%s%s%s]\n",
+	fprintf (stdout, "validate [--help] --config [<file>] | running%s%s%s\n",
 			ds_startup, ds_candidate, ds_url);
 
 	if (session != NULL &&
@@ -2095,7 +2095,7 @@ void* notification_thread(void* arg)
 
 void cmd_subscribe_help()
 {
-	fprintf (stdout, "subscribe [--help] [--filter] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
+	fprintf (stdout, "subscribe [--help] [--filter [file]] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
 	fprintf (stdout, "\t<time> has following format:\n");
 	fprintf (stdout, "\t\t+<num>  - current time plus the given number of seconds.\n");
 	fprintf (stdout, "\t\t<num>   - absolute time as number of seconds since 1970-01-01.\n");
@@ -2250,7 +2250,7 @@ int cmd_subscribe(char *arg)
 
 void cmd_userrpc_help()
 {
-	fprintf (stdout, "user-rpc [--help] [--file <file>]]\n\n"
+	fprintf (stdout, "user-rpc [--help] [--file <file>]\n\n"
 	"\'--file <file>\' - input file with RPC message content.\n"
 	"If \'--file\' is omitted, user is asked to enter content manually.\n");
 }
