@@ -61,7 +61,10 @@
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
-#include <libnetconf_tls.h>
+
+#ifdef ENABLE_TLS
+#	include <libnetconf_tls.h>
+#endif
 
 #include "config.h"
 
