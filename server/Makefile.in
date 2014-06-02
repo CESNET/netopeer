@@ -134,8 +134,8 @@ endef
 
 all: $(AGENT) $(SERVER) $(MANHTMLS) $(TOOLS) 
 
-$(SERVER_MODULES_CONF): 
-	$(call EXPAND,$(@:%=%.out),$@)
+$(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
+	$(call EXPAND,$(@:%=%.tmp),$@)
 
 %.1.html: %.1
 	@ROFF2HTML@ $< > $@
@@ -148,8 +148,8 @@ $(AGENT): $(AGENT_OBJS)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
-manager/netopeer-manager:
-	$(call EXPAND,$(@:%=%.out),$@)
+manager/netopeer-manager: manager/netopeer-manager.tmp
+	$(call EXPAND,$<,$@)
 	chmod +x $@	
 
 $(OBJDIR)/%.o: %.c
