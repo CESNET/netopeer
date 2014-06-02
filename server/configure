@@ -5380,9 +5380,9 @@ ac_config_files="$ac_config_files config/org.liberouter.netopeer.conf"
 
 ac_config_files="$ac_config_files config/org.liberouter.netopeer.server.service"
 
-ac_config_files="$ac_config_files config/Netopeer.xml"
+ac_config_files="$ac_config_files config/Netopeer.xml.out:config/Netopeer.xml.in"
 
-ac_config_files="$ac_config_files config/NETCONF-server.xml"
+ac_config_files="$ac_config_files config/NETCONF-server.xml.out:config/NETCONF-server.xml.in"
 
 ac_config_files="$ac_config_files netopeer-server.spec"
 
@@ -6105,8 +6105,8 @@ do
     "manager/Makefile") CONFIG_FILES="$CONFIG_FILES manager/Makefile" ;;
     "config/org.liberouter.netopeer.conf") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.conf" ;;
     "config/org.liberouter.netopeer.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.server.service" ;;
-    "config/Netopeer.xml") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml" ;;
-    "config/NETCONF-server.xml") CONFIG_FILES="$CONFIG_FILES config/NETCONF-server.xml" ;;
+    "config/Netopeer.xml.out") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml.out:config/Netopeer.xml.in" ;;
+    "config/NETCONF-server.xml.out") CONFIG_FILES="$CONFIG_FILES config/NETCONF-server.xml.out:config/NETCONF-server.xml.in" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
