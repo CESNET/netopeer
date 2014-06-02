@@ -55,6 +55,10 @@ def getText(nodelist):
             rc.append(node.data)
     return ''.join(rc)
 
+def getNetopeerDatastore(config):
+	repo = config.getElementsByTagName('repo')[0]
+	return getText(repo.getElementsByTagName('path')[0].childNodes)
+
 def listModules(config):
 	list = []
 	startup = config.getElementsByTagName('startup')[0]
@@ -102,7 +106,6 @@ def listAugments(config):
 # "main" starts here
 # create argument parser
 parser = argparse.ArgumentParser(description="Manage Netopeer's modules", formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('--netopeer', help='Specify Netopeer\'s configuration directory (by default /etc/netopeer/).')
 subparsers = parser.add_subparsers(dest='subcommand')
 parser_add = subparsers.add_parser('add', help='Add a new module.')
 parser_list = subparsers.add_parser('list', help='List all existing modules.')
@@ -129,18 +132,20 @@ parser_list_augment.add_argument('--name', required=True, help='Name of the modu
 parser_rm_augment.add_argument('--name', required=True, help='Name of the module of the augment model to remove.')
 parser_rm_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
 
-modules_path = '/etc/netopeer/modules.conf.d'
+modules_path = '@MODULESDIR@'
 netopeer_config = '/etc/netopeer/cfgnetopeer/datastore.xml'
 
 try:
 	args = parser.parse_args()
 
-	if args.netopeer:
-		netopeer_config = args.netopeer+'/cfgnetopeer/datastore.xml'
-		modules_path = args.netopeer+'/modules.conf.d/'
+	# get Netopeer configuration datastore
+	if not os.path.exists(modules_path+'/Netopeer.xml'):
+		print('Missing Netopeer module description ('+modules_path+'/Netopeer.xml)')
+		exit(1)
 	
+	netopeer_config = getNetopeerDatastore(minidom.parse(modules_path+'/Netopeer.xml'))	
 	if not os.path.exists(netopeer_config):
-		print('Missing Netopeer configuration ('+netopeer_config+')')
+		print('Missing Netopeer configuration datastore ('+netopeer_config+')')
 		exit(1)
 
 	if args.subcommand == 'list':
