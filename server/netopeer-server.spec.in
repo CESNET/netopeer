@@ -43,6 +43,16 @@ chown @USER@:@GROUP@ @DBUSCONF@/org.liberouter.netopeer.conf
 chown @USER@:@GROUP@ @DBUSSERVICES@/org.liberouter.netopeer.server.service
 chown -R @USER@:@GROUP@ %{_sysconfdir}/netopeer/
 
+#SSHD config
+if test -f /etc/ssh/sshd_config; then \
+        grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > %{_sysconfdir}/netopeer/sshd_config; \
+else \
+        touch %{_sysconfdir}/netopeer/sshd_config; \
+fi; \
+echo "" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "# NETCONF SSH Subsystem settings" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/sshd_config; \
+
 %postun
 
 %files

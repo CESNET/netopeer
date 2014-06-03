@@ -91,6 +91,12 @@ SERVER_MODULES_CONF = config/Netopeer.xml \
 	config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
+COMMON_SRCS = src/common.c
+
+MANAGER_INS = manager/netopeer-manager.in
+
+CONFIGURATOR_INS = configurator/modules/config.py.in
+
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
@@ -112,7 +118,11 @@ CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \
 	config/NETCONF-server.xml.in \
 	config/org.liberouter.netopeer.conf.in \
-	config/org.liberouter.netopeer.server.service.in
+	config/org.liberouter.netopeer.server.service.in \
+	config/Netopeer.xml.in \
+	stunnel/stunnel.conf.in
+
+H_IN = src/config.h.in
 
 MANPAGES = 
 ifneq "@ROFF2HTML@" "no"
@@ -179,8 +189,9 @@ dist: $(NAME).spec tarball rpm
 tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
-	for i in $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(TOOLS) $(CFGS_TAR) configure.in configure \
-	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES); do \
+	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
+	for i in $(SERVER_SRCS) $(AGENT_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) $(H_IN) configure.in configure \
+	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) config.sub config.guess $(MANAGER_INS) $(CONFIGURATOR_INS); do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
 	done;
