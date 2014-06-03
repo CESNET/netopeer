@@ -105,7 +105,10 @@ AC_ARG_ENABLE([debug],
 AC_MSG_CHECKING([for group])
 AC_ARG_WITH([group],
 	AC_HELP_STRING([--with-group=GROUP],[Group of users with enabled access to Netopeer server (root by default)]),
-	GROUP="$with_group",
+	[
+		GROUP="$with_group"
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
+	],
 	GROUP="root"
 )
 AC_MSG_RESULT([$GROUP])
@@ -113,7 +116,10 @@ AC_MSG_RESULT([$GROUP])
 AC_MSG_CHECKING([for user])
 AC_ARG_WITH([user],
 	AC_HELP_STRING([--with-user=USER],[User to be allowed to start Netopeer server (root by default)]),
-	USER="$with_user",
+	[
+		USER="$with_user"
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-user=$with_user"
+	],
 	USER="root"
 )
 AC_MSG_RESULT([$USER])
@@ -269,7 +275,7 @@ if test "$dbus" = "yes"; then
 	AGENT_SRCS_COMM="src/agent_comm_dbus.c"
 	SERVER_SRCS_COMM="src/server_comm_dbus.c"
 	AGENT_HDRS_COMM="src/netopeer_dbus.h"
-	SERVER_HDRS_COMM="src/netopeer-dbus.h"
+	SERVER_HDRS_COMM="src/netopeer_dbus.h"
 
 	# - library
 	AC_ARG_WITH([libdbus],
