@@ -117,7 +117,7 @@ parser_rm_augment = subparsers.add_parser('rm-augment', help='Remove an existing
 parser_add.add_argument('--name', required=True, help='Name (ID) of the module.')
 parser_add.add_argument('--model', required=True, type=argparse.FileType('r'), help='File holding the main data model (YIN format).')
 parser_add.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the main data model.')
-parser_add.add_argument('--features', nargs='+', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+parser_add.add_argument('--features', nargs='+', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\' character.')
 parser_add.add_argument('--datastore', help='File path to the datastore location. If not set, datastore will not be able to store configuration data')
 
 parser_rm.add_argument('--name', required=True, help='Name of the module to remove.')
@@ -125,7 +125,7 @@ parser_rm.add_argument('--name', required=True, help='Name of the module to remo
 parser_add_augment.add_argument('--name', required=True, help='Name (ID) of the module to edit.')
 parser_add_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
 parser_add_augment.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the augment model.')
-parser_add_augment.add_argument('--features', nargs='+', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+parser_add_augment.add_argument('--features', nargs='+', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\' character.')
 
 parser_list_augment.add_argument('--name', required=True, help='Name of the module.')
 
