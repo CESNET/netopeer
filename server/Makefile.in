@@ -124,7 +124,7 @@ CFGS_TAR = $(CFGS) \
 
 H_IN = src/config.h.in
 
-MANPAGES = 
+MANPAGES = manager/netopeer-manager.1
 ifneq "@ROFF2HTML@" "no"
 MANHTMLS = $(MANPAGES:%=%.html)
 endif
