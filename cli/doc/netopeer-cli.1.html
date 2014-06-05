@@ -1,0 +1,1095 @@
+<!-- Creator     : groff version 1.21 -->
+<!-- CreationDate: Thu Jun  5 10:07:53 2014 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
+<title>netopeer-cli</title>
+
+</head>
+<body>
+
+<h1 align="center">netopeer-cli</h1>
+
+<a href="#NAME">NAME</a><br>
+<a href="#DESCRIPTION">DESCRIPTION</a><br>
+<a href="#FILES">FILES</a><br>
+<a href="#COMMANDS">COMMANDS</a><br>
+<a href="#DATASTORES">DATASTORES</a><br>
+<a href="#WITH&minus;DEFAULTS">WITH&minus;DEFAULTS</a><br>
+<a href="#EDIT-CONFIG">EDIT-CONFIG</a><br>
+<a href="#SEE ALSO">SEE ALSO</a><br>
+<a href="#MAILING LIST">MAILING LIST</a><br>
+<a href="#REPORTING BUGS">REPORTING BUGS</a><br>
+<a href="#AUTHORS">AUTHORS</a><br>
+<a href="#COPYRIGHT">COPYRIGHT</a><br>
+
+<hr>
+
+
+<h2>NAME
+<a name="NAME"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">netopeer-cli
+&minus; NETCONF client with command line interface</p>
+
+<h2>DESCRIPTION
+<a name="DESCRIPTION"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-cli</b>
+serves as a generic NETCONF client providing a simple
+interactive command line interface. It allows user to
+establish a NETCONF session with a NETCONF-enabled device on
+the network and to obtain and manipulate its configuration
+data. <b>netopeer-cli</b> is limited to a single NETCONF
+connection at a time via a forward or a reverse (Call Home)
+connecting method.</p>
+
+<p style="margin-left:11%; margin-top: 1em">Here is the
+list of NETCONF capabilities supported by
+<b>netopeer-cli</b>:</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>NETCONF protocol version 1.0 and 1.1 (RFC 6241)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>SSH transport (RFC 6242)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>TLS transport (RFC 5539bis)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>Call Home (reverse SSH/TLS)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>Event Notifications (RFC 5277)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>Access Control (RFC 6536)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:writable-running capability</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:startup capability</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:candidate capability</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:validate capability version 1.1</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:with-defaults capability (RFC 6243)</p></td>
+<td width="14%">
+</td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="1%">
+
+
+<p>&bull;</p></td>
+<td width="2%"></td>
+<td width="72%">
+
+
+<p>:url capability</p></td>
+<td width="14%">
+</td></tr>
+</table>
+
+<h2>FILES
+<a name="FILES"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>~/.netopeer-cli/config.xml</i></p>
+
+<p style="margin-left:22%;">Per user configuration for
+NETCONF &lt;hello&gt; message (see RFC 6241 for further
+details).</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>~/.netopeer-cli/history</i></p>
+
+<p style="margin-left:22%;">Per user history of executed
+commands.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>~/.ssh/netconf_known_hosts</i></p>
+
+<p style="margin-left:22%;">Alternative known_hosts file if
+the original file contains libssh2 incompatible records.</p>
+
+<h2>COMMANDS
+<a name="COMMANDS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>help</b>
+<br>
+Display list of commands. <i>&minus;&minus;help</i> option
+is also accepted by all commands to show detailed
+information about the command.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>connect</b>
+<br>
+Connect to a NETCONF server.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>connect</b>
+[&minus;&minus;help] [&minus;&minus;login <i>username</i>]
+[&minus;&minus;tls <i>cert_path</i> [&minus;&minus;key
+<i>key_path</i>]] [&minus;&minus;port <i>num</i>]
+<i>host</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;login</b>
+<i>username</i></p>
+
+<p style="margin-left:23%;">Specifies the user to log in as
+on the NETCONF server. If not specified, current local
+username is taken.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;tls</b>
+<i>cert_path</i></p>
+
+<p style="margin-left:23%;">Use NETCONF over TLS transport
+instead of default SSH. <i>cert_path</i> specifies path to
+the client certificate. If <b>&minus;&minus;key</b> option
+is not specified, <i>cert_path</i> is expected to contain
+also the private key for the client certificate.</p>
+
+<p style="margin-left:23%; margin-top: 1em">This option is
+available only when the <b>netopeer-cli</b> is compiled with
+configure&rsquo;s &minus;&minus;enable-tls option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;key</b>
+<i>key_path</i></p>
+
+<p style="margin-left:23%;">Specifies path to the private
+key for the client certificate. If not specified,
+<i>cert_path</i> is expected to contain also the private key
+for the client certificate.</p>
+
+<p style="margin-left:23%; margin-top: 1em">This option is
+available only when the <b>netopeer-cli</b> is compiled with
+configure&rsquo;s &minus;&minus;enable-tls option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;port</b>
+<i>num</i></p>
+
+<p style="margin-left:23%;">Port to connect to on the
+NETCONF server. By default, port <i>830</i> for SSH or
+<i>6513</i> for TLS transport is used.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>host</i></p>
+
+<p style="margin-left:23%;">Hostname of the target NETCONF
+server.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>listen</b>
+<br>
+Listen for a NETCONF Call Home.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>listen</b>
+[&minus;&minus;help] [&minus;&minus;login <i>username</i>]
+[&minus;&minus;tls <i>cert_path</i> [&minus;&minus;key
+<i>key_path</i>]] [&minus;&minus;port <i>num</i>]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;login</b>
+<i>username</i></p>
+
+<p style="margin-left:23%;">Specifies the user to log in as
+on the NETCONF server. If not specified, current local
+username is taken.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;tls</b>
+<i>cert_path</i></p>
+
+<p style="margin-left:23%;">Use NETCONF over TLS transport
+instead of default SSH. <i>cert_path</i> specifies path to
+the client certificate. If <b>&minus;&minus;key</b> option
+is not specified, <i>cert_path</i> is expected to contain
+also the private key for the client certificate.</p>
+
+<p style="margin-left:23%; margin-top: 1em">This option is
+available only when the <b>netopeer-cli</b> is compiled with
+configure&rsquo;s &minus;&minus;enable-tls option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;key</b>
+<i>key_path</i></p>
+
+<p style="margin-left:23%;">Specifies path to the private
+key for the client certificate. If not specified,
+<i>cert_path</i> is expected to contain also the private key
+for the client certificate.</p>
+
+<p style="margin-left:23%; margin-top: 1em">This option is
+available only when the <b>netopeer-cli</b> is compiled with
+configure&rsquo;s &minus;&minus;enable-tls option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;port</b>
+<i>num</i></p>
+
+<p style="margin-left:23%;">Port to listen to for the
+NETCONF Call Home. By default, port <i>6666</i> for SSH or
+<i>6667</i> for TLS transport is used.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>disconnect</b>
+<br>
+Disconnect from a NETCONF server.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>commit</b>
+<br>
+Perform NETCONF &lt;commit&gt; operation. For more details
+see <i>RFC 6241 section 8.3.4.1</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>copy&minus;config</b>
+<br>
+Perform NETCONF &lt;copy-config&gt; operation. For more
+details see <i>RFC 6241 section 7.3</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>copy&minus;config</b>
+[&minus;&minus;help] [&minus;&minus;defaults <i>mode</i>]
+[&minus;&minus;source <i>datastore</i> |
+&minus;&minus;config <i>file</i>]
+<i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defaults</b>
+<i>mode</i></p>
+
+<p style="margin-left:23%;">Use :with-defaults capability
+with specified retrieval mode. For more details see <i>RFC
+6243 section 3</i> or <b>WITH&minus;DEFAULTS</b> section of
+this manual.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;source</b>
+<i>datastore</i></p>
+
+<p style="margin-left:23%;">Specifies source datastore for
+the &lt;copy-config&gt; operation. For description of the
+<i>datastore</i> parameter, see the <b>DATASTORES</b>
+section of this manual.</p>
+
+<p style="margin-left:23%; margin-top: 1em">This option is
+available only when the <b>netopeer-cli</b> is compiled with
+configure&rsquo;s &minus;&minus;enable-tls option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;config</b>
+<i>file</i></p>
+
+<p style="margin-left:23%;">Specifies path to a local file
+containing the complete configuration to copy. This option
+alternates the <i>&minus;&minus;source</i> option.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to be
+rewritten. For description of possible values, see the
+<b>DATASTORES</b> section of this manual.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>delete-config</b>
+<br>
+Perform NETCONF &lt;delete-config&gt; operation. For more
+details see <i>RFC 6241 section 7.4</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>delete&minus;config</b>
+[&minus;&minus;help] <i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to delete. For
+description of possible values, see the <b>DATASTORES</b>
+section of this manual. Note, that the <i>running</i>
+configuration datastore cannot be deleted.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>discard-changes</b>
+<br>
+Perform NETCONF &lt;discard-changes&gt; operation. It
+reverts the <i>candidate</i> configuration to the current
+<i>running</i> configuration. For more details see <i>RFC
+6241 section 8.3.4.2</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>edit-config</b>
+<br>
+Perform NETCONF &lt;edit-config&gt; operation. For more
+details see <i>RFC 6241 section 7.2</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>edit-config</b>
+[&minus;&minus;help] [&minus;&minus;defop <i>operation</i>]
+[&minus;&minus;error <i>action</i>] [&minus;&minus;test
+<i>option</i>] [&minus;&minus;config <i>file</i> |
+&minus;&minus;url <i>URI</i>] <i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defop</b>
+<i>operation</i></p>
+
+<p style="margin-left:23%;">Specifies default operation for
+applying configuration data.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="8%">
+
+
+<p style="margin-top: 1em">merge</p></td>
+<td width="3%"></td>
+<td width="66%">
+
+
+<p style="margin-top: 1em">Merge configuration data at the
+corresponding level. This is the default value.</p></td></tr>
+</table>
+
+<p style="margin-left:23%;">replace</p>
+
+<p style="margin-left:34%;">Edit configuration data
+completely replaces the configuration in the target
+datastore.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="6%">
+
+
+<p>none</p></td>
+<td width="5%"></td>
+<td width="66%">
+
+
+<p>The target datastore is unaffected by the edit
+configuration data, unless and until the edit configuration
+data contains the <i>operation</i> attribute to request a
+different operation. For more info, see the
+<b>EDIT-CONFIG</b> section of this document.</p></td></tr>
+</table>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;error</b>
+<i>action</i></p>
+
+<p style="margin-left:23%;">Set reaction to an error.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="6%">
+
+
+<p style="margin-top: 1em">stop</p></td>
+<td width="5%"></td>
+<td width="66%">
+
+
+<p style="margin-top: 1em">Abort the operation on first
+error. This is the default value.</p></td></tr>
+</table>
+
+<p style="margin-left:23%;">continue</p>
+
+<p style="margin-left:34%;">Continue to process
+configuration data on error. The error is recorded and
+negative response is returned.</p>
+
+<p style="margin-left:23%;">rollback</p>
+
+<p style="margin-left:34%;">Stop the operation processing
+on error and restore the configuration to its complete state
+at the start of this operation. This <i>action</i> is
+available only if the server supports :rollback-on-error
+capability (see <i>RFC 6241 section 8.5</i>).</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;test</b>
+<i>option</i></p>
+
+<p style="margin-left:23%;">Perform validation of the
+modified configuration data. This option is available only
+if the server supports :validate:1.1 capability (see <i>RFC
+6241 section 8.6</i>).</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="5%">
+
+
+<p>set</p></td>
+<td width="6%"></td>
+<td width="48%">
+
+
+<p>Do not perform validation test.</p></td>
+<td width="18%">
+</td></tr>
+</table>
+
+<p style="margin-left:23%;">test-only</p>
+
+<p style="margin-left:34%;">Do not apply the modified data,
+only perform the validation test.</p>
+
+<p style="margin-left:23%;">test-then-set</p>
+
+<p style="margin-left:34%;">Perform a validation test
+before attempting to apply modified configuration data. This
+is the default value.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;config</b>
+<i>file</i></p>
+
+<p style="margin-left:23%;">Specify path to a file
+containing edit configuration data. The content of the file
+is placed into the &lt;config&gt; element of the
+<i>edit-config</i> operation. Therefore, it don&rsquo;t have
+to be a well-formed XML document with only a single root
+element. If neither <i>&minus;&minus;config</i> nor
+<i>&minus;&minus;url</i> is specified, user is prompted to
+write edit configuration data manually. For examples, see
+the <b>EDIT-CONFIG</b> section of this document.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;url</b>
+<i>URI</i></p>
+
+<p style="margin-left:23%;">Specify remote location of the
+file containing the configuration data hierarchy to be
+modified, encoded in XML under the element &lt;config&gt; in
+the <i>urn:ietf:params:xml:ns:netconf:base:1.0</i>
+namespace. Note, that this differs from <i>file</i>
+parameter, where the &lt;config&gt; element is not
+expected.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to modify. For
+description of possible values, see the <b>DATASTORES</b>
+section of this manual. Note, that the <i>url</i>
+configuration datastore cannot be modified.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>get</b> <br>
+Perform NETCONF &lt;get&gt; operation. Receives both status
+as well as configuration data from the current running
+datastore. For more details see <i>RFC 6241 section
+7.7</i>.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>get</b>
+[&minus;&minus;help] [&minus;&minus;defaults <i>mode</i>]
+[&minus;&minus;filter [<i>file</i>]]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defaults</b>
+<i>mode</i></p>
+
+<p style="margin-left:23%;">Use :with-defaults capability
+with specified retrieval mode. For more details see <i>RFC
+6243 section 3</i> or <b>WITH&minus;DEFAULTS</b> section of
+this manual.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
+
+<p style="margin-left:23%;">Specifies if the request will
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>get-config</b>
+<br>
+Perform NETCONF &lt;get-config&gt; operation. Retrieves only
+configuration data from the specified
+<i>target_datastore</i>. For more details see <i>RFC 6241
+section 7.1</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>get-config</b>
+[&minus;&minus;help] [&minus;&minus;defaults <i>mode</i>]
+[&minus;&minus;filter [<i>file</i>]]
+<i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defaults</b>
+<i>mode</i></p>
+
+<p style="margin-left:23%;">Use :with-defaults capability
+with specified retrieval mode. For more details see <i>RFC
+6243 section 3</i> or <b>WITH&minus;DEFAULTS</b> section of
+this manual.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
+
+<p style="margin-left:23%;">Specifies if the request will
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to retrieve.
+For description of possible values, see the
+<b>DATASTORES</b> section of this manual. Note, that the
+<i>url</i> configuration datastore cannot be retrieved.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>get-schema</b>
+<br>
+Perform NETCONF &lt;get-schema&gt; operation that retrieves
+specified data model used by the server. This operation is
+available only if the server implements YANG Module for
+NETCONF Monitoring. The list of available schemas can be
+retrieved from <i>/netconf-state/schemas</i> subtree via the
+&lt;get&gt; operation. For more details see <i>RFC 6022
+sections 3.1 and 4</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>get-schema</b>
+[&minus;&minus;help] [&minus;&minus;version <i>version</i>]
+[&minus;&minus;format <i>format</i>] <i>identifier</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;version</b>
+<i>version</i></p>
+
+<p style="margin-left:23%;">Version of the requested
+schema.</p>
+
+<p style="margin-left:17%;"><b>&minus;&minus;format</b>
+<i>format</i></p>
+
+<p style="margin-left:23%;">The data modeling language
+(format) of the requested schema. Default value is
+<i>yang</i>.</p>
+
+<p style="margin-left:17%;"><i>identifier</i></p>
+
+<p style="margin-left:23%;">Identifier for the schema list
+entry.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>kill-session</b>
+<br>
+Perform NETCONF &lt;kill-session&gt; operation to terminate
+specified NETCONF session. To terminate the current session,
+use the <b>disconnect</b> command. For more details see
+<i>RFC 6241 section 7.9</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>kill-session</b>
+[&minus;&minus;help] <i>session-id</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>session-id</i></p>
+
+<p style="margin-left:23%;">Session identifier of the
+NETCONF session to be terminated.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>lock</b>
+<br>
+Perform the NETCONF &lt;lock&gt; operation to lock the
+entire configuration datastore of a server. For more details
+see <i>RFC 6241 section 7.5</i>.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>lock</b>
+[&minus;&minus;help] <i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to lock. For
+description of possible values, see the <b>DATASTORES</b>
+section of this manual. Note, that the <i>url</i>
+configuration datastore cannot be locked.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>unlock</b>
+<br>
+Perform the NETCONF &lt;unlock&gt; operation to release a
+configuration lock, previously obtained with the
+&lt;lock&gt; operation. For more details see <i>RFC 6241
+section 7.6</i>.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>lock</b>
+[&minus;&minus;help] <i>target_datastore</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:23%;">Target datastore to unlock. For
+description of possible values, see the <b>DATASTORES</b>
+section of this manual. Note, that the <i>url</i>
+configuration datastore cannot be unlocked.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>validate</b>
+<br>
+Perform the NETCONF &lt;validate&gt; operation to validate
+configuration data. For more details see <i>RFC 6241 section
+8.6.4.1</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>validate</b>
+[&minus;&minus;help] &minus;&minus;config [<i>file</i>] |
+<i>target_datastore</i></p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;&minus;config</b>
+<i>file</i></p>
+
+<p style="margin-left:17%;">Validate specified
+configuration data. If the <i>file</i> is specified, the
+complete configuration data are taken from the specified
+file. If the <i>file</i> is not specified, user is prompted
+to type the configuration data manually.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>target_datastore</i></p>
+
+<p style="margin-left:17%;">Target datastore to validate.
+For description of possible values, see the
+<b>DATASTORES</b> section of this manual.</p>
+
+<p style="margin-left:11%; margin-top: 1em">Options
+&minus;&minus;config and <i>target_datastore</i> are
+mutually exclusive, but one of these options is
+required.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>subscribe</b>
+<br>
+Perform NETCONF Event Notifications
+&lt;create-subscription&gt; operation. For more details see
+<i>RFC 5277 section 2.1.1</i>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>subscribe</b>
+[&minus;&minus;help] [&minus;&minus;filter [file]]
+[&minus;&minus;begin <i>time</i>] [&minus;&minus;end
+<i>time</i>] [&minus;&minus;output <i>file</i>]
+[<i>stream</i>]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
+
+<p style="margin-left:23%;">Specifies if the request will
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;begin</b>
+<i>time</i></p>
+
+<p style="margin-left:23%;">Start to replay event
+notifications from past (future time is not valid). If the
+start time is not specified, replay feature is not activated
+and only new event notifications are received. Format of the
+<i>time</i> parameter is described below.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;end</b>
+<i>time</i></p>
+
+<p style="margin-left:23%;">Specifies when the event replay
+stops. Format of the <i>time</i> parameter is as
+follows:</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="8%">
+
+
+<p>+<i>time</i></p></td>
+<td width="3%"></td>
+<td width="66%">
+
+
+<p>Current time plus the given number of seconds.</p></td></tr>
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="8%">
+
+
+<p><i>time</i></p></td>
+<td width="3%"></td>
+<td width="66%">
+
+
+<p>Absolute time as number of seconds since 1970-01-01.</p></td></tr>
+<tr valign="top" align="left">
+<td width="23%"></td>
+<td width="8%">
+
+
+<p>-<i>time</i></p></td>
+<td width="3%"></td>
+<td width="66%">
+
+
+<p>Current time minus the given number of seconds.</p></td></tr>
+</table>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;output</b>
+<i>stream</i></p>
+
+<p style="margin-left:23%;">Print received notifications
+into the specified file instead of printing on terminal.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>stream</i></p>
+
+<p style="margin-left:23%;">Specifies which events stream
+is of interest. If not specified, default NETCONF stream is
+received. The list of available streams can be retrieved
+from <i>/netconf/streams</i> subtree via the &lt;get&gt;
+operation.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>status</b>
+<br>
+Print information about the current NETCONF session.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>user-rpc</b>
+<br>
+Send your own content in an RPC envelope. This can be used
+for RPC operations defined in data models not supported by
+the <b>netopeer-cli</b>.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>user-rpc</b>
+[&minus;&minus;help] [&minus;&minus;file <i>file</i>]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;file</b>
+<i>file</i></p>
+
+<p style="margin-left:23%;">Specifies a file containing
+NETCONF RPC operation in XML format. Only the NETCONF
+&lt;rpc&gt; envelope is added to the file content and then
+it is sent to a server. If the option is omitted, user is
+prompted to type the RPC content manually.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>verbose</b>
+<br>
+Enable/disable verbose messages.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>debug</b>
+<br>
+Enable/disable debug messages. Available only if the
+<b>netopeer-cli</b> is compiled with configure&rsquo;s
+&minus;&minus;enable&minus;debug option.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>quit</b>
+<br>
+Quit the program.</p>
+
+<h2>DATASTORES
+<a name="DATASTORES"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">running</p>
+
+<p style="margin-left:22%;">Base NETCONF configuration
+datastore holding the complete configuration currently
+active on the device. This datastore always exists.</p>
+
+<p style="margin-left:11%;">startup</p>
+
+<p style="margin-left:22%;">The configuration datastore
+holding the configuration loaded by the device when it
+boots. Only present on servers that implement :startup
+capability.</p>
+
+<p style="margin-left:11%;">candidate</p>
+
+<p style="margin-left:22%;">The configuration datastore
+that can be manipulated without impacting the device&rsquo;s
+current configuration and that can be committed to the
+running configuration datastore. Only present on servers
+that implement :candidate capability.</p>
+
+<p style="margin-left:11%;">url:<i>URI</i></p>
+
+<p style="margin-left:22%;">Refers to a remote
+configuration datastore located at <i>URI</i>. The file that
+the <i>URI</i> refers to contains the configuration data
+hierarchy to be modified, encoded in XML under the element
+&lt;config&gt; in the
+<i>urn:ietf:params:xml:ns:netconf:base:1.0</i> namespace.
+This datastore is available only on servers that implement
+:url capability.</p>
+
+<h2>WITH&minus;DEFAULTS
+<a name="WITH&minus;DEFAULTS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">This section
+briefly describes :with-defaults capability retrieval modes
+used in NETCONF operation commands described above. More
+detailed information about the :with-defaults capability can
+be found in <i>RFC 6243</i>.</p>
+
+<p style="margin-left:11%; margin-top: 1em">Retrieval
+modes:</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>report&minus;all</b></p>
+
+<p style="margin-left:23%;">All configuration data
+including default data nodes are retrieved.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>report&minus;all&minus;tagged</b></p>
+
+<p style="margin-left:23%;">As <i>report&minus;all</i>, but
+the default data nodes are tagged with XML attribute
+<i>default</i> in
+<i>urn:ietf:params:xml:ns:netconf:default:1.0</i> namespace
+set to value <i>true.</i></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>trim</b></p>
+
+<p style="margin-left:23%;">Only data that do not contain
+default values are retrieved.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>explicit</b></p>
+
+<p style="margin-left:23%;">Only data explicitly set by the
+client are retrieved despite they contain default values or
+not.</p>
+
+<h2>EDIT-CONFIG
+<a name="EDIT-CONFIG"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">TBD</p>
+
+<h2>SEE ALSO
+<a name="SEE ALSO"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-agent(1),
+netopeer-configurator(1), netopeer-manager(1),
+netopeer-server(1),</b> <br>
+RFC 5277 (Event Notifications) <br>
+RFC 6241 (NETCONF v1.1) <br>
+RFC 6242 (NETCONF over SSH) <br>
+RFC 6243 (With-defaults capability) <br>
+RFC 6536 (NETCONF Access Control) <br>
+http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05
+(NETCONF over TLS) <br>
+
+http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05
+(Call Home) <br>
+https://netopeer.googlecode.com (Netopeer homepage)</p>
+
+<h2>MAILING LIST
+<a name="MAILING LIST"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">To discuss
+various topics about <b>netopeer-cli,</b> join the Netopeer
+mailing list at
+&lt;https://groups.google.com/group/netopeer&gt;.</p>
+
+<h2>REPORTING BUGS
+<a name="REPORTING BUGS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Report bugs to
+the issue tracker at
+&lt;https://code.google.com/p/netopeer/issues/list&gt;.</p>
+
+<h2>AUTHORS
+<a name="AUTHORS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Radek Krejci
+&lt;rkrejci@cesnet.cz&gt;</p>
+
+<h2>COPYRIGHT
+<a name="COPYRIGHT"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Copyright
+&copy; 2012-2014 CESNET, z.s.p.o.</p>
+<hr>
+</body>
+</html>
