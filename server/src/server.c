@@ -77,7 +77,7 @@ static void print_version (char *progname)
  */
 static void print_usage (char * progname)
 {
-	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", progname);
+	fprintf (stdout, "Usage: %s [-dhV] [-v level]\n", progname);
 	fprintf (stdout, " -d                  daemonize server\n");
 	fprintf (stdout, " -h                  display help\n");
 	fprintf (stdout, " -v level            verbose output level\n");
