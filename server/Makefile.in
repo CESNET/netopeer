@@ -124,7 +124,7 @@ CFGS_TAR = $(CFGS) \
 
 H_IN = src/config.h.in
 
-MANPAGES = manager/netopeer-manager.1
+MANPAGES = manager/netopeer-manager.1 netopeer-server.8
 ifneq "@ROFF2HTML@" "no"
 MANHTMLS = $(MANPAGES:%=%.html)
 endif
@@ -148,6 +148,9 @@ $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
 
 %.1.html: %.1
+	@ROFF2HTML@ $< > $@
+
+%.8.html: %.8
 	@ROFF2HTML@ $< > $@
 
 $(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
@@ -269,6 +272,6 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
 			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
 	fi
-	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/)
+	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
 
 

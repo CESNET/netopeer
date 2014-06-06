@@ -1,0 +1,144 @@
+.\" Process this file with
+.\" groff -man -Tascii netopeer-server.1
+.\"
+.TH "netopeer-server" 1 "Fri Jun 6 2014" "Netopeer"
+.SH NAME
+netopeer-server \- NETCONF protocol server 
+.SH SYNOPSIS
+.B netopeer-server [\-dhV] [-v
+.IB level ]
+.SH DESCRIPTION
+.B netopeer-server
+is the NETCONF protocol server running as a system daemon. The
+.B netopeer-server
+is based on the libnetconf library. It provides an environment to run transAPI
+modules for configuration a specific device or application according to its
+data model.
+.SH OPTIONS
+.PP
+.B \-d
+.RS
+Run in daemon mode.
+.RE
+.PP
+.B \-h
+.RS
+Show help.
+.RE
+.PP
+.B \-V
+.RS
+Show program version.
+.RE
+.PP
+.B \-v
+.I level
+.RS
+Set the verbosity level. Possible values are from 0 (default) to 3. This
+overrides any
+.B NETOPEER_VERBOSE
+environment variable.
+.RE
+.SH ENVIRONMENT
+.IP NETOPEER_VERBOSE
+Set the verbosity level. Possible values are from 0 (default) to 3. Overridden
+by the
+.B \-v
+option.
+.SH FILES
+.PP
+.I /etc/netopeer/modules.conf.d/
+.RS
+Directory where the modules configuration files are stored. Note, that they
+usually refers to various files in other locations.
+.RE
+.PP
+.I /etc/netopeer/cfgnetopeer/*
+.RS
+Datastores, data models and validators for the
+.B netopeer-server
+internal modules.
+.RE
+.PP
+.I /etc/netopeer/sshd_config
+.RS
+Template configuration for the
+.B sshd(8)
+instance used for accepting incoming NETCONF over SSH connections. Note, that
+the template doesn't contain the listening address/port specification since
+they are set automatically by the \fBnetopeer-server\fR according to the
+configuration following \fIietf-netconf-server\fR data model. 
+.RE
+.PP
+.I /etc/netopeer/stunnel_config
+.RS
+Template configuration for the
+.B stunnel(8)
+instance used for accepting incoming NETCONF over TLS connections. Note, that
+the template doesn't contain the listening address/port specification since
+they are set automatically by the \fBnetopeer-server\fR according to the
+configuration following \fIietf-netconf-server\fR data model.
+.PP
+This file is installed only if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-enable\-tls\fR option.
+.RE
+.PP
+.I /etc/dbus-1/system.d/org.liberouter.netopeer.conf
+.RS
+D-Bus configuration file for the services used by the \fBnetopeer-agent(1)\fR.
+.PP
+This file is not installed if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-disable\-dbus\fR option.
+.RE
+.PP
+.I /usr/share/dbus-1/system-services/org.liberouter.netopeer.server.service
+.RS
+D-Bus service file for automatic start of the \fBnetopeer-server\fR.
+.PP
+This file is not installed if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-disable\-dbus\fR and without \fB\-\-with\-dbus\-services\fR option.
+.RE
+.SS libnetconf files
+.I /var/lib/libnetconf/datastore-acm.xml
+.RS
+Datastore file for the internal NETCONF Access Control module.
+.RE
+.PP
+.I /dev/shm/sem.NCDS_FLOCK_*
+.RS
+Datastores locks used internally by the \fBlibnetconf\fR library. 
+.RE
+.SH NETOPEER MODULES
+TBD
+.SH TROUBLESHOOTING
+.SS Datastores dead lock
+.PP
+When the server crashes or is terminated with SIGKILL, it may happen that the
+internal datastore locks stay locked. In such a case, the next time the
+.B netopeer-server
+(or any other libnetconf based application) tries to access the configuration
+datastores, it freezes. To solve this problem, release the locks manually
+removing the
+.I /dev/shm/sem.NCDS_FLOCK_*
+files.
+.SH "SEE ALSO"
+.BR netopeer-agent(1) ,
+.BR netopeer-cli(1) ,
+.BR netopeer-configurator(1) ,
+.BR netopeer-manager(1) ,
+.BR sshd(8) ,
+.BR stunnel(8) ,
+.SS Homepage
+https://netopeer.googlecode.com
+.SH MAILING LIST
+To discuss various topics about
+.B netopeer-server,
+join the Netopeer mailing list at <https://groups.google.com/group/netopeer>.
+.SH REPORTING BUGS
+Report bugs to the issue tracker at <https://code.google.com/p/netopeer/issues/list>.
+.SH AUTHORS
+Radek Krejci <rkrejci@cesnet.cz>
+.SH COPYRIGHT
+Copyright \(co 2014 CESNET, z.s.p.o.
+
+

@@ -1,0 +1,265 @@
+<!-- Creator     : groff version 1.21 -->
+<!-- CreationDate: Fri Jun  6 15:46:05 2014 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
+<title>netopeer-server</title>
+
+</head>
+<body>
+
+<h1 align="center">netopeer-server</h1>
+
+<a href="#NAME">NAME</a><br>
+<a href="#SYNOPSIS">SYNOPSIS</a><br>
+<a href="#DESCRIPTION">DESCRIPTION</a><br>
+<a href="#OPTIONS">OPTIONS</a><br>
+<a href="#ENVIRONMENT">ENVIRONMENT</a><br>
+<a href="#FILES">FILES</a><br>
+<a href="#NETOPEER MODULES">NETOPEER MODULES</a><br>
+<a href="#TROUBLESHOOTING">TROUBLESHOOTING</a><br>
+<a href="#SEE ALSO">SEE ALSO</a><br>
+<a href="#MAILING LIST">MAILING LIST</a><br>
+<a href="#REPORTING BUGS">REPORTING BUGS</a><br>
+<a href="#AUTHORS">AUTHORS</a><br>
+<a href="#COPYRIGHT">COPYRIGHT</a><br>
+
+<hr>
+
+
+<h2>NAME
+<a name="NAME"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em">netopeer-server
+&minus; NETCONF protocol server</p>
+
+<h2>SYNOPSIS
+<a name="SYNOPSIS"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-server
+[&minus;dhV] [-v</b> <i>level</i><b>]</b></p>
+
+<h2>DESCRIPTION
+<a name="DESCRIPTION"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-server</b>
+is the NETCONF protocol server running as a system daemon.
+The <b>netopeer-server</b> is based on the libnetconf
+library. It provides an environment to run transAPI modules
+for configuration a specific device or application according
+to its data model.</p>
+
+<h2>OPTIONS
+<a name="OPTIONS"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;d</b></p>
+
+<p style="margin-left:22%;">Run in daemon mode.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;h</b></p>
+
+<p style="margin-left:22%;">Show help.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;V</b></p>
+
+<p style="margin-left:22%;">Show program version.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;v</b>
+<i>level</i></p>
+
+<p style="margin-left:22%;">Set the verbosity level.
+Possible values are from 0 (default) to 3. This overrides
+any <b>NETOPEER_VERBOSE</b> environment variable.</p>
+
+<h2>ENVIRONMENT
+<a name="ENVIRONMENT"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em">NETOPEER_VERBOSE</p>
+
+<p style="margin-left:22%;">Set the verbosity level.
+Possible values are from 0 (default) to 3. Overridden by the
+<b>&minus;v</b> option.</p>
+
+<h2>FILES
+<a name="FILES"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/modules.conf.d/</i></p>
+
+<p style="margin-left:22%;">Directory where the modules
+configuration files are stored. Note, that they usually
+refers to various files in other locations.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/cfgnetopeer/*</i></p>
+
+<p style="margin-left:22%;">Datastores, data models and
+validators for the <b>netopeer-server</b> internal
+modules.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/sshd_config</i></p>
+
+<p style="margin-left:22%;">Template configuration for the
+<b>sshd(8)</b> instance used for accepting incoming NETCONF
+over SSH connections. Note, that the template doesn&rsquo;t
+contain the listening address/port specification since they
+are set automatically by the <b>netopeer-server</b>
+according to the configuration following
+<i>ietf-netconf-server</i> data model.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel_config</i></p>
+
+<p style="margin-left:22%;">Template configuration for the
+<b>stunnel(8)</b> instance used for accepting incoming
+NETCONF over TLS connections. Note, that the template
+doesn&rsquo;t contain the listening address/port
+specification since they are set automatically by the
+<b>netopeer-server</b> according to the configuration
+following <i>ietf-netconf-server</i> data model.</p>
+
+<p style="margin-left:22%; margin-top: 1em">This file is
+installed only if the <b>netopeer-server</b> is compiled
+with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/dbus-1/system.d/org.liberouter.netopeer.conf</i></p>
+
+<p style="margin-left:22%;">D-Bus configuration file for
+the services used by the <b>netopeer-agent(1)</b>.</p>
+
+<p style="margin-left:22%; margin-top: 1em">This file is
+not installed if the <b>netopeer-server</b> is compiled with
+the <b>&minus;&minus;disable&minus;dbus</b> option.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/usr/share/dbus-1/system-services/org.liberouter.netopeer.server.service</i></p>
+
+<p style="margin-left:22%;">D-Bus service file for
+automatic start of the <b>netopeer-server</b>.</p>
+
+<p style="margin-left:22%; margin-top: 1em">This file is
+not installed if the <b>netopeer-server</b> is compiled with
+the <b>&minus;&minus;disable&minus;dbus</b> and without
+<b>&minus;&minus;with&minus;dbus&minus;services</b>
+option.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>libnetconf
+files</b> <i><br>
+/var/lib/libnetconf/datastore-acm.xml</i></p>
+
+<p style="margin-left:22%;">Datastore file for the internal
+NETCONF Access Control module.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/dev/shm/sem.NCDS_FLOCK_*</i></p>
+
+<p style="margin-left:22%;">Datastores locks used
+internally by the <b>libnetconf</b> library.</p>
+
+<h2>NETOPEER MODULES
+<a name="NETOPEER MODULES"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">TBD</p>
+
+<h2>TROUBLESHOOTING
+<a name="TROUBLESHOOTING"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>Datastores
+dead lock</b> <br>
+When the server crashes or is terminated with SIGKILL, it
+may happen that the internal datastore locks stay locked. In
+such a case, the next time the <b>netopeer-server</b> (or
+any other libnetconf based application) tries to access the
+configuration datastores, it freezes. To solve this problem,
+release the locks manually removing the
+<i>/dev/shm/sem.NCDS_FLOCK_*</i> files.</p>
+
+<h2>SEE ALSO
+<a name="SEE ALSO"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-agent(1)</b>,
+<b>netopeer-cli(1)</b>, <b>netopeer-configurator(1)</b>,
+<b>netopeer-manager(1)</b>, <b>sshd(8)</b>,
+<b>stunnel(8)</b>,</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>Homepage</b>
+<br>
+https://netopeer.googlecode.com</p>
+
+<h2>MAILING LIST
+<a name="MAILING LIST"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">To discuss
+various topics about <b>netopeer-server,</b> join the
+Netopeer mailing list at
+&lt;https://groups.google.com/group/netopeer&gt;.</p>
+
+<h2>REPORTING BUGS
+<a name="REPORTING BUGS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Report bugs to
+the issue tracker at
+&lt;https://code.google.com/p/netopeer/issues/list&gt;.</p>
+
+<h2>AUTHORS
+<a name="AUTHORS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Radek Krejci
+&lt;rkrejci@cesnet.cz&gt;</p>
+
+<h2>COPYRIGHT
+<a name="COPYRIGHT"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Copyright
+&copy; 2014 CESNET, z.s.p.o.</p>
+<hr>
+</body>
+</html>
