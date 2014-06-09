@@ -25,7 +25,15 @@ class dbus(nc_module.nc_module):
 
 	#curses
 	selected = 0
-
+	
+	def __init__(self, modules = []):
+		if not config.options['dbus']:
+			raise(nc_module.NCModuleOff(self.name))
+		
+		self.all_modules = modules
+		if not self.find() or not self.get():
+			raise(NCModuleError(self.name, 'Module init failed.'))
+	
 	def find(self):
 		"""Try to find DBus configuration files."""
 		if os.path.exists(os.path.join(config.paths['dbusconfdir'],'org.liberouter.netopeer2.conf')):

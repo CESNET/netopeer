@@ -7,6 +7,7 @@ import os
 
 # netopeer configurator module base
 from modules.nc_module import NCModuleError
+from modules.nc_module import NCModuleOff
 
 # error messages
 import modules.messages as messages
@@ -36,6 +37,8 @@ class netopeer_configuration:
 			messages.append(str(e))
 		except NCModuleError as e:
 			messages.append(str(e))
+		except NCModuleOff:
+			pass
 
 		try:
 			import modules.sock

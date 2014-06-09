@@ -18,6 +18,19 @@ class NCModuleError(Exception):
 	def __str__(self):
 		return(self.name+': '+self.errmsg)
 
+class NCModuleOff(Exception):
+	def __init__(self, name = ''):
+		if name:
+			self.name = name
+		else:
+			self.name = '<unspecified>'
+		
+		self.errmsg = 'Module '+self.name+' is turned off'
+
+	def __str__(self):
+		return(self.errmsg)
+	
+
 # base class for netopeer configurator modules
 class nc_module:
 	# every module should define its name
