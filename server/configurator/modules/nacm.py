@@ -167,7 +167,7 @@ class nacm(nc_module.nc_module):
 				rpc_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:protocol-operation/n:rpc-name'.format(list=rule_list_name,rule=rule_name)))
 				notification_name = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:notification/n:notification-name'.format(list=rule_list_name,rule=rule_name)))
 				data_path = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:data-node/n:path'.format(list=rule_list_name,rule=rule_name)))
-				access_operation = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:access-operation'.format(list=rule_list_name,rule=rule_name)))
+				access_operation = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:access-operations'.format(list=rule_list_name,rule=rule_name)))
 				action = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:action'.format(list=rule_list_name,rule=rule_name)))
 				comment = map(libxml2.xmlNode.get_content, nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[\'{rule}\']/n:comment'.format(list=rule_list_name,rule=rule_name)))
 
@@ -202,7 +202,7 @@ class nacm(nc_module.nc_module):
 				else:
 					rule.operations = ['*']
 
-				if action and action[0] == 'allow':
+				if action and action[0] == 'permit':
 					rule.action = acm.action.PERMIT
 				elif action and action[0] == 'deny':
 					rule.action = acm.action.DENY
