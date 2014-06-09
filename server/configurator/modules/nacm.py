@@ -204,7 +204,7 @@ class nacm(nc_module.nc_module):
 
 				if action and action[0] == 'allow':
 					rule.action = acm.action.PERMIT
-				elif action and action[1] == 'deny':
+				elif action and action[0] == 'deny':
 					rule.action = acm.action.DENY
 				else:
 					messages.append('Missing mandatory element \'action\' in rule \'{s}\'. The rule will be skipped.'.format(s=rule_name))
