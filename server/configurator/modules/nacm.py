@@ -321,16 +321,16 @@ class nacm(nc_module.nc_module):
 					nacm_data = nacm_rule.newChild(None, 'data-node', None)
 					nacm_data.newChild(None, 'path', rule.identificator)
 
-			if rule.operations:
-				nacm_rule.newChild(None, 'access-operations', ' '.join(rule.operations))
+				if rule.operations:
+					nacm_rule.newChild(None, 'access-operations', ' '.join(rule.operations))
 
-			if rule.action == acm.action.DENY:
-				nacm_rule.newChild(None, 'action', 'deny')
-			else:
-				nacm_rule.newChild(None, 'action', 'allow')
+				if rule.action == acm.action.DENY:
+					nacm_rule.newChild(None, 'action', 'deny')
+				else:
+					nacm_rule.newChild(None, 'action', 'allow')
 
-			if rule.comment:
-				nacm_rule.newChild(None, 'comment', rule.comment)
+				if rule.comment:
+					nacm_rule.newChild(None, 'comment', rule.comment)
 
 		try:
 			nacm_datastore = open(self.datastore_path, 'w')
