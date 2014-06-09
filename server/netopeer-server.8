@@ -86,6 +86,9 @@ This file is installed only if the \fBnetopeer-server\fR is compiled with the
 .I /etc/dbus-1/system.d/org.liberouter.netopeer.conf
 .RS
 D-Bus configuration file for the services used by the \fBnetopeer-agent(1)\fR.
+The location of the D-Bus configuration files can differ on different Linux
+distributions, so the location can be changed by
+\fB\-\-with\-dbus\-config\-dir\fR configure option.
 .PP
 This file is not installed if the \fBnetopeer-server\fR is compiled with the
 \fB\-\-disable\-dbus\fR option.
@@ -97,6 +100,9 @@ D-Bus service file for automatic start of the \fBnetopeer-server\fR.
 .PP
 This file is not installed if the \fBnetopeer-server\fR is compiled with the
 \fB\-\-disable\-dbus\fR and without \fB\-\-with\-dbus\-services\fR option.
+Specifying the value of the second option, one can correct the default location
+of the D-Bus service configuration files that can differ on different Linux
+distributions.
 .RE
 .SS libnetconf files
 .I /var/lib/libnetconf/datastore-acm.xml
