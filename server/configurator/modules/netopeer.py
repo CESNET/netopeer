@@ -151,11 +151,11 @@ class netopeer(nc_module.nc_module):
 
 	def paint(self, window, focus, height, width):
 		tools = []
-		window.addstr('First netopeer-server binary found in path:\n')
+		window.addstr('The netopeer-server binary found in path:\n')
 		window.addstr('{s}\n'.format(s=self.server_path))
 		window.addstr('\n')
 
-		window.addstr('First netopeer-agent binary found in path:\n')
+		window.addstr('The netopeer-agent binary found in path:\n')
 		window.addstr('{s}\n'.format(s=self.agent_path))
 		window.addstr('\n')
 
