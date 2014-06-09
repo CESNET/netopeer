@@ -304,7 +304,7 @@ class nacm(nc_module.nc_module):
 			nacm_rule_list.newChild(None, 'name', rule_list.name)
 
 			for group in rule_list.groups:
-				nacm_rule_list.newChild(None, 'group', rule_list.group)
+				nacm_rule_list.newChild(None, 'group', group)
 
 			for rule in rule_list.rules:
 				nacm_rule = nacm_rule_list.newChild(None, 'rule', None)
