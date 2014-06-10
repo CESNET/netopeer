@@ -119,8 +119,7 @@ class configurator_window:
 		self.window = self.wrapper.derwin(size_y-2, size_x-2, 1, 1)
 		self.pos['y'] = pos_y
 		self.pos['x'] = pos_x
-		self.size['y'] = size_y
-		self.size['x'] = size_x
+		self.size = {'y':size_y, 'x':size_x}
 
 	def __del__(self):
 		if self.window:
