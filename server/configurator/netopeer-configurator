@@ -158,8 +158,14 @@ def create_windows(stdscr):
 def cli(stdscr, config):
 	# use default terminal colors
 	curses.use_default_colors()
-	for i in range(0, curses.COLORS):
-		curses.init_pair(i, i, -1);
+	curses.init_pair(1, curses.COLOR_RED, -1)
+	curses.init_pair(2, curses.COLOR_YELLOW, -1)
+
+	colors = {
+			'error' : curses.color_pair(1),\
+			'warning' : curses.color_pair(2),\
+			'note' : curses.color_pair(0),\
+		}
 
 	# cursor invsible
 	curses.curs_set(0)
@@ -191,9 +197,9 @@ def cli(stdscr, config):
 		for module in config.nc_modules:
 			if module is config.nc_modules[module_selected]:
 				if windows[window] == 'Menu':
-					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(1))
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
 				else:
-					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(2))
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_UNDERLINE)
 			else:	
 				w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
 
@@ -204,26 +210,26 @@ def cli(stdscr, config):
 		# Messages window
 		last_messages = messages.last(w_messages.size['y']-2)
 		for message in reversed(last_messages):
-			w_messages.window.addstr(message, curses.color_pair(4))
+			w_messages.window.addstr(message[0], colors[message[1]])
 			if not message is last_messages[0]:
 				w_messages.window.addstr('\n')
 
 		# Tools widow
-		w_tools.window.addstr('UP', curses.color_pair(1))
+		w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
 		w_tools.window.addstr(' - next ', curses.color_pair(0))
-		w_tools.window.addstr('DOWN', curses.color_pair(1))
+		w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
 		w_tools.window.addstr(' - previous ', curses.color_pair(0))
 		if windows[window] == 'Menu':
-			w_tools.window.addstr('TAB', curses.color_pair(1))
+			w_tools.window.addstr('TAB', curses.color_pair(0) | curses.A_UNDERLINE)
 			w_tools.window.addstr(' - select ', curses.color_pair(0))
-			w_tools.window.addstr('F10', curses.color_pair(1))
+			w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
 			w_tools.window.addstr(' - save ', curses.color_pair(0))
 		else:
-			w_tools.window.addstr('TAB', curses.color_pair(1))
+			w_tools.window.addstr('TAB', curses.color_pair(0) | curses.A_UNDERLINE)
 			w_tools.window.addstr(' - back ', curses.color_pair(0))
 			# Print module tools
 			for (key,desc) in module_tools:
-				w_tools.window.addstr(key, curses.color_pair(1))
+				w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
 				w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
 
 		stdscr.refresh()
