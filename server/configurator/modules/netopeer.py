@@ -44,7 +44,7 @@ class netopeer(nc_module.nc_module):
 		if os.path.exists(config.paths['modulesdir']):
 			self.modules_path = config.paths['modulesdir']
 		else:
-			messages.append('Netopeer modules directory not fount. No modules can be configured.')
+			messages.append('Netopeer modules directory not found. No modules can be configured.', 'warning')
 		return(True)
 
 	def get(self):
@@ -91,7 +91,7 @@ class netopeer(nc_module.nc_module):
 						node = node.nextElementSibling()
 
 					if not module_valid:
-						messages.append('Module {s} is not installed properly and will not be used: Some of referenced files does not exit.'.format(s=module_name))
+						messages.append('Module {s} is not installed properly and will not be used: Some of referenced files does not exit.'.format(s=module_name), 'warning')
 					elif module_name == 'Netopeer':
 						continue
 					else:
@@ -113,7 +113,7 @@ class netopeer(nc_module.nc_module):
 					else:
 						missing_module = netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:name = \'{s}\']/n:enabled'.format(s=module_name))
 						missing_module[0].setContent('false')
-						messages.append('Module \'{s}\' not installed. Disabling in netopeer configuration.'.format(s=module_name))
+						messages.append('Module \'{s}\' not installed. Disabling in netopeer configuration.'.format(s=module_name), 'warning')
 
 				for module_name in map(libxml2.xmlNode.get_content, netopeer_forbidden_modules):
 					if module_name in map(getattr, self.modules, ['name']*len(self.modules)):
@@ -122,13 +122,14 @@ class netopeer(nc_module.nc_module):
 								module.disable()
 								break
 					else:
-						messages.append('Module \'{s}\' not installed. Skipping in netopeer configuration.'.format(s=module_name))
+						messages.append('Module \'{s}\' not installed. Skipping in netopeer configuration.'.format(s=module_name), 'warning')
 			else:
 				self.modules = []
 
 		return(True)
 
 	def update(self):
+		return(True)
 		netopeer_doc = libxml2.newDoc('1.0')
 		datastores = netopeer_doc.newChild(None, 'datastores', None)
 		datastores.newNs('urn:cesnet:tmc:datastores:file', None)

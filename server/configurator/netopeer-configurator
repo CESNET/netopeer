@@ -26,17 +26,17 @@ class netopeer_configuration:
 			import modules.netopeer
 			self.nc_modules.append(modules.netopeer.netopeer(self.nc_modules))
 		except ImportError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 
 		try:
 			import modules.dbus
 			self.nc_modules.append(modules.dbus.dbus(self.nc_modules))
 		except ImportError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleOff:
 			pass
 
@@ -44,25 +44,25 @@ class netopeer_configuration:
 			import modules.sock
 			self.nc_modules.append(modules.sock.sock(self.nc_modules))
 		except ImportError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 
 		try:
 			import modules.nacm
 			self.nc_modules.append(modules.nacm.nacm(self.nc_modules))
 		except ImportError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 
 		try:
 			import modules.sshd
 			self.nc_modules.append(modules.sshd.sshd(self.nc_modules))
 		except ImportError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 		except NCModuleError as e:
-			messages.append(str(e))
+			messages.append(str(e), 'error')
 
 	def save_all(self):
 		for nc_module in self.nc_modules:

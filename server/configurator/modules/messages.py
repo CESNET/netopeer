@@ -3,8 +3,8 @@
 
 msgs = []
 
-def append(msg):
-	msgs.append(msg)
+def append(msg, severity):
+	msgs.append((msg,severity))
 
 def all():
 	return(msgs)
