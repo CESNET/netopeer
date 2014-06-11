@@ -60,7 +60,7 @@ class nacm(nc_module.nc_module):
 	datastore_path = None
 	nacm_doc = None
 	nacm_ctxt = None
-	print_rules_flag = 1
+	print_rules_flag = 0
 	
 	enabled = True
 	extgroups = True
