@@ -11,6 +11,7 @@ from modules.nc_module import NCModuleOff
 
 # error messages
 import modules.messages as messages
+import modules.config as config
 
 class netopeer_configuration:
 	"""Top level class of netopeer-configuration script."""
@@ -31,30 +32,29 @@ class netopeer_configuration:
 			messages.append(str(e), 'error')
 
 		try:
-			import modules.dbus
-			self.nc_modules.append(modules.dbus.dbus(self.nc_modules))
-		except ImportError as e:
-			messages.append(str(e), 'error')
-		except NCModuleError as e:
-			messages.append(str(e), 'error')
-		except NCModuleOff:
-			pass
-
-		try:
-			import modules.sock
-			self.nc_modules.append(modules.sock.sock(self.nc_modules))
-		except ImportError as e:
-			messages.append(str(e), 'error')
-		except NCModuleError as e:
-			messages.append(str(e), 'error')
-
-		try:
 			import modules.nacm
 			self.nc_modules.append(modules.nacm.nacm(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e), 'error')
 		except NCModuleError as e:
 			messages.append(str(e), 'error')
+
+		if config.options['dbus']:
+			try:
+				import modules.dbus
+				self.nc_modules.append(modules.dbus.dbus(self.nc_modules))
+			except ImportError as e:
+				messages.append(str(e), 'error')
+			except NCModuleError as e:
+				messages.append(str(e), 'error')
+		else:
+			try:
+				import modules.sock
+				self.nc_modules.append(modules.sock.sock(self.nc_modules))
+			except ImportError as e:
+				messages.append(str(e), 'error')
+			except NCModuleError as e:
+				messages.append(str(e), 'error')
 
 	def save_all(self):
 		for nc_module in self.nc_modules:
