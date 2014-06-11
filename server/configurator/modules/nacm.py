@@ -323,7 +323,6 @@ class nacm(nc_module.nc_module):
 
 		if focus:
 			tools.append(('ENTER','change'))
-			tools.append(('selected',str(self.selected)))
 				
 		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
 		window.addstr('\n')

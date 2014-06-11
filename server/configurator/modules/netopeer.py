@@ -207,7 +207,6 @@ class netopeer(nc_module.nc_module):
 		window.addstr('\n')
 
 		tools.append(('ENTER','enable/disable'))
-		tools.append(('selected',str(self.selected)))
 		window.addstr('Curently installed modules:\n')
 		if self.modules_maxlen + 10 > 50:
 			linewidth = self.modules_maxlen + 10
