@@ -306,9 +306,7 @@ class nacm(nc_module.nc_module):
 			self.xml_x_default = nacm.newChild(nacm.ns(), 'exec-default', 'deny')
 			
 		try:
-			nacm_datastore = open(self.datastore_path, 'w')
-			nacm_datastore.write(self.nacm_doc.serialize(encoding='UTF-8', format=1))
-			nacm_datastore.close
+			self.nacm_doc.saveFormatFile(self.datastore_path, 1)
 		except IOError:
 			messages.append('Failed to write NACM configuration to file %s' % self.datastore_path, 'error')
 			return(False)
