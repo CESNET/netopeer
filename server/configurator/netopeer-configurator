@@ -253,8 +253,7 @@ def cli(stdscr, config):
 			elif c == curses.KEY_F10:
 				config.save_all()
 				messages.append('Configuration saved', 'note')
-				config.nc_modules[module_selected].get()
-				config.nc_modules[module_selected].paint(w_content.window, False, w_content.size['y'], w_content.size['x'])
+				config.nc_modules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
 			elif c == ord('\n'):
 				window = windows.index('Content')
 			else:

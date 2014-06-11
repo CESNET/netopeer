@@ -54,7 +54,11 @@ class nc_module:
 	# write current configuration to files
 	def update(self):
 		return(True)
-
+	
+ 	# refresh content window after save
+	def refresh(self, window, focus, height, width):
+		return(True)
+	
 	def get_editable(self, y, x, stdscr, window, variable, color = None):
 		index = 0
 	

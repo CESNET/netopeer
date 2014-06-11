@@ -149,6 +149,8 @@ class netopeer(nc_module.nc_module):
 		netopeer_doc.saveFormatFile(self.netopeer_path, 1)
 		return(True)
 
+	def refresh(self, window, focus, height, width):
+		return(True)
 
 	def paint(self, window, focus, height, width):
 		tools = []

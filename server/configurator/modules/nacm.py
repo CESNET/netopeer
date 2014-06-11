@@ -383,6 +383,11 @@ class nacm(nc_module.nc_module):
 		
 		return(tools)
 
+	def refresh(self, window, focus, height, width):
+		self.get()
+		self.paint(window, focus, height, width)
+		return(True)
+	
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 			self.selected = self.selected-1
