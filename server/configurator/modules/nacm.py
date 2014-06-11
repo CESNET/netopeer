@@ -119,7 +119,7 @@ class nacm(nc_module.nc_module):
 			return(False)
 
 		try:
-			self.nacm_doc = libxml2.readFile(self.datastore_path, None, libxml2.XML_PARSE_NOERROR|libxml2.XML_PARSE_NOWARNING)
+			self.nacm_doc = libxml2.parseFile(self.datastore_path)
 		except:
 			messages.append('Can not parse Access Control configuration. File %s is probably corrupted.' % self.datastore_path, 'warning')
 			return(False)
