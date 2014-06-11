@@ -208,19 +208,23 @@ def cli(stdscr, config):
 
 		# Tools widow
 		w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - next ', curses.color_pair(0))
+		w_tools.window.addstr(' - next | ', curses.color_pair(0))
 		w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - previous ', curses.color_pair(0))
+		w_tools.window.addstr(' - previous | ', curses.color_pair(0))
 		if windows[window] == 'Menu':
-			w_tools.window.addstr('TAB', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - select ', curses.color_pair(0))
-			w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - save ', curses.color_pair(0))
+			w_tools.window.addstr("RIGHT", curses.color_pair(0) | curses.A_UNDERLINE)
 		else:
-			w_tools.window.addstr('TAB', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - back ', curses.color_pair(0))
+			w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
+		w_tools.window.addstr(' - switch window | ', curses.color_pair(0))
+		w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
+		w_tools.window.addstr(' - save | ', curses.color_pair(0))
+		w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
+		w_tools.window.addstr(' - exit ', curses.color_pair(0))
+				
+		if windows[window] == 'Content':
 			# Print module tools
 			for (key,desc) in module_tools:
+				w_tools.window.addstr('| ', curses.color_pair(0))
 				w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
 				w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
 
@@ -237,15 +241,19 @@ def cli(stdscr, config):
 			(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
 		elif c == ord('\t'):
 			window = (window + 1) % len(windows)
+		elif c == curses.KEY_RIGHT and windows[window] == 'Menu':
+			window = windows.index('Content')
+		elif c == curses.KEY_LEFT and windows[window] == 'Content':
+			window = windows.index('Menu')
+		elif c == curses.KEY_F10:
+			config.save_all()
+			messages.append('Configuration saved', 'note')
+			config.nc_modules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
 		elif windows[window] == 'Menu':
 			if c == curses.KEY_UP and module_selected > 0:
 				module_selected = module_selected-1
 			elif c == curses.KEY_DOWN and module_selected < (len(config.nc_modules)-1):
 				module_selected = module_selected+1
-			elif c == curses.KEY_F10:
-				config.save_all()
-				messages.append('Configuration saved', 'note')
-				config.nc_modules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
 			elif c == ord('\n'):
 				window = windows.index('Content')
 			else:
