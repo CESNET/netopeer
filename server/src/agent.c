@@ -54,7 +54,7 @@
 #include "comm.h"
 
 /* Define libnetconf submodules necessary for the NETCONF agent */
-#define NC_INIT_AGENT NC_INIT_NOTIF
+#define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING)
 
 volatile int done = 0;
 
