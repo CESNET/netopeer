@@ -53,6 +53,9 @@
 #include "common.c"
 #include "comm.h"
 
+/* Define libnetconf submodules necessary for the NETCONF agent */
+#define NC_INIT_AGENT NC_INIT_NOTIF
+
 volatile int done = 0;
 
 typedef int model_t;
@@ -309,7 +312,7 @@ int main()
 	nc_callback_print(clb_print);
 
 	/* initialize library */
-	if (nc_init(NC_INIT_ALL) < 0) {
+	if (nc_init(NC_INIT_AGENT) < 0) {
 		clb_print(NC_VERB_ERROR, "Library initialization failed");
 		return EXIT_FAILURE;
 	}
