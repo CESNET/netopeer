@@ -215,6 +215,11 @@ class netopeer(nc_module.nc_module):
 		for module in self.modules:
 			msg = '{s}'.format(s=module.name)
 			window.addstr(msg+' '*(linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and module is self.modules[self.selected] else 0)
+		
+		window.addstr('\nTo (un)install Netopeer modules, use ')
+		window.addstr('netopeer-manager(1)', curses.color_pair(0) | curses.A_UNDERLINE)
+		window.addstr('.\n')
+		
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
