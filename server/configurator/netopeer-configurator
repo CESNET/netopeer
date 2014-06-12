@@ -219,7 +219,7 @@ def cli(stdscr, config):
 		w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
 		w_tools.window.addstr(' - save | ', curses.color_pair(0))
 		w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - exit ', curses.color_pair(0))
+		w_tools.window.addstr(' - exit, do not save changes ', curses.color_pair(0))
 				
 		if windows[window] == 'Content':
 			# Print module tools
