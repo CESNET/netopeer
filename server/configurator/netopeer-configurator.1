@@ -1,0 +1,67 @@
+.\" Process this file with
+.\" groff -man -Tascii netopeer-configurator.1
+.\"
+.TH "netopeer-configurator" 1 "Fri Jun 13 2014" "Netopeer"
+.SH NAME
+netopeer-configurator \- \fBnetopeer-server\fR's first run configurator 
+.SH DESCRIPTION
+.B netopeer-configurator
+is a tool to make 
+.B netopeer-server
+configuration more easy. It is supposed mainly for the configuration before the
+first run of the
+.BR netopeer-server .
+However, it can be used whenever to check the current settings and modify the
+selected properties of the
+.BR netopeer-server .
+.PP
+Because the
+.B netopeer-configurator
+accesses configuration files in the system directories, it is necessary to run
+it as the \fIroot\fR user.
+.PP
+The
+.B netopeer-configurator
+provides information from the following areas:
+.IP Netopeer
+Generic configuration of the Netopeer server. It provides information about the
+server's binaries and the Netopeer modules. It allows to enable/disable the
+installed modules. To install/remove the Netopeer modules, use the
+.B netopeer-manager
+tool.
+.IP NACM
+NETCONF Access Control Module. This part allows to change the default settings
+of the NACM. It is useful mainly because the NACM by default avoids any write
+to the configuration, so via the NETCONF the user is not allowed to specify even
+NACM rules. The
+.B netopeer-configurator
+allows to change the default rules for read, write and execute actions as well
+as to specify the users that will be permitted to do anything (all access right
+in all modules will be granted).
+.IP Intercommunication
+Provides information about the communication between the
+.B netopeer-server
+and
+.BR netopeer-agent s.
+In case of DBus communication, it also allows to change the user allowed to run the
+.B netopeer-server
+and the group of users allowed to connect to the NETCONF server.
+.SH "SEE ALSO"
+.BR netopeer-agent(1) ,
+.BR netopeer-cli(1) ,
+.BR netopeer-manager(1) ,
+.BR netopeer-server(8) ,
+.SS Homepage
+https://netopeer.googlecode.com
+.SH MAILING LIST
+To discuss various topics about
+.B netopeer-configurator,
+join the Netopeer mailing list at <https://groups.google.com/group/netopeer>.
+.SH REPORTING BUGS
+Report bugs to the issue tracker at <https://code.google.com/p/netopeer/issues/list>.
+.SH AUTHORS
+Radek Krejci <rkrejci@cesnet.cz>
+.SH COPYRIGHT
+Copyright \(co 2014 CESNET, z.s.p.o.
+
+
