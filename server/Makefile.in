@@ -176,8 +176,8 @@ manager/netopeer-manager: manager/netopeer-manager.tmp
 	chmod +x $@	
 
 $(OBJDIR)/%.o: %.c
-	@[ -d $$(dirname $@) ] || \
-		(mkdir -p $$(dirname $@))
+	@[ -d $(dir $@) ] || \
+		(mkdir -p $(dir $@))
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
 
 .PHONY: clean
