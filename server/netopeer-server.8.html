@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Fri Jun  6 15:46:05 2014 -->
+<!-- CreationDate: Thu Jun 12 18:55:39 2014 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -157,7 +157,12 @@ with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
 <p style="margin-left:11%; margin-top: 1em"><i>/etc/dbus-1/system.d/org.liberouter.netopeer.conf</i></p>
 
 <p style="margin-left:22%;">D-Bus configuration file for
-the services used by the <b>netopeer-agent(1)</b>.</p>
+the services used by the <b>netopeer-agent(1)</b>. The
+location of the D-Bus configuration files can differ on
+different Linux distributions, so the location can be
+changed by
+<b>&minus;&minus;with&minus;dbus&minus;config&minus;dir</b>
+configure option.</p>
 
 <p style="margin-left:22%; margin-top: 1em">This file is
 not installed if the <b>netopeer-server</b> is compiled with
@@ -172,8 +177,10 @@ automatic start of the <b>netopeer-server</b>.</p>
 <p style="margin-left:22%; margin-top: 1em">This file is
 not installed if the <b>netopeer-server</b> is compiled with
 the <b>&minus;&minus;disable&minus;dbus</b> and without
-<b>&minus;&minus;with&minus;dbus&minus;services</b>
-option.</p>
+<b>&minus;&minus;with&minus;dbus&minus;services</b> option.
+Specifying the value of the second option, one can correct
+the default location of the D-Bus service configuration
+files that can differ on different Linux distributions.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>libnetconf
 files</b> <i><br>
