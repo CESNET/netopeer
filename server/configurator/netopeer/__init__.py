@@ -23,6 +23,6 @@ def consolidate_paths(paths):
 			break
 
 # when inporting all import only configuring modules
-__all__ = ['sshd', 'nacm', 'netopeer', 'dbus']
+__all__ = ['nacm', 'netopeer', 'dbus', 'sock']
 # consolidate configure paths
 consolidate_paths(config.paths)

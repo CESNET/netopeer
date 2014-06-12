@@ -426,6 +426,6 @@ AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
 AC_CONFIG_FILES(src/config.h)
 AC_CONFIG_FILES(stunnel/stunnel.conf)
-AC_CONFIG_FILES(configurator/modules/config.py)
+AC_CONFIG_FILES(configurator/netopeer/config.py)
 
 AC_OUTPUT

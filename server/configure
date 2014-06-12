@@ -653,6 +653,8 @@ LIBDBUS_LIBS
 LIBDBUS_CFLAGS
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
+PKG_CONFIG_LIBDIR
+PKG_CONFIG_PATH
 XML2_CONFIG
 INSTALL_DATA
 INSTALL_SCRIPT
@@ -740,6 +742,8 @@ LDFLAGS
 LIBS
 CPPFLAGS
 PKG_CONFIG
+PKG_CONFIG_PATH
+PKG_CONFIG_LIBDIR
 LIBNETCONF_CFLAGS
 LIBNETCONF_LIBS
 LIBDBUS_CFLAGS
@@ -1398,6 +1402,10 @@ Some influential environment variables:
   CPPFLAGS    (Objective) C/C++ preprocessor flags, e.g. -I<include dir> if
               you have headers in a nonstandard directory <include dir>
   PKG_CONFIG  path to pkg-config utility
+  PKG_CONFIG_PATH
+              directories to add to pkg-config's search path
+  PKG_CONFIG_LIBDIR
+              path overriding pkg-config's built-in search path
   LIBNETCONF_CFLAGS
               C compiler flags for LIBNETCONF, overriding pkg-config
   LIBNETCONF_LIBS
@@ -3731,6 +3739,11 @@ REQS="$REQS libxml2"
 # libnetconf
 
 
+
+
+
+
+
 if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
 	if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}pkg-config", so it can be a program name with args.
@@ -3843,7 +3856,6 @@ $as_echo "yes" >&6; }
 $as_echo "no" >&6; }
 		PKG_CONFIG=""
 	fi
-
 fi
 
 # Check whether --with-libnetconf was given.
@@ -3870,6 +3882,7 @@ if test -n "$LIBNETCONF_CFLAGS"; then
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
   pkg_cv_LIBNETCONF_CFLAGS=`$PKG_CONFIG --cflags "libnetconf" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
 fi
@@ -3886,6 +3899,7 @@ if test -n "$LIBNETCONF_LIBS"; then
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
   pkg_cv_LIBNETCONF_LIBS=`$PKG_CONFIG --libs "libnetconf" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
 fi
@@ -3896,6 +3910,8 @@ fi
 
 
 if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 
 if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
         _pkg_short_errors_supported=yes
@@ -3903,9 +3919,9 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        LIBNETCONF_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors "libnetconf" 2>&1`
+	        LIBNETCONF_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libnetconf" 2>&1`
         else
-	        LIBNETCONF_PKG_ERRORS=`$PKG_CONFIG --print-errors "libnetconf" 2>&1`
+	        LIBNETCONF_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libnetconf" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$LIBNETCONF_PKG_ERRORS" >&5
@@ -3919,9 +3935,10 @@ installed software in a non-standard prefix.
 
 Alternatively, you may set the environment variables LIBNETCONF_CFLAGS
 and LIBNETCONF_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
-" "$LINENO" 5
+See the pkg-config man page for more details." "$LINENO" 5
 elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
@@ -3939,7 +3956,7 @@ else
 	LIBNETCONF_LIBS=$pkg_cv_LIBNETCONF_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	:
+
 fi
 	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
 	LIBS="$LIBNETCONF_LIBS $LIBS"
@@ -4099,6 +4116,7 @@ if test -n "$LIBDBUS_CFLAGS"; then
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
   pkg_cv_LIBDBUS_CFLAGS=`$PKG_CONFIG --cflags "dbus-1 >= 1.0.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
 fi
@@ -4115,6 +4133,7 @@ if test -n "$LIBDBUS_LIBS"; then
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
   pkg_cv_LIBDBUS_LIBS=`$PKG_CONFIG --libs "dbus-1 >= 1.0.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
 fi
@@ -4125,6 +4144,8 @@ fi
 
 
 if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 
 if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
         _pkg_short_errors_supported=yes
@@ -4132,9 +4153,9 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors "dbus-1 >= 1.0.0" 2>&1`
+	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
         else
-	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --print-errors "dbus-1 >= 1.0.0" 2>&1`
+	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$LIBDBUS_PKG_ERRORS" >&5
@@ -4148,9 +4169,10 @@ installed software in a non-standard prefix.
 
 Alternatively, you may set the environment variables LIBDBUS_CFLAGS
 and LIBDBUS_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
-" "$LINENO" 5
+See the pkg-config man page for more details." "$LINENO" 5
 elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
@@ -4168,7 +4190,7 @@ else
 	LIBDBUS_LIBS=$pkg_cv_LIBDBUS_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	:
+
 fi
 		CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
 		LIBS="$LIBDBUS_LIBS $LIBS"
@@ -5376,7 +5398,7 @@ ac_config_files="$ac_config_files src/config.h"
 
 ac_config_files="$ac_config_files stunnel/stunnel.conf"
 
-ac_config_files="$ac_config_files configurator/modules/config.py"
+ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
 
 cat >confcache <<\_ACEOF
@@ -6095,7 +6117,7 @@ do
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
     "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
-    "configurator/modules/config.py") CONFIG_FILES="$CONFIG_FILES configurator/modules/config.py" ;;
+    "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

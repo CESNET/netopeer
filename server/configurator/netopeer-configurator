@@ -6,12 +6,12 @@ import curses
 import os
 
 # netopeer configurator module base
-from modules.nc_module import NCModuleError
-from modules.nc_module import NCModuleOff
+from netopeer.nc_module import NCModuleError
+from netopeer.nc_module import NCModuleOff
 
 # error messages
-import modules.messages as messages
-import modules.config as config
+import netopeer.messages as messages
+import netopeer.config as config
 
 class netopeer_configuration:
 	"""Top level class of netopeer-configuration script."""
@@ -24,16 +24,16 @@ class netopeer_configuration:
 			print('Script must be run with as a root.')
 			exit(1)
 		try:
-			import modules.netopeer
-			self.nc_modules.append(modules.netopeer.netopeer(self.nc_modules))
+			import netopeer.netopeer
+			self.nc_modules.append(netopeer.netopeer.netopeer(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e), 'error')
 		except NCModuleError as e:
 			messages.append(str(e), 'error')
 
 		try:
-			import modules.nacm
-			self.nc_modules.append(modules.nacm.nacm(self.nc_modules))
+			import netopeer.nacm
+			self.nc_modules.append(netopeer.nacm.nacm(self.nc_modules))
 		except ImportError as e:
 			messages.append(str(e), 'error')
 		except NCModuleError as e:
@@ -41,16 +41,16 @@ class netopeer_configuration:
 
 		if config.options['dbus']:
 			try:
-				import modules.dbus
-				self.nc_modules.append(modules.dbus.dbus(self.nc_modules))
+				import netopeer.dbus
+				self.nc_modules.append(netopeer.dbus.dbus(self.nc_modules))
 			except ImportError as e:
 				messages.append(str(e), 'error')
 			except NCModuleError as e:
 				messages.append(str(e), 'error')
 		else:
 			try:
-				import modules.sock
-				self.nc_modules.append(modules.sock.sock(self.nc_modules))
+				import netopeer.sock
+				self.nc_modules.append(netopeer.sock.sock(self.nc_modules))
 			except ImportError as e:
 				messages.append(str(e), 'error')
 			except NCModuleError as e:
