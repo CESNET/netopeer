@@ -8,8 +8,6 @@ import subprocess
 import nc_module
 import messages
 
-linewidth = 50
-
 class acm:
 	class action:
 		DENY = 0
@@ -61,6 +59,8 @@ class nacm(nc_module.nc_module):
 	nacm_doc = None
 	nacm_ctxt = None
 	print_rules_flag = 0
+	
+	linewidth = 50
 	
 	enabled = True
 	extgroups = True
@@ -173,7 +173,11 @@ class nacm(nc_module.nc_module):
 		if 'almighty' in self.nacm_group_names:
 			self.almighty_users = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'almighty\']/n:user-name'))
 			self.almighty_group = self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'almighty\']')[0]
-			
+		
+		for user in self.almighty_users:
+			if (len(user) + 3) > self.linewidth:
+				self.linewidth = len(tmp_nacm_var) + 3
+		
 		return(True)
 
 	def print_rules(self, window):
@@ -314,69 +318,60 @@ class nacm(nc_module.nc_module):
 		return(True)
 
 	def paint(self, window, focus, height, width):
-		window.addstr('Path to NACM datastore:\n')
 		tools = []
-		msg = '{s}'.format(s=self.datastore_path)
-		if len(msg) > 50:
-			global linewidth
-			linewidth = len(msg)
-
 		if focus:
 			tools.append(('ENTER','change'))
-				
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
-		window.addstr('\n')
 		
 		# NACM enabled/disabled
 		if self.enabled:
 			msg = 'Access control is ON'
 		else:
 			msg = 'Access control is OFF'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 1 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
 			
 		# NACM system groups usage
 		if self.extgroups:
 			msg = 'Using system groups is ALLOWED'
 		else:
 			msg = 'Using system groups is FORBIDDEN'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 2 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 1 else 0)
 		
 		# default read permission
 		if self.r_default == acm.action.DENY:
 			msg = 'Default action for read requests: DENY'
 		else:
 			msg = 'Default action for read requests: PERMIT'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 3 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 2 else 0)
 		
 		# default write permission
 		if self.w_default == acm.action.DENY:
 			msg = 'Default action for write requests: DENY'
 		else:
 			msg = 'Default action for write requests: PERMIT'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 4 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 3 else 0)
 			
 		# default execute permission
 		if self.x_default == acm.action.DENY:
 			msg = 'Default action for execute requests: DENY'
 		else:
 			msg = 'Default action for execute requests: PERMIT'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 5 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 4 else 0)
 
 		msg = 'Add users with unlimited access'
-		window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6 else 0)
+		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 5 else 0)
 		if self.almighty_users:
 			for user in self.almighty_users:
 				msg = '  {s}'.format(s=user)
-				window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == self.almighty_users.index(user)+7 else 0)
+				window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == self.almighty_users.index(user)+6 else 0)
 		window.addstr('\n')
 		
 		if self.print_rules_flag:
 			msg = 'Hide current NACM rules.'
-			window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 7+len(self.almighty_users) else 0)
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
 			self.print_rules(window)
 		else:
 			msg = 'Show current NACM rules.'
-			window.addstr(msg+' '*(linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 7+len(self.almighty_users) else 0)
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
 		
 		return(tools)
 
@@ -388,59 +383,45 @@ class nacm(nc_module.nc_module):
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 			self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < 7 + len(self.almighty_users):
+		elif key == curses.KEY_DOWN and self.selected < 6 + len(self.almighty_users):
 			self.selected = self.selected+1
 		elif key == ord('\n'):
 			if self.selected == 0:
-				window.addstr(1, 0, ' '*linewidth,  curses.color_pair(0))
-				# edit file path
-				tmp_nacm_var = self.get_editable(1,0, stdscr, window, self.datastore_path, curses.color_pair(1))
-				if tmp_nacm_var and os.path.isfile(tmp_nacm_var):
-					self.datastore_path = tmp_nacm_var
-					self.get()
-				else:
-					try:
-						open(tmp_nacm_var, 'w').close()
-						self.datastore_path = tmp_nacm_var
-						self.get()
-					except IOError:
-						messages.append('{s} is not valid file and can not be created.'.format(s=tmp_nacm_var), 'error')
-			elif self.selected == 1:
 				self.enabled = not(self.enabled)
-			elif self.selected == 2:
+			elif self.selected == 1:
 				self.extgroups = not(self.extgroups)
-			elif self.selected == 3:
+			elif self.selected == 2:
 				if self.r_default == acm.action.PERMIT:
 					self.r_default = acm.action.DENY
 				else:
 					self.r_default = acm.action.PERMIT
-			elif self.selected == 4:
+			elif self.selected == 3:
 				if self.w_default == acm.action.PERMIT:
 					self.w_default = acm.action.DENY
 				else:
 					self.w_default = acm.action.PERMIT
-			elif self.selected == 5:
+			elif self.selected == 4:
 				if self.x_default == acm.action.PERMIT:
 					self.x_default = acm.action.DENY
 				else:
 					self.x_default = acm.action.PERMIT
-			elif self.selected in range(6, len(self.almighty_users) + 7):
-				window.addstr(11+len(self.almighty_users), 0, '> _'+' '*(linewidth-3),  curses.color_pair(0))
-				if self.selected == 6:
+			elif self.selected in range(5, len(self.almighty_users) + 6):
+				window.addstr(8+len(self.almighty_users), 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
+				if self.selected == 5:
 					# add new user
-					tmp_nacm_var = self.get_editable(11+len(self.almighty_users), 2, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE)
+					tmp_nacm_var = self.get_editable(8+len(self.almighty_users), 2, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE)
 				else:
 					# edit user
-					pos = self.selected-7
-					tmp_nacm_var = self.get_editable(11+len(self.almighty_users), 2, stdscr, window, self.almighty_users[pos], curses.color_pair(1))
+					pos = self.selected-6
+					tmp_nacm_var = self.get_editable(8+len(self.almighty_users), 2, stdscr, window, self.almighty_users[pos], curses.color_pair(1))
 					
 				if tmp_nacm_var:
-					if self.selected == 6 and self.almighty_users.count(tmp_nacm_var):
+					if self.selected == 5 and self.almighty_users.count(tmp_nacm_var):
 						# adding user that already present in the list
 						messages.append('User \'{s}\' already present in the list'.format(s=tmp_nacm_var), 'error')
 						curses.flash()
 						return(True)
-					elif self.selected == 6:
+					elif self.selected == 5:
 						# adding a new user that is not yet in the list
 						self.almighty_users.append(tmp_nacm_var)
 					else:
@@ -448,9 +429,12 @@ class nacm(nc_module.nc_module):
 						self.almighty_users.remove(self.almighty_users[pos])
 						self.almighty_users.append(tmp_nacm_var)
 					
+					if (len(tmp_nacm_var) + 3) > self.linewidth:
+						self.linewidth = len(tmp_nacm_var) + 3
+					 
 					self.almighty_users.sort()	
-					self.selected = self.almighty_users.index(tmp_nacm_var) + 7
-				elif self.selected != 6:
+					self.selected = self.almighty_users.index(tmp_nacm_var) + 6
+				elif self.selected != 5:
 					# removing an existing user from the list
 					self.almighty_users.remove(self.almighty_users[pos])
 				else:
@@ -458,7 +442,7 @@ class nacm(nc_module.nc_module):
 					messages.append('Invalid empty user', 'error')
 					curses.flash()
 					return(True)
-			elif self.selected == len(self.almighty_users) + 7:
+			elif self.selected == len(self.almighty_users) + 6:
 				self.print_rules_flag = not self.print_rules_flag
 			else:
 				curses.flash()
