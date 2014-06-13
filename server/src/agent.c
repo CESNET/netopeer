@@ -56,6 +56,11 @@
 /* Define libnetconf submodules necessary for the NETCONF agent */
 #define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING)
 
+/**
+ * Environment variabe with settings for verbose level
+ */
+#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
+
 volatile int done = 0;
 
 typedef int model_t;
@@ -278,7 +283,17 @@ char *get_tls_username(void)
 
 #endif /* ENABLE_TLS */
 
-int main()
+static void print_usage (char * progname)
+{
+	fprintf(stdout, "This program is not supposed for manual use, it should be\n");
+	fprintf(stdout, "started automatically as an SSH Subsystem by an SSH daemon.\n\n");
+	fprintf(stdout, "Usage: %s [-h] [-v level]\n", progname);
+	fprintf(stdout, " -h                  display help\n");
+	fprintf(stdout, " -v level            verbose output level\n");
+	exit (0);
+}
+
+int main (int argc, char** argv)
 {
 	conn_t *con;
 	struct nc_session * netconf_con;
@@ -289,11 +304,34 @@ int main()
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
+	int next_option;
+	int verbose;
+	char *aux_string = NULL;
 
 #ifdef ENABLE_TLS
 	struct passwd *pw;
 	char* username;
 #endif
+
+	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
+		verbose = NC_VERB_ERROR;
+	} else {
+		verbose = atoi(aux_string);
+	}
+
+	while ((next_option = getopt(argc, argv, "hv:")) != -1) {
+		switch (next_option) {
+		case 'h':
+			print_usage(argv[0]);
+			break;
+		case 'v':
+			verbose = atoi(optarg);
+			break;
+		default:
+			print_usage(argv[0]);
+			break;
+		}
+	}
 
 	/* set signal handler */
 	sigfillset(&action.sa_mask);
@@ -305,11 +343,17 @@ int main()
 	sigaction(SIGTERM, &action, NULL );
 	sigaction(SIGKILL, &action, NULL );
 
-#ifdef DEBUG
-	nc_verbosity(NC_VERB_DEBUG);
-#endif
 	openlog("netopeer-agent", LOG_PID, LOG_DAEMON);
 	nc_callback_print(clb_print);
+
+	/* normalize value if not from the enum */
+	if (verbose < NC_VERB_ERROR) {
+		nc_verbosity(NC_VERB_ERROR);
+	} else if (verbose > NC_VERB_DEBUG) {
+		nc_verbosity(NC_VERB_DEBUG);
+	} else {
+		nc_verbosity(verbose);
+	}
 
 	/* initialize library */
 	if (nc_init(NC_INIT_AGENT) < 0) {
