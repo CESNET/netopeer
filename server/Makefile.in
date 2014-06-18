@@ -130,6 +130,7 @@ H_IN = src/config.h.in
 
 MANPAGES = manager/netopeer-manager.1 \
 	netopeer-server.8 \
+	netopeer-agent.1 \
 	configurator/netopeer-configurator.1
 
 ifneq "@ROFF2HTML@" "no"
