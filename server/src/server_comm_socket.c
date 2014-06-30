@@ -95,11 +95,6 @@ conn_t* comm_init()
 	server.sun_family = AF_UNIX;
 	strncpy(server.sun_path, COMM_SOCKET_PATH, sizeof(server.sun_path) - 1);
 
-	if (unlink(server.sun_path) == -1) {
-		nc_verb_error("Unable to unlink Netopeer's communication socket \'%s\' (%s)", COMM_SOCKET_PATH, strerror(errno));
-		goto error_cleanup;
-	}
-
 	/* set socket permission using umask */
 	mask = umask(~COMM_SOCKET_PERM);
 	/* bind socket to the file path */
