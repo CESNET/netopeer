@@ -74,6 +74,13 @@ conn_t* comm_init()
 		return (&sock);
 	}
 
+	/* check another instance of the netopeer-server */
+	if (access(COMM_SOCKET_PATH, F_OK) == 0) {
+		nc_verb_error("Communication socket \'%s\' already exists.", COMM_SOCKET_PATH);
+		nc_verb_error("Another instance of the netopeer-server is running. If not, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
+		return (NULL);
+	}
+
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (sock == -1) {
 		nc_verb_error("Unable to create communication socket (%s).", strerror(errno));
@@ -89,7 +96,7 @@ conn_t* comm_init()
 	strncpy(server.sun_path, COMM_SOCKET_PATH, sizeof(server.sun_path) - 1);
 
 	if (unlink(server.sun_path) == -1) {
-		nc_verb_error("Unable to unlink Netopeer's communication socket \'%s\' (%s)", strerror(errno));
+		nc_verb_error("Unable to unlink Netopeer's communication socket \'%s\' (%s)", COMM_SOCKET_PATH, strerror(errno));
 		goto error_cleanup;
 	}
 
