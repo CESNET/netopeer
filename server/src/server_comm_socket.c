@@ -83,9 +83,15 @@ conn_t* comm_init()
 	flags = fcntl(sock, F_GETFL, 0);
 	fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
+	/* prepare structure */
+	memset(&server, 0, sizeof(struct sockaddr_un));
 	server.sun_family = AF_UNIX;
 	strncpy(server.sun_path, COMM_SOCKET_PATH, sizeof(server.sun_path) - 1);
-	unlink(server.sun_path);
+
+	if (unlink(server.sun_path) == -1) {
+		nc_verb_error("Unable to unlink Netopeer's communication socket \'%s\' (%s)", strerror(errno));
+		goto error_cleanup;
+	}
 
 	/* set socket permission using umask */
 	mask = umask(~COMM_SOCKET_PERM);
