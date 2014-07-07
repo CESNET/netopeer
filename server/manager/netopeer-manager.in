@@ -244,8 +244,11 @@ try:
 		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
 		
 	elif args.subcommand == 'rm':
-		config = minidom.parse(netopeer_config)
-		module = getModule(config, args.name)
+		try:
+			config = minidom.parse(netopeer_config)
+			module = getModule(config, args.name)
+		except xml.parsers.expat.ExpatError:
+			module = None
 		
 		if not module:
 			print('No \''+args.name+'\' module found.')
