@@ -68,12 +68,15 @@ class nc_module:
 		while True:
 			# how much to erase
 			blocklen = len(variable)
-			# repaint
-			window.addstr(y,x, variable[:index], color)
-			window.addstr(variable[index:index+1], color | curses.A_REVERSE)
-			window.addstr(variable[index+1:], color)
-			window.refresh()
-	
+			try:
+				# repaint
+				window.addstr(y,x, variable[:index], color)
+				window.addstr(variable[index:index+1], color | curses.A_REVERSE)
+				window.addstr(variable[index+1:], color)
+				window.refresh()
+			except curses.error:
+				pass
+		
 			# get next key
 			c = stdscr.getch()
 			if c == ord('\n'):

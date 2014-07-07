@@ -106,23 +106,26 @@ class dbus(nc_module.nc_module):
 
 	def paint(self, window, focus, height, width):
 		tools = []
-		window.addstr('For intercommunication between Netopeer server and agents is used: DBus\n\n')
-		
-		window.addstr('Netopeer DBus configuration file:\n')
-		window.addstr('{s}\n\n'.format(s=self.permission_path), curses.color_pair(0) | curses.A_UNDERLINE)
-		if self.service_path:
-			window.addstr('Netopeer DBus service autostart file:\n')
-			window.addstr('{s}\n\n'.format(s=self.service_path), curses.color_pair(0) | curses.A_UNDERLINE)
-		
-		window.addstr('Allowed user to start the Netopeer server:\n')
-		msg = '  {s}'.format(s=self.user)
-		window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
-		window.addstr('\n\n')
+		try:
+			window.addstr('For intercommunication between Netopeer server and agents is used: DBus\n\n')
 			
-		window.addstr('Allowed group to connect to the Netopeer server:\n')
-		msg = '  {s}'.format(s=self.group)
-		window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 1) else 0)
-		window.addstr('\n\n')
+			window.addstr('Netopeer DBus configuration file:\n')
+			window.addstr('{s}\n\n'.format(s=self.permission_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			if self.service_path:
+				window.addstr('Netopeer DBus service autostart file:\n')
+				window.addstr('{s}\n\n'.format(s=self.service_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			
+			window.addstr('Allowed user to start the Netopeer server:\n')
+			msg = '  {s}'.format(s=self.user)
+			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
+			window.addstr('\n\n')
+				
+			window.addstr('Allowed group to connect to the Netopeer server:\n')
+			msg = '  {s}'.format(s=self.group)
+			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 1) else 0)
+			window.addstr('\n\n')
+		except curses.error:
+			pass
 		
 		return(tools)
 
@@ -133,12 +136,18 @@ class dbus(nc_module.nc_module):
 			self.selected = self.selected+1
 		elif key == ord('\n'):
 			if self.selected == 0:
-				window.addstr(9 if self.service_path else 6, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
+				try:
+					window.addstr(9 if self.service_path else 6, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
+				except curses.error:
+					pass
 				self.user = self.get_editable(9 if self.service_path else 6, 2, stdscr, window, self.user, curses.color_pair(1) | curses.A_REVERSE)
 				if len(self.user) >= self.linewidth:
 					self.linewidth = len(self.user) + 3
 			elif self.selected == 1:
-				window.addstr(12 if self.service_path else 9, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
+				try:
+					window.addstr(12 if self.service_path else 9, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
+				except curses.error:
+					pass
 				self.group = self.get_editable(12 if self.service_path else 9, 2, stdscr, window, self.group, curses.color_pair(1) | curses.A_REVERSE)
 				if len(self.group) >= self.linewidth:
 					self.linewidth = len(self.group) + 3

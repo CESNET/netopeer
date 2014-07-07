@@ -194,31 +194,34 @@ class netopeer(nc_module.nc_module):
 
 	def paint(self, window, focus, height, width):
 		tools = []
-		window.addstr('The netopeer-server binary found in path:\n')
-		window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
-		window.addstr('\n')
+		try:
+			window.addstr('The netopeer-server binary found in path:\n')
+			window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('\n')
 
-		window.addstr('The netopeer-agent binary found in path:\n')
-		window.addstr('{s}\n'.format(s=self.agent_path), curses.color_pair(0) | curses.A_UNDERLINE)
-		window.addstr('\n')
+			window.addstr('The netopeer-agent binary found in path:\n')
+			window.addstr('{s}\n'.format(s=self.agent_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('\n')
 
-		window.addstr('Using modules instaled in path:\n')
-		window.addstr('{s}\n'.format(s=self.modules_path), curses.color_pair(0) | curses.A_UNDERLINE)
-		window.addstr('\n')
+			window.addstr('Using modules instaled in path:\n')
+			window.addstr('{s}\n'.format(s=self.modules_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('\n')
 
-		tools.append(('ENTER','enable/disable'))
-		window.addstr('Curently installed modules:\n')
-		if self.modules_maxlen + 10 > 50:
-			linewidth = self.modules_maxlen + 10
-		else:
-			linewidth = 50
-		for module in self.modules:
-			msg = '{s}'.format(s=module.name)
-			window.addstr(msg+' '*(linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and module is self.modules[self.selected] else 0)
+			tools.append(('ENTER','enable/disable'))
+			window.addstr('Curently installed modules:\n')
+			if self.modules_maxlen + 10 > 50:
+				linewidth = self.modules_maxlen + 10
+			else:
+				linewidth = 50
+			for module in self.modules:
+				msg = '{s}'.format(s=module.name)
+				window.addstr(msg+' '*(linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and module is self.modules[self.selected] else 0)
 		
-		window.addstr('\nTo (un)install Netopeer modules, use ')
-		window.addstr('netopeer-manager(1)', curses.color_pair(0) | curses.A_UNDERLINE)
-		window.addstr('.\n')
+			window.addstr('\nTo (un)install Netopeer modules, use ')
+			window.addstr('netopeer-manager(1)', curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('.\n')
+		except curses.error:
+			pass
 		
 		return(tools)
 

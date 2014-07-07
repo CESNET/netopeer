@@ -4,6 +4,7 @@
 # standard modules 
 import curses
 import os
+import time
 
 # netopeer configurator module base
 from netopeer.nc_module import NCModuleError
@@ -128,23 +129,42 @@ class configurator_window:
 def create_windows(stdscr):
 	#get 'window' size
 	(maxy,maxx) = stdscr.getmaxyx()
+	if maxx < 40 or maxy < 23:
+		curses.endwin()
+		print('\n\nTerminal is too small.\n')
+		exit(1)
+
 	# window sizes
 	w_messages_x = maxx
-	w_messages_y = 13
+	if maxy < 40:
+		w_messages_y = 4
+	else:
+		w_messages_y = 13
+	
 	tools_x = maxx
 	tools_y = 3
-	menu_x = 22
+	
 	menu_y = maxy-w_messages_y-tools_y
+	if maxx < 50:
+		menu_x = 15
+	else:
+		menu_x = 20
+		
 	content_x = maxx-menu_x
 	content_y = maxy-w_messages_y-tools_y
+	
 	# left subwindow with menu items
 	menu = configurator_window(stdscr, menu_y,menu_x, 0,0)
+
 	# right window with content depending on selected menu item
 	content = configurator_window(stdscr, content_y,content_x, 0,menu_x)
+	
 	# bottom window with error and other messages
 	messages = configurator_window(stdscr, w_messages_y,w_messages_x, maxy-tools_y-w_messages_y,0)
+	
 	# bottom line with avaliable tools/commands
 	tools = configurator_window(stdscr, tools_y,tools_x, maxy-tools_y,0)
+		
 	return(menu, content,  messages, tools)
 
 def cli(stdscr, config):
@@ -187,13 +207,16 @@ def cli(stdscr, config):
 
 		# Menu window
 		for module in config.nc_modules:
-			if module is config.nc_modules[module_selected]:
-				if windows[window] == 'Menu':
-					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
-				else:
-					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_UNDERLINE)
-			else:	
-				w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
+			try:
+				if module is config.nc_modules[module_selected]:
+					if windows[window] == 'Menu':
+						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
+					else:
+						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_UNDERLINE)
+				else:	
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
+			except curses.error:
+				pass
 
 		# Content window
 		focus = windows[window] == 'Content'
@@ -202,31 +225,40 @@ def cli(stdscr, config):
 		# Messages window
 		last_messages = messages.last(w_messages.size['y']-2)
 		for message in reversed(last_messages):
-			w_messages.window.addstr(message[0], colors[message[1]])
-			if not message is last_messages[0]:
-				w_messages.window.addstr('\n')
+			try:
+				w_messages.window.addstr(message[0], colors[message[1]])
+				if not message is last_messages[0]:
+					w_messages.window.addstr('\n')
+			except curses.error:
+				pass
 
 		# Tools widow
-		w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - next | ', curses.color_pair(0))
-		w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - previous | ', curses.color_pair(0))
-		if windows[window] == 'Menu':
-			w_tools.window.addstr("RIGHT", curses.color_pair(0) | curses.A_UNDERLINE)
-		else:
-			w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - switch window | ', curses.color_pair(0))
-		w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - save | ', curses.color_pair(0))
-		w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
-		w_tools.window.addstr(' - exit, do not save changes ', curses.color_pair(0))
+		try:
+			w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' - next | ', curses.color_pair(0))
+			w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' - previous | ', curses.color_pair(0))
+			if windows[window] == 'Menu':
+				w_tools.window.addstr("RIGHT", curses.color_pair(0) | curses.A_UNDERLINE)
+			else:
+				w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' - switch window | ', curses.color_pair(0))
+			w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' - save | ', curses.color_pair(0))
+			w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' - exit', curses.color_pair(0))
+		except curses.error:
+			pass
 				
 		if windows[window] == 'Content':
 			# Print module tools
 			for (key,desc) in module_tools:
-				w_tools.window.addstr('| ', curses.color_pair(0))
-				w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
-				w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
+				try:
+					w_tools.window.addstr('| ', curses.color_pair(0))
+					w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
+					w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
+				except curses.error:
+					pass
 
 		stdscr.refresh()
 

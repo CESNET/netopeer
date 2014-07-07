@@ -183,51 +183,56 @@ class nacm(nc_module.nc_module):
 	def print_rules(self, window):
 
 		for group_name in self.nacm_group_names:
-			window.addstr('\nGroup {s}:\n'.format(s=group_name))
-			group_users = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'{s}\']/n:user-name'.format(s=group_name)))
-			for user in group_users:
-				window.addstr('  {s}\n'.format(s=user))
+			try:
+				window.addstr('\nGroup {s}:\n'.format(s=group_name))
+				group_users = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'{s}\']/n:user-name'.format(s=group_name)))
+				for user in group_users:
+					window.addstr('  {s}\n'.format(s=user))
+			except curses.error:
+				pass
 				
 		nacm_rule_lists = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list/n:name'))
 		for rule_list_name in nacm_rule_lists:
-			window.addstr('\nRule list {s}:\n'.format(s=rule_list_name))
-			window.addstr('  Group(s): ')
-			groups = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:group'.format(s=rule_list_name)))
-			for group in groups:
-				window.addstr('{s} '.format(s=group))
-			window.addstr('\n')
-			
-			rule_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:rule/n:name'.format(s=rule_list_name)))
-			for rule_name in rule_names:
-				window.addstr('  Rule {s}:\n'.format(s=rule_name))
-				module_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:module-name'.format(list=rule_list_name,rule=rule_name)))
-				if module_names:
-					window.addstr('    Module: {s}\n'.format(s=module_names[0]))
+			try:
+				window.addstr('\nRule list {s}:\n'.format(s=rule_list_name))
+				window.addstr('  Group(s): ')
+				groups = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:group'.format(s=rule_list_name)))
+				for group in groups:
+					window.addstr('{s} '.format(s=group))
+				window.addstr('\n')
 				
-				rpc_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:protocol-operation/n:rpc-name'.format(list=rule_list_name,rule=rule_name)))
-				if rpc_names:
-					window.addstr('    RPC: {s}\n'.format(s=rpc_names[0]))
-				
-				notification_name = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:notification/n:notification-name'.format(list=rule_list_name,rule=rule_name)))
-				if notification_name:
-					window.addstr('    Notification: {s}\n'.format(s=notification_name[0]))
+				rule_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{s}\']/n:rule/n:name'.format(s=rule_list_name)))
+				for rule_name in rule_names:
+					window.addstr('  Rule {s}:\n'.format(s=rule_name))
+					module_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:module-name'.format(list=rule_list_name,rule=rule_name)))
+					if module_names:
+						window.addstr('    Module: {s}\n'.format(s=module_names[0]))
 					
-				data_path = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:data-node/n:path'.format(list=rule_list_name,rule=rule_name)))
-				if data_path:
-					window.addstr('    Data Path: {s}\n'.format(s=data_path[0]))
+					rpc_names = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:protocol-operation/n:rpc-name'.format(list=rule_list_name,rule=rule_name)))
+					if rpc_names:
+						window.addstr('    RPC: {s}\n'.format(s=rpc_names[0]))
 					
-				access_operation = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:access-operations'.format(list=rule_list_name,rule=rule_name)))
-				if access_operation:
-					window.addstr('    Access Operation(s): {s}\n'.format(s=access_operation[0]))
-				
-				action = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:action'.format(list=rule_list_name,rule=rule_name)))
-				if action:
-					window.addstr('    Action: {s}\n'.format(s=action[0]))
-				
-				comment = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:comment'.format(list=rule_list_name,rule=rule_name)))
-				if comment:
-					window.addstr('    Comment: {s}\n'.format(s=comment[0]))
-
+					notification_name = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:notification/n:notification-name'.format(list=rule_list_name,rule=rule_name)))
+					if notification_name:
+						window.addstr('    Notification: {s}\n'.format(s=notification_name[0]))
+						
+					data_path = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:data-node/n:path'.format(list=rule_list_name,rule=rule_name)))
+					if data_path:
+						window.addstr('    Data Path: {s}\n'.format(s=data_path[0]))
+						
+					access_operation = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:access-operations'.format(list=rule_list_name,rule=rule_name)))
+					if access_operation:
+						window.addstr('    Access Operation(s): {s}\n'.format(s=access_operation[0]))
+					
+					action = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:action'.format(list=rule_list_name,rule=rule_name)))
+					if action:
+						window.addstr('    Action: {s}\n'.format(s=action[0]))
+					
+					comment = map(libxml2.xmlNode.get_content, self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:rule-list[n:name=\'{list}\']/n:rule[n:name=\'{rule}\']/n:comment'.format(list=rule_list_name,rule=rule_name)))
+					if comment:
+						window.addstr('    Comment: {s}\n'.format(s=comment[0]))
+			except curses.error:
+				pass
 		return(True)
 
 	def update(self):
@@ -322,56 +327,59 @@ class nacm(nc_module.nc_module):
 		if focus:
 			tools.append(('ENTER','change'))
 		
-		# NACM enabled/disabled
-		if self.enabled:
-			msg = 'Access control is ON'
-		else:
-			msg = 'Access control is OFF'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
+		try:
+			# NACM enabled/disabled
+			if self.enabled:
+				msg = 'Access control is ON'
+			else:
+				msg = 'Access control is OFF'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
 			
-		# NACM system groups usage
-		if self.extgroups:
-			msg = 'Using system groups is ALLOWED'
-		else:
-			msg = 'Using system groups is FORBIDDEN'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 1 else 0)
+			# NACM system groups usage
+			if self.extgroups:
+				msg = 'Using system groups is ALLOWED'
+			else:
+				msg = 'Using system groups is FORBIDDEN'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 1 else 0)
 		
-		# default read permission
-		if self.r_default == acm.action.DENY:
-			msg = 'Default action for read requests: DENY'
-		else:
-			msg = 'Default action for read requests: PERMIT'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 2 else 0)
-		
-		# default write permission
-		if self.w_default == acm.action.DENY:
-			msg = 'Default action for write requests: DENY'
-		else:
-			msg = 'Default action for write requests: PERMIT'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 3 else 0)
+			# default read permission
+			if self.r_default == acm.action.DENY:
+				msg = 'Default action for read requests: DENY'
+			else:
+				msg = 'Default action for read requests: PERMIT'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 2 else 0)
 			
-		# default execute permission
-		if self.x_default == acm.action.DENY:
-			msg = 'Default action for execute requests: DENY'
-		else:
-			msg = 'Default action for execute requests: PERMIT'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 4 else 0)
-
-		msg = 'Add users with unlimited access'
-		window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 5 else 0)
-		if self.almighty_users:
-			for user in self.almighty_users:
-				msg = '  {s}'.format(s=user)
-				window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == self.almighty_users.index(user)+6 else 0)
-		window.addstr('\n')
-		
-		if self.print_rules_flag:
-			msg = 'Hide current NACM rules.'
-			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
-			self.print_rules(window)
-		else:
-			msg = 'Show current NACM rules.'
-			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
+			# default write permission
+			if self.w_default == acm.action.DENY:
+				msg = 'Default action for write requests: DENY'
+			else:
+				msg = 'Default action for write requests: PERMIT'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 3 else 0)
+				
+			# default execute permission
+			if self.x_default == acm.action.DENY:
+				msg = 'Default action for execute requests: DENY'
+			else:
+				msg = 'Default action for execute requests: PERMIT'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 4 else 0)
+	
+			msg = 'Add users with unlimited access'
+			window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 5 else 0)
+			if self.almighty_users:
+				for user in self.almighty_users:
+					msg = '  {s}'.format(s=user)
+					window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == self.almighty_users.index(user)+6 else 0)
+			window.addstr('\n')
+			
+			if self.print_rules_flag:
+				msg = 'Hide current NACM rules.'
+				window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
+				self.print_rules(window)
+			else:
+				msg = 'Show current NACM rules.'
+				window.addstr(msg+' '*(self.linewidth-len(msg))+'\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 6+len(self.almighty_users) else 0)
+		except curses.error:
+			pass
 		
 		return(tools)
 
