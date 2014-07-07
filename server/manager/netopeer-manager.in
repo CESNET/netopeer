@@ -149,7 +149,12 @@ try:
 		exit(1)
 
 	if args.subcommand == 'list':
-		list = listModules(minidom.parse(netopeer_config))
+		try:
+			config = minidom.parse(netopeer_config)
+			list = listModules(minidom.parse(netopeer_config))
+		except xml.parsers.expat.ExpatError:
+			list = []
+
 		if list == []:
 			print('No module installed.')
 		else:
