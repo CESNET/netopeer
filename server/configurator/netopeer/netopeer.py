@@ -116,7 +116,7 @@ class netopeer(nc_module.nc_module):
 							self.modules_maxlen = len(module_name)
 
 			if self.netopeer_path:
-				if not os.path.exists(self.netopeer_path):
+				if not os.path.exists(self.netopeer_path) or os.path.getsize(self.netopeer_path) == 0:
 					datastore = open(self.netopeer_path, 'w')
 					datastore.write('<?xml version="1.0" encoding="UTF-8"?>\n<datastores xmlns="urn:cesnet:tmc:datastores:file">\n  <running lock=""/>\n  <startup lock=""/>\n  <candidate modified="false" lock=""/>\n</datastores>')
 					datastore.close()
