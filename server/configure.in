@@ -248,9 +248,6 @@ AX_PYTHON_MODULE(string, fatal)
 AX_PYTHON_MODULE(argparse, fatal)
 AX_PYTHON_MODULE(xml, fatal)
 
-# Check for doxygen
-AC_CHECK_PROG(DOXYGEN, doxygen, doxygen)
-
 # Check for rpmbuil
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
 
@@ -435,11 +432,6 @@ AC_SUBST(SERVER_LIBS)
 AC_SUBST(AGENT_LIBS)
 AC_SUBST(NCSERVER_FEATURES)
 AC_SUBST(MODULESDIR)
-
-AC_SUBST(DOXYGEN)
-if test -z "$DOXYGEN"; then
-	AC_MSG_WARN([Due to missing doxygen you will not able to generate Doxygen documentation.])
-fi
 
 AC_SUBST(RPMBUILD)
 if test -z "$RPMBUILD"; then

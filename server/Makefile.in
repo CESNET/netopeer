@@ -55,9 +55,6 @@ modulesdir = @MODULESDIR@
 TOPDIR = @CONFIGURE_PWD@
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
 CC = @CC@
-DOXYGEN = @DOXYGEN@
-DOXYGEN_CONFIG = Doxyfile
-DOXYGEN_DIR = doxygen
 RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -156,7 +153,7 @@ define EXPAND
 sed -e 's|$${prefix}|$(prefix)|g' $(1) > $(2);
 endef
 
-all: $(AGENT) $(SERVER) $(MANHTMLS) $(TOOLS)
+all: $(AGENT) $(SERVER) $(TOOLS)
 
 $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
@@ -186,18 +183,10 @@ $(OBJDIR)/%.o: %.c
 
 .PHONY: clean
 clean:
-	rm -rf $(AGENT) $(SERVER) $(TOOLS) $(OBJDIR) $(MANHTMLS) doxygen/
+	rm -rf $(AGENT) $(SERVER) $(TOOLS) $(OBJDIR) $(MANHTMLS)
 
 .PHONY: doc
-doc: $(DOXYGEN_CONFIG)
-	@if [ -n "$(DOXYGEN)" ]; then \
-		(cat $(DOXYGEN_CONFIG); \
-		echo 'OUTPUT_DIRECTORY = $(DOXYGEN_DIR)' ) | \
-		$(DOXYGEN) - > /dev/null 2>&1; \
-	else \
-		echo "Missing doxygen"; \
-		exit 1; \
-	fi
+doc: $(MANHTMLS) 
 
 .PHONY: dist
 dist: $(NAME).spec tarball rpm
@@ -207,7 +196,7 @@ tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
 	@for i in $(SERVER_SRCS) $(AGENT_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) $(H_IN) configure.in configure \
-	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
+	    Makefile.in VERSION $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
 	done;
