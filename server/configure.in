@@ -40,6 +40,7 @@
 AC_INIT([netopeer-server], m4_esyscmd([cut -f1 ./VERSION | tr -d '\n']))
 
 m4_include([m4/ax_pthread.m4])
+m4_include([m4/ax_python_module.m4])
 
 PACKAGE_VERSION=`cut -f1 ./VERSION | tr -d '\n'`
 AC_SUBST(PACKAGE_VERSION)
@@ -217,6 +218,15 @@ case $target_cpu in
         ;;
 esac
 
+# Check python for manager and configurator
+AX_PYTHON_MODULE(os, fatal)
+AX_PYTHON_MODULE(curses, fatal)
+AX_PYTHON_MODULE(libxml2, fatal)
+AX_PYTHON_MODULE(subprocess, fatal)
+AX_PYTHON_MODULE(re, fatal)
+AX_PYTHON_MODULE(string, fatal)
+AX_PYTHON_MODULE(argparse, fatal)
+AX_PYTHON_MODULE(xml, fatal)
 
 # Check for doxygen
 AC_CHECK_PROG(DOXYGEN, doxygen, doxygen)
