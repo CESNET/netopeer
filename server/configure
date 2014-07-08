@@ -721,6 +721,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+with_sshd
 with_distro
 enable_debug
 with_group
@@ -1370,6 +1371,8 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-sshd=PATH        Set absolute path of the SSH daemon (searched in
+                          PATH by default)
   --with-distro=DISTRO    Compile for specific Linux distribution (RHEL based
                           by default)
   --with-group=GROUP      Group of users with enabled access to Netopeer
@@ -2583,7 +2586,20 @@ fi
 
 
 # Check for sshd (OpenSSH).
-# Extract the first word of "sshd", so it can be a program name with args.
+
+# Check whether --with-sshd was given.
+if test "${with_sshd+set}" = set; then :
+  withval=$with_sshd; { $as_echo "$as_me:${as_lineno-$LINENO}: checking for sshd" >&5
+$as_echo_n "checking for sshd... " >&6; }
+	if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
+		SSHD_EXEC="no";
+	else
+		SSHD_EXEC="$with_sshd";
+	fi
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $SSHD_EXEC" >&5
+$as_echo "$SSHD_EXEC" >&6; }
+else
+  # Extract the first word of "sshd", so it can be a program name with args.
 set dummy sshd; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -2624,10 +2640,16 @@ $as_echo "no" >&6; }
 fi
 
 
-if test "x$SSHD_EXEC" = "xno"; then
-	as_fn_error $? "'sshd' not found." "$LINENO" 5
+
 fi
 
+
+if test "x$SSHD_EXEC" = "xno"; then
+	as_fn_error $? "\"sshd\" not found." "$LINENO" 5
+fi
+if test ! -x "$SSHD_EXEC"; then
+	as_fn_error $? "SSH daemon \"$SSHD_EXEC\" is not executable file." "$LINENO" 5
+fi
 
 # check for Linux distribution
 

@@ -66,11 +66,24 @@ fi
 AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
 # Check for sshd (OpenSSH).
-AC_PATH_PROG(SSHD_EXEC, [sshd], [no])
-if test "x$SSHD_EXEC" = "xno"; then
-	AC_MSG_ERROR(['sshd' not found.])
-fi
+AC_ARG_WITH([sshd],
+	AC_HELP_STRING([--with-sshd=PATH],[Set absolute path of the SSH daemon (searched in PATH by default)]),
+	AC_MSG_CHECKING([for sshd])
+	if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
+		SSHD_EXEC="no";
+	else
+		SSHD_EXEC="$with_sshd";
+	fi
+	AC_MSG_RESULT([$SSHD_EXEC]),
+	[AC_PATH_PROG([SSHD_EXEC], [sshd], [no])]
+)
 
+if test "x$SSHD_EXEC" = "xno"; then
+	AC_MSG_ERROR([\"sshd\" not found.])
+fi
+if test ! -x "$SSHD_EXEC"; then
+	AC_MSG_ERROR([SSH daemon \"$SSHD_EXEC\" is not executable file.])
+fi
 
 # check for Linux distribution
 AC_ARG_WITH([distro],
