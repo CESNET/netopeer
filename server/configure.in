@@ -67,17 +67,20 @@ AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
 # Check for sshd (OpenSSH).
 AC_ARG_WITH([sshd],
-	AC_HELP_STRING([--with-sshd=PATH],[Set absolute path of the SSH daemon (searched in PATH by default)]),
-	AC_MSG_CHECKING([for sshd])
+	AC_HELP_STRING([--with-sshd=PATH],[Set absolute path to the SSH daemon (searched in PATH by default)]),
 	if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
-		SSHD_EXEC="no";
+		SSHD_EXEC="";
 	else
+		AC_MSG_CHECKING([for sshd])
 		SSHD_EXEC="$with_sshd";
-	fi
-	AC_MSG_RESULT([$SSHD_EXEC]),
-	[AC_PATH_PROG([SSHD_EXEC], [sshd], [no])]
+		AC_MSG_RESULT([$SSHD_EXEC])
+	fi,
+	SSHD_EXEC="";
 )
 
+if test -z "$SSHD_EXEC"; then
+	AC_PATH_PROG([SSHD_EXEC], [sshd], [no])
+fi
 if test "x$SSHD_EXEC" = "xno"; then
 	AC_MSG_ERROR([\"sshd\" not found.])
 fi
@@ -163,11 +166,28 @@ AC_ARG_ENABLE([tls],
 	AC_SUBST(TLS)
 )
 
+AC_ARG_WITH([stunnel],
+	AC_HELP_STRING([--with-stunnel=PATH],[Set absolute path to the stunnel (TLS daemon). Makes sense only with --enable-tls option, by default it is searched in PATH.]),
+	if test -z "$with_stunnel" -o "x$with_stunnel" = "xyes"; then
+		STUNNEL_EXEC="";
+	else
+		STUNNEL_EXEC="$with_stunnel";
+	fi,
+	STUNNEL_EXEC=""
+)
+
 if test "$tls" = "yes"; then
 	# check stunnel
-	AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
+	if test -z "$STUNNEL_EXEC"; then
+		AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
+	else
+		AC_MSG_CHECKING([for stunnel])
+		AC_MSG_RESULT([$STUNNEL_EXEC])
+	fi
 	if test "x$STUNNEL_EXEC" = "xno"; then
 		AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
+	elif test ! -x "$STUNNEL_EXEC"; then
+		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" is not executable file.])
 	else
 		AC_MSG_CHECKING([for NETCONF support in stunnel])
 		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
