@@ -4,7 +4,6 @@
 # standard modules 
 import curses
 import os
-import time
 
 # netopeer configurator module base
 from netopeer.nc_module import NCModuleError
