@@ -30,6 +30,41 @@ data, the Netopeer project includes the netopeer-cli(1) program.
 [4] http://tools.ietf.org/html/rfc6241
 [5] http://tools.ietf.org/html/rfc6020
 
+
+Requirements
+============
+
+Before compiling the source code, make sure that your system provides the
+following libraries or applications. Some of them are optional or can be
+avoided in cost of missing of some feature - see the notes for the specific
+item. All requirements are checked by the `configure` script.
+
+- compiler (gcc, clang,...) and standard headers
+- pkg-config
+- libpthreads
+- libxml2 (including headers from the devel package)
+- libnetconf (including headers from the devel package)
+- libdbus (including headers from the devel package)
+ - can be omitted by --disable-dbus configure's option. In that case standard
+   UNIX sockets are used for communication between netopeer-server(8) and
+   netopeer-agent(1)s.
+- python 2.6 or higher with the following modules:
+ - os, string, re, argparse, subprocess, curses, xml, libxml2
+- sshd
+ - openSSH's SSH server, make sure that the correct path to this binary is part
+   of your PATH environment variable or use --with-sshd=/path/to/sshd configure's
+   option.
+- stunnel
+ - required only when the TLS transport is enabled by `--enable-tls` option.
+   Make sure that the correct path to this binary is part of your PATH
+   environment variable or use --with-stunnel=/path/to/stunnel configure's
+   option.
+- roff2html
+ - optional, used for building HTML version of man pages (make doc)
+- rpmbuild
+ - optional, used for building RPM package (make rpm).
+
+
 Instalation
 ===========
 
@@ -88,7 +123,7 @@ NACM
 ~~~~
 
 This section covers NETCONF Access Control Module configuration. By default NACM
-avoids any write to the configuration data. To change this, the user can here
+avoids any write to the configuration data. To change this, the user can set here
 the default write action or specify the user(s) with unlimited access. There are
 more configuration switches including a possibility to completely turn off the
 NACM.
