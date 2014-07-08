@@ -672,7 +672,6 @@ UNAME
 STUNNEL_EXEC
 TLS
 GROUP
-USER
 SSHD_EXEC
 ROFF2HTML
 PKG_CONFIG
@@ -725,7 +724,6 @@ with_sshd
 with_distro
 enable_debug
 with_group
-with_user
 enable_dbus
 enable_tls
 with_libnetconf
@@ -1377,8 +1375,6 @@ Optional Packages:
                           by default)
   --with-group=GROUP      Group of users with enabled access to Netopeer
                           server (root by default)
-  --with-user=USER        User to be allowed to start Netopeer server (root by
-                          default)
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
   --with-libdbus=PATH     Set explicit installation prefix to the libdbus
@@ -2708,25 +2704,6 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GROUP" >&5
 $as_echo "$GROUP" >&6; }
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for user" >&5
-$as_echo_n "checking for user... " >&6; }
-
-# Check whether --with-user was given.
-if test "${with_user+set}" = set; then :
-  withval=$with_user;
-		USER="$with_user"
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-user=$with_user"
-
-else
-  USER="root"
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $USER" >&5
-$as_echo "$USER" >&6; }
-
-
 
 
 # Check whether --enable-dbus was given.

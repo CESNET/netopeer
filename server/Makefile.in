@@ -64,7 +64,7 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_DATA_PRIVATE = @INSTALL@ -m 600
 ifeq ($(shell id -u $(USER)),0)
-  INSTALL_OWNER = -o @USER@ -g @GROUP@
+  INSTALL_OWNER = -g @GROUP@
 endif
 RPMDIR = RPMBUILD
 
@@ -247,14 +247,12 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	fi
 	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
 	for i in $(SERVER_MODULES_CONF); do \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) $$i $(DESTDIR)/$(modulesdir)/; \
+		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
 	done
 	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
 	for i in $(CFGS); do \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
+		$(INSTALL_DATA_PRIVATE) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
-	touch $(CFGDIR)/cfgnetopeer/datastore.xml
-	touch $(CFGDIR)/cfgnetopeer/datastore-server.xml
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
 	@if test ! -f $(CFGDIR)/sshd_config; then \
@@ -268,17 +266,14 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
 	fi
 	chmod 600 $(CFGDIR)/sshd_config;
-	if test -n "$(INSTALL_OWNER)"; then \
-		chown @USER@ $(CFGDIR)/sshd_config; \
-	fi
 	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
 	@if test -n "@TLS@"; then \
 		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
+		$(INSTALL_DATA_PRIVATE) config/stunnel_config $(CFGDIR)/; \
 		rm -rf config/stunnel_config; \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
+		$(INSTALL_DATA_PRIVATE) stunnel/server.* $(CFGDIR)/stunnel; \
+		$(INSTALL_DATA_PRIVATE) stunnel/rootCA.* $(CFGDIR)/stunnel; \
 		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
 	fi
 	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))

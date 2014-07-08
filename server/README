@@ -98,11 +98,10 @@ Intercommunication
 
 This tab provides information about used communication technology between the
 Netopeer server and agents. Currently, there are two possibilities: D-Bus and
-UNIX sockets. In case of D-Bus, user can specify here permissions who is allowed
-to start the Netopeer server (root is the default and expected choice) and what
-users group is allowed to connect to the Netopeer server. In case of UNIX
-sockets, these settings can be changed only by recompiling the server with
-different values to the --with-user and --with-group options.
+UNIX sockets. In case of D-Bus, user can specify here permissions what users
+group is allowed to connect to the Netopeer server. In case of UNIX sockets,
+this setting can be changed only by recompiling the server with different
+value of the --with-group option.
 
 Starting the server
 -------------------

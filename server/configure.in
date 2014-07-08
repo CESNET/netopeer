@@ -126,19 +126,6 @@ AC_ARG_WITH([group],
 	GROUP="root"
 )
 AC_MSG_RESULT([$GROUP])
-
-AC_MSG_CHECKING([for user])
-AC_ARG_WITH([user],
-	AC_HELP_STRING([--with-user=USER],[User to be allowed to start Netopeer server (root by default)]),
-	[
-		USER="$with_user"
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-user=$with_user"
-	],
-	USER="root"
-)
-AC_MSG_RESULT([$USER])
-
-AC_SUBST(USER)
 AC_SUBST(GROUP)
 
 AC_ARG_ENABLE([dbus],

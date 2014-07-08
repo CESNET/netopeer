@@ -39,9 +39,9 @@ make doc
 make DESTDIR=$RPM_BUILD_ROOT install
 
 %post
-chown @USER@:@GROUP@ @DBUSCONF@/org.liberouter.netopeer.conf
-chown @USER@:@GROUP@ @DBUSSERVICES@/org.liberouter.netopeer.server.service
-chown -R @USER@:@GROUP@ %{_sysconfdir}/netopeer/
+chgrp @GROUP@ @DBUSCONF@/org.liberouter.netopeer.conf
+chgrp @GROUP@ @DBUSSERVICES@/org.liberouter.netopeer.server.service
+chgrp -R @GROUP@ %{_sysconfdir}/netopeer/
 
 #SSHD config
 if test -f /etc/ssh/sshd_config; then \

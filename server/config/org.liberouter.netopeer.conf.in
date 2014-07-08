@@ -4,7 +4,7 @@
 <busconfig>
 
   <!-- Only user root can own the service -->
-  <policy user="@USER@">
+  <policy user="root">
     <allow own="org.liberouter.netopeer.server"/>
   </policy>
 

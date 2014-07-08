@@ -41,7 +41,7 @@
 #define CONFIG_H_
 
 /* netopeer_socket.h */
-#define USER "@USER@"
+#define USER "root"
 #define GROUP "@GROUP@"
 
 /* netconf-server-transapi.c */

@@ -116,13 +116,11 @@ class dbus(nc_module.nc_module):
 				window.addstr('{s}\n\n'.format(s=self.service_path), curses.color_pair(0) | curses.A_UNDERLINE)
 			
 			window.addstr('Allowed user to start the Netopeer server:\n')
-			msg = '  {s}'.format(s=self.user)
-			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
-			window.addstr('\n\n')
+			window.addstr('  {s}\n\n'.format(s=config.options['user']))
 				
 			window.addstr('Allowed group to connect to the Netopeer server:\n')
 			msg = '  {s}'.format(s=self.group)
-			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 1) else 0)
+			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
 			window.addstr('\n\n')
 		except curses.error:
 			pass
@@ -132,18 +130,10 @@ class dbus(nc_module.nc_module):
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 			self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < 1:
+		elif key == curses.KEY_DOWN and self.selected < 0:
 			self.selected = self.selected+1
 		elif key == ord('\n'):
 			if self.selected == 0:
-				try:
-					window.addstr(9 if self.service_path else 6, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
-				except curses.error:
-					pass
-				self.user = self.get_editable(9 if self.service_path else 6, 2, stdscr, window, self.user, curses.color_pair(1) | curses.A_REVERSE)
-				if len(self.user) >= self.linewidth:
-					self.linewidth = len(self.user) + 3
-			elif self.selected == 1:
 				try:
 					window.addstr(12 if self.service_path else 9, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
 				except curses.error:
