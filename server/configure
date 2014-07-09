@@ -647,7 +647,9 @@ build_os
 build_vendor
 build_cpu
 build
+DBUSSERVICESFILE
 DBUSSERVICES
+DBUSCONFFILE
 DBUSCONF
 LIBDBUS_LIBS
 LIBDBUS_CFLAGS
@@ -2720,6 +2722,7 @@ if test "${enable_dbus+set}" = set; then :
 	else
 		dbus="yes"
 	fi
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-dbus"
 
 else
   # use DBus by default
@@ -4520,6 +4523,8 @@ $as_echo "missing" >&6; }
 	else
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
 $as_echo "ok" >&6; }
+		DBUSCONFFILE="$DBUSCONF/org.liberouter.netopeer.conf"
+
 
 	fi
 
@@ -4546,6 +4551,9 @@ $as_echo "ok" >&6; }
 
 			fi
 			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+			DBUSSERVICESFILE="$DBUSSERVICES/org.liberouter.netopeer.server.service"
+
+
 
 fi
 

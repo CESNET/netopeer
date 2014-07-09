@@ -59,11 +59,11 @@ echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/ss
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
 %{_bindir}/netopeer-manager
-@DBUSCONF@/org.liberouter.netopeer.conf
-@DBUSSERVICES@/org.liberouter.netopeer.server.service
 %{_sysconfdir}/netopeer/*
 %{_sysconfdir}/init.d/netopeer.rc
 %{_mandir}/man1/*
 %{_mandir}/man8/*
 %{_datadir}/netopeer/*.html
+@DBUSCONFFILE@
+@DBUSSERVICESFILE@
 

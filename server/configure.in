@@ -139,6 +139,7 @@ AC_ARG_ENABLE([dbus],
 	else
 		dbus="yes"
 	fi
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-dbus"
 	,
 	# use DBus by default
 	dbus="yes"
@@ -331,7 +332,9 @@ if test "$dbus" = "yes"; then
 		AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
 	else
 		AC_MSG_RESULT([ok])
+		DBUSCONFFILE="$DBUSCONF/org.liberouter.netopeer.conf"
 		AC_SUBST(DBUSCONF)
+		AC_SUBST(DBUSCONFFILE)
 	fi
 
 	# - services directory
@@ -353,6 +356,9 @@ if test "$dbus" = "yes"; then
 				AC_SUBST(DBUSSERVICES)
 			fi
 			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+			DBUSSERVICESFILE="$DBUSSERVICES/org.liberouter.netopeer.server.service"
+			AC_SUBST(DBUSSERVICES)
+			AC_SUBST(DBUSSERVICESFILE)
 			,
 			# do not install DBus service file anywhere
 			DBUSSERVICES=""
