@@ -94,7 +94,7 @@ define MANINSTALL
 $(INSTALL_DATA) $(1) $(call MANPATH,$(1))/;
 endef
 
-all: $(NAME) $(MANHTMLS)
+all: $(NAME)
 
 $(NAME): $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) $(LIBS) -o $(NAME)
@@ -110,6 +110,9 @@ $(OBJDIR)/%.o: %.c
 
 %.1.html: %.1
 	@ROFF2HTML@ $< > $@
+
+.PHONY: doc
+doc: $(MANHTMLS)
 
 .PHONY: tarball
 tarball: $(SRCS) $(HEADERS)
