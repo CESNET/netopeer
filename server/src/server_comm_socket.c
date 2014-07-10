@@ -205,8 +205,16 @@ static void set_new_session(int socket)
 	cpblts_list[cpblts_count] = NULL;
 	for (i = 0; i < cpblts_count; i++) {
 		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-		cpblts_list[i] = malloc(sizeof(char) * len);
-		recv(socket, cpblts_list[i], len, COMM_SOCKET_SEND_FLAGS);
+		if ((cpblts_list[i] = recv_msg(socket, len, NULL)) == NULL) {
+			/* something went wrong */
+			for(i--; i >= 0; i--) {
+				free(cpblts_list[i]);
+			}
+			free(cpblts_list);
+			result = COMM_SOCKET_RESULT_ERROR;
+			send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+			return;
+		}
 	}
 	cpblts = nc_cpblts_new((const char* const*)cpblts_list);
 
@@ -254,25 +262,27 @@ static void close_session(int socket)
 static void kill_session (int socket)
 {
 	struct session_info *session, *sender_session;
-	struct nc_err* err;
+	struct nc_err* err = NULL;
 	char *session_id = NULL, *aux_string = NULL;
-	unsigned int len;
+	size_t len;
 	char id[6];
 	nc_reply *reply;
 	msgtype_t result;
 
 	/* session ID*/
 	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	session_id = malloc(sizeof(char) * len);
-	recv(socket, session_id, len, COMM_SOCKET_SEND_FLAGS);
-
+	session_id = recv_msg(socket, len, &err);
+	if (err != NULL) {
+		reply = nc_reply_error(err);
+		goto send_reply;
+	}
 
 	if ((session = (struct session_info *)server_sessions_get_by_agentid(session_id)) == NULL) {
 		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
 		err = nc_err_new (NC_ERR_OP_FAILED);
 		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
 			nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
-			free (aux_string);
+			free(aux_string);
 		}
 		reply = nc_reply_error(err);
 		goto send_reply;
@@ -306,13 +316,14 @@ send_reply:
 	send(socket, aux_string, len, COMM_SOCKET_SEND_FLAGS);
 
 	/* cleanup */
-	free (aux_string);
+	free(aux_string);
+	free(session_id);
 }
 
 static void process_operation (int socket)
 {
 	struct session_info *session;
-	struct nc_err* err;
+	struct nc_err* err = NULL;
 	char *msg_dump = NULL;
 	unsigned int len;
 	char id[6];
@@ -322,8 +333,11 @@ static void process_operation (int socket)
 
 	/* RPC dump */
 	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	msg_dump = malloc(sizeof(char) * len);
-	recv(socket, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+	msg_dump = recv_msg(socket, len, &err);
+	if (err != NULL) {
+		reply = nc_reply_error(err);
+		goto send_reply;
+	}
 
 	snprintf(id, sizeof(id), "%d", socket);
 	if ((session = (struct session_info *)server_sessions_get_by_agentid(id)) == NULL) {

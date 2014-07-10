@@ -108,8 +108,14 @@ char** comm_get_srv_cpblts(conn_t* conn)
 	cpblts[count] = NULL;
 	for (i = 0; i < count; i++) {
 		recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-		cpblts[i] = malloc(sizeof(char) * len);
-		recv(*conn, cpblts[i], len, COMM_SOCKET_SEND_FLAGS);
+		if ((cpblts[i] = recv_msg(*conn, len, NULL)) == NULL) {
+			/* something went wrong */
+			for(i--; i >= 0; i--) {
+				free(cpblts[i]);
+			}
+			free(cpblts);
+			return(NULL);
+		}
 	}
 
 	return(cpblts);
@@ -159,10 +165,10 @@ int comm_session_info_send(conn_t* conn, const char* username, const char* sid, 
 nc_reply* comm_operation(conn_t* conn, const nc_rpc *rpc)
 {
 	msgtype_t result = 0, op = COMM_SOCKET_OP_GENERIC;
-	struct nc_err* err;
+	struct nc_err* err = NULL;
 	nc_reply* reply;
 	char *msg_dump;
-	unsigned int len;
+	size_t len;
 
 	if (*conn == -1) {
 		nc_verb_error("%s: invalid parameter.", __func__);
@@ -191,12 +197,21 @@ nc_reply* comm_operation(conn_t* conn, const nc_rpc *rpc)
 
 	/* get the reply message */
 	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	msg_dump = malloc(sizeof(char) * len);
-	recv(*conn, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+	msg_dump = recv_msg(*conn, len, &err);
+	if (err != NULL) {
+		return (nc_reply_error(err));
+	}
 	reply = nc_reply_build(msg_dump);
 
 	/* cleanup */
 	free(msg_dump);
+
+	if (reply == NULL) {
+		nc_verb_error("%s: building reply from the server's message failed.", __func__);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "Building reply message failed.");
+		return (nc_reply_error(err));
+	}
 
 	return (reply);
 }
@@ -256,12 +271,21 @@ nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 
 	/* get the reply message */
 	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	reply_dump = malloc(sizeof(char) * len);
-	recv(*conn, reply_dump, len, COMM_SOCKET_SEND_FLAGS);
+	reply_dump = recv_msg(*conn, len, &err);
+	if (err != NULL) {
+		return (nc_reply_error(err));
+	}
 	reply = nc_reply_build(reply_dump);
 
 	/* cleanup */
 	free(reply_dump);
+
+	if (reply == NULL) {
+		nc_verb_error("%s: building reply from the server's message failed.", __func__);
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "Building reply message failed.");
+		return (nc_reply_error(err));
+	}
 
 	return (reply);
 }

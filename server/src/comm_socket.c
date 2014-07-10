@@ -1,9 +1,9 @@
 /**
- * \file netopeer_socket.h
- * \author Radek Krejci <rkrejci@cesnet.cz>
- * \brief Netopeer's UNIX socket communication macros.
+ * \file comm_socket.c
+ * \author Radek Krejci <rkrejci@cesent.cz>
+ * \brief Common functions for socket communication between server and agent
  *
- * Copyright (C) 2011 CESNET, z.s.p.o.
+ * Copyright (C) 2014 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,34 +37,53 @@
  *
  */
 
-#ifndef NETOPEER_SOCKET_H_
-#define NETOPEER_SOCKET_H_
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
-#include "config.h"
+#include <libnetconf.h>
 
-#define COMM_SOCKET_SEND_FLAGS MSG_NOSIGNAL
+#include "netopeer_socket.h"
 
-#define COMM_SOCKET_PATH "/tmp/netopeer.socket"
-#define COMM_SOCKET_PERM 0660
-#define COMM_SOCKET_OWNER USER
-#define COMM_SOCKET_GROUP GROUP
+char* recv_msg(int socket, size_t len, struct nc_err** err)
+{
+	size_t recv_len = 0;
+	ssize_t ret = 0;
+	char* msg_dump;
 
-/**
- * @brief Main communication type
- */
-typedef int conn_t;
+	msg_dump = malloc(sizeof(char) * len);
+	if (msg_dump == NULL) {
+		nc_verb_error("Memory allocation failed - %s (%s:%d).", strerror(errno), __FILE__, __LINE__);
+		if (err) {
+			*err = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*err, NC_ERR_PARAM_MSG, "Memory allocation failed.");
+		}
+		return (NULL);
+	}
+	while (recv_len < len) {
+		/* recv in loop to pass transfer capacity of the socket */
+		ret = recv(socket, &(msg_dump[recv_len]), len - recv_len, COMM_SOCKET_SEND_FLAGS);
+		if (ret <= 0) {
+			if (ret == 0) {
+				nc_verb_error("%s: communication failed, server unexpectedly closed the communication socket.", __func__);
+			} else { /* ret == -1 */
+				if (errno == EAGAIN || errno == EINTR) {
+					/* ignore error and try it again */
+					continue;
+				}
+				nc_verb_error("%s: communication failed, %s.", __func__, strerror(errno));
+			}
+			if (err) {
+				*err = nc_err_new(NC_ERR_OP_FAILED);
+				nc_err_set(*err, NC_ERR_PARAM_MSG, "agent-server communication failed.");
+			}
+			return (NULL);
+		}
+		recv_len += ret;
+	}
 
-typedef int msgtype_t;
+	return (msg_dump);
+}
 
-enum COMM_SOCKET_MSGTYPE {
-	COMM_SOCKET_RESULT_ERROR = -1,
-	COMM_SOCKET_OP_GET_CPBLTS = 1,
-	COMM_SOCKET_OP_SET_SESSION,
-	COMM_SOCKET_OP_CLOSE_SESSION,
-	COMM_SOCKET_OP_KILL_SESSION,
-	COMM_SOCKET_OP_GENERIC
-};
-
-char* recv_msg(int socket, size_t len, struct nc_err** err);
-
-#endif /* NETOPEER_SOCKET_H_ */
