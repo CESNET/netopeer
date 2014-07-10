@@ -82,9 +82,7 @@ HDRS = 	commands.h \
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 MANPAGES = doc/netopeer-cli.1
-ifneq "@ROFF2HTML@" "no"
 MANHTMLS = $(MANPAGES:%=%.html)
-endif
 
 MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
 define MANINSTALL
@@ -109,6 +107,10 @@ $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(CPPFLAGS) -fPIC -c $< -o $@
 
 %.1.html: %.1
+	@if [ -z "@ROFF2HTML@" ]; then \
+		echo "Missing roff2html"; \
+		exit 1; \
+	fi
 	@ROFF2HTML@ $< > $@
 
 .PHONY: doc

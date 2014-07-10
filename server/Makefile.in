@@ -130,9 +130,7 @@ MANPAGES = manager/netopeer-manager.1 \
 	netopeer-agent.1 \
 	configurator/netopeer-configurator.1
 
-ifneq "@ROFF2HTML@" "no"
 MANHTMLS = $(MANPAGES:%=%.html)
-endif
 
 MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
 define MANINSTALL
@@ -159,9 +157,17 @@ $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
 
 %.1.html: %.1
+	@if [ -z "@ROFF2HTML@" ]; then \
+		echo "Missing roff2html"; \
+		exit 1; \
+	fi
 	@ROFF2HTML@ $< > $@
 
 %.8.html: %.8
+	@if [ -z "@ROFF2HTML@" ]; then \
+		echo "Missing roff2html"; \
+		exit 1; \
+	fi
 	@ROFF2HTML@ $< > $@
 
 $(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
