@@ -214,7 +214,10 @@ int module_enable(struct module * module, int add)
 	xmlXPathContextPtr xpath_ctxt;
 	xmlXPathObjectPtr xpath_obj;
 
-	asprintf(&config_path, "%s/%s.xml", MODULES_CFG_DIR, module->name);
+	if (asprintf(&config_path, "%s/%s.xml", MODULES_CFG_DIR, module->name) == -1) {
+		nc_verb_error("asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		return(EXIT_FAILURE);
+	}
 	if ((module_config = xmlReadFile(config_path, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN|XML_PARSE_NOWARNING|XML_PARSE_NOERROR)) == NULL) {
 		nc_verb_error("Reading configuration for %s module failed", module->name);
 		free(config_path);
