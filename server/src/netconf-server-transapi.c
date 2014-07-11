@@ -362,6 +362,7 @@ static void clh_close(void* arg)
 	close(*((int*)(arg)));
 }
 
+__attribute__((noreturn))
 static void* app_loop(void* app_v)
 {
 	struct ch_app *app = (struct ch_app*)app_v;
@@ -377,22 +378,19 @@ static void* app_loop(void* app_v)
 
 	nc_verb_verbose("Starting Call Home thread (%s).", app->name);
 
-	if (app->start_server) {
-		/* last connected */
-		start_server = nc_callhome_mngmt_server_getactive(app->servers);
-	}
-	if (start_server == NULL) {
-		/*
-		 * first-listed start-with's value or the first attempt to
-		 * connect, so use the first listed server specification
-		 */
-		start_server = app->servers;
-	}
-
 	nc_session_transport(app->transport);
 
 	for (;;) {
 		pthread_testcancel();
+
+		/* get last connected server if any */
+		if ((start_server = nc_callhome_mngmt_server_getactive(app->servers)) == NULL) {
+			/*
+			 * first-listed start-with's value is set in config or this is the
+			 * first attempt to connect, so use the first listed server spec
+			 */
+			start_server = app->servers;
+		}
 
 		sock = -1;
 		pid = -1;
@@ -402,10 +400,6 @@ static void* app_loop(void* app_v)
 		}
 		pthread_cleanup_push(clh_close, &sock);
 		nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
-
-		if (app->start_server) {
-			start_server = nc_callhome_mngmt_server_getactive(app->servers);
-		}
 
 		/* check sock to get information about the connection */
 		/* we have to use epoll API since we need event (not the level) triggering */
@@ -464,8 +458,6 @@ static void* app_loop(void* app_v)
 			sleep(app->rep_timeout);
 		}
 	}
-
-	return (NULL);
 }
 
 static int app_create(NC_TRANSPORT transport, xmlNodePtr node, struct nc_err** error)
@@ -527,6 +519,13 @@ static int app_create(NC_TRANSPORT transport, xmlNodePtr node, struct nc_err** e
 		new->servers = nc_callhome_mngmt_server_add(new->servers,(const char*)host, (const char*)port);
 		free(host);
 		free(port);
+	}
+
+	if (new->servers == NULL) {
+		nc_verb_error("%s: No server to connect to from %s app.", __func__, new->name);
+		free(new->name);
+		free(new);
+		return (EXIT_FAILURE);
 	}
 
 	/* get reconnect settings */
