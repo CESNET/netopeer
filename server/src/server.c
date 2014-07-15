@@ -113,6 +113,11 @@ void signal_handler (int sig)
 			exit (EXIT_FAILURE);
 		}
 		break;
+	case SIGHUP:
+		/* restart the daemon */
+		restart_soft = 1;
+		done = 1;
+		break;
 	default:
 		nc_verb_error("exiting on signal: %d", sig);
 		exit (EXIT_FAILURE);
@@ -173,6 +178,7 @@ int main (int argc, char** argv)
 	sigaction (SIGABRT, &action, NULL);
 	sigaction (SIGTERM, &action, NULL);
 	sigaction (SIGKILL, &action, NULL);
+	sigaction (SIGHUP, &action, NULL);
 
 	nc_callback_print (clb_print);
 
