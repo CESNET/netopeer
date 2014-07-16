@@ -1768,7 +1768,7 @@ int cmd_listen (char* arg)
 			break;
 		case 'p':
 			port = (unsigned short) atoi (optarg);
-			if (listening != port) {
+			if (listening != 0 && listening != port) {
 				nc_callhome_listen_stop();
 				listening = 0;
 			}
