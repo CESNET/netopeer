@@ -981,45 +981,52 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 
 	/* set device according to defaults */
 	nc_verb_verbose("Setting default configuration for ietf-netconf-server module");
-	doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><ssh><listen><port>830</port></listen></ssh></netconf>",
-			NULL, NULL, 0);
-	if (doc == NULL) {
-		nc_verb_error("Unable to parse default configuration.");
-		xmlFreeDoc(doc);
-		return (EXIT_FAILURE);
-	}
 
-	if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&
+			ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh")) {
+		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><ssh><listen><port>830</port></listen></ssh></netconf>",
+		NULL, NULL, 0);
+		if (doc == NULL) {
+			nc_verb_error("Unable to parse default configuration.");
+			xmlFreeDoc(doc);
+			return (EXIT_FAILURE);
+		}
+
+		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+			xmlFreeDoc(doc);
+			return (EXIT_FAILURE);
+		}
+		if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+			xmlFreeDoc(doc);
+			return (EXIT_FAILURE);
+		}
 		xmlFreeDoc(doc);
-		return (EXIT_FAILURE);
 	}
-	if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
-		xmlFreeDoc(doc);
-		return (EXIT_FAILURE);
-	}
-	xmlFreeDoc(doc);
 
 #ifdef ENABLE_TLS
-	doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
-			NULL, NULL, 0);
-	if (doc == NULL) {
-		nc_verb_error("Unable to parse default configuration.");
-		xmlFreeDoc(doc);
-		kill_sshd();
-		return (EXIT_FAILURE);
-	}
+	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&
+			ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
+		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
+		NULL, NULL, 0);
+		if (doc == NULL) {
+			nc_verb_error("Unable to parse default configuration.");
+			xmlFreeDoc(doc);
+			kill_sshd();
+			return (EXIT_FAILURE);
+		}
 
-	if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+			xmlFreeDoc(doc);
+			kill_sshd();
+			return (EXIT_FAILURE);
+		}
+		if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+			xmlFreeDoc(doc);
+			kill_sshd();
+			return (EXIT_FAILURE);
+		}
 		xmlFreeDoc(doc);
-		kill_sshd();
-		return (EXIT_FAILURE);
 	}
-	if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
-		xmlFreeDoc(doc);
-		kill_sshd();
-		return (EXIT_FAILURE);
-	}
-	xmlFreeDoc(doc);
 #endif
 
 	return EXIT_SUCCESS;
