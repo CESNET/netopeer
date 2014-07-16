@@ -263,7 +263,7 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	chmod 600 $(CFGDIR)/sshd_config;
 	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
 	@if test -n "@TLS@"; then \
-		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
+		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); sub(/{BINDIR}/, "'$(BINDIR)'"); sub(/{AGENT}/, "'$(AGENT)'"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
 		$(INSTALL_DATA_PRIVATE) config/stunnel_config $(CFGDIR)/; \
 		rm -rf config/stunnel_config; \

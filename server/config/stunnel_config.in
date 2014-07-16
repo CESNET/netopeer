@@ -17,7 +17,7 @@ output = {CFGDIR}/stunnel.log
 cert = {CFGDIR}/server.pem
 ;key = {CFGDIR}/server.key
 
-; Verify peer with locally installed certificate. 
+; Verify peer with locally installed certificate.
 verify = 3
 
 ; CA certificate, with verify level 3, it also includes allowed client
@@ -26,6 +26,9 @@ CAfile = {CFGDIR}/rootCA.pem
 
 ; Disable support for insecure SSLv2 protocol
 options = NO_SSLv2
+
+; If running in inetd mode (call home)
+exec = {BINDIR}/{AGENT}
 
 ; **************************************************************************
 ; * Service definitions (remove all services for inetd mode)               *

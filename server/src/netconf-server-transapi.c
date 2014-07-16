@@ -372,7 +372,8 @@ static void* app_loop(void* app_v)
 	int timeout;
 	int sleep_flag;
 	struct epoll_event event_in, event_out;
-	char* const sshd_argv[] = {"/usr/sbin/sshd", "-i", "-f", CFG_DIR"/sshd_config", NULL};
+	char* const sshd_argv[] = {SSHD_EXEC, "-i", "-f", CFG_DIR"/sshd_config", NULL};
+	char* const stunnel_argv[] = {TLSD_EXEC, CFG_DIR"/stunnel_config", NULL};
 
 	/* TODO sigmask for the thread? */
 
@@ -394,12 +395,16 @@ static void* app_loop(void* app_v)
 
 		sock = -1;
 		pid = -1;
-		pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+		if (app->transport == NC_TRANSPORT_SSH) {
+			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+		} else if (app->transport == NC_TRANSPORT_TLS) {
+			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, stunnel_argv[0], stunnel_argv, &sock);
+		}
 		if (pid == -1) {
 			continue;
 		}
 		pthread_cleanup_push(clh_close, &sock);
-		nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
+		nc_verb_verbose("Call Home transport server (%s) started (PID %d)", (app->transport == NC_TRANSPORT_SSH ? sshd_argv[0] : stunnel_argv[0]), pid);
 
 		/* check sock to get information about the connection */
 		/* we have to use epoll API since we need event (not the level) triggering */
@@ -799,7 +804,7 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	 * settings were modified or created
 	 */
 
-	/* prepare sshd_config */
+	/* prepare stunnel_config */
 	if ((cfgfile = open(CFG_DIR"/stunnel_config", O_RDONLY)) == -1) {
 		nc_verb_error("Unable to open TLS server configuration template (%s)", strerror(errno));
 		goto err_return;
