@@ -373,7 +373,9 @@ static void* app_loop(void* app_v)
 	int sleep_flag;
 	struct epoll_event event_in, event_out;
 	char* const sshd_argv[] = {SSHD_EXEC, "-i", "-f", CFG_DIR"/sshd_config", NULL};
+#ifdef ENABLE_TLS
 	char* const stunnel_argv[] = {TLSD_EXEC, CFG_DIR"/stunnel_config", NULL};
+#endif /* ENABLE_TLS */
 
 	/* TODO sigmask for the thread? */
 
@@ -397,14 +399,22 @@ static void* app_loop(void* app_v)
 		pid = -1;
 		if (app->transport == NC_TRANSPORT_SSH) {
 			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+#ifdef ENABLE_TLS
 		} else if (app->transport == NC_TRANSPORT_TLS) {
 			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, stunnel_argv[0], stunnel_argv, &sock);
+#endif
 		}
 		if (pid == -1) {
 			continue;
 		}
 		pthread_cleanup_push(clh_close, &sock);
-		nc_verb_verbose("Call Home transport server (%s) started (PID %d)", (app->transport == NC_TRANSPORT_SSH ? sshd_argv[0] : stunnel_argv[0]), pid);
+		if (app->transport == NC_TRANSPORT_SSH) {
+			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
+#ifdef ENABLE_TLS
+		} else if (app->transport == NC_TRANSPORT_SSH) {
+			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", stunnel_argv[0], pid);
+#endif
+		}
 
 		/* check sock to get information about the connection */
 		/* we have to use epoll API since we need event (not the level) triggering */
