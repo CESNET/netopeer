@@ -234,11 +234,11 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool)))
 	if test -n "$(dbusconfdir)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
 	fi
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA_PRIVATE) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
 	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
 	for i in $(SERVER_MODULES_CONF); do \
