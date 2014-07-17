@@ -157,18 +157,18 @@ $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
 
 %.1.html: %.1
-	@if [ -z "@ROFF2HTML@" ]; then \
+	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
-		exit 1; \
+	else \
+		@ROFF2HTML@ $< > $@ \
 	fi
-	@ROFF2HTML@ $< > $@
 
 %.8.html: %.8
-	@if [ -z "@ROFF2HTML@" ]; then \
+	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
-		exit 1; \
+	else \
+		@ROFF2HTML@ $< > $@ \
 	fi
-	@ROFF2HTML@ $< > $@
 
 $(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
 	@rm -f $@;

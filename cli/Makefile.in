@@ -107,11 +107,11 @@ $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(CPPFLAGS) -fPIC -c $< -o $@
 
 %.1.html: %.1
-	@if [ -z "@ROFF2HTML@" ]; then \
+	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
-		exit 1; \
+	else \
+		@ROFF2HTML@ $< > $@ \
 	fi
-	@ROFF2HTML@ $< > $@
 
 .PHONY: doc
 doc: $(MANHTMLS)
