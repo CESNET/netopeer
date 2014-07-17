@@ -411,7 +411,7 @@ static void* app_loop(void* app_v)
 		if (app->transport == NC_TRANSPORT_SSH) {
 			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
 #ifdef ENABLE_TLS
-		} else if (app->transport == NC_TRANSPORT_SSH) {
+		} else if (app->transport == NC_TRANSPORT_TLS) {
 			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", stunnel_argv[0], pid);
 #endif
 		}
