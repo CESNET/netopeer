@@ -110,7 +110,7 @@ $(OBJDIR)/%.o: %.c
 	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
 	else \
-		@ROFF2HTML@ $< > $@ \
+		@ROFF2HTML@ $< > $@; \
 	fi
 
 .PHONY: doc

@@ -158,14 +158,14 @@ $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
 	else \
-		@ROFF2HTML@ $< > $@ \
+		@ROFF2HTML@ $< > $@; \
 	fi
 
 %.8.html: %.8
 	@if [ "@ROFF2HTML@" = "no" ]; then \
 		echo "Missing roff2html"; \
 	else \
-		@ROFF2HTML@ $< > $@ \
+		@ROFF2HTML@ $< > $@; \
 	fi
 
 $(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
