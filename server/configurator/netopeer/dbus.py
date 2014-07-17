@@ -118,10 +118,13 @@ class dbus(nc_module.nc_module):
 			window.addstr('Allowed user to start the Netopeer server:\n')
 			window.addstr('  {s}\n\n'.format(s=config.options['user']))
 				
-			window.addstr('Allowed group to connect to the Netopeer server:\n')
-			msg = '  {s}'.format(s=self.group)
-			window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
-			window.addstr('\n\n')
+			if self.group == None:
+				window.addstr('All users are allowed to connect to the Netopeer server.\n')
+			else:
+				window.addstr('Allowed group to connect to the Netopeer server:\n')
+				msg = '  {s}'.format(s=self.group)
+				window.addstr(msg+' '*(self.linewidth - len(msg)),curses.color_pair(0) | curses.A_REVERSE if (focus and self.selected == 0) else 0)
+				window.addstr('\n\n')
 		except curses.error:
 			pass
 		
@@ -133,7 +136,7 @@ class dbus(nc_module.nc_module):
 		elif key == curses.KEY_DOWN and self.selected < 0:
 			self.selected = self.selected+1
 		elif key == ord('\n'):
-			if self.selected == 0:
+			if self.selected == 0 and self.group != None:
 				try:
 					window.addstr(12 if self.service_path else 9, 0, '> _'+' '*(self.linewidth-3),  curses.color_pair(0))
 				except curses.error:

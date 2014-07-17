@@ -41,8 +41,7 @@
 #define CONFIG_H_
 
 /* netopeer_socket.h */
-#define USER "root"
-#define GROUP "@GROUP@"
+@GROUPDEFINE@
 
 /* netconf-server-transapi.c */
 #define SSHD_EXEC "@SSHD_EXEC@"

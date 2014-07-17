@@ -66,9 +66,9 @@ conn_t* comm_init()
 {
 	int i, flags;
 	mode_t mask;
-	uid_t uid;
-	struct passwd *pwd;
+#ifdef COMM_SOCKET_GROUP
 	struct group *grp;
+#endif
 
 	if (sock != -1) {
 		return (&sock);
@@ -104,17 +104,7 @@ conn_t* comm_init()
 	}
 	umask(mask);
 
-	/* check owner and set group to apply permissions */
-	pwd = getpwnam(COMM_SOCKET_OWNER);
-	if (pwd == NULL) {
-		nc_verb_error("Setting communication socket permissions failed (getpwnam(): %s).", strerror(errno));
-		goto error_cleanup;
-	}
-	if ((uid = geteuid()) != 0 && uid != pwd->pw_uid) {
-		nc_verb_error("Insufficient permission to run netopeer-server, only \'%s\' is allowed to run it.", COMM_SOCKET_OWNER);
-		goto error_cleanup;
-	}
-
+#ifdef COMM_SOCKET_GROUP
 	grp = getgrnam(COMM_SOCKET_GROUP);
 	if (grp == NULL) {
 		nc_verb_error("Setting communication socket permissions failed (getgrnam(): %s).", strerror(errno));
@@ -122,11 +112,9 @@ conn_t* comm_init()
 	}
 	if (chown(server.sun_path, -1, grp->gr_gid) == -1) {
 		nc_verb_error("Setting communication socket permissions failed (fchown(): %s).", strerror(errno));
-		if (errno == EPERM) {
-			nc_verb_error("Check that user \'%s\' is memeber of the greoup \'%s\'.", COMM_SOCKET_OWNER, COMM_SOCKET_GROUP);
-		}
 		goto error_cleanup;
 	}
+#endif
 
 	/* start listening */
 	if (listen(sock, AGENTS_QUEUE) == -1) {

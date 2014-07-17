@@ -28,8 +28,11 @@ class sock(nc_module.nc_module):
 			window.addstr('Allowed user to start the Netopeer server:\n')
 			window.addstr('  {s}\n\n'.format(s=config.options['user']))
 			
-			window.addstr('Allowed group to connect to the Netopeer server:\n')
-			window.addstr('  {s}\n\n'.format(s=config.options['group']))
+			if config.options['group'] == '':
+				window.addstr('All users are allowed to connect to the Netopeer server.\n')
+			else:
+				window.addstr('Allowed group to connect to the Netopeer server:\n')
+				window.addstr('  {s}\n\n'.format(s=config.options['group']))
 		except curses.error:
 			pass 
 		

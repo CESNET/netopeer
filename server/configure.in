@@ -121,15 +121,21 @@ AC_ARG_ENABLE([debug],
 # Add --with-group parameter
 AC_MSG_CHECKING([for group])
 AC_ARG_WITH([group],
-	AC_HELP_STRING([--with-group=GROUP],[Group of users with enabled access to Netopeer server (root by default)]),
+	AC_HELP_STRING([--with-group=GROUP],[Limit access to Netopeer server only to the specified group of users]),
 	[
 		GROUP="$with_group"
+		GROUPDEFINE="#define GROUP \"$with_group\""
+		DBUSPOLICY="group=\"$with_group\""
 		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
 	],
-	GROUP="root"
+	GROUP=""
+	GROUPDEFINE="#undef GROUP"
+	DBUSPOLICY="context=\"default\""
 )
 AC_MSG_RESULT([$GROUP])
 AC_SUBST(GROUP)
+AC_SUBST(GROUPDEFINE)
+AC_SUBST(DBUSPOLICY)
 
 AC_ARG_ENABLE([dbus],
 	AC_HELP_STRING([--disable-dbus], [Use UNIX sockets instead of DBus.]),

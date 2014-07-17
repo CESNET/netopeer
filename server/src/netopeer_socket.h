@@ -45,9 +45,13 @@
 #define COMM_SOCKET_SEND_FLAGS MSG_NOSIGNAL
 
 #define COMM_SOCKET_PATH "/tmp/netopeer.socket"
-#define COMM_SOCKET_PERM 0660
-#define COMM_SOCKET_OWNER USER
-#define COMM_SOCKET_GROUP GROUP
+#ifdef GROUP
+#	define COMM_SOCKET_PERM 0660
+#	define COMM_SOCKET_GROUP GROUP
+#else
+#	define COMM_SOCKET_PERM 0666
+#	undef COMM_SOCKET_GROUP
+#endif
 
 /**
  * @brief Main communication type

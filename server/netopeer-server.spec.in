@@ -39,10 +39,6 @@ make doc
 make DESTDIR=$RPM_BUILD_ROOT install
 
 %post
-chgrp @GROUP@ @DBUSCONF@/org.liberouter.netopeer.conf
-chgrp @GROUP@ @DBUSSERVICES@/org.liberouter.netopeer.server.service
-chgrp -R @GROUP@ %{_sysconfdir}/netopeer/
-
 #SSHD config
 if test -f /etc/ssh/sshd_config; then \
         grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > %{_sysconfdir}/netopeer/sshd_config; \
