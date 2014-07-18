@@ -120,9 +120,9 @@ struct tmz timezones[] = {
 	{0, NULL}
 };
 
-int nclc_set_timezone(const char *location)
+int nclc_set_timezone(const char *name)
 {
-	if (location == NULL) {
+	if (name == NULL) {
 		return 1;
 	}
 
@@ -131,7 +131,7 @@ int nclc_set_timezone(const char *location)
 	char *tmp = NULL;
 	int file_ok = 0;
 
-	asprintf(&tmp, "%s%s", path, location);
+	asprintf(&tmp, "%s%s", path, name);
 
 	file_ok = access(tmp, F_OK);
 

@@ -1,6 +1,6 @@
 systemns=urn:ietf:params:xml:ns:yang:ietf-system
 /systemns:system/systemns:hostname
-/systemns:system/systemns:clock/systemns:timezone-location/systemns:timezone-location
+/systemns:system/systemns:clock/systemns:timezone-name/systemns:timezone-name
 /systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset
 /systemns:system/systemns:ntp/systemns:enabled
 /systemns:system/systemns:ntp/systemns:server
@@ -12,6 +12,6 @@ systemns=urn:ietf:params:xml:ns:yang:ietf-system
 /systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts
 /systemns:system/systemns:dns-resolver
 # doplnit LDAP a groups
-/systemns:system/systemns:authentication/systemns:user/systemns:ssh-key
+/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key
 /systemns:system/systemns:authentication/systemns:user
 /systemns:system/systemns:authentication

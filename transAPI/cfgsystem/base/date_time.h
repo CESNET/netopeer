@@ -56,13 +56,13 @@ struct tmz {
 
 /**
  * @brief set the /etc/localtime file to right timezone
- * @param location[in] char * name of new timezone (e.g. "Europe/Prague")
+ * @param name[in] char * name of new timezone (e.g. "Europe/Prague")
  * file with this name has to be in /usr/share/zomeinfo/ folder
  * @return 0 successful rewrite of /etc/localtime
  * @return 1 file not found
  * @return 2 permission denied
  */
-int nclc_set_timezone(const char *location);
+int nclc_set_timezone(const char *name);
 
 /**
  * @brief set the /etc/localtime file to right timezone

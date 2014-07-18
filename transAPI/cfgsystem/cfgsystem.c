@@ -172,12 +172,12 @@ int transapi_init(xmlDocPtr * running)
 	/* clock */
 	container_cur = xmlNewChild(running_root, NULL, "clock", NULL);
 
-	/* timezone-location */
-	cur = xmlNewChild(container_cur, NULL, "timezone-location", NULL);
+	/* timezone-name */
+	cur = xmlNewChild(container_cur, NULL, "timezone-name", NULL);
 	if ((tmp = ntp_get_timezone(&msg)) == NULL) {
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
-	xmlNewChild(cur, NULL, "timezone-location", tmp);
+	xmlNewChild(cur, NULL, "timezone-name", tmp);
 	free(tmp);
 
 	/* ntp */
@@ -369,7 +369,7 @@ int transapi_init(xmlDocPtr * running)
 
 		index = 0;
 		while (key[index] != NULL) {
-			cur = xmlNewChild(cur, NULL, BAD_CAST "ssh-key", NULL);
+			cur = xmlNewChild(cur, NULL, BAD_CAST "authorized-key", NULL);
 
 			/* name */
 			xmlNewChild(cur, NULL, "name", key[index]->name);
@@ -492,7 +492,7 @@ int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xml
 }
 
 /**
- * @brief This callback will be run when node in path /systemns:system/systemns:clock/systemns:timezone-location changes
+ * @brief This callback will be run when node in path /systemns:system/systemns:clock/systemns:timezone-name changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -502,7 +502,7 @@ int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xml
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	char* msg;
@@ -519,7 +519,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_
 	} else if (op & XMLDIFF_REM) {
 		/* Nothing for us to do */
 	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-location callback.", op);
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-name callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -742,7 +742,7 @@ int callback_systemns_system_systemns_ntp_systemns_server (void ** data, XMLDIFF
 		free(association_type);
 
 	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-location callback.", op);
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-name callback.", op);
 		return fail_with_aug(error, msg, a, EXIT_FAILURE);
 	}
 
@@ -1198,7 +1198,7 @@ int callback_systemns_system_systemns_dns_resolver (void ** data, XMLDIFF_OP op,
 }
 
 /**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user/systemns:ssh-key changes
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user/systemns:authorized-key changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -1208,7 +1208,7 @@ int callback_systemns_system_systemns_dns_resolver (void ** data, XMLDIFF_OP op,
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user_systemns_ssh_key (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	struct ssh_key* key;
@@ -1491,7 +1491,7 @@ struct transapi_data_callbacks clbks =  {
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-location/systemns:timezone-location", .func = callback_systemns_system_systemns_clock_systemns_timezone_location_systemns_timezone_location},
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-name/systemns:timezone-name", .func = callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name},
 		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset},
 		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled},
 		{.path = "/systemns:system/systemns:ntp/systemns:server", .func = callback_systemns_system_systemns_ntp_systemns_server},
@@ -1502,7 +1502,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
 		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
-		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:ssh-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_ssh_key},
+		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
 		{.path = "/systemns:system/systemns:authentication/systemns:user", .func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication", .func = callback_systemns_system_systemns_authentication}
 	}
