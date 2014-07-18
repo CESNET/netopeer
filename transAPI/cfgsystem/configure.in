@@ -39,8 +39,16 @@ fi
 AC_SUBST(libtool)
 
 # Checks for libraries.
-AC_SEARCH_LIBS([ncds_apply_rpc], [netconf], ,AC_MSG_ERROR([libnetconf not found!]))
-AC_SEARCH_LIBS([aug_init], [augeas], ,AC_MSG_ERROR([augeas not found!]))
+export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
+
+PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
+LIBS="$LIBS $LIBNETCONF_LIBS"
+
+PKG_CHECK_MODULES(AUGEAS, augeas)
+CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
+LIBS="$LIBS $AUGEAS_LIBS"
+
 AC_SEARCH_LIBS([crypt_gensalt_ra], [crypt], ,AC_MSG_ERROR([crypt not found!]))
 
 # Check for libxml2.
