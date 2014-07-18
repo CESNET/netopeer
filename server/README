@@ -88,6 +88,42 @@ ietf-netconf-server data model. By default, the server will listen on port 830,
 so it is good to make sure that no other application (including the default SSH
 daemon) does not use this port.
 
+Generic User Access
+-------------------
+
+This section describes how to specify a group of users allowed to communicate
+with the netopeer-server(8). This can be done by limiting users allowed to use
+intercommunication channel between netopeer-agent(1) and netopeer-server(8).
+There are two possibilities of intercommunication: D-Bus and Unix sockets.
+
+By default, all users are allowed to use intercommunication channel. If you
+prefer to limit this access, use --with-group option of the configure script.
+
+D-Bus
+~~~~~
+
+D-Bus is a default intercommunication channel. In this case, access control is
+specified in the D-Bus configuration file for Netopeer
+service org.liberouter.netopeer.conf (usually
+/etc/dbus-1/system.d/org.liberouter.netopeer.conf). Netopeer allows user to 
+a) allow access to anybody or b) specify a single group with granted access.
+The group can be specified via configure's --with-group option or via
+Intercommunication section in netopeer-configurator(1). However, D-Bus
+configuration allows you to specify more groups or just specific users with
+access to the service. For more information, see the D-Bus configuration file
+description.
+
+UNIX socket
+~~~~~~~~~~~
+
+UNIX socket is an alternate communication channel when D-Bus cannot be used. To
+switch to the UNIX socket communication, use configure's --disable-dbus option.
+In this case, user access to the communication channel is done via access rights
+to the socket file. Therefore, is it possible to allow access to all users (by
+default) or limit it to a single group (with the configure's --with-group
+option). Furthermore, this setting is compiled into the netopeer-server(8) and
+it can be changed only by recompiling Netopeer server with different value to
+the --with-group option.
 
 Usage
 =====
