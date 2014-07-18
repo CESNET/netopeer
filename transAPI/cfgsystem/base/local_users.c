@@ -229,6 +229,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 		fprintf(key_file, "%s %s\n", key->alg, key->data);
 		fclose(key_file);
 
+		break;
 	/* MOD */
 	case 1:
 		ret = eaccess(key_file_path, W_OK);
@@ -248,6 +249,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 		fprintf(key_file, "%s %s\n", key->alg, key->data);
 		fclose(key_file);
 
+		break;
 	/* REM */
 	case 2:
 		ret = remove(key_file_path);
@@ -256,6 +258,11 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 			free(key_file_path);
 			return EXIT_FAILURE;
 		}
+		break;
+	default:
+		*msg = strdup("Internal error (invalid \"change\" attribute of the key."); /* allow free */
+		free(key_file_path);
+		return (EXIT_FAILURE);
 	}
 
 	free(key_file_path);
