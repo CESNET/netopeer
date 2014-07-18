@@ -628,6 +628,7 @@ AGENT_HDRS_COMM
 SERVER_SRCS_COMM
 AGENT_SRCS_COMM
 DISTRO
+LIBNETCONF_DATADIR
 CONFIGURE_PARAMS
 REQS
 BUILDREQS
@@ -4118,6 +4119,7 @@ if test "${with_libnetconf+set}" = set; then :
   withval=$with_libnetconf; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
+	LIBNETCONF_DATADIR="$withval/share/"
 
 else
 
@@ -4215,6 +4217,7 @@ $as_echo "yes" >&6; }
 fi
 	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
 	LIBS="$LIBNETCONF_LIBS $LIBS"
+	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
 
 fi
 
@@ -5627,6 +5630,7 @@ done
 
 
 
+
 if test -z "$RPMBUILD"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&5
 $as_echo "$as_me: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&2;}
@@ -5643,6 +5647,10 @@ ac_config_files="$ac_config_files config/org.liberouter.netopeer.server.service"
 ac_config_files="$ac_config_files config/Netopeer.xml.tmp:config/Netopeer.xml.in"
 
 ac_config_files="$ac_config_files config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in"
+
+ac_config_files="$ac_config_files config/ietf-netconf-server-data.rng"
+
+ac_config_files="$ac_config_files config/netopeer-cfgnetopeer-data.rng"
 
 ac_config_files="$ac_config_files netopeer-server.spec"
 
@@ -6367,6 +6375,8 @@ do
     "config/org.liberouter.netopeer.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.server.service" ;;
     "config/Netopeer.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml.tmp:config/Netopeer.xml.in" ;;
     "config/NETCONF-server.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in" ;;
+    "config/ietf-netconf-server-data.rng") CONFIG_FILES="$CONFIG_FILES config/ietf-netconf-server-data.rng" ;;
+    "config/netopeer-cfgnetopeer-data.rng") CONFIG_FILES="$CONFIG_FILES config/netopeer-cfgnetopeer-data.rng" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
