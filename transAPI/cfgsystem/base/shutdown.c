@@ -53,7 +53,13 @@
 
 #define SHUTDOWN_PATH "/sbin/shutdown"
 
-int test_shutdown(void)
+/**
+ * @brief test shutdown usability
+ * @return 0 success
+ * @return 1 file not found or execute permission denied
+ * @return 2 failed to actually try to shutdown
+ */
+static int test_shutdown(void)
 {
 	int ret;
 

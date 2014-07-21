@@ -46,14 +46,6 @@
 #include <stdbool.h>
 
 /**
- * @brief test shutdown usability
- * @return 0 success
- * @return 1 file not found or execute permission denied
- * @return 2 failed to actually try to shutdown
- */
-int test_shutdown(void);
-
-/**
  * @brief shutdown or reboot the system
  * @param shutdown true for shutdown, false for reboot
  * @param msg error message in case of an error
