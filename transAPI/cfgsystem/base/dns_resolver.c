@@ -1,5 +1,6 @@
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <augeas.h>
@@ -40,13 +41,13 @@ int dns_augeas_init(augeas** a, char** msg) {
 
 bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg) {
 	xmlNodePtr cur;
-	int i, old_domain_count = 0, new_domain_count;
+	int old_domain_count = 0, new_domain_count;
 	char* path;
 
 	/* Get the search-node count */
 	cur = search_node;
 	while (cur != NULL) {
-		if (strcmp(cur->name, "search") == 0) {
+		if (xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
 			++new_domain_count;
 		}
 		cur = cur->next;
@@ -319,13 +320,13 @@ int dns_augeas_next_nameserver(augeas* a, int index, char** address, char** msg)
 
 bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char** msg) {
 	xmlNodePtr cur;
-	int i, old_nameserver_count = 0, new_nameserver_count;
+	int old_nameserver_count = 0, new_nameserver_count;
 	char* path;
 
 	/* Get the server-node count, go from the beginning */
 	cur = server_node->parent->children;
 	while (cur != NULL) {
-		if (strcmp(cur->name, "server") == 0) {
+		if (xmlStrcmp(cur->name, BAD_CAST "server") == 0) {
 			++new_nameserver_count;
 		}
 		cur = cur->next;

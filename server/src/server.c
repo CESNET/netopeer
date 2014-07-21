@@ -96,7 +96,7 @@ static void print_usage (char * progname)
  */
 void signal_handler (int sig)
 {
-	nc_verb_verbose("Signal %d received.", sig);
+//	nc_verb_verbose("Signal %d received.", sig);
 
 	switch (sig) {
 	case SIGINT:
@@ -109,7 +109,7 @@ void signal_handler (int sig)
 			done = 1;
 		} else {
 			/* second attempt */
-			nc_verb_error("Hey! I need some time to stop, be patient next time!");
+//			nc_verb_error("Hey! I need some time to stop, be patient next time!");
 			exit (EXIT_FAILURE);
 		}
 		break;
@@ -119,7 +119,7 @@ void signal_handler (int sig)
 		done = 1;
 		break;
 	default:
-		nc_verb_error("exiting on signal: %d", sig);
+//		nc_verb_error("exiting on signal: %d", sig);
 		exit (EXIT_FAILURE);
 		break;
 	}

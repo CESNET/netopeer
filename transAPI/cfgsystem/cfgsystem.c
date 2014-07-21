@@ -34,6 +34,27 @@
 #define DNS_TIMEOUT_MAX 30
 #define DNS_ATTEMPTS_MAX 5
 
+/* IANA SSH Public Key Algorithm Names */
+struct pub_key_alg {
+	int len; /* Length to compare */
+	const char* alg; /* Name of an algorithm */
+};
+static struct pub_key_alg pub_key_algs[] = {
+	{8, "ssh-dss"},
+	{8, "ssh-rsa"},
+	{14, "spki-sign-rsa"},
+	{14, "spki-sign-dss"},
+	{13, "pgp-sign-rsa"},
+	{13, "pgp-sign-dss"},
+	{5, "null"},
+	{11, "ecdsa-sha2-"},
+	{15, "x509v3-ssh-dss"},
+	{15, "x509v3-ssh-rsa"},
+	{22, "x509v3-rsa2048-sha256"},
+	{18, "x509v3-ecdsa-sha2-"},
+	{0, NULL}
+};
+
 /* transAPI version which must be compatible with libnetconf */
 int transapi_version = 4;
 
@@ -131,7 +152,7 @@ const char* get_node_content(const xmlNodePtr node) {
 		return NULL;
 	}
 
-	return node->children->content;
+	return (const char*)(node->children->content);
 }
 
 /**
@@ -166,18 +187,18 @@ int transapi_init(xmlDocPtr * running)
 		asprintf(&msg, "Failed to get the local hostname.");
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
-	xmlNewChild(running_root, NULL, "hostname", hostname);
+	xmlNewChild(running_root, NULL, BAD_CAST "hostname", BAD_CAST hostname);
 	free(hostname);
 
 	/* clock */
-	container_cur = xmlNewChild(running_root, NULL, "clock", NULL);
+	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
 
 	/* timezone-name */
-	cur = xmlNewChild(container_cur, NULL, "timezone-name", NULL);
+	cur = xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", NULL);
 	if ((tmp = ntp_get_timezone(&msg)) == NULL) {
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
-	xmlNewChild(cur, NULL, "timezone-name", tmp);
+	xmlNewChild(cur, NULL, BAD_CAST "timezone-name", BAD_CAST tmp);
 	free(tmp);
 
 	/* ntp */
@@ -185,7 +206,7 @@ int transapi_init(xmlDocPtr * running)
 
 	/* enabled */
 	ret = nclc_ntp_status();
-	xmlNewChild(container_cur, NULL, "enabled", (ret ? "true" : "false"));
+	xmlNewChild(container_cur, NULL, BAD_CAST "enabled", (ret != 0) ? BAD_CAST "true" : BAD_CAST "false");
 
 	/* server */
 	if (ntp_augeas_init(&a, &msg) != EXIT_SUCCESS) {
@@ -196,22 +217,21 @@ int transapi_init(xmlDocPtr * running)
 		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
 		/* name */
 		asprintf(&tmp, "server%d", index);
-		xmlNewChild(cur, NULL, "name", tmp);
+		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
 		free(tmp);
 
 		/* association-type */
-		xmlNewChild(cur, NULL, "association-type", "server");
+		xmlNewChild(cur, NULL, BAD_CAST "association-type", BAD_CAST "server");
 
 		/* iburst */
-		xmlNewChild(cur, NULL, "iburst", (iburst ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "iburst", (iburst) ? BAD_CAST "true" : BAD_CAST "false");
 
 		/* prefer */
-		xmlNewChild(cur, NULL, "prefer", (prefer ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "prefer", (prefer) ? BAD_CAST "true" : BAD_CAST "false");
 
 		/* udp address */
-		cur = xmlNewChild(cur, NULL, "udp", NULL);
-		cur = xmlNewChild(cur, NULL, "udp", NULL);
-		xmlNewChild(cur, NULL, "address", udp_address);
+		cur = xmlNewChild(cur, NULL, BAD_CAST "udp", NULL);
+		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
 		free(udp_address);
 
 		++index;
@@ -221,25 +241,24 @@ int transapi_init(xmlDocPtr * running)
 	}
 	index = 1;
 	while ((ret = ntp_augeas_next_server(a, "peer", index, &udp_address, &iburst, &prefer, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, "server", NULL);
+		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
 		/* name */
 		asprintf(&tmp, "server%d", index);
-		xmlNewChild(cur, NULL, "name", tmp);
+		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
 		free(tmp);
 
 		/* association-type */
-		xmlNewChild(cur, NULL, "association-type", "peer");
+		xmlNewChild(cur, NULL, BAD_CAST "association-type", BAD_CAST "peer");
 
 		/* iburst */
-		xmlNewChild(cur, NULL, "iburst", (iburst ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "iburst", BAD_CAST (iburst ? "true" : "false"));
 
 		/* prefer */
-		xmlNewChild(cur, NULL, "prefer", (prefer ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "prefer", BAD_CAST (prefer ? "true" : "false"));
 
 		/* udp address */
-		cur = xmlNewChild(cur, NULL, "udp", NULL);
-		cur = xmlNewChild(cur, NULL, "udp", NULL);
-		xmlNewChild(cur, NULL, "address", udp_address);
+		cur = xmlNewChild(cur, NULL, BAD_CAST "udp", NULL);
+		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
 		free(udp_address);
 
 		++index;
@@ -258,7 +277,7 @@ int transapi_init(xmlDocPtr * running)
 	/* search */
 	index = 1;
 	while ((ret = dns_augeas_next_search_domain(a, index, &domain, &msg)) == 1) {
-		xmlNewChild(container_cur, NULL, BAD_CAST "search", domain);
+		xmlNewChild(container_cur, NULL, BAD_CAST "search", BAD_CAST domain);
 		free(domain);
 
 		++index;
@@ -273,13 +292,13 @@ int transapi_init(xmlDocPtr * running)
 		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
 		/* name */
 		asprintf(&tmp, "nameserver%d", index);
-		xmlNewChild(cur, NULL, "name", tmp);
+		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
 		free(tmp);
 
 		/* udp-and-tcp address */
-		cur = xmlNewChild(cur, NULL, "udp-and-tcp", NULL);
-		cur = xmlNewChild(cur, NULL, "udp-and-tcp", NULL);
-		xmlNewChild(cur, NULL, "address", udp_address);
+		cur = xmlNewChild(cur, NULL, BAD_CAST "udp-and-tcp", NULL);
+		cur = xmlNewChild(cur, NULL, BAD_CAST "udp-and-tcp", NULL);
+		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
 		free(udp_address);
 
 		++index;
@@ -290,13 +309,13 @@ int transapi_init(xmlDocPtr * running)
 
 	/* options */
 	if ((ret = dns_augeas_read_options(a, &timeout, &attempts, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, "options", NULL);
+		cur = xmlNewChild(container_cur, NULL, BAD_CAST "options", NULL);
 		if (timeout != NULL) {
-			xmlNewChild(cur, NULL, "timeout", timeout);
+			xmlNewChild(cur, NULL, BAD_CAST "timeout", BAD_CAST timeout);
 			free(timeout);
 		}
 		if (attempts != NULL) {
-			xmlNewChild(cur, NULL, "attempts", attempts);
+			xmlNewChild(cur, NULL, BAD_CAST "attempts", BAD_CAST attempts);
 			free(attempts);
 		}
 	}
@@ -321,7 +340,7 @@ int transapi_init(xmlDocPtr * running)
 	aug_close(a);
 	if (auth_order != NULL) {
 		for (index = 0; index < auth_order_len; ++index) {
-			xmlNewChild(running_root, NULL, BAD_CAST "user-authentication-order", auth_order[index]); 
+			xmlNewChild(running_root, NULL, BAD_CAST "user-authentication-order", BAD_CAST auth_order[index]);
 			free(auth_order[index]);
 		}
 		free(auth_order);
@@ -335,10 +354,10 @@ int transapi_init(xmlDocPtr * running)
 	}
 	while ((pwd = getpwent()) != NULL) {
 		/* user */
-		cur = xmlNewChild(container_cur, NULL, "user", NULL);
+		cur = xmlNewChild(container_cur, NULL, BAD_CAST "user", NULL);
 
 		/* name */
-		xmlNewChild(cur, NULL, "name", pwd->pw_name);
+		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST pwd->pw_name);
 
 		/* passwd */
 		if (pwd->pw_passwd[0] == 'x') {
@@ -353,10 +372,10 @@ int transapi_init(xmlDocPtr * running)
 				return fail(NULL, msg, EXIT_FAILURE);
 			}
 			if (spwd->sp_pwdp[0] != '*' && spwd->sp_pwdp[0] != '!') {
-				xmlNewChild(cur, NULL, "password", spwd->sp_pwdp);
+				xmlNewChild(cur, NULL, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
 			}
 		} else if (pwd->pw_passwd[0] != '*') {
-			xmlNewChild(cur, NULL, "password", pwd->pw_passwd);
+			xmlNewChild(cur, NULL, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
 		}
 
 		/* ssh-key */
@@ -372,15 +391,15 @@ int transapi_init(xmlDocPtr * running)
 			cur = xmlNewChild(cur, NULL, BAD_CAST "authorized-key", NULL);
 
 			/* name */
-			xmlNewChild(cur, NULL, "name", key[index]->name);
+			xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST key[index]->name);
 			free(key[index]->name);
 
 			/* algorithm */
-			xmlNewChild(cur, NULL, "algorithm", key[index]->alg);
+			xmlNewChild(cur, NULL, BAD_CAST "algorithm", BAD_CAST key[index]->alg);
 			free(key[index]->alg);
 
 			/* key-data */
-			xmlNewChild(cur, NULL, "key-data", key[index]->data);
+			xmlNewChild(cur, NULL, BAD_CAST "key-data", BAD_CAST key[index]->data);
 			free(key[index]->data);
 
 			free(key[index]);
@@ -432,18 +451,18 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	xmlAddChild(state_root, container_cur);
 
 	/* Add platform leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-name", nclc_get_sysname());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-release", nclc_get_os_release());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-version", nclc_get_os_version());
-	xmlNewChild(container_cur, NULL, BAD_CAST "machine", nclc_get_os_machine());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-name", BAD_CAST nclc_get_sysname());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-release", BAD_CAST nclc_get_os_release());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-version", BAD_CAST nclc_get_os_version());
+	xmlNewChild(container_cur, NULL, BAD_CAST "machine", BAD_CAST nclc_get_os_machine());
 
 	/* Add the clock container */
 	container_cur = xmlNewNode(NULL, BAD_CAST "clock");
 	xmlAddChild(state_root, container_cur);
 
 	/* Add clock leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", nclc_get_time());
-	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", nclc_get_boottime());
+	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST nclc_get_time());
+	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST nclc_get_boottime());
 
 	return state_doc;
 }
@@ -472,9 +491,9 @@ struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:
 int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	const char* hostname;
-	char* msg, *tmp;
+	char* msg;
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		hostname = get_node_content(node);
 
 		if (nclc_set_hostname(hostname) != EXIT_SUCCESS) {
@@ -507,7 +526,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_time
 	int ret;
 	char* msg;
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		ret = nclc_set_timezone(get_node_content(node));
 		if (ret == 1) {
 			asprintf(&msg, "Timezone %s was not found.", get_node_content(node));
@@ -578,10 +597,10 @@ int callback_systemns_system_systemns_ntp_systemns_enabled (void ** data, XMLDIF
 	bool ignore = false;
 	char* msg = NULL;
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD) {
-		if (xmlStrcmp(get_node_content(node), "true") == 0) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		if (strcmp(get_node_content(node), "true") == 0) {
 			ret = nclc_ntp_start();
-		} else if (xmlStrcmp(get_node_content(node), "false") == 0) {
+		} else if (strcmp(get_node_content(node), "false") == 0) {
 			ret = nclc_ntp_stop();
 			/* In case NTP is not running when starting this module */
 			if (op & XMLDIFF_ADD) {
@@ -623,7 +642,7 @@ int callback_systemns_system_systemns_ntp_systemns_enabled (void ** data, XMLDIF
 int callback_systemns_system_systemns_ntp_systemns_server (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur, child;
-	int ret, i;
+	int i;
 	char* msg = NULL, *item, **resolved = NULL;
 	augeas* a;
 	char* udp_address = NULL;
@@ -635,14 +654,14 @@ int callback_systemns_system_systemns_ntp_systemns_server (void ** data, XMLDIFF
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
-	if (op & XMLDIFF_ADD || op & XMLDIFF_REM || op & XMLDIFF_MOD) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_REM) || (op & XMLDIFF_MOD)) {
 		child = node->children;
 		while (child != NULL) {
 			/* udp */
 			if (xmlStrcmp(child->name, BAD_CAST "udp") == 0) {
 				cur = child->children->children;
 				while (cur != NULL) {
-					if (xmlStrcmp(cur->name, "address") == 0) {
+					if (xmlStrcmp(cur->name, BAD_CAST "address") == 0) {
 						udp_address = strdup(get_node_content(cur));
 					}
 					cur = cur->next;
@@ -848,7 +867,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 	augeas* a;
 
 	/* Already processed, skip */
-	if (op & XMLDIFF_SIBLING && dns_search_reorder == 1) {
+	if ((op & XMLDIFF_SIBLING) && (dns_search_reorder == 1)) {
 		return EXIT_SUCCESS;
 	}
 
@@ -865,7 +884,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 		cur = node->parent->children;
 		while (cur != NULL) {
 			/* We are working with an XML, children can be in any order and we want only the "search" nodes */
-			if (strcmp(cur->name, "search") != 0) {
+			if (xmlStrcmp(cur->name, BAD_CAST "search") != 0) {
 				cur = cur->next;
 				continue;
 			}
@@ -913,7 +932,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
 		index = 1;
 		cur = node->parent->children;
 		while (cur != NULL) {
-			if (strcmp(cur->name, "search") != 0) {
+			if (xmlStrcmp(cur->name, BAD_CAST "search") != 0) {
 				cur = cur->next;
 				continue;
 			}
@@ -1198,6 +1217,144 @@ int callback_systemns_system_systemns_dns_resolver (void ** data, XMLDIFF_OP op,
 }
 
 /**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_authentication_systemns_user (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+{
+	xmlNodePtr cur;
+	const char* pass = NULL, *name;
+	char* msg = NULL, *msg2, *home_dir;
+	struct user_ctx* ctx;
+	int i;
+
+	/* Check name node */
+	cur = node->children;
+	while (cur != NULL) {
+		if (xmlStrcmp(cur->name, BAD_CAST "name") == 0) {
+			break;
+		}
+		cur = cur->next;
+	}
+
+	if (cur == NULL) {
+		/* No name node */
+		asprintf(&msg, "No name node in a new user.");
+		if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+			asprintf(&msg2, "Inconsistent SSH key configuration (if any) of a user, %s", msg);
+		} else {
+			msg2 = msg;
+		}
+		user_ctx_cleanup((struct user_ctx**) data);
+		return fail(error, msg2, EXIT_FAILURE);
+	} else {
+		name = get_node_content(cur);
+	}
+
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD) || (op & XMLDIFF_REM)) {
+		if (!(op & XMLDIFF_REM)) {
+			pass = users_process_pass(node, &config_modified, &msg);
+			if (msg != NULL) {
+				if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+					asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+					free(msg);
+				} else {
+					msg2 = msg;
+				}
+				user_ctx_cleanup((struct user_ctx**) data);
+				return fail(error, msg2, EXIT_FAILURE);
+			}
+		}
+
+		/* Adding a user */
+		if ((op & XMLDIFF_ADD) && (users_add_user(name, pass, &msg) != EXIT_SUCCESS)) {
+			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+				free(msg);
+			} else {
+				msg2 = msg;
+			}
+			user_ctx_cleanup((struct user_ctx**) data);
+			return fail(error, msg2, EXIT_FAILURE);
+		}
+
+		/* Modifying a user */
+		if ((op & XMLDIFF_MOD) && (users_mod_user(name, pass, &msg) != EXIT_SUCCESS)) {
+			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+				free(msg);
+			} else {
+				msg2 = msg;
+			}
+			user_ctx_cleanup((struct user_ctx**) data);
+			return fail(error, msg2, EXIT_FAILURE);
+		}
+
+		/* Removing a user */
+		if ((op & XMLDIFF_REM) && (users_rem_user(name, &msg) != EXIT_SUCCESS)) {
+			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+				free(msg);
+			} else {
+				msg2 = msg;
+			}
+			user_ctx_cleanup((struct user_ctx**) data);
+			return fail(error, msg2, EXIT_FAILURE);
+		}
+	}
+
+	/* Process the SSH key changes */
+	if (*data != NULL) {
+		ctx = *data;
+
+		if ((home_dir = users_get_home_dir(name, &msg)) == NULL) {
+			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+				free(msg);
+			} else {
+				msg2 = msg;
+			}
+			user_ctx_cleanup((struct user_ctx**) data);
+			return fail(error, msg2, EXIT_FAILURE);
+		}
+
+		for (i = 0; i < ctx->count; ++i) {
+			if (users_process_ssh_key(home_dir, ctx->first+i, &msg) != EXIT_SUCCESS) {
+				break;
+			}
+		}
+		free(home_dir);
+
+		if (i != ctx->count) {
+			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
+				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
+				free(msg);
+			} else {
+				msg2 = msg;
+			}
+			user_ctx_cleanup((struct user_ctx**) data);
+			return fail(error, msg2, EXIT_FAILURE);
+		}
+	}
+
+	if (!(op & XMLDIFF_ADD) && !(op & XMLDIFF_MOD) && !(op & XMLDIFF_REM) && !(op & XMLDIFF_CHAIN)) {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the authentication-user callback.", op);
+		user_ctx_cleanup((struct user_ctx**) data);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	user_ctx_cleanup((struct user_ctx**) data);
+	return EXIT_SUCCESS;
+}
+
+/**
  * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user/systemns:authorized-key changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -1296,144 +1453,6 @@ int callback_systemns_system_systemns_authentication_systemns_user_systemns_auth
 }
 
 /**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	xmlNodePtr cur;
-	const char* pass = NULL, *name;
-	char* msg = NULL, *msg2, *home_dir;
-	struct user_ctx* ctx;
-	int i;
-
-	/* Check name node */
-	cur = node->children;
-	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, "name") == 0) {
-			break;
-		}
-		cur = cur->next;
-	}
-
-	if (cur == NULL) {
-		/* No name node */
-		asprintf(&msg, "No name node in a new user.");
-		if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-			asprintf(&msg2, "Inconsistent SSH key configuration (if any) of a user, %s", msg);
-		} else {
-			msg2 = msg;
-		}
-		user_ctx_cleanup((struct user_ctx**) data);
-		return fail(error, msg2, EXIT_FAILURE);
-	} else {
-		name = get_node_content(cur);
-	}
-
-	if (op & XMLDIFF_ADD || op & XMLDIFF_MOD || op & XMLDIFF_REM) {
-		if (!(op & XMLDIFF_REM)) {
-			pass = users_process_pass(node, &config_modified, &msg);
-			if (msg != NULL) {
-				if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-					asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-					free(msg);
-				} else {
-					msg2 = msg;
-				}
-				user_ctx_cleanup((struct user_ctx**) data);
-				return fail(error, msg2, EXIT_FAILURE);
-			}
-		}
-
-		/* Adding a user */
-		if (op & XMLDIFF_ADD && users_add_user(name, pass, &msg) != EXIT_SUCCESS) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		/* Modifying a user */
-		if (op & XMLDIFF_MOD && users_mod_user(name, pass, &msg) != EXIT_SUCCESS) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		/* Removing a user */
-		if (op & XMLDIFF_REM && users_rem_user(name, &msg) != EXIT_SUCCESS) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-	}
-
-	/* Process the SSH key changes */
-	if (*data != NULL) {
-		ctx = *data;
-
-		if ((home_dir = users_get_home_dir(name, &msg)) == NULL) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		for (i = 0; i < ctx->count; ++i) {
-			if (users_process_ssh_key(home_dir, ctx->first+i, &msg) != EXIT_SUCCESS) {
-				break;
-			}
-		}
-		free(home_dir);
-
-		if (i != ctx->count) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-	}
-
-	if (!(op & XMLDIFF_ADD) && !(op & XMLDIFF_MOD) && !(op & XMLDIFF_REM) && !(op & XMLDIFF_CHAIN)) {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the authentication-user callback.", op);
-		user_ctx_cleanup((struct user_ctx**) data);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	user_ctx_cleanup((struct user_ctx**) data);
-	return EXIT_SUCCESS;
-}
-
-/**
  * @brief This callback will be run when node in path /systemns:system/systemns:authentication changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -1462,7 +1481,7 @@ int callback_systemns_system_systemns_authentication (void ** data, XMLDIFF_OP o
 
 		cur = node->last;
 		while (cur != NULL) {
-			if (xmlStrcmp(cur->name, "user-authentication-order") == 0) {
+			if (xmlStrcmp(cur->name, BAD_CAST "user-authentication-order") == 0) {
 				if (users_augeas_add_first_sshd_auth_order(a, get_node_content(cur), &msg) != EXIT_SUCCESS) {
 					return fail_with_aug(error, msg, a, EXIT_FAILURE);
 				}
@@ -1600,7 +1619,7 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 	timezone = strdup(strchr(get_node_content(current_datetime), 'T')+9);
 	if (strcmp(timezone, "Z") == 0) {
 		offset = 0;
-	} else if (timezone[0] != '+' && timezone[0] != '-' || strlen(timezone) != 6) {
+	} else if (((timezone[0] != '+') && (timezone[0] != '-')) || (strlen(timezone) != 6)) {
 		asprintf(&msg, "Invalid timezone format (%s).", timezone);
 		goto error;
 	} else {

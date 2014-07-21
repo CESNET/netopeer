@@ -38,6 +38,9 @@ if test -z "$libtool"; then
 fi
 AC_SUBST(libtool)
 
+AC_PATH_PROG(NETOPEER_MANAGER, [netopeer-manager], [])
+AC_SUBST(NETOPEER_MANAGER)
+
 # Checks for libraries.
 export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
 
@@ -45,7 +48,7 @@ PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
 
-PKG_CHECK_MODULES(AUGEAS, augeas)
+PKG_CHECK_MODULES(AUGEAS, augeas >= 1.0.0)
 CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
 LIBS="$LIBS $AUGEAS_LIBS"
 

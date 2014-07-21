@@ -23,28 +23,6 @@ struct ssh_key {
 	int change;		// 0 - add, 1 - mod, 2 - rem
 };
 
-/* IANA SSH Public Key Algorithm Names */
-struct pub_key_alg {
-	int len; /* Length to compare */
-	const char* alg; /* Name of an algorithm */
-};
-
-static struct pub_key_alg pub_key_algs[] = {
-	{8, "ssh-dss"},
-	{8, "ssh-rsa"},
-	{14, "spki-sign-rsa"},
-	{14, "spki-sign-dss"},
-	{13, "pgp-sign-rsa"},
-	{13, "pgp-sign-dss"},
-	{5, "null"},
-	{11, "ecdsa-sha2-"},
-	{15, "x509v3-ssh-dss"},
-	{15, "x509v3-ssh-rsa"},
-	{22, "x509v3-rsa2048-sha256"},
-	{18, "x509v3-ecdsa-sha2-"},
-	{0, NULL}
-};
-
 /**
  * @brief get and possibly hash the password in parent's child
  * @param parent parent node of the password node

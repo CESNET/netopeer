@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #define _OW_SOURCE
-#define _POSIX_SOURCE
+//#define _POSIX_SOURCE
 
 #include "local_users.h"
 
@@ -37,7 +37,7 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 	
 	cur = parent->children;
 	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, "password") == 0) {
+		if (xmlStrcmp(cur->name, BAD_CAST "password") == 0) {
 			break;
 		}
 		cur = cur->next;
@@ -47,7 +47,7 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 		/* No password specified (empty) */
 		password = NULL;
 	} else {
-		password = cur->children->content;
+		password = (const char*)(cur->children->content);
 	}
 
 	/* Check format and hash the password if needed */
@@ -63,15 +63,17 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 			data.initialized = 0;
 			pass = crypt_r(password+3, salt, &data);
 
-			cur = xmlNewChild(parent, NULL, "password", pass);
+			cur = xmlNewChild(parent, NULL, BAD_CAST "password", BAD_CAST pass);
 			*config_modified = 1;
 			free(pass);
 			free(salt);
 
-			password = cur->children->content;
+			password = (const char*)(cur->children->content);
 			return password;
 		}
 	}
+
+	return (NULL);
 }
 
 int users_add_user(const char* name, const char* passwd, char** msg) {
@@ -594,7 +596,7 @@ int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg) {
 		} else {
 			aug_get(a, path, &value);
 			free(path);
-			if (value = NULL) {
+			if (value == NULL) {
 				asprintf(msg, "SSHD PAM entry no.%d corrupted.", i);
 				return EXIT_FAILURE;
 			}

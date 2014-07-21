@@ -241,6 +241,8 @@ char * nclc_get_hostname()
 
 		fclose(hostname);
 		break;
+	default:
+		return (NULL);
 	}
 
 	return ret;
@@ -255,6 +257,8 @@ int nclc_set_hostname(const char* hostname)
 	int host_found = 0, ret, i;
 	augeas* a;
 
+	/* TODO check hostname */
+
 	/* Get the current hostname */
 	line = nclc_get_hostname();
 	if (line == NULL) {
@@ -264,7 +268,7 @@ int nclc_set_hostname(const char* hostname)
 	free(line);
 
 	/* Call hostname in a shell */
-	asprintf(&line, "hostname %s >& /dev/null");
+	asprintf(&line, "hostname %s >& /dev/null", hostname);
 	if (WEXITSTATUS(system(line)) != 0) {
 		free(line);
 		return EXIT_FAILURE;
@@ -385,6 +389,8 @@ int nclc_set_hostname(const char* hostname)
 		fprintf(host, "%s", hostname);
 		fclose(host);
 		break;
+	default:
+		return (EXIT_FAILURE);
 	}
 
 	return EXIT_SUCCESS;

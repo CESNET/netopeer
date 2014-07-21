@@ -17,9 +17,16 @@ INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 LIBS = @LIBS@
-CFLAGS = @CFLAGS@
+CFLAGS = -Wall @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 LIBTOOL = $(libtool) --tag=CC --quiet
+NETOPEER_MANAGER = @NETOPEER_MANAGER@
+
+MODEL = model/ietf-system.yin \
+	model/iana-crypt-hash.yin \
+	model/ietf-system-data.rng \
+	model/ietf-system-gdefs.rng \
+	model/ietf-system-schematron.xsl
 
 SRCS = @PROJECTNAME@.c \
 	base/date_time.c \
@@ -50,6 +57,19 @@ $(OBJDIR)/%.lo: %.c
 install: $(TARGET)
 	$(INSTALL) -m 775 -d $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=install cp $(TARGET) $(DESTDIR)/$(libdir)/;
+	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/
+	@for i in $(MODEL); do \
+		$(INSTALL_DATA) -m 600 $$i $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/; \
+	done
+	@if test -n "$(NETOPEER_MANAGER)"; then \
+		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
+			$(NETOPEER_MANAGER) rm --name ietf-system; \
+		fi \
+		$(NETOPEER_MANAGER) add --name ietf-system \
+			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
+			--features authentication local-users ntp ntp-udp-port timezone-name dns-udp-tcp-port \
+			--datastore $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/datastore.xml; \
+	fi
 
 .PHONY: clean
 clean:

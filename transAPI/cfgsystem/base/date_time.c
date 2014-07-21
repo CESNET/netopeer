@@ -41,15 +41,8 @@
  * if advised of the possibility of such damage.
  *
  */
-
-#include "date_time.h"
-#include "platform.h"
-
 #define _GNU_SOURCE
-
-#ifndef _BSD_SOURCE
 #define _BSD_SOURCE
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +58,9 @@
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <augeas.h>
+
+#include "date_time.h"
+#include "platform.h"
 
 #define ZONEINFO_FOLDER_PATH	"/usr/share/zoneinfo/"
 #define LOCALTIME_FILE_PATH	"/etc/localtime"
