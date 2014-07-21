@@ -1,11 +1,9 @@
-/*!
+/**
  * \file date_time.c
  * \brief Functions for date/time/timezone manipulation
- * \author Miroslav Brabenec <brabemi3@fit.cvut.cz>
- * \author Tomas Cejka <cejkat@cesnet.cz>
+ * \author Michal Vasko <mvasko@cesnet.cz>
  * \date 2013
- */
-/*
+ *
  * Copyright (C) 2013 CESNET
  *
  * LICENSE TERMS
@@ -41,6 +39,7 @@
  * if advised of the possibility of such damage.
  *
  */
+
 #define _GNU_SOURCE
 #define _BSD_SOURCE
 
@@ -73,47 +72,47 @@
 #define NTP_CONF_FILE_PATH	"/etc/ntp.conf"
 
 struct tmz timezones[] = {
-	{-720, "Etc/GMT-12"},
-	{-660, "Etc/GMT-11"},
-	{-600, "Etc/GMT-10"},
-	{-570, "Pacific/Marquesas"},
-	{-540, "Etc/GMT-9"},
-	{-480, "Etc/GMT-8"},
-	{-420, "Etc/GMT-7"},
-	{-360, "Etc/GMT-6"},
-	{-300, "Etc/GMT-5"},
-	{-270, "America/Caracas"},
-	{-240, "Etc/GMT-4"},
-	{-210, "Canada/Newfoundland"},
-	{-180, "Etc/GMT-3"},
-	{-120, "Etc/GMT-2"},
-	{-60, "Etc/GMT-1"},
-	{0, "Etc/GMT0"},
-	{60, "Etc/GMT+1"},
-	{120, "Etc/GMT+2"},
-	{180, "Etc/GMT+3"},
-	{210, "Asia/Tehran"},
-	{240, "Etc/GMT+4"},
-	{270, "Asia/Kabul"},
-	{300, "Etc/GMT+5"},
-	{330, "Asia/Colombo"},
-	{345, "Asia/Kathmandu"},
-	{360, "Etc/GMT+6"},
-	{390, "Asia/Rangoon"},
-	{420, "Etc/GMT+7"},
-	{480, "Etc/GMT+8"},
-	{525, "Australia/Eucla"},
-	{540, "Etc/GMT+9"},
-	{570, "Australia/Adelaide"},
-	{600, "Etc/GMT+10"},
-	{630, "Australia/Lord_Howe"},
-	{660, "Etc/GMT+11"},
-	{690, "Pacific/Norfolk"},
-	{720, "Etc/GMT+12"},
-	{765, "Pacific/Chatham"},
-	{780, "Pacific/Apia"},
-	{840, "Pacific/Kiritimati"},
-	{0, NULL}
+    {-720, "Etc/GMT-12"},
+    {-660, "Etc/GMT-11"},
+    {-600, "Etc/GMT-10"},
+    {-570, "Pacific/Marquesas"},
+    {-540, "Etc/GMT-9"},
+    {-480, "Etc/GMT-8"},
+    {-420, "Etc/GMT-7"},
+    {-360, "Etc/GMT-6"},
+    {-300, "Etc/GMT-5"},
+    {-270, "America/Caracas"},
+    {-240, "Etc/GMT-4"},
+    {-210, "Canada/Newfoundland"},
+    {-180, "Etc/GMT-3"},
+    {-120, "Etc/GMT-2"},
+    {-60, "Etc/GMT-1"},
+    {0, "Etc/GMT0"},
+    {60, "Etc/GMT+1"},
+    {120, "Etc/GMT+2"},
+    {180, "Etc/GMT+3"},
+    {210, "Asia/Tehran"},
+    {240, "Etc/GMT+4"},
+    {270, "Asia/Kabul"},
+    {300, "Etc/GMT+5"},
+    {330, "Asia/Colombo"},
+    {345, "Asia/Kathmandu"},
+    {360, "Etc/GMT+6"},
+    {390, "Asia/Rangoon"},
+    {420, "Etc/GMT+7"},
+    {480, "Etc/GMT+8"},
+    {525, "Australia/Eucla"},
+    {540, "Etc/GMT+9"},
+    {570, "Australia/Adelaide"},
+    {600, "Etc/GMT+10"},
+    {630, "Australia/Lord_Howe"},
+    {660, "Etc/GMT+11"},
+    {690, "Pacific/Norfolk"},
+    {720, "Etc/GMT+12"},
+    {765, "Pacific/Chatham"},
+    {780, "Pacific/Apia"},
+    {840, "Pacific/Kiritimati"},
+    {0, NULL}
 };
 
 int nclc_set_timezone(const char *name)
@@ -123,7 +122,7 @@ int nclc_set_timezone(const char *name)
 	}
 
 	struct stat statbuf;
-	char *path = ZONEINFO_FOLDER_PATH;	/*"/usr/share/zoneinfo/"*/
+	char *path = ZONEINFO_FOLDER_PATH; /*"/usr/share/zoneinfo/"*/
 	char *tmp = NULL;
 	int file_ok = 0;
 
@@ -135,13 +134,15 @@ int nclc_set_timezone(const char *name)
 		stat(tmp, &statbuf);
 	}
 
-	if (file_ok!=0 || S_ISDIR(statbuf.st_mode)) {
+	if (file_ok != 0 || S_ISDIR(statbuf.st_mode)) {
 		free(tmp);
 		return 1;
 	}
 
-	if (unlink(LOCALTIME_FILE_PATH)) return 2;	/*"/etc/localtime"*/
-	if (symlink(tmp, LOCALTIME_FILE_PATH)) return 2;	/*"/etc/localtime"*/
+	if (unlink(LOCALTIME_FILE_PATH))
+		return 2; /*"/etc/localtime"*/
+	if (symlink(tmp, LOCALTIME_FILE_PATH))
+		return 2; /*"/etc/localtime"*/
 	free(tmp);
 
 	return 0;
@@ -170,14 +171,14 @@ int nclc_set_gmt_offset(int offset)
  */
 static int date_ok(int day, int month, int year)
 {
-	if(0<day && day<29 && 0<month && month<13 && 1899<year) {
+	if (0 < day && day < 29 && 0 < month && month < 13 && 1899 < year) {
 		return 1;
 	}
-	if(1>day || day>31 || 1>month || month>12 || 1900>year) {
+	if (1 > day || day > 31 || 1 > month || month > 12 || 1900 > year) {
 		return 0;
 	}
-	
-	switch(month) {
+
+	switch (month) {
 	case 1:
 	case 3:
 	case 5:
@@ -185,10 +186,9 @@ static int date_ok(int day, int month, int year)
 	case 8:
 	case 10:
 	case 12:
-		if(day<32) {
+		if (day < 32) {
 			return 1;
-		}
-		else {
+		} else {
 			return 0;
 		}
 		break;
@@ -196,34 +196,35 @@ static int date_ok(int day, int month, int year)
 	case 6:
 	case 9:
 	case 11:
-		if(day<31) {
+		if (day < 31) {
 			return 1;
-		}
-		else {
+		} else {
 			return 0;
 		}
 		break;
 	case 2:
-		if( ( (year%4)==0 && (year%100)!=0 ) || (year%400)==0 ) {
-			if(day<30) return 1;
+		if (((year % 4) == 0 && (year % 100) != 0) || (year % 400) == 0) {
+			if (day < 30) {
+				return 1;
+			}
 		}
 		break;
 	}
 	return 0;
 }
 
-int nclc_set_time(char *HHMMSS)
+int nclc_set_time(char* HHMMSS)
 {
 	time_t new_time = time(NULL);
 	struct tm *loc_time = localtime(&new_time);
 
 	int time_H, time_M, time_S;
 
-	if(sscanf(HHMMSS, "%d:%d:%d", &time_H, &time_M, &time_S) != 3) {
+	if (sscanf(HHMMSS, "%d:%d:%d", &time_H, &time_M, &time_S) != 3) {
 		return 1;
 	}
 
-	if(time_H>23 || time_H<0 || time_M>59 || time_M<0 || time_S>59 || time_S<0 ) {
+	if (time_H > 23 || time_H < 0 || time_M > 59 || time_M < 0 || time_S > 59 || time_S < 0) {
 		return 2;
 	}
 
@@ -233,22 +234,24 @@ int nclc_set_time(char *HHMMSS)
 
 	new_time = mktime(loc_time);
 
-	if(stime(&new_time)) return 3;
+	if (stime(&new_time)) {
+		return 3;
+	}
 
 	return 0;
 }
 
-int nclc_set_date(char *YYYYMMDD)
+int nclc_set_date(char* YYYYMMDD)
 {
 	time_t new_date = time(NULL);
 	struct tm *loc_time = localtime(&new_date);
 
 	int time_D, time_M, time_Y;
 
-	if(sscanf(YYYYMMDD, "%d-%d-%d", &time_Y, &time_M, &time_D) != 3) {
+	if (sscanf(YYYYMMDD, "%d-%d-%d", &time_Y, &time_M, &time_D) != 3) {
 		return 1;
 	}
-	if(date_ok(time_D, time_M, time_Y) == 0) {
+	if (date_ok(time_D, time_M, time_Y) == 0) {
 		return 2;
 	}
 
@@ -260,58 +263,62 @@ int nclc_set_date(char *YYYYMMDD)
 	loc_time->tm_year = time_Y;
 
 	new_date = mktime(loc_time);
-	if(stime(&new_date)) return 3;
+	if (stime(&new_date)) {
+		return 3;
+	}
 
 	return 0;
 }
 
-char *nclc_get_time()
+char* nclc_get_time(void)
 {
 	time_t cas = time(NULL);
 	char *output = NULL;
-	char *tmp = ctime( &cas);
+	char *tmp = ctime(&cas);
 	int i;
 
 	tzset();
 
-	for(i=0; tmp[i]!='\n'; i++);
+	for (i = 0; tmp[i] != '\n'; i++)
+		;
 	tmp[i] = '\0';
 
-	asprintf(&output, "%s%s%s%s%s", tmp,", ",tzname[0],", ",tzname[1]);
+	asprintf(&output, "%s%s%s%s%s", tmp, ", ", tzname[0], ", ", tzname[1]);
 	return output;
 }
 
-char * nclc_get_boottime()
+char* nclc_get_boottime(void)
 {
 	struct sysinfo s_info;
 	time_t cur_time = time(NULL);
 	char * boot_time;
 	int i;
 
-	if(sysinfo(&s_info)!=0) {
-	return NULL;
+	if (sysinfo(&s_info) != 0) {
+		return NULL;
 	}
-	
+
 	cur_time -= s_info.uptime;
 	boot_time = ctime(&cur_time);
 
-	for(i=0; boot_time[i]!='\n'; i++);
+	for (i = 0; boot_time[i] != '\n'; i++)
+		;
 	boot_time[i] = '\0';
 
 	return strdup(boot_time);
 }
 
-int nclc_ntp_start()
+int nclc_ntp_start(void)
 {
 	int output = 1;
 
-	if(nclc_distribution_id == 0) {
+	if (nclc_distribution_id == 0) {
 		nclc_identity();
 	}
 
-	switch(nclc_distribution_id) {
+	switch (nclc_distribution_id) {
 	case REDHAT:
-		switch(nclc_version_id) {
+		switch (nclc_version_id) {
 		case 3:
 			printf("I can't work with Chrony yet :-(\n");
 			output = 1;
@@ -331,25 +338,24 @@ int nclc_ntp_start()
 		return 2; /*unknown distribution*/
 	}
 
-	if(output) {
+	if (output) {
 		return 1;
-	}
-	else {
+	} else {
 		return 0;
 	}
 }
 
-int nclc_ntp_stop()
+int nclc_ntp_stop(void)
 {
 	int output = 1;
 
-	if(nclc_distribution_id == 0) {
+	if (nclc_distribution_id == 0) {
 		nclc_identity();
 	}
 
-	switch(nclc_distribution_id) {
+	switch (nclc_distribution_id) {
 	case REDHAT:
-		switch(nclc_version_id) {
+		switch (nclc_version_id) {
 		case 3:
 			printf("I can't work with Chrony yet :-(\n");
 			output = 1;
@@ -371,39 +377,38 @@ int nclc_ntp_stop()
 
 	if (output) { /*imposible using of ntp/ntpd in /etc/init.d */
 		return 1;
-	}
-	else {
+	} else {
 		return 0;
 	}
 }
 
-int nclc_ntp_restart()
+int nclc_ntp_restart(void)
 {
 	int output = 1;
 
-	if(nclc_distribution_id == 0) {
+	if (nclc_distribution_id == 0) {
 		nclc_identity();
 	}
 
 	output = nclc_ntp_stop();
-	if(output!=0) {
+	if (output != 0) {
 		return output;
 	}
 	output = nclc_ntp_start();
 	return output;
 }
 
-int nclc_ntp_status()
+int nclc_ntp_status(void)
 {
 	int output;
 
-	if(nclc_distribution_id == 0) {
+	if (nclc_distribution_id == 0) {
 		nclc_identity();
 	}
 
-	switch(nclc_distribution_id) {
+	switch (nclc_distribution_id) {
 	case REDHAT:
-		switch(nclc_version_id) {
+		switch (nclc_version_id) {
 		case 3:
 			printf("I can't work with Chrony yet :-(\n");
 			return -1;
@@ -430,15 +435,15 @@ int nclc_ntp_status()
 	}
 }
 
-int nclc_ntp_rewrite_conf(char * new_conf)
+int nclc_ntp_rewrite_conf(char* new_conf)
 {
-	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt");	/*"/etc/ntp.conf"*/
+	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt"); /*"/etc/ntp.conf"*/
 
-	if(nclc_distribution_id == 0) {
+	if (nclc_distribution_id == 0) {
 		nclc_identity();
 	}
 
-	if(f==NULL) {
+	if (f == NULL) {
 		return 1;
 	}
 
@@ -478,7 +483,8 @@ int ntp_augeas_init(augeas** a, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg)
+int ntp_augeas_add(augeas* a, char* udp_address, char* association_type,
+bool iburst, bool prefer, char** msg)
 {
 	int ret;
 	char* path;
@@ -518,7 +524,8 @@ int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool ib
 	return EXIT_SUCCESS;
 }
 
-char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg)
+char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type,
+bool iburst, bool prefer, char** msg)
 {
 	int ret, ret2, i, j;
 	char* path, *match;
@@ -545,7 +552,7 @@ char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool
 			continue;
 		}
 
-		asprintf(&path, "/files/%s/%s[%d]/*", NTP_CONF_FILE_PATH, association_type, i+1);
+		asprintf(&path, "/files/%s/%s[%d]/*", NTP_CONF_FILE_PATH, association_type, i + 1);
 		ret2 = aug_match(a, path, &item_match);
 		free(path);
 		if (ret2 > 2) {
@@ -562,11 +569,11 @@ char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool
 		}
 
 		if (ret2 == 1) {
-			if (iburst && strcmp(item_match[0]+strlen(item_match[0])-6, "iburst") == 0) {
+			if (iburst && strcmp(item_match[0] + strlen(item_match[0]) - 6, "iburst") == 0) {
 				/* Match */
 				break;
 			}
-			if (prefer && strcmp(item_match[0]+strlen(item_match[0])-6, "prefer") == 0) {
+			if (prefer && strcmp(item_match[0] + strlen(item_match[0]) - 6, "prefer") == 0) {
 				/* Match */
 				break;
 			}
@@ -577,19 +584,18 @@ char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool
 			if (!iburst || !prefer) {
 				goto next_iter;
 			}
-			if (strcmp(item_match[0]+strlen(item_match[0])-6, "iburst") == 0 && strcmp(item_match[1]+strlen(item_match[1])-6, "prefer") == 0) {
+			if (strcmp(item_match[0] + strlen(item_match[0]) - 6, "iburst") == 0 && strcmp(item_match[1] + strlen(item_match[1]) - 6, "prefer") == 0) {
 				/* Match */
 				break;
 			}
-			if (strcmp(item_match[0]+strlen(item_match[0])-6, "prefer") == 0 && strcmp(item_match[1]+strlen(item_match[1])-6, "iburst") == 0) {
+			if (strcmp(item_match[0] + strlen(item_match[0]) - 6, "prefer") == 0 && strcmp(item_match[1] + strlen(item_match[1]) - 6, "iburst") == 0) {
 				/* Match */
 				break;
 			}
 			goto next_iter;
 		}
 
-next_iter:
-		for (j = 0; j < ret2; ++j) {
+		next_iter: for (j = 0; j < ret2; ++j) {
 			free(item_match[i]);
 		}
 		free(item_match);
@@ -675,7 +681,7 @@ char** ntp_resolve_server(char* server_name, char** msg)
 {
 	struct sockaddr_in* addr4;
 	struct sockaddr_in6* addr6;
-	char buffer[INET6_ADDRSTRLEN+1];
+	char buffer[INET6_ADDRSTRLEN + 1];
 	struct addrinfo* current;
 	struct addrinfo* addinfo;
 	struct addrinfo hints;
@@ -704,18 +710,18 @@ char** ntp_resolve_server(char* server_name, char** msg)
 			ret_count = 1;
 		} else {
 			++ret_count;
-			ret = realloc(ret, ret_count*sizeof(char*));
+			ret = realloc(ret, ret_count * sizeof(char*));
 		}
 
 		switch (current->ai_addr->sa_family) {
 		case AF_INET:
 			addr4 = (struct sockaddr_in*) current->ai_addr;
-			ret[ret_count-1] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
+			ret[ret_count - 1] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
 			break;
-		
+
 		case AF_INET6:
 			addr6 = (struct sockaddr_in6*) current->ai_addr;
-			ret[ret_count-1] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
+			ret[ret_count - 1] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
 			break;
 		}
 
@@ -724,8 +730,8 @@ char** ntp_resolve_server(char* server_name, char** msg)
 
 	freeaddrinfo(addinfo);
 	++ret_count;
-	ret = realloc(ret, ret_count*sizeof(char*));
-	ret[ret_count-1] = NULL;
+	ret = realloc(ret, ret_count * sizeof(char*));
+	ret[ret_count - 1] = NULL;
 	return ret;
 }
 
@@ -736,7 +742,7 @@ char* ntp_get_timezone(char** msg)
 	int ret;
 
 	buf_len = 128;
-	buf = malloc(buf_len*sizeof(char));
+	buf = malloc(buf_len * sizeof(char));
 
 	ret = readlink(LOCALTIME_FILE_PATH, buf, buf_len);
 
@@ -753,7 +759,7 @@ char* ntp_get_timezone(char** msg)
 	}
 
 	buf[ret] = '\0';
-	tz = strdup(strrchr(buf, '/')+1);
+	tz = strdup(strrchr(buf, '/') + 1);
 	free(buf);
 	return tz;
 }

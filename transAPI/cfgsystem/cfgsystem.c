@@ -40,19 +40,19 @@ struct pub_key_alg {
 	const char* alg; /* Name of an algorithm */
 };
 static struct pub_key_alg pub_key_algs[] = {
-	{8, "ssh-dss"},
-	{8, "ssh-rsa"},
-	{14, "spki-sign-rsa"},
-	{14, "spki-sign-dss"},
-	{13, "pgp-sign-rsa"},
-	{13, "pgp-sign-dss"},
-	{5, "null"},
-	{11, "ecdsa-sha2-"},
-	{15, "x509v3-ssh-dss"},
-	{15, "x509v3-ssh-rsa"},
-	{22, "x509v3-rsa2048-sha256"},
-	{18, "x509v3-ecdsa-sha2-"},
-	{0, NULL}
+		{8, "ssh-dss"},
+        {8, "ssh-rsa"},
+        {14, "spki-sign-rsa"},
+        {14, "spki-sign-dss"},
+        {13, "pgp-sign-rsa"},
+        {13, "pgp-sign-dss"},
+        {5, "null"},
+        {11, "ecdsa-sha2-"},
+        {15, "x509v3-ssh-dss"},
+        {15, "x509v3-ssh-rsa"},
+        {22, "x509v3-rsa2048-sha256"},
+        {18, "x509v3-ecdsa-sha2-"},
+        {0, NULL}
 };
 
 /* transAPI version which must be compatible with libnetconf */
@@ -73,13 +73,13 @@ int config_modified = 0;
 const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
-Feel free to use it to distinguish module behavior for different error-option values.
+ * Feel free to use it to distinguish module behavior for different error-option values.
  * Possible values:
  * NC_EDIT_ERROPT_STOP - Following callback after failure are not executed, all successful callbacks executed till
-                         failure point must be applied to the device.
+ *                       failure point must be applied to the device.
  * NC_EDIT_ERROPT_CONT - Failed callbacks are skipped, but all callbacks needed to apply configuration changes are executed
  * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
-                         executed again with previous configuration data to roll it back.
+ *                       executed again with previous configuration data to roll it back.
  */
 NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
@@ -89,12 +89,13 @@ int dns_nmsrv_mod_reorder;
 /* Similar to the above, for search domains */
 int dns_search_reorder;
 
-void user_ctx_cleanup(struct user_ctx** ctx) {
+void user_ctx_cleanup(struct user_ctx** ctx)
+{
 	int i;
 
 	if (ctx != NULL && *ctx != NULL) {
 		for (i = 0; i < (*ctx)->count; ++i) {
-			if ((*ctx)->first+i != NULL) {
+			if ((*ctx)->first + i != NULL) {
 				if ((*ctx)->first[i].name != NULL) {
 					free((*ctx)->first[i].name);
 				}
@@ -111,7 +112,9 @@ void user_ctx_cleanup(struct user_ctx** ctx) {
 		*ctx = NULL;
 	}
 }
-int fail(struct nc_err** error, char* msg, int ret) {
+
+int fail(struct nc_err** error, char* msg, int ret)
+{
 	if (error != NULL) {
 		*error = nc_err_new(NC_ERR_OP_FAILED);
 		if (msg != NULL) {
@@ -127,7 +130,8 @@ int fail(struct nc_err** error, char* msg, int ret) {
 	return ret;
 }
 
-int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret) {
+int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret)
+{
 	if (a != NULL) {
 		aug_close(a);
 	}
@@ -147,22 +151,22 @@ int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret) {
 	return ret;
 }
 
-const char* get_node_content(const xmlNodePtr node) {
+const char* get_node_content(const xmlNodePtr node)
+{
 	if (node == NULL || node->children == NULL || node->children->type != XML_TEXT_NODE) {
 		return NULL;
 	}
 
-	return (const char*)(node->children->content);
+	return (const char*) (node->children->content);
 }
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
  *
  * @param[out] running	Current configuration of managed device.
-
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int transapi_init(xmlDocPtr * running)
+int transapi_init(xmlDocPtr* running)
 {
 	xmlNodePtr running_root, container_cur, cur;
 	char* msg = NULL, *tmp;
@@ -251,10 +255,10 @@ int transapi_init(xmlDocPtr * running)
 		xmlNewChild(cur, NULL, BAD_CAST "association-type", BAD_CAST "peer");
 
 		/* iburst */
-		xmlNewChild(cur, NULL, BAD_CAST "iburst", BAD_CAST (iburst ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "iburst", iburst ? BAD_CAST "true" : BAD_CAST "false");
 
 		/* prefer */
-		xmlNewChild(cur, NULL, BAD_CAST "prefer", BAD_CAST (prefer ? "true" : "false"));
+		xmlNewChild(cur, NULL, BAD_CAST "prefer", prefer ? BAD_CAST "true" : BAD_CAST "false");
 
 		/* udp address */
 		cur = xmlNewChild(cur, NULL, BAD_CAST "udp", NULL);
@@ -435,7 +439,8 @@ void transapi_close(void)
  * @param[out] err  Double poiter to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
+xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
+        struct nc_err **err)
 {
 	xmlNodePtr container_cur, state_root;
 	xmlDocPtr state_doc;
@@ -470,13 +475,16 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
  * Mapping prefixes with namespaces.
  * Do NOT modify this structure!
  */
-struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"}, {NULL, NULL}};
+struct ns_pair namespace_mapping[] = {
+		{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"},
+		{NULL, NULL}
+};
 
 /*
-* CONFIGURATION callbacks
-* Here follows set of callback functions run every time some change in associated part of running datastore occurs.
-* You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
-*/
+ * CONFIGURATION callbacks
+ * Here follows set of callback functions run every time some change in associated part of running datastore occurs.
+ * You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
+ */
 /**
  * @brief This callback will be run when node in path /systemns:system/systemns:hostname changes
  *
@@ -488,7 +496,7 @@ struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	const char* hostname;
 	char* msg;
@@ -521,7 +529,7 @@ int callback_systemns_system_systemns_hostname (void ** data, XMLDIFF_OP op, xml
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	char* msg;
@@ -556,7 +564,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_time
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	char* msg;
@@ -591,7 +599,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemn
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp_systemns_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	bool ignore = false;
@@ -639,7 +647,7 @@ int callback_systemns_system_systemns_ntp_systemns_enabled (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp_systemns_server (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur, child;
 	int i;
@@ -817,7 +825,7 @@ error:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	bool enabled = false;
@@ -858,7 +866,7 @@ int callback_systemns_system_systemns_ntp (void ** data, XMLDIFF_OP op, xmlNodeP
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	int index, count, total_len;
@@ -971,7 +979,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search (void ** data
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	int index;
@@ -1033,7 +1041,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_server (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	augeas* a;
@@ -1089,7 +1097,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server (void ** data
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
 	augeas* a;
@@ -1148,7 +1156,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_tim
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
 	augeas* a;
@@ -1207,7 +1215,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_att
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	/* Reset MOD and REORDER flags in order to process these changes in the next configuration change */
 	dns_nmsrv_mod_reorder = 0;
@@ -1227,7 +1235,7 @@ int callback_systemns_system_systemns_dns_resolver (void ** data, XMLDIFF_OP op,
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	const char* pass = NULL, *name;
@@ -1326,7 +1334,7 @@ int callback_systemns_system_systemns_authentication_systemns_user (void ** data
 		}
 
 		for (i = 0; i < ctx->count; ++i) {
-			if (users_process_ssh_key(home_dir, ctx->first+i, &msg) != EXIT_SUCCESS) {
+			if (users_process_ssh_key(home_dir, ctx->first + i, &msg) != EXIT_SUCCESS) {
 				break;
 			}
 		}
@@ -1365,7 +1373,7 @@ int callback_systemns_system_systemns_authentication_systemns_user (void ** data
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	struct ssh_key* key;
@@ -1386,7 +1394,7 @@ int callback_systemns_system_systemns_authentication_systemns_user_systemns_auth
 		user->count += 1;
 		user->first = realloc(user->first, user->count * sizeof(struct ssh_key));
 	}
-	key = user->first+(user->count-1);
+	key = user->first + (user->count - 1);
 	memset(key, 0, sizeof(struct ssh_key));
 
 	cur = node->children;
@@ -1463,7 +1471,7 @@ int callback_systemns_system_systemns_authentication_systemns_user_systemns_auth
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	char* msg;
@@ -1501,41 +1509,56 @@ int callback_systemns_system_systemns_authentication (void ** data, XMLDIFF_OP o
 }
 
 /*
-* Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
-* It is used by libnetconf library to decide which callbacks will be run.
-* DO NOT alter this structure
-*/
-struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 15,
-	.data = NULL,
-	.callbacks = {
-		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-name/systemns:timezone-name", .func = callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset},
-		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled},
-		{.path = "/systemns:system/systemns:ntp/systemns:server", .func = callback_systemns_system_systemns_ntp_systemns_server},
-		{.path = "/systemns:system/systemns:ntp", .func = callback_systemns_system_systemns_ntp},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:search", .func = callback_systemns_system_systemns_dns_resolver_systemns_search},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:udp-and-tcp/systemns:address", .func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:server", .func = callback_systemns_system_systemns_dns_resolver_systemns_server},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
-		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
-		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
-		{.path = "/systemns:system/systemns:authentication/systemns:user", .func = callback_systemns_system_systemns_authentication_systemns_user},
-		{.path = "/systemns:system/systemns:authentication", .func = callback_systemns_system_systemns_authentication}
-	}
+ * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
+ * It is used by libnetconf library to decide which callbacks will be run.
+ * DO NOT alter this structure
+ */
+struct transapi_data_callbacks clbks = {
+		.callbacks_count = 15,
+        .data = NULL,
+        .callbacks = {
+        		{ .path = "/systemns:system/systemns:hostname",
+        				.func = callback_systemns_system_systemns_hostname },
+                { .path = "/systemns:system/systemns:clock/systemns:timezone-name/systemns:timezone-name",
+                        .func = callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name },
+                { .path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset",
+                        .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset },
+                { .path = "/systemns:system/systemns:ntp/systemns:enabled",
+                        .func = callback_systemns_system_systemns_ntp_systemns_enabled },
+                { .path = "/systemns:system/systemns:ntp/systemns:server",
+                        .func = callback_systemns_system_systemns_ntp_systemns_server },
+                { .path = "/systemns:system/systemns:ntp",
+                        .func = callback_systemns_system_systemns_ntp },
+                { .path = "/systemns:system/systemns:dns-resolver/systemns:search",
+                        .func = callback_systemns_system_systemns_dns_resolver_systemns_search },
+                { .path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:udp-and-tcp/systemns:address",
+                        .func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address },
+                { .path = "/systemns:system/systemns:dns-resolver/systemns:server",
+                        .func = callback_systemns_system_systemns_dns_resolver_systemns_server },
+                { .path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout",
+                        .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout },
+                { .path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts",
+                        .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts },
+                { .path = "/systemns:system/systemns:dns-resolver",
+                        .func = callback_systemns_system_systemns_dns_resolver },
+                { .path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key",
+                        .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key },
+                { .path = "/systemns:system/systemns:authentication/systemns:user",
+                        .func = callback_systemns_system_systemns_authentication_systemns_user },
+                { .path = "/systemns:system/systemns:authentication",
+                        .func = callback_systemns_system_systemns_authentication }
+		}
 };
 
 /*
-* RPC callbacks
-* Here follows set of callback functions run every time RPC specific for this device arrives.
-* You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
-* Every function takes array of inputs as an argument. On few first lines they are assigned to named variables. Avoid accessing the array directly.
-* If input was not set in RPC message argument in set to NULL.
-*/
+ * RPC callbacks
+ * Here follows set of callback functions run every time RPC specific for this device arrives.
+ * You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
+ * Every function takes array of inputs as an argument. On few first lines they are assigned to named variables. Avoid accessing the array directly.
+ * If input was not set in RPC message argument in set to NULL.
+ */
 
-nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
+nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 {
 	struct nc_err* err;
 	xmlNodePtr current_datetime = input[0];
@@ -1562,24 +1585,24 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 
 	/* current_datetime format
 
-      1985-04-12T23:20:50.52Z
+	 1985-04-12T23:20:50.52Z
 
-   This represents 20 minutes and 50.52 seconds after the 23rd hour of
-   April 12th, 1985 in UTC.
+	 This represents 20 minutes and 50.52 seconds after the 23rd hour of
+	 April 12th, 1985 in UTC.
 
-      1996-12-19T16:39:57-08:00
+	 1996-12-19T16:39:57-08:00
 
-   This represents 39 minutes and 57 seconds after the 16th hour of
-   December 19th, 1996 with an offset of -08:00 from UTC (Pacific
-   Standard Time).  Note that this is equivalent to 1996-12-20T00:39:57Z
-   in UTC.
+	 This represents 39 minutes and 57 seconds after the 16th hour of
+	 December 19th, 1996 with an offset of -08:00 from UTC (Pacific
+	 Standard Time).  Note that this is equivalent to 1996-12-20T00:39:57Z
+	 in UTC.
 
-      1990-12-31T23:59:60Z
+	 1990-12-31T23:59:60Z
 
-   This represents the leap second inserted at the end of 1990.
+	 This represents the leap second inserted at the end of 1990.
 
-      1990-12-31T15:59:60-08:00
-	*/
+	 1990-12-31T15:59:60-08:00
+	 */
 
 	/* Date */
 	date = strdup(get_node_content(current_datetime));
@@ -1599,7 +1622,7 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 	free(date);
 
 	/* Time */
-	time = strdup(strchr(get_node_content(current_datetime), 'T')+1);
+	time = strdup(strchr(get_node_content(current_datetime), 'T') + 1);
 	if (strlen(time) < 8) {
 		asprintf(&msg, "Invalid date-and-time format (%s).", get_node_content(current_datetime));
 		goto error;
@@ -1616,20 +1639,20 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 	free(time);
 
 	/* Timezone */
-	timezone = strdup(strchr(get_node_content(current_datetime), 'T')+9);
+	timezone = strdup(strchr(get_node_content(current_datetime), 'T') + 9);
 	if (strcmp(timezone, "Z") == 0) {
 		offset = 0;
 	} else if (((timezone[0] != '+') && (timezone[0] != '-')) || (strlen(timezone) != 6)) {
 		asprintf(&msg, "Invalid timezone format (%s).", timezone);
 		goto error;
 	} else {
-		offset = strtol(timezone+1, &ptr, 10);
+		offset = strtol(timezone + 1, &ptr, 10);
 		if (*ptr != ':') {
 			asprintf(&msg, "Invalid timezone format (%s).", timezone);
 			goto error;
 		}
 		offset *= 60;
-		offset += strtol(timezone+4, &ptr, 10);
+		offset += strtol(timezone + 4, &ptr, 10);
 		if (*ptr != '\0') {
 			asprintf(&msg, "Invalid timezone format (%s).", timezone);
 			goto error;
@@ -1666,7 +1689,7 @@ error:
 	free(msg);
 	return nc_reply_error(err);
 }
-nc_reply * rpc_system_restart (xmlNodePtr input[])
+nc_reply* rpc_system_restart(xmlNodePtr input[])
 {
 	char* msg;
 	struct nc_err* err;
@@ -1681,7 +1704,7 @@ nc_reply * rpc_system_restart (xmlNodePtr input[])
 
 	return nc_reply_ok();
 }
-nc_reply * rpc_system_shutdown (xmlNodePtr input[])
+nc_reply* rpc_system_shutdown(xmlNodePtr input[])
 {
 	char* msg;
 	struct nc_err* err;
@@ -1697,16 +1720,16 @@ nc_reply * rpc_system_shutdown (xmlNodePtr input[])
 	return nc_reply_ok();
 }
 /*
-* Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
-* It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
-* DO NOT alter this structure
-*/
+ * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
+ * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
+ * DO NOT alter this structure
+ */
 struct transapi_rpc_callbacks rpc_clbks = {
-	.callbacks_count = 3,
-	.callbacks = {
-		{.name="set-current-datetime", .func=rpc_set_current_datetime, .arg_count=1, .arg_order={"current-datetime"}},
-		{.name="system-restart", .func=rpc_system_restart, .arg_count=0, .arg_order={}},
-		{.name="system-shutdown", .func=rpc_system_shutdown, .arg_count=0, .arg_order={}}
-	}
+		.callbacks_count = 3,
+        .callbacks = {
+        		{.name = "set-current-datetime", .func = rpc_set_current_datetime, .arg_count = 1, .arg_order = {"current-datetime"}},
+                {.name = "system-restart", .func = rpc_system_restart, .arg_count = 0, .arg_order = {}},
+                {.name = "system-shutdown", .func = rpc_system_shutdown, .arg_count = 0, .arg_order = {}}
+		}
 };
 

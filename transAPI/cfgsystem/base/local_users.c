@@ -1,8 +1,47 @@
+/**
+ * \file local_users.c
+ * \brief Functions for manipulation with local users
+ * \author Michal Vasko <mvasko@cesnet.cz>
+ * \date 2013
+ *
+ * Copyright (C) 2013 CESNET
+ *
+ * LICENSE TERMS
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is'', and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
+ *
+ */
+
 #define _GNU_SOURCE
 #define _OW_SOURCE
-//#define _POSIX_SOURCE
-
-#include "local_users.h"
 
 #include <sys/types.h>
 #include <pwd.h>
@@ -15,6 +54,8 @@
 #include <dirent.h>
 #include <augeas.h>
 
+#include "local_users.h"
+
 #define USERADD_PATH "/usr/sbin/useradd"
 #define USERMOD_PATH "/usr/sbin/usermod"
 #define USERDEL_PATH "/usr/sbin/userdel"
@@ -24,17 +65,23 @@
 
 #define PAM_DIR_PATH "/etc/pam.d"
 
-static struct _supported_auth supported_auth[] = {
-	{"local-users", "pam_unix.so"},
-	{NULL, NULL}
+struct _supported_auth {
+	char* name;
+	char* module;
 };
 
-const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg) {
+static struct _supported_auth supported_auth[] = {
+    {"local-users", "pam_unix.so"},
+    {NULL, NULL}
+};
+
+const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg)
+{
 	xmlNodePtr cur;
 	char* pass, *salt;
 	const char* password;
 	struct crypt_data data;
-	
+
 	cur = parent->children;
 	while (cur != NULL) {
 		if (xmlStrcmp(cur->name, BAD_CAST "password") == 0) {
@@ -47,12 +94,15 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 		/* No password specified (empty) */
 		password = NULL;
 	} else {
-		password = (const char*)(cur->children->content);
+		password = (const char*) (cur->children->content);
 	}
 
 	/* Check format and hash the password if needed */
 	if (password != NULL) {
-		if (password[0] != '$' || (password[1] != '0' && password[1] != '1' && password[1] != '5' && password[1] != '6') || password[2] != '$' || strrchr(password, '$')-password < 5) {
+		if ((password[0] != '$') ||
+				(password[1] != '0' && password[1] != '1' && password[1] != '5' && password[1] != '6') ||
+				(password[2] != '$') ||
+				(strrchr(password, '$') - password < 5)) {
 			asprintf(msg, "Wrong password format (%s).", password);
 			return NULL;
 		}
@@ -61,14 +111,14 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 			salt = crypt_gensalt_ra("$6$", 1, NULL, 0);
 
 			data.initialized = 0;
-			pass = crypt_r(password+3, salt, &data);
+			pass = crypt_r(password + 3, salt, &data);
 
 			cur = xmlNewChild(parent, NULL, BAD_CAST "password", BAD_CAST pass);
 			*config_modified = 1;
 			free(pass);
 			free(salt);
 
-			password = (const char*)(cur->children->content);
+			password = (const char*) (cur->children->content);
 			return password;
 		}
 	}
@@ -76,7 +126,8 @@ const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** m
 	return (NULL);
 }
 
-int users_add_user(const char* name, const char* passwd, char** msg) {
+int users_add_user(const char* name, const char* passwd, char** msg)
+{
 	int ret;
 	char* tmp;
 
@@ -85,32 +136,33 @@ int users_add_user(const char* name, const char* passwd, char** msg) {
 	free(tmp);
 
 	switch (ret) {
-		case 0:
-			break;
-		case 1:
-			asprintf(msg, "Could not update the password file.");
-			return EXIT_FAILURE;
-		case 2:
-			asprintf(msg, "Invalid \"useradd\" syntax.");
-			return EXIT_FAILURE;
-		case 3:
-			asprintf(msg, "Invalid \"useradd\" argument to an option.");
-			return EXIT_FAILURE;
-		case 9:
-			asprintf(msg, "Username \"%s\" already used.", name);
-			return EXIT_FAILURE;
-		case 10:
-			asprintf(msg, "Could not update the group file.");
-			return EXIT_FAILURE;
-		default:
-			asprintf(msg, "\"useradd\" failed.");
-			return EXIT_FAILURE;
+	case 0:
+		break;
+	case 1:
+		asprintf(msg, "Could not update the password file.");
+		return EXIT_FAILURE;
+	case 2:
+		asprintf(msg, "Invalid \"useradd\" syntax.");
+		return EXIT_FAILURE;
+	case 3:
+		asprintf(msg, "Invalid \"useradd\" argument to an option.");
+		return EXIT_FAILURE;
+	case 9:
+		asprintf(msg, "Username \"%s\" already used.", name);
+		return EXIT_FAILURE;
+	case 10:
+		asprintf(msg, "Could not update the group file.");
+		return EXIT_FAILURE;
+	default:
+		asprintf(msg, "\"useradd\" failed.");
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-int users_mod_user(const char* name, const char* passwd, char** msg) {
+int users_mod_user(const char* name, const char* passwd, char** msg)
+{
 	int ret;
 	char* tmp;
 
@@ -119,29 +171,30 @@ int users_mod_user(const char* name, const char* passwd, char** msg) {
 	free(tmp);
 
 	switch (ret) {
-		case 0:
-			break;
-		case 1:
-			asprintf(msg, "Could not update the password file.");
-			return EXIT_FAILURE;
-		case 2:
-			asprintf(msg, "Invalid \"usermod\" syntax.");
-			return EXIT_FAILURE;
-		case 3:
-			asprintf(msg, "Invalid \"usermod\" argument to an option.");
-			return EXIT_FAILURE;
-		case 6:
-			asprintf(msg, "Username \"%s\" does not exist.", name);
-			return EXIT_FAILURE;
-		default:
-			asprintf(msg, "\"usermod\" failed.");
-			return EXIT_FAILURE;
+	case 0:
+		break;
+	case 1:
+		asprintf(msg, "Could not update the password file.");
+		return EXIT_FAILURE;
+	case 2:
+		asprintf(msg, "Invalid \"usermod\" syntax.");
+		return EXIT_FAILURE;
+	case 3:
+		asprintf(msg, "Invalid \"usermod\" argument to an option.");
+		return EXIT_FAILURE;
+	case 6:
+		asprintf(msg, "Username \"%s\" does not exist.", name);
+		return EXIT_FAILURE;
+	default:
+		asprintf(msg, "\"usermod\" failed.");
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-int users_rem_user(const char* name, char** msg) {
+int users_rem_user(const char* name, char** msg)
+{
 	int ret;
 	char* tmp;
 
@@ -150,28 +203,30 @@ int users_rem_user(const char* name, char** msg) {
 	free(tmp);
 
 	switch (ret) {
-		case 0:
-			break;
-		case 1:
-			asprintf(msg, "Could not update the password file.");
-			return EXIT_FAILURE;
-		case 2:
-			asprintf(msg, "Invalid \"userdel\" syntax.");
-			return EXIT_FAILURE;
-		case 6:
-			asprintf(msg, "Username \"%s\" does not exist.", name);
-			return EXIT_FAILURE;
-		case 8:
-			asprintf(msg, "User is currently logged.");
-		default:
-			asprintf(msg, "\"userdel\" failed.");
-			return EXIT_FAILURE;
+	case 0:
+		break;
+	case 1:
+		asprintf(msg, "Could not update the password file.");
+		return EXIT_FAILURE;
+	case 2:
+		asprintf(msg, "Invalid \"userdel\" syntax.");
+		return EXIT_FAILURE;
+	case 6:
+		asprintf(msg, "Username \"%s\" does not exist.", name);
+		return EXIT_FAILURE;
+	case 8:
+		asprintf(msg, "User is currently logged.");
+		break;
+	default:
+		asprintf(msg, "\"userdel\" failed.");
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-char* users_get_home_dir(const char* user_name, char** msg) {
+char* users_get_home_dir(const char* user_name, char** msg)
+{
 	size_t buf_len;
 	char* buf, *home_dir;
 	struct passwd pwd, *result;
@@ -196,7 +251,8 @@ char* users_get_home_dir(const char* user_name, char** msg) {
 	return home_dir;
 }
 
-int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg) {
+int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
+{
 	char* key_file_path;
 	FILE* key_file;
 	int ret;
@@ -208,8 +264,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 	asprintf(&key_file_path, "%s%s%s%s", home_dir, SSH_USER_CONFIG_PATH, key->name, ".pub");
 
 	switch (key->change) {
-	/* ADD */
-	case 0:
+	case 0: /* ADD */
 		ret = access(key_file_path, F_OK);
 		if (ret == 0) {
 			asprintf(msg, "SSH key \"%s\" cannot be added, already exists.", key_file_path);
@@ -232,8 +287,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 		fclose(key_file);
 
 		break;
-	/* MOD */
-	case 1:
+	case 1: /* MOD */
 		ret = eaccess(key_file_path, W_OK);
 		if (ret != 0) {
 			asprintf(msg, "SSH key \"%s\" cannot be modified: %s", key_file_path, strerror(errno));
@@ -252,8 +306,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 		fclose(key_file);
 
 		break;
-	/* REM */
-	case 2:
+	case 2: /* REM */
 		ret = remove(key_file_path);
 		if (ret != 0) {
 			asprintf(msg, "Could not remove \"%s\": %s", key_file_path, strerror(errno));
@@ -271,7 +324,8 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) {
+int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg)
+{
 	char* path, *tmp, c;
 	DIR* dir;
 	FILE* file;
@@ -299,12 +353,12 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) 
 
 	key_count = 0;
 	while ((ent = readdir(dir)) != NULL) {
-		if (strlen(ent->d_name) >= 5 && strcmp(ent->d_name+strlen(ent->d_name)-4, ".pub") == 0) {
+		if (strlen(ent->d_name) >= 5 && strcmp(ent->d_name + strlen(ent->d_name) - 4, ".pub") == 0) {
 			/* Public ssh key */
 			if (key_count == 0) {
 				*key = malloc(sizeof(struct ssh_key*));
 			} else {
-				*key = realloc(*key, (key_count+1)*sizeof(struct ssh_key*));
+				*key = realloc(*key, (key_count + 1) * sizeof(struct ssh_key*));
 			}
 			(*key)[key_count] = malloc(sizeof(struct ssh_key));
 			cur_key = (*key)[key_count];
@@ -335,7 +389,7 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) 
 			used = 0;
 			cur_key->data = malloc(alloc * sizeof(char));
 			while ((c = fgetc(file)) != EOF && c != ' ') {
-				if (used+1 == alloc) {
+				if (used + 1 == alloc) {
 					alloc += 100;
 					cur_key->data = realloc(cur_key->data, alloc * sizeof(char));
 				}
@@ -351,7 +405,7 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) 
 	}
 
 	if (key_count != 0) {
-		*key = realloc(*key, (key_count+1)*sizeof(struct ssh_key*));
+		*key = realloc(*key, (key_count + 1) * sizeof(struct ssh_key*));
 		(*key)[key_count] = NULL;
 	}
 
@@ -360,7 +414,8 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg) 
 	return EXIT_SUCCESS;
 }
 
-int users_augeas_init(augeas** a, char** msg) {
+int users_augeas_init(augeas** a, char** msg)
+{
 	char* path;
 	int ret;
 
@@ -391,7 +446,8 @@ int users_augeas_init(augeas** a, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_order_len, char** msg) {
+int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_order_len, char** msg)
+{
 	char* path;
 	const char* value;
 	int ret, i, j;
@@ -476,7 +532,7 @@ int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_or
 			j = 0;
 			while (supported_auth[j].name != NULL) {
 				if (strcmp(value, supported_auth[j].module) == 0) {
-					*auth_order = realloc(*auth_order, (*auth_order_len+1)*sizeof(char*));
+					*auth_order = realloc(*auth_order, (*auth_order_len + 1) * sizeof(char*));
 					(*auth_order)[*auth_order_len] = strdup(supported_auth[j].name);
 					*auth_order_len += 1;
 					break;
@@ -508,7 +564,8 @@ error:
 	return EXIT_FAILURE;
 }
 
-int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg) {
+int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg)
+{
 	char* path, tmp[4];
 	const char* value;
 	int ret, i, j;
@@ -622,11 +679,11 @@ int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg) {
 	}
 
 	/* We deleted i-1 entries, now we have to adjust the indices of all the other entries */
-	if (i-1 != 0) {
+	if (i - 1 != 0) {
 		j = i;
 		while (1) {
 			asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, j);
-			sprintf(tmp, "%d", j-i+1);
+			sprintf(tmp, "%d", j - i + 1);
 			ret = aug_rename(a, path, tmp);
 			free(path);
 			if (ret == -1) {
@@ -640,7 +697,8 @@ int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int users_augeas_add_first_sshd_auth_order(augeas* a, const char* auth_type, char** msg) {
+int users_augeas_add_first_sshd_auth_order(augeas* a, const char* auth_type, char** msg)
+{
 	char* path = NULL, tmp[4];
 	int ret, i, auth_index;
 
@@ -676,7 +734,7 @@ int users_augeas_add_first_sshd_auth_order(augeas* a, const char* auth_type, cha
 	/* Move all the entries one indice forward to make room for the new one */
 	while (i > 0) {
 		asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, i);
-		sprintf(tmp, "%d", i+1);
+		sprintf(tmp, "%d", i + 1);
 		ret = aug_rename(a, path, tmp);
 		if (ret == -1) {
 			asprintf(msg, "Augeas rename of \"%s\" failed: %s", path, aug_error_message(a));

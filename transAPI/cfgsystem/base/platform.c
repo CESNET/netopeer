@@ -1,11 +1,10 @@
-/*!
+/**
  * \file platform.c
  * \brief Functions for getting onformation about platform
- * \author Miroslav Brabenec <brabemi3@fit.cvut.cz>
+ * \author Michal Vasko <mvasko@cesnet.cz>
  * \author Tomas Cejka <cejkat@cesnet.cz>
  * \date 2013
- */
-/*
+ *
  * Copyright (C) 2013 CESNET
  *
  * LICENSE TERMS
@@ -71,131 +70,162 @@ int nclc_version_id;
 static struct utsname kernel;
 static char kernel_set = 0;
 
-static void fill_kernel()
+static void fill_kernel(void)
 {
-	if(uname(&kernel)) kernel_set = 1;
+	if (uname(&kernel)) {
+		kernel_set = 1;
+	}
 }
 
-void nclc_identity()
+void nclc_identity(void)
 {
 	int file_ok;
 
-	if(kernel_set==0) {
+	if (kernel_set == 0) {
 		fill_kernel();
 	}
 
-	nclc_version_id = kernel.release[0]-'0';
+	nclc_version_id = kernel.release[0] - '0';
 
-	file_ok = access(REDHAT_RELEASE_PATH, F_OK);	/*"/etc/redhat-release"*/
-	if(file_ok==0) {
+	file_ok = access(REDHAT_RELEASE_PATH, F_OK); /*"/etc/redhat-release"*/
+	if (file_ok == 0) {
 		nclc_distribution_id = REDHAT;
 		return;
 	}
 
-	file_ok = access(SUSE_RELEASE_PATH, F_OK);	/*"/etc/SuSE-release"*/
-	if(file_ok==0) {
+	file_ok = access(SUSE_RELEASE_PATH, F_OK); /*"/etc/SuSE-release"*/
+	if (file_ok == 0) {
 		nclc_distribution_id = SUSE;
 		return;
 	}
 
-	file_ok = access(DEBIAN_RELEASE_PATH, F_OK);	/*"/etc/debian_version"*/
-	if(file_ok==0) {
+	file_ok = access(DEBIAN_RELEASE_PATH, F_OK); /*"/etc/debian_version"*/
+	if (file_ok == 0) {
 		nclc_distribution_id = DEBIAN;
 		return;
 	}
 	nclc_distribution_id = UNKNOWN;
 }
 
-static char * uname_part(char id)
+static char* uname_part(char id)
 {
-	char * output = NULL;
-	if(kernel_set==0) {
+	char* output = NULL;
+	if (kernel_set == 0) {
 		fill_kernel();
 	}
-	switch(id) {
-	case 'm': output = (char *) malloc(strlen(kernel.machine) + 1);
-		if(output == NULL) break;
+	switch (id) {
+	case 'm':
+		output = (char *) malloc(strlen(kernel.machine) + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, kernel.machine);
 		break;
-	case 'n': output = (char *) malloc(strlen(kernel.nodename) + 1);
-		if(output == NULL) break;
+	case 'n':
+		output = (char *) malloc(strlen(kernel.nodename) + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, kernel.nodename);
 		break;
-	case 'r': output = (char *) malloc(strlen(kernel.release) + 1);
-		if(output == NULL) break;
+	case 'r':
+		output = (char *) malloc(strlen(kernel.release) + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, kernel.release);
 		break;
-	case 's': output = (char *) malloc(strlen(kernel.sysname) + 1);
-		if(output == NULL) break;
+	case 's':
+		output = (char *) malloc(strlen(kernel.sysname) + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, kernel.sysname);
 		break;
-	case 'v': output = (char *) malloc(strlen(kernel.version) + 1);
-		if(output == NULL) break;
+	case 'v':
+		output = (char *) malloc(strlen(kernel.version) + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, kernel.version);
 		break;
 	}
 	return output;
 }
 
-char * nclc_get_nodename()
+char* nclc_get_nodename(void)
 {
 	return uname_part('n');
 }
 
-char * nclc_get_os_release()
+char* nclc_get_os_release(void)
 {
 	return uname_part('r');
 }
 
-char * nclc_get_os_version()
+char* nclc_get_os_version(void)
 {
 	return uname_part('v');
 }
 
 /* co všechno nechám vracet nclc_get_os_machine */
-char * nclc_get_os_machine()
+char* nclc_get_os_machine(void)
 {
 	return uname_part('m');
 }
 
-char * nclc_get_sysname()
+char* nclc_get_sysname(void)
 {
 	return uname_part('s');
 }
 
-char * nclc_get_os_distribution()
+char* nclc_get_os_distribution(void)
 {
-	char * output = NULL;
-	if(nclc_distribution_id==UNKNOWN) nclc_identity();
+	char* output = NULL;
+	if (nclc_distribution_id == UNKNOWN) {
+		nclc_identity();
+	}
 
-	switch(nclc_distribution_id) {
-	case REDHAT: output = (char *) malloc(strlen("REDHAT") + 1);
-		if(output == NULL) break;
+	switch (nclc_distribution_id) {
+	case REDHAT:
+		output = (char *) malloc(strlen("REDHAT") + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, "REDHAT");
 		break;
-	case SUSE: output = (char *) malloc(strlen("SUSE") + 1);
-		if(output == NULL) break;
+	case SUSE:
+		output = (char *) malloc(strlen("SUSE") + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, "SUSE");
 		break;
-	case DEBIAN: output = (char *) malloc(strlen("DEBIAN") + 1);
-		if(output == NULL) break;
+	case DEBIAN:
+		output = (char *) malloc(strlen("DEBIAN") + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, "DEBIAN");
 		break;
-	default: output = (char *) malloc(strlen("UNKNOWN") + 1);
-		if(output == NULL) break;
+	default:
+		output = (char *) malloc(strlen("UNKNOWN") + 1);
+		if (output == NULL) {
+			break;
+		}
 		output = strcpy(output, "UNKNOWN");
 		break;
 	}
 	return output;
 }
 
-char * nclc_get_hostname()
+char* nclc_get_hostname(void)
 {
 	FILE* hostname;
 	char* line = NULL, *ret = NULL;
 	size_t len = 0;
 
-	switch(nclc_distribution_id) {
+	switch (nclc_distribution_id) {
 	case REDHAT:
 		hostname = fopen(REDHAT_HOSTNAME_PATH, "r");
 		if (hostname == NULL) {
@@ -204,13 +234,13 @@ char * nclc_get_hostname()
 
 		while (getline(&line, &len, hostname) != -1) {
 			if (strncmp(line, "HOSTNAME", 8) == 0) {
-				ret = strdup(line+9);
+				ret = strdup(line + 9);
 				break;
 			}
 		}
 		free(line);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
+		if (ret[strlen(ret) - 1] == '\n') {
+			ret[strlen(ret) - 1] = '\0';
 		}
 
 		fclose(hostname);
@@ -222,8 +252,8 @@ char * nclc_get_hostname()
 		}
 
 		getline(&ret, &len, hostname);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
+		if (ret[strlen(ret) - 1] == '\n') {
+			ret[strlen(ret) - 1] = '\0';
 		}
 
 		fclose(hostname);
@@ -235,8 +265,8 @@ char * nclc_get_hostname()
 		}
 
 		getline(&ret, &len, hostname);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
+		if (ret[strlen(ret) - 1] == '\n') {
+			ret[strlen(ret) - 1] = '\0';
 		}
 
 		fclose(hostname);
@@ -321,7 +351,7 @@ int nclc_set_hostname(const char* hostname)
 	aug_close(a);
 
 	/* Change hostname in a config file */
-	switch(nclc_distribution_id) {
+	switch (nclc_distribution_id) {
 	case REDHAT:
 		if (access(REDHAT_HOSTNAME_PATH, F_OK) != 0) {
 			return EXIT_FAILURE;
@@ -335,8 +365,8 @@ int nclc_set_hostname(const char* hostname)
 		/* Parse the whole file, remember config before HOSTNAME and after it */
 		while (getline(&line, &line_len, host) != -1) {
 			if (!host_found) {
-				network_config1 = realloc(network_config1, (net_len1+line_len+1)*sizeof(char));
-				strcpy(network_config1+net_len1, line);
+				network_config1 = realloc(network_config1, (net_len1 + line_len + 1) * sizeof(char));
+				strcpy(network_config1 + net_len1, line);
 				net_len1 += line_len;
 			}
 
@@ -346,8 +376,8 @@ int nclc_set_hostname(const char* hostname)
 			}
 
 			if (host_found) {
-				network_config2 = realloc(network_config2, (net_len2+line_len+1)*sizeof(char));
-				strcpy(network_config2+net_len2, line);
+				network_config2 = realloc(network_config2, (net_len2 + line_len + 1) * sizeof(char));
+				strcpy(network_config2 + net_len2, line);
 				net_len2 += line_len;
 			}
 		}
