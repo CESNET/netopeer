@@ -96,7 +96,7 @@ int run_shutdown(bool shutdown, char** msg)
 		sleep(1);
 		execl(SHUTDOWN_PATH, SHUTDOWN_PATH, (shutdown ? "-P" : "-r"), "now", (char*) NULL);
 
-		nc_verb_error("Exec failed: %s", strerror(errno));
+		nc_verb_error("Executing %s failed: %s", SHUTDOWN_PATH, strerror(errno));
 		exit(1);
 
 	} else if (ret == -1) {
