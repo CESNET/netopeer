@@ -96,7 +96,7 @@ int run_shutdown(bool shutdown, char** msg)
 		execl(SHUTDOWN_PATH, SHUTDOWN_PATH, (shutdown ? "-P" : "-r"), "now", (char*) NULL);
 
 		asprintf(msg, "Exec failed: %s", strerror(errno));
-		return EXIT_FAILURE;
+		exit(1);
 
 	} else if (ret == -1) {
 		/* Parent fail */
