@@ -24,6 +24,10 @@
 #include "base/shutdown.h"
 #include "base/local_users.h"
 
+#ifndef PUBLIC
+#	define PUBLIC
+#endif
+
 #define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 #define NTP_SERVER_IBURST_DEFAULT false
 #define NTP_SERVER_PREFER_DEFAULT false
@@ -33,6 +37,40 @@
 #define DNS_SEARCH_DOMAINLIST_LEN_MAX 256
 #define DNS_TIMEOUT_MAX 30
 #define DNS_ATTEMPTS_MAX 5
+
+/* transAPI version which must be compatible with libnetconf */
+PUBLIC int transapi_version = 4;
+
+/* Signal to libnetconf that configuration data were modified by any callback.
+ * 0 - data not modified
+ * 1 - data have been modified
+ */
+PUBLIC int config_modified = 0;
+
+/*
+ * Determines the callbacks order.
+ * Set this variable before compilation and DO NOT modify it in runtime.
+ * TRANSAPI_CLBCKS_LEAF_TO_ROOT (default)
+ * TRANSAPI_CLBCKS_ROOT_TO_LEAF
+ */
+PUBLIC const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
+
+/* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
+ * Feel free to use it to distinguish module behavior for different error-option values.
+ * Possible values:
+ * NC_EDIT_ERROPT_STOP - Following callback after failure are not executed, all successful callbacks executed till
+ *                       failure point must be applied to the device.
+ * NC_EDIT_ERROPT_CONT - Failed callbacks are skipped, but all callbacks needed to apply configuration changes are executed
+ * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
+ *                       executed again with previous configuration data to roll it back.
+ */
+PUBLIC NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
+
+/* Indicate address MOD or server REORDER - we have to update the whole config, but only once */
+static int dns_nmsrv_mod_reorder;
+
+/* Similar to the above, for search domains */
+static int dns_search_reorder;
 
 /* IANA SSH Public Key Algorithm Names */
 struct pub_key_alg {
@@ -55,41 +93,7 @@ static struct pub_key_alg pub_key_algs[] = {
         {0, NULL}
 };
 
-/* transAPI version which must be compatible with libnetconf */
-int transapi_version = 4;
-
-/* Signal to libnetconf that configuration data were modified by any callback.
- * 0 - data not modified
- * 1 - data have been modified
- */
-int config_modified = 0;
-
-/*
- * Determines the callbacks order.
- * Set this variable before compilation and DO NOT modify it in runtime.
- * TRANSAPI_CLBCKS_LEAF_TO_ROOT (default)
- * TRANSAPI_CLBCKS_ROOT_TO_LEAF
- */
-const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
-
-/* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
- * Feel free to use it to distinguish module behavior for different error-option values.
- * Possible values:
- * NC_EDIT_ERROPT_STOP - Following callback after failure are not executed, all successful callbacks executed till
- *                       failure point must be applied to the device.
- * NC_EDIT_ERROPT_CONT - Failed callbacks are skipped, but all callbacks needed to apply configuration changes are executed
- * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
- *                       executed again with previous configuration data to roll it back.
- */
-NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
-
-/* Indicate address MOD or server REORDER - we have to update the whole config, but only once */
-int dns_nmsrv_mod_reorder;
-
-/* Similar to the above, for search domains */
-int dns_search_reorder;
-
-void user_ctx_cleanup(struct user_ctx** ctx)
+static void user_ctx_cleanup(struct user_ctx** ctx)
 {
 	int i;
 
@@ -113,7 +117,7 @@ void user_ctx_cleanup(struct user_ctx** ctx)
 	}
 }
 
-int fail(struct nc_err** error, char* msg, int ret)
+static int fail(struct nc_err** error, char* msg, int ret)
 {
 	if (error != NULL) {
 		*error = nc_err_new(NC_ERR_OP_FAILED);
@@ -130,7 +134,7 @@ int fail(struct nc_err** error, char* msg, int ret)
 	return ret;
 }
 
-int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret)
+static int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret)
 {
 	if (a != NULL) {
 		aug_close(a);
@@ -151,7 +155,7 @@ int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret)
 	return ret;
 }
 
-const char* get_node_content(const xmlNodePtr node)
+static const char* get_node_content(const xmlNodePtr node)
 {
 	if (node == NULL || node->children == NULL || node->children->type != XML_TEXT_NODE) {
 		return NULL;
@@ -166,7 +170,7 @@ const char* get_node_content(const xmlNodePtr node)
  * @param[out] running	Current configuration of managed device.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int transapi_init(xmlDocPtr* running)
+PUBLIC int transapi_init(xmlDocPtr* running)
 {
 	xmlNodePtr running_root, container_cur, cur;
 	char* msg = NULL, *tmp;
@@ -426,7 +430,7 @@ int transapi_init(xmlDocPtr* running)
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void transapi_close(void)
+PUBLIC void transapi_close(void)
 {
 	return;
 }
@@ -439,7 +443,7 @@ void transapi_close(void)
  * @param[out] err  Double poiter to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
+PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
         struct nc_err **err)
 {
 	xmlNodePtr container_cur, state_root;
@@ -475,7 +479,7 @@ xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
  * Mapping prefixes with namespaces.
  * Do NOT modify this structure!
  */
-struct ns_pair namespace_mapping[] = {
+PUBLIC struct ns_pair namespace_mapping[] = {
 		{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"},
 		{NULL, NULL}
 };
@@ -496,7 +500,7 @@ struct ns_pair namespace_mapping[] = {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	const char* hostname;
 	char* msg;
@@ -529,7 +533,7 @@ int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	char* msg;
@@ -564,7 +568,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_time
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	char* msg;
@@ -599,7 +603,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemn
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
 	bool ignore = false;
@@ -647,7 +651,7 @@ int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur, child;
 	int i;
@@ -825,7 +829,7 @@ error:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	bool enabled = false;
@@ -866,7 +870,7 @@ int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	int index, count, total_len;
@@ -979,7 +983,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	int index;
@@ -1041,7 +1045,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	augeas* a;
@@ -1097,7 +1101,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
 	augeas* a;
@@ -1156,7 +1160,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_tim
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
 	augeas* a;
@@ -1215,7 +1219,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_att
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	/* Reset MOD and REORDER flags in order to process these changes in the next configuration change */
 	dns_nmsrv_mod_reorder = 0;
@@ -1235,7 +1239,7 @@ int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, x
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	const char* pass = NULL, *name;
@@ -1373,7 +1377,7 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** data, 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	struct ssh_key* key;
@@ -1471,7 +1475,7 @@ int callback_systemns_system_systemns_authentication_systemns_user_systemns_auth
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	char* msg;
@@ -1513,7 +1517,7 @@ int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op,
  * It is used by libnetconf library to decide which callbacks will be run.
  * DO NOT alter this structure
  */
-struct transapi_data_callbacks clbks = {
+PUBLIC struct transapi_data_callbacks clbks = {
 		.callbacks_count = 15,
         .data = NULL,
         .callbacks = {
@@ -1558,7 +1562,7 @@ struct transapi_data_callbacks clbks = {
  * If input was not set in RPC message argument in set to NULL.
  */
 
-nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 {
 	struct nc_err* err;
 	xmlNodePtr current_datetime = input[0];
@@ -1706,12 +1710,12 @@ static nc_reply* _rpc_system_shutdown(bool shutdown)
 	return nc_reply_ok();
 }
 
-nc_reply* rpc_system_restart(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_system_restart(xmlNodePtr input[])
 {
 	return _rpc_system_shutdown(false);
 }
 
-nc_reply* rpc_system_shutdown(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_system_shutdown(xmlNodePtr input[])
 {
 	return _rpc_system_shutdown(true);
 }
@@ -1721,7 +1725,7 @@ nc_reply* rpc_system_shutdown(xmlNodePtr input[])
  * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
  * DO NOT alter this structure
  */
-struct transapi_rpc_callbacks rpc_clbks = {
+PUBLIC struct transapi_rpc_callbacks rpc_clbks = {
 		.callbacks_count = 3,
         .callbacks = {
         		{.name = "set-current-datetime", .func = rpc_set_current_datetime, .arg_count = 1, .arg_order = {"current-datetime"}},

@@ -38,6 +38,25 @@ if test -z "$libtool"; then
 fi
 AC_SUBST(libtool)
 
+# Check for compiler's visibility attribute
+SAVE_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden"
+AC_MSG_CHECKING(for ELF visibility)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#pragma GCC visibility push(hidden)
+		__attribute__((visibility("default")))
+		int var=10;
+		]])
+	],[
+	AC_MSG_RESULT([yes])
+	CPPFLAGS="-DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
+	],[
+	AC_MSG_RESULT([no])
+	CFLAGS="$SAVE_CFLAGS"
+	]
+)
+
 AC_PATH_PROG(NETOPEER_MANAGER, [netopeer-manager], [])
 AC_SUBST(NETOPEER_MANAGER)
 
