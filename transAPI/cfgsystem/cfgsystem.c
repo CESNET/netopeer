@@ -1689,36 +1689,33 @@ error:
 	free(msg);
 	return nc_reply_error(err);
 }
+
+static nc_reply* _rpc_system_shutdown(bool shutdown)
+{
+	char* msg;
+	struct nc_err* err;
+
+	if (run_shutdown(shutdown, &msg) != EXIT_SUCCESS) {
+		err = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(err, NC_ERR_PARAM_MSG, msg);
+		nc_verb_error(msg);
+		free(msg);
+		return nc_reply_error(err);
+	}
+
+	return nc_reply_ok();
+}
+
 nc_reply* rpc_system_restart(xmlNodePtr input[])
 {
-	char* msg;
-	struct nc_err* err;
-
-	if (run_shutdown(false, &msg) != EXIT_SUCCESS) {
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_MSG, msg);
-		nc_verb_error(msg);
-		free(msg);
-		return nc_reply_error(err);
-	}
-
-	return nc_reply_ok();
+	return _rpc_system_shutdown(false);
 }
+
 nc_reply* rpc_system_shutdown(xmlNodePtr input[])
 {
-	char* msg;
-	struct nc_err* err;
-
-	if (run_shutdown(true, &msg) != EXIT_SUCCESS) {
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_MSG, msg);
-		nc_verb_error(msg);
-		free(msg);
-		return nc_reply_error(err);
-	}
-
-	return nc_reply_ok();
+	return _rpc_system_shutdown(true);
 }
+
 /*
  * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
  * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
