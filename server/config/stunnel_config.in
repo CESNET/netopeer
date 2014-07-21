@@ -20,9 +20,9 @@ cert = {CFGDIR}/server.pem
 ; Verify peer with locally installed certificate.
 verify = 3
 
-; CA certificate, with verify level 3, it also includes allowed client
+; CA certificates directory, with verify level 3, it also includes allowed client
 ; certificates.
-CAfile = {CFGDIR}/rootCA.pem
+CApath = {CFGDIR}/certs
 
 ; Disable support for insecure SSLv2 protocol
 options = NO_SSLv2
@@ -35,5 +35,3 @@ exec = {BINDIR}/{AGENT}
 ; **************************************************************************
 
 ; SSL server mode services
-
-

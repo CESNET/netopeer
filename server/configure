@@ -5658,8 +5658,6 @@ ac_config_files="$ac_config_files netopeer.rc"
 
 ac_config_files="$ac_config_files src/config.h"
 
-ac_config_files="$ac_config_files stunnel/stunnel.conf"
-
 ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
 
@@ -6380,7 +6378,6 @@ do
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
-    "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
     "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
