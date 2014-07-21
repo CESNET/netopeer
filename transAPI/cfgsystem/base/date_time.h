@@ -62,7 +62,7 @@ struct tmz {
  * @return 1 file not found
  * @return 2 permission denied
  */
-int nclc_set_timezone(const char *name);
+int set_timezone(const char *name);
 
 /**
  * @brief set the /etc/localtime file to right timezone
@@ -72,7 +72,7 @@ int nclc_set_timezone(const char *name);
  * @return 1 timezone not found
  * @return 2 permission denied
  */
-int nclc_set_gmt_offset(int offset);
+int set_gmt_offset(int offset);
 
 /**
  * @brief set system time
@@ -82,7 +82,7 @@ int nclc_set_gmt_offset(int offset);
  * @return 2 invalid time information (e.g. hour<0 or hour>24, ...)
  * @return 3 permission denied
  */ 
-int nclc_set_time(char* HHMMSS);
+int set_time(char* HHMMSS);
 
 /**
  * @brief set system date
@@ -92,21 +92,21 @@ int nclc_set_time(char* HHMMSS);
  * @return 2 invalid date (e.g. day>31, 2013-2-30, ....)
  * @return 3 permission denied
  */
-int nclc_set_date(char* YYYYMMDD);
+int set_date(char* YYYYMMDD);
 
 /**
  * @brief return char * in format --**něco**--
  * @return NULL fail
  * @return char * with actual system time, date and timezone 
  */
-char* nclc_get_time(void);
+char* get_time(void);
 
 /**
  * @brief return char * which is boot time and date
  * @return NULL fail
  * @return char * boot time and date
  */
-char* nclc_get_boottime(void);
+char* get_boottime(void);
 
 /**
  * @brief start ntp program on your system
@@ -114,7 +114,7 @@ char* nclc_get_boottime(void);
  * @return 1 problem with using ntp program
  * @return 2 UNKNOWN distribution
  */
-int nclc_ntp_start(void);
+int ntp_start(void);
 
 /**
  * @brief stop ntp program on your system
@@ -122,13 +122,13 @@ int nclc_ntp_start(void);
  * @return 1 problem with using ntp program
  * @return 2 UNKNOWN distribution
  */
-int nclc_ntp_stop(void);
+int ntp_stop(void);
 
 /**
  * @brief restart ntp program on your system
  * @return 0 success 
  */
-int nclc_ntp_restart(void);
+int ntp_restart(void);
 
 /**
  * @brief check the status of ntp on your system
@@ -136,7 +136,7 @@ int nclc_ntp_restart(void);
  * @return 0 ntp not running
  * @return -1 failed to check ntp status
  */
-int nclc_ntp_status(void);
+int ntp_status(void);
 
 /**
  * @brief rewrite /etc/ntp.conf file with new configuration
@@ -144,7 +144,7 @@ int nclc_ntp_status(void);
  * @return 0 success
  * @return 1 imposible to open /etc/ntp.conf
  */
-int nclc_ntp_rewrite_conf(char* new_conf);
+int ntp_rewrite_conf(char* new_conf);
 
 /**
  * @brief init augeas for NTP

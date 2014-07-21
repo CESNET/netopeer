@@ -115,7 +115,7 @@ struct tmz timezones[] = {
     {0, NULL}
 };
 
-int nclc_set_timezone(const char *name)
+int set_timezone(const char *name)
 {
 	if (name == NULL) {
 		return 1;
@@ -148,7 +148,7 @@ int nclc_set_timezone(const char *name)
 	return 0;
 }
 
-int nclc_set_gmt_offset(int offset)
+int set_gmt_offset(int offset)
 {
 	int i;
 
@@ -158,7 +158,7 @@ int nclc_set_gmt_offset(int offset)
 		}
 	}
 
-	return nclc_set_timezone(timezones[i].timezone_file);
+	return set_timezone(timezones[i].timezone_file);
 }
 
 /**
@@ -213,7 +213,7 @@ static int date_ok(int day, int month, int year)
 	return 0;
 }
 
-int nclc_set_time(char* HHMMSS)
+int set_time(char* HHMMSS)
 {
 	time_t new_time = time(NULL);
 	struct tm *loc_time = localtime(&new_time);
@@ -241,7 +241,7 @@ int nclc_set_time(char* HHMMSS)
 	return 0;
 }
 
-int nclc_set_date(char* YYYYMMDD)
+int set_date(char* YYYYMMDD)
 {
 	time_t new_date = time(NULL);
 	struct tm *loc_time = localtime(&new_date);
@@ -270,7 +270,7 @@ int nclc_set_date(char* YYYYMMDD)
 	return 0;
 }
 
-char* nclc_get_time(void)
+char* get_time(void)
 {
 	time_t cas = time(NULL);
 	char *output = NULL;
@@ -287,7 +287,7 @@ char* nclc_get_time(void)
 	return output;
 }
 
-char* nclc_get_boottime(void)
+char* get_boottime(void)
 {
 	struct sysinfo s_info;
 	time_t cur_time = time(NULL);
@@ -308,7 +308,7 @@ char* nclc_get_boottime(void)
 	return strdup(boot_time);
 }
 
-int nclc_ntp_start(void)
+int ntp_start(void)
 {
 	int output = 1;
 
@@ -345,7 +345,7 @@ int nclc_ntp_start(void)
 	}
 }
 
-int nclc_ntp_stop(void)
+int ntp_stop(void)
 {
 	int output = 1;
 
@@ -382,7 +382,7 @@ int nclc_ntp_stop(void)
 	}
 }
 
-int nclc_ntp_restart(void)
+int ntp_restart(void)
 {
 	int output = 1;
 
@@ -390,15 +390,15 @@ int nclc_ntp_restart(void)
 		nclc_identity();
 	}
 
-	output = nclc_ntp_stop();
+	output = ntp_stop();
 	if (output != 0) {
 		return output;
 	}
-	output = nclc_ntp_start();
+	output = ntp_start();
 	return output;
 }
 
-int nclc_ntp_status(void)
+int ntp_status(void)
 {
 	int output;
 
@@ -435,7 +435,7 @@ int nclc_ntp_status(void)
 	}
 }
 
-int nclc_ntp_rewrite_conf(char* new_conf)
+int ntp_rewrite_conf(char* new_conf)
 {
 	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt"); /*"/etc/ntp.conf"*/
 
@@ -450,7 +450,7 @@ int nclc_ntp_rewrite_conf(char* new_conf)
 	fprintf(f, "%s", new_conf);
 	fclose(f);
 
-	nclc_ntp_restart();
+	ntp_restart();
 	return 0;
 }
 

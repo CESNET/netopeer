@@ -209,7 +209,7 @@ int transapi_init(xmlDocPtr* running)
 	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "ntp", NULL);
 
 	/* enabled */
-	ret = nclc_ntp_status();
+	ret = ntp_status();
 	xmlNewChild(container_cur, NULL, BAD_CAST "enabled", (ret != 0) ? BAD_CAST "true" : BAD_CAST "false");
 
 	/* server */
@@ -466,8 +466,8 @@ xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
 	xmlAddChild(state_root, container_cur);
 
 	/* Add clock leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST nclc_get_time());
-	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST nclc_get_boottime());
+	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST get_time());
+	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST get_boottime());
 
 	return state_doc;
 }
@@ -535,7 +535,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_time
 	char* msg;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		ret = nclc_set_timezone(get_node_content(node));
+		ret = set_timezone(get_node_content(node));
 		if (ret == 1) {
 			asprintf(&msg, "Timezone %s was not found.", get_node_content(node));
 			return fail(error, msg, EXIT_FAILURE);
@@ -570,7 +570,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemn
 	char* msg;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		ret = nclc_set_gmt_offset(atoi(get_node_content(node)));
+		ret = set_gmt_offset(atoi(get_node_content(node)));
 		if (ret == 1) {
 			asprintf(&msg, "Timezone %s does not exist.", get_node_content(node));
 			return fail(error, msg, EXIT_FAILURE);
@@ -607,9 +607,9 @@ int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		if (strcmp(get_node_content(node), "true") == 0) {
-			ret = nclc_ntp_start();
+			ret = ntp_start();
 		} else if (strcmp(get_node_content(node), "false") == 0) {
-			ret = nclc_ntp_stop();
+			ret = ntp_stop();
 			/* In case NTP is not running when starting this module */
 			if (op & XMLDIFF_ADD) {
 				ignore = true;
@@ -783,7 +783,7 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_O
 		return fail(error, msg, EXIT_FAILURE);
 	}
 	if (strcmp(get_node_content(cur), "true") == 0) {
-		if (nclc_ntp_restart() != 0) {
+		if (ntp_restart() != 0) {
 			asprintf(&msg, "Failed to restart NTPD.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -844,7 +844,7 @@ int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr
 			cur = cur->next;
 		}
 
-		ret = nclc_ntp_stop();
+		ret = ntp_stop();
 		if (enabled && ret == 1) {
 			asprintf(&msg, "Failed to stop NTP.");
 			return fail(error, msg, EXIT_FAILURE);
@@ -1565,7 +1565,7 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 	char* date = NULL, *time = NULL, *timezone = NULL, *msg, *ptr;
 	int ret, offset;
 
-	switch (nclc_ntp_status()) {
+	switch (ntp_status()) {
 	case 1:
 		err = nc_err_new(NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_APPTAG, "ntp-active");
@@ -1611,7 +1611,7 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 		goto error;
 	}
 	*strchr(date, 'T') = '\0';
-	ret = nclc_set_date(date);
+	ret = set_date(date);
 	if (ret == 1 || ret == 2) {
 		asprintf(&msg, "Invalid date format (%s).", date);
 		goto error;
@@ -1628,7 +1628,7 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 		goto error;
 	}
 	time[8] = '\0';
-	ret = nclc_set_time(time);
+	ret = set_time(time);
 	if (ret == 1 || ret == 2) {
 		asprintf(&msg, "Invalid time format (%s).", time);
 		goto error;
@@ -1661,7 +1661,7 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 			offset = -offset;
 		}
 	}
-	ret = nclc_set_gmt_offset(offset);
+	ret = set_gmt_offset(offset);
 	if (ret == 1) {
 		asprintf(&msg, "Could not find the \"localtime\" file.");
 		goto error;
