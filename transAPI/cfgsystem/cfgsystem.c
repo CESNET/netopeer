@@ -17,6 +17,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <shadow.h>
+#include <errno.h>
 
 #include "base/date_time.h"
 #include "base/platform.h"
@@ -189,8 +190,8 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 	xmlNewProp(running_root, BAD_CAST "xmlns", BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system");
 
 	/* hostname */
-	nclc_identity();
-	hostname = nclc_get_hostname();
+	identity_detect();
+	hostname = get_hostname();
 	if (hostname == NULL) {
 		asprintf(&msg, "Failed to get the local hostname.");
 		return fail(NULL, msg, EXIT_FAILURE);
@@ -203,7 +204,7 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 
 	/* timezone-name */
 	cur = xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", NULL);
-	if ((tmp = ntp_get_timezone(&msg)) == NULL) {
+	if ((tmp = get_timezone(&msg)) == NULL) {
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
 	xmlNewChild(cur, NULL, BAD_CAST "timezone-name", BAD_CAST tmp);
@@ -448,6 +449,7 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
 {
 	xmlNodePtr container_cur, state_root;
 	xmlDocPtr state_doc;
+	char *s;
 
 	/* Create the beginning of the state XML document */
 	state_doc = xmlNewDoc(BAD_CAST "1.0");
@@ -460,18 +462,20 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
 	xmlAddChild(state_root, container_cur);
 
 	/* Add platform leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-name", BAD_CAST nclc_get_sysname());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-release", BAD_CAST nclc_get_os_release());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-version", BAD_CAST nclc_get_os_version());
-	xmlNewChild(container_cur, NULL, BAD_CAST "machine", BAD_CAST nclc_get_os_machine());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-name", BAD_CAST get_sysname());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-release", BAD_CAST get_os_release());
+	xmlNewChild(container_cur, NULL, BAD_CAST "os-version", BAD_CAST get_os_version());
+	xmlNewChild(container_cur, NULL, BAD_CAST "machine", BAD_CAST get_os_machine());
 
 	/* Add the clock container */
 	container_cur = xmlNewNode(NULL, BAD_CAST "clock");
 	xmlAddChild(state_root, container_cur);
 
 	/* Add clock leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST get_time());
-	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST get_boottime());
+	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST (s = nc_time2datetime(time(NULL), NULL)));
+	free(s);
+	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST (s = nc_time2datetime(get_boottime(), NULL)));
+	free(s);
 
 	return state_doc;
 }
@@ -508,7 +512,7 @@ PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		hostname = get_node_content(node);
 
-		if (nclc_set_hostname(hostname) != EXIT_SUCCESS) {
+		if (set_hostname(hostname) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the hostname.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -1566,7 +1570,9 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 {
 	struct nc_err* err;
 	xmlNodePtr current_datetime = input[0];
-	char* date = NULL, *time = NULL, *timezone = NULL, *msg, *ptr;
+	time_t new_time;
+	const char* timezone = NULL;
+	char *msg, *ptr, *rollback_timezone;
 	int ret, offset;
 
 	switch (ntp_status()) {
@@ -1577,14 +1583,13 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 		return nc_reply_error(err);
 
 	case 0:
-		/* NTP not running */
+		/* NTP not running, set datatime */
 		break;
 
 	case -1:
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(err, NC_ERR_PARAM_MSG, "Failed to check NTP status.");
-		nc_verb_error("Failed to check NTP status.");
-		return nc_reply_error(err);
+		/* we were unable to check NTP, try to continue with warning */
+		nc_verb_warning("Failed to check NTP status.");
+		break;
 	}
 
 	/* current_datetime format
@@ -1608,42 +1613,8 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 	 1990-12-31T15:59:60-08:00
 	 */
 
-	/* Date */
-	date = strdup(get_node_content(current_datetime));
-	if (strchr(date, 'T') == NULL) {
-		asprintf(&msg, "Invalid date-and-time format (%s).", get_node_content(current_datetime));
-		goto error;
-	}
-	*strchr(date, 'T') = '\0';
-	ret = set_date(date);
-	if (ret == 1 || ret == 2) {
-		asprintf(&msg, "Invalid date format (%s).", date);
-		goto error;
-	} else if (ret == 3) {
-		asprintf(&msg, "Denied permission to change the date.");
-		goto error;
-	}
-	free(date);
-
-	/* Time */
-	time = strdup(strchr(get_node_content(current_datetime), 'T') + 1);
-	if (strlen(time) < 8) {
-		asprintf(&msg, "Invalid date-and-time format (%s).", get_node_content(current_datetime));
-		goto error;
-	}
-	time[8] = '\0';
-	ret = set_time(time);
-	if (ret == 1 || ret == 2) {
-		asprintf(&msg, "Invalid time format (%s).", time);
-		goto error;
-	} else if (ret == 3) {
-		asprintf(&msg, "Denied permission to change the time.");
-		goto error;
-	}
-	free(time);
-
-	/* Timezone */
-	timezone = strdup(strchr(get_node_content(current_datetime), 'T') + 9);
+	/* start with timezone due to simpler rollback */
+	timezone = strchr(get_node_content(current_datetime), 'T') + 9;
 	if (strcmp(timezone, "Z") == 0) {
 		offset = 0;
 	} else if (((timezone[0] != '+') && (timezone[0] != '-')) || (strlen(timezone) != 6)) {
@@ -1665,28 +1636,35 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 			offset = -offset;
 		}
 	}
+
+	rollback_timezone = get_timezone(NULL);
 	ret = set_gmt_offset(offset);
 	if (ret == 1) {
 		asprintf(&msg, "Could not find the \"localtime\" file.");
 		goto error;
 	} else if (ret == 2) {
-		asprintf(&msg, "Denied permission to change the timezone.");
+		asprintf(&msg, "Insufficient permissions to change the timezone.");
 		goto error;
 	}
-	free(timezone);
+
+	/* set datetime */
+	new_time = nc_datetime2time(get_node_content(current_datetime));
+	if (stime(&new_time) == -1) {
+		asprintf(&msg, "Unable to set time (%s).", strerror(errno));
+
+		/* rollback timezone */
+		set_timezone(rollback_timezone);
+		free(rollback_timezone);
+
+		goto error;
+	}
+
+	/* cleanup */
+	free(rollback_timezone);
 
 	return nc_reply_ok();
 
 error:
-	if (date != NULL) {
-		free(date);
-	}
-	if (time != NULL) {
-		free(time);
-	}
-	if (timezone != NULL) {
-		free(timezone);
-	}
 	err = nc_err_new(NC_ERR_OP_FAILED);
 	nc_err_set(err, NC_ERR_PARAM_MSG, msg);
 	nc_verb_error(msg);

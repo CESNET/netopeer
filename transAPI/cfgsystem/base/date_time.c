@@ -66,9 +66,9 @@
 #define REDHAT_RELEASE_PATH	"/etc/redhat-release"
 #define SUSE_RELEASE_PATH	"/etc/SuSE-release"
 #define DEBIAN_RELEASE_PATH	"/etc/debian_version"
-#define REDHAT_NTP_PROGRAM_PATH	"/etc/init.d/ntpd"
-#define SUSE_NTP_PROGRAM_PATH	"/etc/init.d/ntp"
-#define DEBIAN_NTP_PROGRAM_PATH	"/etc/init.d/ntp"
+#define REDHAT_NTP_SERVICE "ntpd"
+#define SUSE_NTP_SERVICE "ntp"
+#define DEBIAN_NTP_SERVICE "ntp"
 #define NTP_CONF_FILE_PATH	"/etc/ntp.conf"
 
 struct tmz timezones[] = {
@@ -139,10 +139,11 @@ int set_timezone(const char *name)
 		return 1;
 	}
 
-	if (unlink(LOCALTIME_FILE_PATH))
+	if (unlink(LOCALTIME_FILE_PATH)) {
 		return 2; /*"/etc/localtime"*/
-	if (symlink(tmp, LOCALTIME_FILE_PATH))
+	} if (symlink(tmp, LOCALTIME_FILE_PATH)) {
 		return 2; /*"/etc/localtime"*/
+	}
 	free(tmp);
 
 	return 0;
@@ -161,178 +162,35 @@ int set_gmt_offset(int offset)
 	return set_timezone(timezones[i].timezone_file);
 }
 
-/**
- * @brief check validity of date
- * @param day[in] - day number
- * @param month[in] - mounth number
- * @param year[in] - year number
- * @return 0 - false - invalid date
- * @return 1 - true - valid date
- */
-static int date_ok(int day, int month, int year)
-{
-	if (0 < day && day < 29 && 0 < month && month < 13 && 1899 < year) {
-		return 1;
-	}
-	if (1 > day || day > 31 || 1 > month || month > 12 || 1900 > year) {
-		return 0;
-	}
-
-	switch (month) {
-	case 1:
-	case 3:
-	case 5:
-	case 7:
-	case 8:
-	case 10:
-	case 12:
-		if (day < 32) {
-			return 1;
-		} else {
-			return 0;
-		}
-		break;
-	case 4:
-	case 6:
-	case 9:
-	case 11:
-		if (day < 31) {
-			return 1;
-		} else {
-			return 0;
-		}
-		break;
-	case 2:
-		if (((year % 4) == 0 && (year % 100) != 0) || (year % 400) == 0) {
-			if (day < 30) {
-				return 1;
-			}
-		}
-		break;
-	}
-	return 0;
-}
-
-int set_time(char* HHMMSS)
-{
-	time_t new_time = time(NULL);
-	struct tm *loc_time = localtime(&new_time);
-
-	int time_H, time_M, time_S;
-
-	if (sscanf(HHMMSS, "%d:%d:%d", &time_H, &time_M, &time_S) != 3) {
-		return 1;
-	}
-
-	if (time_H > 23 || time_H < 0 || time_M > 59 || time_M < 0 || time_S > 59 || time_S < 0) {
-		return 2;
-	}
-
-	loc_time->tm_hour = time_H;
-	loc_time->tm_min = time_M;
-	loc_time->tm_sec = time_S;
-
-	new_time = mktime(loc_time);
-
-	if (stime(&new_time)) {
-		return 3;
-	}
-
-	return 0;
-}
-
-int set_date(char* YYYYMMDD)
-{
-	time_t new_date = time(NULL);
-	struct tm *loc_time = localtime(&new_date);
-
-	int time_D, time_M, time_Y;
-
-	if (sscanf(YYYYMMDD, "%d-%d-%d", &time_Y, &time_M, &time_D) != 3) {
-		return 1;
-	}
-	if (date_ok(time_D, time_M, time_Y) == 0) {
-		return 2;
-	}
-
-	time_M -= 1; 	// January is 0
-	time_Y -= 1900;	// Year 1900 is 0
-
-	loc_time->tm_mday = time_D;
-	loc_time->tm_mon = time_M;
-	loc_time->tm_year = time_Y;
-
-	new_date = mktime(loc_time);
-	if (stime(&new_date)) {
-		return 3;
-	}
-
-	return 0;
-}
-
-char* get_time(void)
-{
-	time_t cas = time(NULL);
-	char *output = NULL;
-	char *tmp = ctime(&cas);
-	int i;
-
-	tzset();
-
-	for (i = 0; tmp[i] != '\n'; i++)
-		;
-	tmp[i] = '\0';
-
-	asprintf(&output, "%s%s%s%s%s", tmp, ", ", tzname[0], ", ", tzname[1]);
-	return output;
-}
-
-char* get_boottime(void)
+time_t get_boottime(void)
 {
 	struct sysinfo s_info;
 	time_t cur_time = time(NULL);
-	char * boot_time;
-	int i;
 
 	if (sysinfo(&s_info) != 0) {
-		return NULL;
+		return 0;
 	}
 
-	cur_time -= s_info.uptime;
-	boot_time = ctime(&cur_time);
-
-	for (i = 0; boot_time[i] != '\n'; i++)
-		;
-	boot_time[i] = '\0';
-
-	return strdup(boot_time);
+	return (cur_time - s_info.uptime);
 }
 
 int ntp_start(void)
 {
 	int output = 1;
 
-	if (nclc_distribution_id == 0) {
-		nclc_identity();
+	if (distribution_id == 0) {
+		identity_detect();
 	}
 
-	switch (nclc_distribution_id) {
+	switch (distribution_id) {
 	case REDHAT:
-		switch (nclc_version_id) {
-		case 3:
-			printf("I can't work with Chrony yet :-(\n");
-			output = 1;
-			break;
-		default:
-			output = system(REDHAT_NTP_PROGRAM_PATH " start" " 1> /dev/null  2>/dev/null");
-			break;
-		}
+		output = system("service" REDHAT_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
 		break;
 	case SUSE:
-		output = system(SUSE_NTP_PROGRAM_PATH " start" " 1> /dev/null  2>/dev/null");
+		output = system("service" SUSE_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
 		break;
 	case DEBIAN:
-		output = system(DEBIAN_NTP_PROGRAM_PATH" start" " 1> /dev/null  2>/dev/null");
+		output = system("service" DEBIAN_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
 		break;
 	default:
 		return 2; /*unknown distribution*/
@@ -349,27 +207,19 @@ int ntp_stop(void)
 {
 	int output = 1;
 
-	if (nclc_distribution_id == 0) {
-		nclc_identity();
+	if (distribution_id == 0) {
+		identity_detect();
 	}
 
-	switch (nclc_distribution_id) {
+	switch (distribution_id) {
 	case REDHAT:
-		switch (nclc_version_id) {
-		case 3:
-			printf("I can't work with Chrony yet :-(\n");
-			output = 1;
-			break;
-		default:
-			output = system(REDHAT_NTP_PROGRAM_PATH " stop" " 1> /dev/null  2>/dev/null");
-			break;
-		}
+		output = system("service" REDHAT_NTP_SERVICE " stop 1> /dev/null  2>/dev/null");
 		break;
 	case SUSE:
-		output = system(SUSE_NTP_PROGRAM_PATH " stop" " 1> /dev/null  2>/dev/null");
+		output = system("service" SUSE_NTP_SERVICE " stop 1> /dev/null  2>/dev/null");
 		break;
 	case DEBIAN:
-		output = system(DEBIAN_NTP_PROGRAM_PATH" stop" " 1> /dev/null  2>/dev/null");
+		output = system("service" DEBIAN_NTP_SERVICE" stop 1> /dev/null  2>/dev/null");
 		break;
 	default:
 		return 2; /*unknown distribution*/
@@ -386,8 +236,8 @@ int ntp_restart(void)
 {
 	int output = 1;
 
-	if (nclc_distribution_id == 0) {
-		nclc_identity();
+	if (distribution_id == 0) {
+		identity_detect();
 	}
 
 	output = ntp_stop();
@@ -402,27 +252,19 @@ int ntp_status(void)
 {
 	int output;
 
-	if (nclc_distribution_id == 0) {
-		nclc_identity();
+	if (distribution_id == 0) {
+		identity_detect();
 	}
 
-	switch (nclc_distribution_id) {
+	switch (distribution_id) {
 	case REDHAT:
-		switch (nclc_version_id) {
-		case 3:
-			printf("I can't work with Chrony yet :-(\n");
-			return -1;
-			break;
-		default:
-			output = system(REDHAT_NTP_PROGRAM_PATH " status" " 1> /dev/null  2>/dev/null");
-			break;
-		}
+		output = system("service" REDHAT_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	case SUSE:
-		output = system(SUSE_NTP_PROGRAM_PATH " status" " 1> /dev/null  2>/dev/null");
+		output = system("service" SUSE_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	case DEBIAN:
-		output = system(DEBIAN_NTP_PROGRAM_PATH " status" " 1> /dev/null  2>/dev/null");
+		output = system("service" DEBIAN_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	default:
 		return -1; /*unknown distribution*/
@@ -439,8 +281,8 @@ int ntp_rewrite_conf(char* new_conf)
 {
 	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt"); /*"/etc/ntp.conf"*/
 
-	if (nclc_distribution_id == 0) {
-		nclc_identity();
+	if (distribution_id == 0) {
+		identity_detect();
 	}
 
 	if (f == NULL) {
@@ -735,7 +577,7 @@ char** ntp_resolve_server(char* server_name, char** msg)
 	return ret;
 }
 
-char* ntp_get_timezone(char** msg)
+char* get_timezone(char** msg)
 {
 	char* buf, *tz;
 	size_t buf_len;
@@ -747,13 +589,17 @@ char* ntp_get_timezone(char** msg)
 	ret = readlink(LOCALTIME_FILE_PATH, buf, buf_len);
 
 	if (ret == -1) {
-		asprintf(msg, "Getting the current timezone failed: %s", strerror(errno));
+		if (msg) {
+			asprintf(msg, "Getting the current timezone failed: %s", strerror(errno));
+		}
 		free(buf);
 		return NULL;
 	}
 
 	if (ret == buf_len) {
-		asprintf(msg, "Buffer too small for the timezone path.");
+		if (msg) {
+			asprintf(msg, "Buffer too small for the timezone path.");
+		}
 		free(buf);
 		return NULL;
 	}

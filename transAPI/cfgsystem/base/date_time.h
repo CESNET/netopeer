@@ -75,38 +75,10 @@ int set_timezone(const char *name);
 int set_gmt_offset(int offset);
 
 /**
- * @brief set system time
- * @param HHMMSS[in] char * in format "HH:MM:SS" (e.g. "10:35:55")
- * @return 0 success
- * @return 1 error in input string format
- * @return 2 invalid time information (e.g. hour<0 or hour>24, ...)
- * @return 3 permission denied
- */ 
-int set_time(char* HHMMSS);
-
-/**
- * @brief set system date
- * @param YYYYMMDD[in] char * in format "YYYY-MM-DD" (e.g. 2012-12-24)
- * @return 0 success
- * @return 1 error in input string format
- * @return 2 invalid date (e.g. day>31, 2013-2-30, ....)
- * @return 3 permission denied
+ * @brief return boot time as seconds since Epoch
+ * @return boot time, 0 on failure
  */
-int set_date(char* YYYYMMDD);
-
-/**
- * @brief return char * in format --**něco**--
- * @return NULL fail
- * @return char * with actual system time, date and timezone 
- */
-char* get_time(void);
-
-/**
- * @brief return char * which is boot time and date
- * @return NULL fail
- * @return char * boot time and date
- */
-char* get_boottime(void);
+time_t get_boottime(void);
 
 /**
  * @brief start ntp program on your system
@@ -211,7 +183,7 @@ char** ntp_resolve_server(char* server_name, char** msg);
  * @return timezone name
  * @return NULL if error occured
  */
-char* ntp_get_timezone(char** msg);
+char* get_timezone(char** msg);
 
 #endif /* DATE_TIME_H_ */
 
