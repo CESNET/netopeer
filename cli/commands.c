@@ -1712,7 +1712,7 @@ int cmd_unlock (char *arg)
 void cmd_listen_help ()
 {
 #ifdef ENABLE_TLS
-	fprintf (stdout, "listen [--help] [--tls <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
+	fprintf (stdout, "listen [--help] [--tls] [--cert <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
 #else
 	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
 #endif
@@ -1726,7 +1726,8 @@ int cmd_listen (char* arg)
 	static unsigned short listening = 0;
 	char *user = NULL;
 #ifdef ENABLE_TLS
-	char *cert = NULL, *key = NULL;
+	int usetls = 0;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
 #endif
 	unsigned short port = 0;
 	int c;
@@ -1737,7 +1738,8 @@ int cmd_listen (char* arg)
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
 #ifdef ENABLE_TLS
-			{"tls", 1, 0, 't'},
+			{"tls", 0, 0, 't'},
+			{"cert", 1, 0, 'c'},
 			{"key", 1, 0, 'k'},
 #endif
 			{0, 0, 0, 0}
@@ -1782,11 +1784,14 @@ int cmd_listen (char* arg)
 				if (port == 0) {
 					port = DEFAULT_PORT_CH_TLS;
 				}
+				usetls = 1;
 			}
-			cert = optarg;
+			break;
+		case 'c':
+			asprintf(&cert, "%s", optarg);
 			break;
 		case 'k':
-			key = optarg;
+			asprintf(&key, "%s", optarg);
 			break;
 #endif
 		default:
@@ -1800,10 +1805,26 @@ int cmd_listen (char* arg)
 		port = DEFAULT_PORT_CH_SSH;
 	}
 #ifdef ENABLE_TLS
-	if (cert) {
-		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
+	if (usetls) {
+		if (cert == NULL) {
+			get_default_client_cert(&cert, &key);
+			if (cert == NULL) {
+				ERROR("listen", "Could not find the default client certificate.");
+				return (EXIT_FAILURE);
+			}
+		}
+		if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+			ERROR("listen", "Could not use the trusted CA directory.");
+			return (EXIT_FAILURE);
+		}
+		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+		free(cert);
+		if (key != NULL) {
+			free(key);
 		}
 	}
 #endif
@@ -1837,7 +1858,7 @@ int cmd_listen (char* arg)
 void cmd_connect_help ()
 {
 #ifdef ENABLE_TLS
-	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls <cert_path> [--key <key_path>]] host\n");
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] host\n");
 #else
 	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
 #endif
@@ -1849,7 +1870,8 @@ int cmd_connect (char* arg)
 {
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
-	char *cert = NULL, *key = NULL;
+	int usetls = 0;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
 #endif
 	int hostfree = 0;
 	unsigned short port = 0;
@@ -1860,7 +1882,8 @@ int cmd_connect (char* arg)
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
 #ifdef ENABLE_TLS
-			{"tls", 1, 0, 't'},
+			{"tls", 0, 0, 't'},
+			{"cert", 1, 0, 'c'},
 			{"key", 1, 0, 'k'},
 #endif
 			{0, 0, 0, 0}
@@ -1901,11 +1924,14 @@ int cmd_connect (char* arg)
 				if (port == 0) {
 					port = DEFAULT_PORT_TLS;
 				}
+				usetls = 1;
 			}
-			cert = optarg;
+			break;
+		case 'c':
+			asprintf(&cert, "%s", optarg);
 			break;
 		case 'k':
-			key = optarg;
+			asprintf(&key, "%s", optarg);
 			break;
 #endif
 		default:
@@ -1919,10 +1945,26 @@ int cmd_connect (char* arg)
 		port = DEFAULT_PORT_SSH;
 	}
 #ifdef ENABLE_TLS
-	if (cert) {
-		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
+	if (usetls) {
+		if (cert == NULL) {
+			get_default_client_cert(&cert, &key);
+			if (cert == NULL) {
+				ERROR("connect", "Could not find the default client certificate.");
+				return (EXIT_FAILURE);
+			}
+		}
+		if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+			ERROR("connect", "Could not use the trusted CA directory.");
+			return (EXIT_FAILURE);
+		}
+		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+		free(cert);
+		if (key != NULL) {
+			free(key);
 		}
 	}
 #endif

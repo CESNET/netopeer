@@ -50,6 +50,7 @@
 #include <pwd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
@@ -64,10 +65,126 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 /* NetConf Client home (appended to ~/) */
 #define NCC_DIR ".netopeer-cli"
 
+char* get_netconf_dir()
+{
+	int ret;
+	struct passwd * pw;
+	char* user_home, *netconf_dir;
+
+	if ((pw = getpwuid(getuid())) == NULL) {
+		ERROR("get_netconf_dir", "Determining home directory failed (%s).", strerror(errno));
+		return NULL;
+	}
+	user_home = pw->pw_dir;
+
+	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+		ERROR("get_netconf_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		return NULL;
+	}
+
+	ret = access (netconf_dir, R_OK|X_OK);
+	if (ret == -1) {
+		if (errno == ENOENT) {
+			/* directory does not exist */
+			ERROR ("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
+			if (mkdir (netconf_dir, 0700) != 0) {
+				ERROR ("get_netconf_dir", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
+				free (netconf_dir);
+				return NULL;
+			}
+		} else {
+			ERROR ("get_netconf_dir", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
+			free (netconf_dir);
+			return NULL;
+		}
+	}
+
+	return netconf_dir;
+}
+
+void get_default_client_cert(char** cert, char** key) {
+	char* netconf_dir;
+	int ret;
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return;
+	}
+
+	// trying to use *.crt and *.key format
+	if (asprintf(cert, "%s/%s", netconf_dir, "client.crt") == -1 || asprintf(key, "%s/%s", netconf_dir, "client.key") == -1) {
+		ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+		return;
+	}
+
+	if (access(*cert, R_OK) == -1 || access(*key, R_OK) == -1) {
+		// *.crt & *.key failed, trying to use *.pem format
+		free(*key);
+		*key = NULL;
+		free(*cert);
+		if (asprintf(cert, "%s/%s", netconf_dir, "client.pem") == -1) {
+			ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+			ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+			return;
+		}
+
+		ret = access(*cert, R_OK);
+		if (ret == -1) {
+			// *.pem failed as well
+			ERROR("get_default_client_cert", "Unable to find the default client certificate.");
+			free(*cert);
+			*cert = NULL;
+			return;
+		}
+
+		ERROR("get_default_client_cert", "Using \"client.pem\" but this may be a security risk and separate certificate and key files should be used.");
+	}
+
+	return;
+}
+
+char* get_default_trustedCA_dir() {
+	int n = 0;
+	char* netconf_dir, *cert_dir;
+	DIR* dir;
+	struct dirent *d;
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return NULL;
+	}
+
+	if (asprintf(&cert_dir, "%s/%s", netconf_dir, "certs") == -1) {
+		ERROR("get_default_trustedCA_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_trustedCA_dir", "Unable to use the trusted CA directory due to the previous error.");
+		return NULL;
+	}
+
+	if ((dir = opendir(cert_dir)) == NULL) {
+		ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory.");
+		free(cert_dir);
+		return NULL;
+	}
+
+	while ((d = readdir(dir)) != NULL) {
+		if (++n > 2) {
+			break;
+		}
+	}
+	closedir(dir);
+	if (n <= 2) {
+		ERROR("get_default_trustedCA_dir", "Trusted CA directory empty, use \"!!TODO!!\" command to add certificates.");
+	}
+
+	return cert_dir;
+}
+
 void load_config (struct nc_cpblts **cpblts)
 {
-	struct passwd * pw;
-	char * user_home, *netconf_dir, * history_file, *config_file;
+	char * netconf_dir, * history_file, *config_file;
+#ifdef ENABLE_TLS
+	struct stat st;
+	char* trusted_dir;
+#endif
 	char * tmp_cap;
 	int ret, history_fd, config_fd;
 	xmlDocPtr config_doc;
@@ -80,33 +197,32 @@ void load_config (struct nc_cpblts **cpblts)
 
 	(*cpblts) = nc_session_get_cpblts_default();
 
-	if ((pw = getpwuid(getuid())) == NULL) {
-		ERROR("load_config", "Determining home directory failed (%s).", strerror(errno));
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
 	}
-	user_home = pw->pw_dir;
 
-	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+#ifdef ENABLE_TLS
+	if (asprintf (&trusted_dir, "%s/certs", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
-		return;
-	}
-
-	ret = access (netconf_dir, R_OK|X_OK);
-	if (ret == -1) {
-		if (errno == ENOENT) {
-			/* directory does not exist */
-			ERROR ("load_config", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
-			if (mkdir (netconf_dir, 0700) != 0) {
-				ERROR ("load_config", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
-				free (netconf_dir);
-				return;
+		ERROR("load_config", "Unable to check trusted CA directory due to the previous error.");
+		trusted_dir = NULL;
+	} else {
+		if (stat(trusted_dir, &st) == -1) {
+			if (errno == ENOENT) {
+				ERROR("load_config", "Trusted CA directory (%s) does not exist, creating it", trusted_dir);
+				if (mkdir(trusted_dir, 0700) == -1) {
+					ERROR("load_config", "Trusted CA directory cannot be created (%s)", strerror(errno));
+				}
+			} else {
+				ERROR("load_config", "Accessing the trusted CA directory failed (%s)", strerror(errno));
 			}
 		} else {
-			ERROR ("load_config", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
-			free (netconf_dir);
-			return;
+			if (!S_ISDIR(st.st_mode)) {
+				ERROR("load_config", "Accessing the trusted CA directory failed (Not a directory)");
+			}
 		}
 	}
+#endif /* ENABLE_TLS */
 
 	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
