@@ -1,11 +1,10 @@
-/*!
+/**
  * \file platform.c
  * \brief Functions for getting onformation about platform
- * \author Miroslav Brabenec <brabemi3@fit.cvut.cz>
+ * \author Michal Vasko <mvasko@cesnet.cz>
  * \author Tomas Cejka <cejkat@cesnet.cz>
  * \date 2013
- */
-/*
+ *
  * Copyright (C) 2013 CESNET
  *
  * LICENSE TERMS
@@ -50,7 +49,9 @@
 #include <string.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <errno.h>
 #include <augeas.h>
+#include <libnetconf.h>
 
 #include "platform.h"
 
@@ -64,191 +65,147 @@
 
 #define HOSTS_PATH "/etc/hosts"
 
-NCLC_DISTRIB nclc_distribution_id = 0;
+DISTRO distribution_id = 0;
 
-int nclc_version_id;
+static struct utsname *kernel = NULL;
 
-static struct utsname kernel;
-static char kernel_set = 0;
-
-static void fill_kernel()
+static void fill_kernel(void)
 {
-	if(uname(&kernel)) kernel_set = 1;
+	if ((kernel = malloc(sizeof(struct utsname))) == NULL) {
+		nc_verb_error("Memory allocation failed - %s (%s:%d).", strerror(errno), __FILE__, __LINE__);
+		return;
+	}
+
+	if (uname(kernel) == -1) {
+		nc_verb_error("uname(2) failed (%s).", strerror(errno));
+		kernel = NULL;
+		return;
+	}
 }
 
-void nclc_identity()
+void identity_detect(void)
 {
 	int file_ok;
 
-	if(kernel_set==0) {
+	/* RHEL, CentOS, Scientific Linux, Fedora */
+	file_ok = access(REDHAT_RELEASE_PATH, F_OK); /*"/etc/redhat-release"*/
+	if (file_ok == 0) {
+		distribution_id = REDHAT;
+		return;
+	}
+
+	/* SuSE, openSUSE */
+	file_ok = access(SUSE_RELEASE_PATH, F_OK); /*"/etc/SuSE-release"*/
+	if (file_ok == 0) {
+		distribution_id = SUSE;
+		return;
+	}
+
+	/* Debian, Ubuntu */
+	file_ok = access(DEBIAN_RELEASE_PATH, F_OK); /*"/etc/debian_version"*/
+	if (file_ok == 0) {
+		distribution_id = DEBIAN;
+		return;
+	}
+
+	distribution_id = UNKNOWN;
+}
+
+const char* get_nodename(void)
+{
+	if (!kernel) {
 		fill_kernel();
 	}
-
-	nclc_version_id = kernel.release[0]-'0';
-
-	file_ok = access(REDHAT_RELEASE_PATH, F_OK);	/*"/etc/redhat-release"*/
-	if(file_ok==0) {
-		nclc_distribution_id = REDHAT;
-		return;
-	}
-
-	file_ok = access(SUSE_RELEASE_PATH, F_OK);	/*"/etc/SuSE-release"*/
-	if(file_ok==0) {
-		nclc_distribution_id = SUSE;
-		return;
-	}
-
-	file_ok = access(DEBIAN_RELEASE_PATH, F_OK);	/*"/etc/debian_version"*/
-	if(file_ok==0) {
-		nclc_distribution_id = DEBIAN;
-		return;
-	}
-	nclc_distribution_id = UNKNOWN;
+	return kernel->nodename;
 }
 
-static char * uname_part(char id)
+const char* get_os_release(void)
 {
-	char * output = NULL;
-	if(kernel_set==0) {
+	if (!kernel) {
 		fill_kernel();
 	}
-	switch(id) {
-	case 'm': output = (char *) malloc(strlen(kernel.machine) + 1);
-		if(output == NULL) break;
-		output = strcpy(output, kernel.machine);
-		break;
-	case 'n': output = (char *) malloc(strlen(kernel.nodename) + 1);
-		if(output == NULL) break;
-		output = strcpy(output, kernel.nodename);
-		break;
-	case 'r': output = (char *) malloc(strlen(kernel.release) + 1);
-		if(output == NULL) break;
-		output = strcpy(output, kernel.release);
-		break;
-	case 's': output = (char *) malloc(strlen(kernel.sysname) + 1);
-		if(output == NULL) break;
-		output = strcpy(output, kernel.sysname);
-		break;
-	case 'v': output = (char *) malloc(strlen(kernel.version) + 1);
-		if(output == NULL) break;
-		output = strcpy(output, kernel.version);
-		break;
+	return kernel->release;
+}
+
+const char* get_os_version(void)
+{
+	if (!kernel) {
+		fill_kernel();
 	}
-	return output;
-}
-
-char * nclc_get_nodename()
-{
-	return uname_part('n');
-}
-
-char * nclc_get_os_release()
-{
-	return uname_part('r');
-}
-
-char * nclc_get_os_version()
-{
-	return uname_part('v');
+	return kernel->version;
 }
 
 /* co všechno nechám vracet nclc_get_os_machine */
-char * nclc_get_os_machine()
+const char* get_os_machine(void)
 {
-	return uname_part('m');
-}
-
-char * nclc_get_sysname()
-{
-	return uname_part('s');
-}
-
-char * nclc_get_os_distribution()
-{
-	char * output = NULL;
-	if(nclc_distribution_id==UNKNOWN) nclc_identity();
-
-	switch(nclc_distribution_id) {
-	case REDHAT: output = (char *) malloc(strlen("REDHAT") + 1);
-		if(output == NULL) break;
-		output = strcpy(output, "REDHAT");
-		break;
-	case SUSE: output = (char *) malloc(strlen("SUSE") + 1);
-		if(output == NULL) break;
-		output = strcpy(output, "SUSE");
-		break;
-	case DEBIAN: output = (char *) malloc(strlen("DEBIAN") + 1);
-		if(output == NULL) break;
-		output = strcpy(output, "DEBIAN");
-		break;
-	default: output = (char *) malloc(strlen("UNKNOWN") + 1);
-		if(output == NULL) break;
-		output = strcpy(output, "UNKNOWN");
-		break;
+	if (!kernel) {
+		fill_kernel();
 	}
-	return output;
+	return kernel->machine;
 }
 
-char * nclc_get_hostname()
+const char* get_sysname(void)
+{
+	if (!kernel) {
+		fill_kernel();
+	}
+	return kernel->sysname;
+}
+
+char* get_hostname(void)
 {
 	FILE* hostname;
+	char* path = NULL;
 	char* line = NULL, *ret = NULL;
 	size_t len = 0;
 
-	switch(nclc_distribution_id) {
+	switch (distribution_id) {
 	case REDHAT:
-		hostname = fopen(REDHAT_HOSTNAME_PATH, "r");
-		if (hostname == NULL) {
-			return NULL;
-		}
-
-		while (getline(&line, &len, hostname) != -1) {
-			if (strncmp(line, "HOSTNAME", 8) == 0) {
-				ret = strdup(line+9);
-				break;
-			}
-		}
-		free(line);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
-		}
-
-		fclose(hostname);
+		path = REDHAT_HOSTNAME_PATH;
 		break;
 	case SUSE:
-		hostname = fopen(SUSE_HOSTNAME_PATH, "r");
-		if (hostname == NULL) {
-			return NULL;
-		}
-
-		getline(&ret, &len, hostname);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
-		}
-
-		fclose(hostname);
+		path = SUSE_HOSTNAME_PATH;
 		break;
 	case DEBIAN:
-		hostname = fopen(DEBIAN_HOSTNAME_PATH, "r");
-		if (hostname == NULL) {
-			return NULL;
-		}
-
-		getline(&ret, &len, hostname);
-		if (ret[strlen(ret)-1] == '\n') {
-			ret[strlen(ret)-1] = '\0';
-		}
-
-		fclose(hostname);
+		path = DEBIAN_HOSTNAME_PATH;
 		break;
 	default:
+		nc_verb_error("%s: unknown distro.", __func__);
 		return (NULL);
+	}
+
+	/* open hostname file */
+	hostname = fopen(path, "r");
+	if (hostname == NULL) {
+		nc_verb_error("%s: unable to open hostname file \"%s\" (%s).", __func__, path, strerror(errno));
+		return (NULL);
+	}
+
+	/* get the hostname string */
+	if (distribution_id == REDHAT) {
+		while (getline(&line, &len, hostname) != -1) {
+			if (strncmp(line, "HOSTNAME=", 9) == 0) {
+				ret = strdup(line + 9);
+				free(line);
+				break;
+			}
+			free(line);
+		}
+	} else {
+		getline(&ret, &len, hostname);
+	}
+
+	fclose(hostname);
+
+	/* make it null terminated string */
+	if (ret[strlen(ret) - 1] == '\n') {
+		ret[strlen(ret) - 1] = '\0';
 	}
 
 	return ret;
 }
 
-int nclc_set_hostname(const char* hostname)
+int set_hostname(const char* hostname)
 {
 	FILE* host;
 	char* line, *network_config1 = NULL, *network_config2 = NULL, **matches, *old_hostname;
@@ -260,7 +217,7 @@ int nclc_set_hostname(const char* hostname)
 	/* TODO check hostname */
 
 	/* Get the current hostname */
-	line = nclc_get_hostname();
+	line = get_hostname();
 	if (line == NULL) {
 		return EXIT_FAILURE;
 	}
@@ -321,7 +278,7 @@ int nclc_set_hostname(const char* hostname)
 	aug_close(a);
 
 	/* Change hostname in a config file */
-	switch(nclc_distribution_id) {
+	switch (distribution_id) {
 	case REDHAT:
 		if (access(REDHAT_HOSTNAME_PATH, F_OK) != 0) {
 			return EXIT_FAILURE;
@@ -335,8 +292,8 @@ int nclc_set_hostname(const char* hostname)
 		/* Parse the whole file, remember config before HOSTNAME and after it */
 		while (getline(&line, &line_len, host) != -1) {
 			if (!host_found) {
-				network_config1 = realloc(network_config1, (net_len1+line_len+1)*sizeof(char));
-				strcpy(network_config1+net_len1, line);
+				network_config1 = realloc(network_config1, (net_len1 + line_len + 1) * sizeof(char));
+				strcpy(network_config1 + net_len1, line);
 				net_len1 += line_len;
 			}
 
@@ -346,8 +303,8 @@ int nclc_set_hostname(const char* hostname)
 			}
 
 			if (host_found) {
-				network_config2 = realloc(network_config2, (net_len2+line_len+1)*sizeof(char));
-				strcpy(network_config2+net_len2, line);
+				network_config2 = realloc(network_config2, (net_len2 + line_len + 1) * sizeof(char));
+				strcpy(network_config2 + net_len2, line);
 				net_len2 += line_len;
 			}
 		}

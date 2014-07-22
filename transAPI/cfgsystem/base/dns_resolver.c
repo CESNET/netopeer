@@ -1,3 +1,45 @@
+/**
+ * \file dns_resolver.c
+ * \brief Functions for DNS resolver configuration
+ * \author Michal Vasko <mvasko@cesnet.cz>
+ * \date 2013
+ *
+ * Copyright (C) 2013 CESNET
+ *
+ * LICENSE TERMS
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is'', and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
+ *
+ */
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -11,7 +53,8 @@
 
 #define RESOLV_CONF_FILE_PATH "/etc/resolv.conf"
 
-int dns_augeas_init(augeas** a, char** msg) {
+int dns_augeas_init(augeas** a, char** msg)
+{
 	int ret;
 
 	*a = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
@@ -39,7 +82,8 @@ int dns_augeas_init(augeas** a, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg) {
+bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg)
+{
 	xmlNodePtr cur;
 	int old_domain_count = 0, new_domain_count;
 	char* path;
@@ -70,7 +114,8 @@ bool dns_augeas_equal_search_count(augeas* a, xmlNodePtr search_node, char** msg
 	}
 }
 
-int dns_augeas_add_search_domain(augeas* a, const char* domain, int index, char** msg) {
+int dns_augeas_add_search_domain(augeas* a, const char* domain, int index, char** msg)
+{
 	int ret;
 	char* path;
 
@@ -105,7 +150,7 @@ int dns_augeas_add_search_domain(augeas* a, const char* domain, int index, char*
 			aug_insert(a, path, "domain", 1);
 			free(path);
 		} else {
-			asprintf(&path, "/files/%s/search/domain[%d]", RESOLV_CONF_FILE_PATH, index-1);
+			asprintf(&path, "/files/%s/search/domain[%d]", RESOLV_CONF_FILE_PATH, index - 1);
 			aug_insert(a, path, "domain", 0);
 			free(path);
 		}
@@ -119,7 +164,8 @@ int dns_augeas_add_search_domain(augeas* a, const char* domain, int index, char*
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_search_domain(augeas* a, const char* domain, char** msg) {
+int dns_augeas_rem_search_domain(augeas* a, const char* domain, char** msg)
+{
 	int i, ret;
 	char* path, **matches;
 	const char* value;
@@ -164,7 +210,8 @@ int dns_augeas_rem_search_domain(augeas* a, const char* domain, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_next_search_domain(augeas* a, int index, char** domain, char** msg) {
+int dns_augeas_next_search_domain(augeas* a, int index, char** domain, char** msg)
+{
 	const char* value;
 	char* path;
 	int ret;
@@ -194,7 +241,8 @@ int dns_augeas_next_search_domain(augeas* a, int index, char** domain, char** ms
 	return 1;
 }
 
-void dns_augeas_rem_all_search_domains(augeas* a) {
+void dns_augeas_rem_all_search_domains(augeas* a)
+{
 	char* path;
 
 	asprintf(&path, "/files/%s/search", RESOLV_CONF_FILE_PATH);
@@ -202,7 +250,8 @@ void dns_augeas_rem_all_search_domains(augeas* a) {
 	free(path);
 }
 
-int dns_augeas_add_nameserver(augeas* a, const char* address, int index, char** msg) {
+int dns_augeas_add_nameserver(augeas* a, const char* address, int index, char** msg)
+{
 	int ret;
 	char* path;
 
@@ -237,7 +286,7 @@ int dns_augeas_add_nameserver(augeas* a, const char* address, int index, char** 
 			aug_insert(a, path, "nameserver", 1);
 			free(path);
 		} else {
-			asprintf(&path, "/files/%s/nameserver[%d]", RESOLV_CONF_FILE_PATH, index-1);
+			asprintf(&path, "/files/%s/nameserver[%d]", RESOLV_CONF_FILE_PATH, index - 1);
 			aug_insert(a, path, "nameserver", 0);
 			free(path);
 		}
@@ -251,7 +300,8 @@ int dns_augeas_add_nameserver(augeas* a, const char* address, int index, char** 
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_nameserver(augeas* a, const char* address, char** msg) {
+int dns_augeas_rem_nameserver(augeas* a, const char* address, char** msg)
+{
 	int i, ret;
 	char* path, **matches;
 	const char* value;
@@ -287,7 +337,8 @@ int dns_augeas_rem_nameserver(augeas* a, const char* address, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_next_nameserver(augeas* a, int index, char** address, char** msg) {
+int dns_augeas_next_nameserver(augeas* a, int index, char** address, char** msg)
+{
 	const char* value;
 	char* path;
 	int ret;
@@ -318,7 +369,8 @@ int dns_augeas_next_nameserver(augeas* a, int index, char** address, char** msg)
 	return 1;
 }
 
-bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char** msg) {
+bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char** msg)
+{
 	xmlNodePtr cur;
 	int old_nameserver_count = 0, new_nameserver_count;
 	char* path;
@@ -349,7 +401,8 @@ bool dns_augeas_equal_nameserver_count(augeas* a, xmlNodePtr server_node, char**
 	}
 }
 
-void dns_augeas_rem_all_nameservers(augeas* a) {
+void dns_augeas_rem_all_nameservers(augeas* a)
+{
 	char* path;
 
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
@@ -357,7 +410,8 @@ void dns_augeas_rem_all_nameservers(augeas* a) {
 	free(path);
 }
 
-int dns_augeas_add_opt_timeout(augeas* a, const char* number, char** msg) {
+int dns_augeas_add_opt_timeout(augeas* a, const char* number, char** msg)
+{
 	int ret, i;
 	char* path, **matches;
 
@@ -396,7 +450,8 @@ int dns_augeas_add_opt_timeout(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_opt_timeout(augeas* a, const char* number, char** msg) {
+int dns_augeas_rem_opt_timeout(augeas* a, const char* number, char** msg)
+{
 	int ret, i;
 	char* path, **matches, *match = NULL;
 
@@ -437,7 +492,7 @@ int dns_augeas_rem_opt_timeout(augeas* a, const char* number, char** msg) {
 	}
 
 	for (i = 0; i < ret; ++i) {
-		if (strcmp(matches[i]+strlen(matches[i])-7, "timeout") == 0) {
+		if (strcmp(matches[i] + strlen(matches[i]) - 7, "timeout") == 0) {
 			match = strdup(matches[i]);
 			break;
 		}
@@ -464,7 +519,8 @@ int dns_augeas_rem_opt_timeout(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_mod_opt_timeout(augeas* a, const char* number, char** msg) {
+int dns_augeas_mod_opt_timeout(augeas* a, const char* number, char** msg)
+{
 	int ret;
 	char* path;
 
@@ -499,7 +555,8 @@ int dns_augeas_mod_opt_timeout(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_add_opt_attempts(augeas* a, const char* number, char** msg) {
+int dns_augeas_add_opt_attempts(augeas* a, const char* number, char** msg)
+{
 	int ret, i;
 	char* path, **matches;
 
@@ -538,7 +595,8 @@ int dns_augeas_add_opt_attempts(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_opt_attempts(augeas* a, const char* number, char** msg) {
+int dns_augeas_rem_opt_attempts(augeas* a, const char* number, char** msg)
+{
 	int ret, i;
 	char* path, **matches, *match = NULL;
 
@@ -579,7 +637,7 @@ int dns_augeas_rem_opt_attempts(augeas* a, const char* number, char** msg) {
 	}
 
 	for (i = 0; i < ret; ++i) {
-		if (strcmp(matches[i]+strlen(matches[i])-8, "attempts") == 0) {
+		if (strcmp(matches[i] + strlen(matches[i]) - 8, "attempts") == 0) {
 			match = strdup(matches[i]);
 			break;
 		}
@@ -606,7 +664,8 @@ int dns_augeas_rem_opt_attempts(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_mod_opt_attempts(augeas* a, const char* number, char** msg) {
+int dns_augeas_mod_opt_attempts(augeas* a, const char* number, char** msg)
+{
 	int ret;
 	char* path;
 
@@ -641,7 +700,8 @@ int dns_augeas_mod_opt_attempts(augeas* a, const char* number, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_read_options(augeas* a, char** timeout, char** attempts, char** msg) {
+int dns_augeas_read_options(augeas* a, char** timeout, char** attempts, char** msg)
+{
 	const char* value;
 	char* path;
 	int ret;

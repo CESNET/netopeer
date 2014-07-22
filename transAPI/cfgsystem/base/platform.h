@@ -1,11 +1,10 @@
-/*!
- * \file platform.h
+/**
+ * \file platform.c
  * \brief Functions for getting onformation about platform
- * \author Miroslav Brabenec <brabemi3@fit.cvut.cz>
+ * \author Michal Vasko <mvasko@cesnet.cz>
  * \author Tomas Cejka <cejkat@cesnet.cz>
  * \date 2013
- */
-/*
+ *
  * Copyright (C) 2013 CESNET
  *
  * LICENSE TERMS
@@ -57,73 +56,65 @@ typedef enum {
 	REDHAT,	/*1*/
 	SUSE,	/*2*/
 	DEBIAN	/*3*/
-} NCLC_DISTRIB;
+} DISTRO;
 
 /**
  * @brief variable which indicate distribution of system
  */
-extern NCLC_DISTRIB nclc_distribution_id;
+extern DISTRO distribution_id;
 
 /**
  * @brief int which indicate kernel version (2., 3., ...)
  */
-extern int nclc_version_id;
+extern int version_id;
 
 /**
- * @brief set global variables nclc_distribution_id and nclc_version_id
+ * @brief set global variables distribution_id and version_id
  */
-void nclc_identity();
+void identity_detect(void);
 
 /**
  * @brief return same information as uname -n
  * @return NULL allocation fail
  * @return char * node network name
  */
-char * nclc_get_nodename();
+const char* get_nodename(void);
 
 /**
  * @brief return same information as uname -r
  * @return NULL allocation fail
  * @return char * kernel release
  */
-char * nclc_get_os_release();
+const char* get_os_release(void);
 
 /**
  * @brief return same information as uname -v
  * @return NULL allocation fail
  * @return char * kernel version
  */
-char * nclc_get_os_version();
+const char* get_os_version(void);
 
 /**
  * @brief return same information as uname -m
  * @return NULL allocation fail
  * @return char * machine hardware name
  */
-char * nclc_get_os_machine();
+const char* get_os_machine(void);
 
 /**
  * @brief return same information uname -s
  * @return NULL allocation fail
  * @return char * NIS or YP domain name
  */
-char * nclc_get_sysname();
+const char* get_sysname(void);
 
-/**
- * @brief return distribution family of your system, use nclc_identity()
- * @return NULL allocation fail
- * @return char * - "UNKNOWN" imposible to identificate distribution,
- * nclc_identity() can't identify system
- * @return char * - "REDHAT", "SUSE" or "DEBIAN"
- */
-char * nclc_get_os_distribution();
 
 /**
  * @brief return local hostname
  * @return NULL error
  * @return otherwise hostname
  */
-char * nclc_get_hostname();
+char* get_hostname(void);
 
 /**
  * @brief set local hostname
@@ -131,6 +122,6 @@ char * nclc_get_hostname();
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS success
  */
-int nclc_set_hostname(const char* hostname);
+int set_hostname(const char* hostname);
 
 #endif /* PLATFORM_H_ */

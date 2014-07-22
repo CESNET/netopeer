@@ -10798,6 +10798,45 @@ if test -z "$libtool"; then
 fi
 
 
+# Check for compiler's visibility attribute
+SAVE_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ELF visibility" >&5
+$as_echo_n "checking for ELF visibility... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#pragma GCC visibility push(hidden)
+		__attribute__((visibility("default")))
+		int var=10;
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	#CPPFLAGS="-DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
+	CFLAGS="$SAVE_CFLAGS"
+
+else
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	CFLAGS="$SAVE_CFLAGS"
+
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 # Extract the first word of "netopeer-manager", so it can be a program name with args.
 set dummy netopeer-manager; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5

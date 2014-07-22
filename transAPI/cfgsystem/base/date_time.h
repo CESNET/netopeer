@@ -62,7 +62,7 @@ struct tmz {
  * @return 1 file not found
  * @return 2 permission denied
  */
-int nclc_set_timezone(const char *name);
+int set_timezone(const char *name);
 
 /**
  * @brief set the /etc/localtime file to right timezone
@@ -72,41 +72,13 @@ int nclc_set_timezone(const char *name);
  * @return 1 timezone not found
  * @return 2 permission denied
  */
-int nclc_set_gmt_offset(int offset);
+int set_gmt_offset(int offset);
 
 /**
- * @brief set system time
- * @param HHMMSS[in] char * in format "HH:MM:SS" (e.g. "10:35:55")
- * @return 0 success
- * @return 1 error in input string format
- * @return 2 invalid time information (e.g. hour<0 or hour>24, ...)
- * @return 3 permission denied
- */ 
-int nclc_set_time(char *HHMMSS);
-
-/**
- * @brief set system date
- * @param YYYYMMDD[in] char * in format "YYYY-MM-DD" (e.g. 2012-12-24)
- * @return 0 success
- * @return 1 error in input string format
- * @return 2 invalid date (e.g. day>31, 2013-2-30, ....)
- * @return 3 permission denied
+ * @brief return boot time as seconds since Epoch
+ * @return boot time, 0 on failure
  */
-int nclc_set_date(char *YYYYMMDD);
-
-/**
- * @brief return char * in format --**něco**--
- * @return NULL fail
- * @return char * with actual system time, date and timezone 
- */
-char * nclc_get_time();
-
-/**
- * @brief return char * which is boot time and date
- * @return NULL fail
- * @return char * boot time and date
- */
-char * nclc_get_boottime();
+time_t get_boottime(void);
 
 /**
  * @brief start ntp program on your system
@@ -114,7 +86,7 @@ char * nclc_get_boottime();
  * @return 1 problem with using ntp program
  * @return 2 UNKNOWN distribution
  */
-int nclc_ntp_start();
+int ntp_start(void);
 
 /**
  * @brief stop ntp program on your system
@@ -122,13 +94,13 @@ int nclc_ntp_start();
  * @return 1 problem with using ntp program
  * @return 2 UNKNOWN distribution
  */
-int nclc_ntp_stop();
+int ntp_stop(void);
 
 /**
  * @brief restart ntp program on your system
  * @return 0 success 
  */
-int nclc_ntp_restart();
+int ntp_restart(void);
 
 /**
  * @brief check the status of ntp on your system
@@ -136,7 +108,7 @@ int nclc_ntp_restart();
  * @return 0 ntp not running
  * @return -1 failed to check ntp status
  */
-int nclc_ntp_status();
+int ntp_status(void);
 
 /**
  * @brief rewrite /etc/ntp.conf file with new configuration
@@ -144,7 +116,7 @@ int nclc_ntp_status();
  * @return 0 success
  * @return 1 imposible to open /etc/ntp.conf
  */
-int nclc_ntp_rewrite_conf(char * new_conf);
+int ntp_rewrite_conf(char* new_conf);
 
 /**
  * @brief init augeas for NTP
@@ -211,7 +183,7 @@ char** ntp_resolve_server(char* server_name, char** msg);
  * @return timezone name
  * @return NULL if error occured
  */
-char* ntp_get_timezone(char** msg);
+char* get_timezone(char** msg);
 
 #endif /* DATE_TIME_H_ */
 
