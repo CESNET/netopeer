@@ -108,20 +108,4 @@ const char* get_os_machine(void);
  */
 const char* get_sysname(void);
 
-
-/**
- * @brief return local hostname
- * @return NULL error
- * @return otherwise hostname
- */
-char* get_hostname(void);
-
-/**
- * @brief set local hostname
- * @param hostname hostname to set
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS success
- */
-int set_hostname(const char* hostname);
-
 #endif /* PLATFORM_H_ */

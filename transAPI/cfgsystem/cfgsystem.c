@@ -7,6 +7,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,7 +178,9 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 	char* msg = NULL, *tmp;
 	int ret, index, auth_order_len;
 	bool iburst, prefer;
-	char* udp_address, *domain, *timeout, *attempts, *hostname;
+	char* udp_address, *domain, *timeout, *attempts;
+#define HOSTNAME_LENGTH 256
+	char hostname[HOSTNAME_LENGTH];
 	char** auth_order = NULL;
 	struct passwd* pwd;
 	struct spwd* spwd;
@@ -191,13 +194,13 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 
 	/* hostname */
 	identity_detect();
-	hostname = get_hostname();
-	if (hostname == NULL) {
-		asprintf(&msg, "Failed to get the local hostname.");
+
+	hostname[HOSTNAME_LENGTH - 1] = '\0';
+	if (gethostname(hostname, HOSTNAME_LENGTH - 1) == -1) {
+		asprintf(&msg, "Failed to get the local hostname (%s).", strerror(errno));
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
 	xmlNewChild(running_root, NULL, BAD_CAST "hostname", BAD_CAST hostname);
-	free(hostname);
 
 	/* clock */
 	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
@@ -512,8 +515,8 @@ PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		hostname = get_node_content(node);
 
-		if (set_hostname(hostname) != EXIT_SUCCESS) {
-			asprintf(&msg, "Failed to set the hostname.");
+		if (sethostname(hostname, strlen(hostname)) == -1) {
+			asprintf(&msg, "Failed to set the hostname (%s).", strerror(errno));
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
