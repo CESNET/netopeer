@@ -849,6 +849,9 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* give him some time to restart */
 		usleep(500000);
 	} else {
+		/* remove possible leftover pid file */
+		remove(CFG_DIR"/stunnel/stunnel.pid");
+
 		/* start stunnel */
 		pid = fork();
 		if (pid < 0) {
@@ -978,6 +981,8 @@ int callback_srv_netconf_srv_tls_srv_cert_maps (void ** UNUSED(data), XMLDIFF_OP
 int server_transapi_init(xmlDocPtr * UNUSED(running))
 {
 	xmlDocPtr doc;
+	struct nc_err* error = NULL;
+	const char* str_err;
 
 	/* set device according to defaults */
 	nc_verb_verbose("Setting default configuration for ietf-netconf-server module");
@@ -992,11 +997,25 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 			return (EXIT_FAILURE);
 		}
 
-		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
+			if (error != NULL) {
+				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+				if (str_err != NULL) {
+					nc_verb_error(str_err);
+				}
+				nc_err_free(error);
+			}
 			xmlFreeDoc(doc);
 			return (EXIT_FAILURE);
 		}
-		if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, &error) != EXIT_SUCCESS) {
+			if (error != NULL) {
+				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+				if (str_err != NULL) {
+					nc_verb_error(str_err);
+				}
+				nc_err_free(error);
+			}
 			xmlFreeDoc(doc);
 			return (EXIT_FAILURE);
 		}
@@ -1015,12 +1034,26 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 			return (EXIT_FAILURE);
 		}
 
-		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, NULL) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
+			if (error != NULL) {
+				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+				if (str_err != NULL) {
+					nc_verb_error(str_err);
+				}
+				nc_err_free(error);
+			}
 			xmlFreeDoc(doc);
 			kill_sshd();
 			return (EXIT_FAILURE);
 		}
-		if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, NULL) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, &error) != EXIT_SUCCESS) {
+			if (error != NULL) {
+				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+				if (str_err != NULL) {
+					nc_verb_error(str_err);
+				}
+				nc_err_free(error);
+			}
 			xmlFreeDoc(doc);
 			kill_sshd();
 			return (EXIT_FAILURE);
