@@ -849,6 +849,9 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* give him some time to restart */
 		usleep(500000);
 	} else {
+		/* remove possible leftover pid file */
+		remove(CFG_DIR"/stunnel/stunnel.pid");
+
 		/* start stunnel */
 		pid = fork();
 		if (pid < 0) {
