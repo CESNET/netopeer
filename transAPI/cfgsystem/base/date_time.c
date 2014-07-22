@@ -57,6 +57,7 @@
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <augeas.h>
+#include <libnetconf.h>
 
 #include "date_time.h"
 #include "platform.h"
@@ -115,41 +116,39 @@ struct tmz timezones[] = {
     {0, NULL}
 };
 
-int set_timezone(const char *name)
+int set_timezone(const char *name, char** errmsg)
 {
-	if (name == NULL) {
-		return 1;
-	}
-
 	struct stat statbuf;
-	char *path = ZONEINFO_FOLDER_PATH; /*"/usr/share/zoneinfo/"*/
 	char *tmp = NULL;
-	int file_ok = 0;
+	int ret = EXIT_SUCCESS;
 
-	asprintf(&tmp, "%s%s", path, name);
-
-	file_ok = access(tmp, F_OK);
-
-	if (file_ok) {
-		stat(tmp, &statbuf);
+	if (name == NULL) {
+		*errmsg = strdup("set_timezone: invalid parameter.");
+		return EXIT_FAILURE;
 	}
 
-	if (file_ok != 0 || S_ISDIR(statbuf.st_mode)) {
+	asprintf(&tmp, "%s%s", ZONEINFO_FOLDER_PATH, name);
+	if (stat(tmp, &statbuf) == -1) {
+		asprintf(errmsg, "Setting timezone failed - unable to get info about \"%s\" file (%s).", tmp, strerror(errno));
 		free(tmp);
-		return 1;
+		return EXIT_FAILURE;
+	}
+	if (S_ISDIR(statbuf.st_mode)) {
+		asprintf(errmsg, "Setting timezone failed - \"%s\" is a directory.", tmp);
+		free(tmp);
+		return EXIT_FAILURE;
 	}
 
-	if (unlink(LOCALTIME_FILE_PATH)) {
-		return 2; /*"/etc/localtime"*/
-	} if (symlink(tmp, LOCALTIME_FILE_PATH)) {
-		return 2; /*"/etc/localtime"*/
+	if (unlink(LOCALTIME_FILE_PATH) == -1 || symlink(tmp, LOCALTIME_FILE_PATH) == -1) {
+		asprintf(errmsg, "Setting timezone failed - unable to create localtime symlink to \"%s\" (%s).", tmp, strerror(errno));
+		ret = EXIT_FAILURE;
 	}
 	free(tmp);
 
-	return 0;
+	return ret;
 }
 
-int set_gmt_offset(int offset)
+int set_gmt_offset(int offset, char** errmsg)
 {
 	int i;
 
@@ -159,7 +158,12 @@ int set_gmt_offset(int offset)
 		}
 	}
 
-	return set_timezone(timezones[i].timezone_file);
+	if (timezones[i].timezone_file == NULL) {
+		*errmsg = strdup("Invalid timezone UTC offset.");
+		return EXIT_FAILURE;
+	}
+
+	return set_timezone(timezones[i].timezone_file, errmsg);
 }
 
 time_t get_boottime(void)
@@ -577,35 +581,33 @@ char** ntp_resolve_server(char* server_name, char** msg)
 	return ret;
 }
 
-char* get_timezone(char** msg)
+long get_tz_offset(void)
 {
-	char* buf, *tz;
-	size_t buf_len;
+	tzset();
+
+	/* timezone is in seconds, ietf-system shows it in minutes */
+	return (timezone / 60);
+}
+
+const char* get_tz(void)
+{
+	static char buf[128];
+	char* tz;
 	int ret;
 
-	buf_len = 128;
-	buf = malloc(buf_len * sizeof(char));
-
-	ret = readlink(LOCALTIME_FILE_PATH, buf, buf_len);
-
-	if (ret == -1) {
-		if (msg) {
-			asprintf(msg, "Getting the current timezone failed: %s", strerror(errno));
-		}
-		free(buf);
-		return NULL;
+	/* try to get nice name from localtime link */
+	if((ret = readlink(LOCALTIME_FILE_PATH, buf, 127)) == -1) {
+		goto backup;
 	}
-
-	if (ret == buf_len) {
-		if (msg) {
-			asprintf(msg, "Buffer too small for the timezone path.");
-		}
-		free(buf);
-		return NULL;
-	}
-
 	buf[ret] = '\0';
-	tz = strdup(strrchr(buf, '/') + 1);
-	free(buf);
-	return tz;
+
+	if ((tz = strstr(buf, ZONEINFO_FOLDER_PATH)) != NULL) {
+		return (tz + strlen(ZONEINFO_FOLDER_PATH));
+	} else {
+		return (strrchr(buf, '/') + 1);
+	}
+
+backup:
+	tzset();
+	return tzname[0];
 }

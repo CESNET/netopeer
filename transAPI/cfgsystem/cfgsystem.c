@@ -193,10 +193,9 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 	xmlNewProp(running_root, BAD_CAST "xmlns", BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system");
 
 	/* hostname */
-	identity_detect();
-
 	hostname[HOSTNAME_LENGTH - 1] = '\0';
 	if (gethostname(hostname, HOSTNAME_LENGTH - 1) == -1) {
+		xmlFreeDoc(*running); *running = NULL;
 		asprintf(&msg, "Failed to get the local hostname (%s).", strerror(errno));
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
@@ -204,14 +203,16 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 
 	/* clock */
 	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
-
-	/* timezone-name */
-	cur = xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", NULL);
-	if ((tmp = get_timezone(&msg)) == NULL) {
-		return fail(NULL, msg, EXIT_FAILURE);
+	if (ncds_feature_isenabled("ietf-system", "timezone-name")) {
+		/* clock/timezone-name */
+		xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", BAD_CAST get_tz());
+	} else {
+		/* clock/timezone-utc-offset */
+		tmp = NULL;
+		asprintf(&tmp, "%ld", get_tz_offset());
+		xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", BAD_CAST tmp);
+		free(tmp);
 	}
-	xmlNewChild(cur, NULL, BAD_CAST "timezone-name", BAD_CAST tmp);
-	free(tmp);
 
 	/* ntp */
 	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "ntp", NULL);
@@ -540,18 +541,12 @@ PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	int ret;
-	char* msg;
+	char* msg = NULL;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		ret = set_timezone(get_node_content(node));
-		if (ret == 1) {
-			asprintf(&msg, "Timezone %s was not found.", get_node_content(node));
-			return fail(error, msg, EXIT_FAILURE);
-		} else if (ret == 2) {
-			asprintf(&msg, "Permission to write the new timezone denied.");
+		if (set_timezone(get_node_content(node), &msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -575,18 +570,12 @@ PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name_system
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	int ret;
 	char* msg;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		ret = set_gmt_offset(atoi(get_node_content(node)));
-		if (ret == 1) {
-			asprintf(&msg, "Timezone %s does not exist.", get_node_content(node));
-			return fail(error, msg, EXIT_FAILURE);
-		} else if (ret == 2) {
-			asprintf(&msg, "Permission to write the new timezone denied.");
+		if (set_gmt_offset(atoi(get_node_content(node)), &msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -1530,10 +1519,10 @@ PUBLIC struct transapi_data_callbacks clbks = {
         .callbacks = {
         		{ .path = "/systemns:system/systemns:hostname",
         				.func = callback_systemns_system_systemns_hostname },
-                { .path = "/systemns:system/systemns:clock/systemns:timezone-name/systemns:timezone-name",
-                        .func = callback_systemns_system_systemns_clock_systemns_timezone_name_systemns_timezone_name },
-                { .path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset/systemns:timezone-utc-offset",
-                        .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset_systemns_timezone_utc_offset },
+                { .path = "/systemns:system/systemns:clock/systemns:timezone-name",
+                        .func = callback_systemns_system_systemns_clock_systemns_timezone_name },
+                { .path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset",
+                        .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset },
                 { .path = "/systemns:system/systemns:ntp/systemns:enabled",
                         .func = callback_systemns_system_systemns_ntp_systemns_enabled },
                 { .path = "/systemns:system/systemns:ntp/systemns:server",
@@ -1575,8 +1564,9 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 	xmlNodePtr current_datetime = input[0];
 	time_t new_time;
 	const char* timezone = NULL;
-	char *msg, *ptr, *rollback_timezone;
-	int ret, offset;
+	char *msg = NULL, *ptr;
+	const char *rollback_timezone;
+	int offset;
 
 	switch (ntp_status()) {
 	case 1:
@@ -1640,30 +1630,22 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 		}
 	}
 
-	rollback_timezone = get_timezone(NULL);
-	ret = set_gmt_offset(offset);
-	if (ret == 1) {
-		asprintf(&msg, "Could not find the \"localtime\" file.");
-		goto error;
-	} else if (ret == 2) {
-		asprintf(&msg, "Insufficient permissions to change the timezone.");
+	rollback_timezone = get_tz();
+	if (set_gmt_offset(offset, &msg) != 0) {
 		goto error;
 	}
 
 	/* set datetime */
 	new_time = nc_datetime2time(get_node_content(current_datetime));
 	if (stime(&new_time) == -1) {
-		asprintf(&msg, "Unable to set time (%s).", strerror(errno));
-
 		/* rollback timezone */
-		set_timezone(rollback_timezone);
-		free(rollback_timezone);
+		set_timezone(rollback_timezone, &msg);
+		free(msg); /* ignore rollback result, just do the best */
+		msg = NULL;
 
+		asprintf(&msg, "Unable to set time (%s).", strerror(errno));
 		goto error;
 	}
-
-	/* cleanup */
-	free(rollback_timezone);
 
 	return nc_reply_ok();
 

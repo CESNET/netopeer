@@ -62,7 +62,7 @@ struct tmz {
  * @return 1 file not found
  * @return 2 permission denied
  */
-int set_timezone(const char *name);
+int set_timezone(const char *name, char** errmsg);
 
 /**
  * @brief set the /etc/localtime file to right timezone
@@ -72,7 +72,7 @@ int set_timezone(const char *name);
  * @return 1 timezone not found
  * @return 2 permission denied
  */
-int set_gmt_offset(int offset);
+int set_gmt_offset(int offset, char** errmsg);
 
 /**
  * @brief return boot time as seconds since Epoch
@@ -178,12 +178,16 @@ int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** 
 char** ntp_resolve_server(char* server_name, char** msg);
 
 /**
- * @brief get the current timezone
- * @param msg error message in case of an error
- * @return timezone name
- * @return NULL if error occured
+ * @brief get the current timezone offset
+ * @return timezone offset in minutes, cannot fail
  */
-char* get_timezone(char** msg);
+long get_tz_offset(void);
+
+/**
+ * @brief get the current timezone
+ * @return timezone identification, cannot fail
+ */
+const char* get_tz(void);
 
 #endif /* DATE_TIME_H_ */
 
