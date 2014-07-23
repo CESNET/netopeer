@@ -47,7 +47,8 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include <augeas.h>
+
+#include <libxml/tree.h>
 
 struct tmz {
 	int minute_offset;
@@ -111,21 +112,19 @@ int ntp_restart(void);
 int ntp_status(void);
 
 /**
- * @brief rewrite /etc/ntp.conf file with new configuration
- * @param naw_conf[in] char * new configuration
- * @return 0 success
- * @return 1 imposible to open /etc/ntp.conf
- */
-int ntp_rewrite_conf(char* new_conf);
-
-/**
  * @brief init augeas for NTP
  * @param a augeas to initialize
  * @param msg error message in case of an error
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int ntp_augeas_init(augeas** a, char** msg);
+int ntp_augeas_init(char** msg);
+
+void ntp_augeas_close(void);
+
+int ntp_augeas_save(char** msg);
+
+xmlNodePtr ntp_augeas_getxml(char** msg, xmlNsPtr ns);
 
 /**
  * @brief add new server into augeas NTP config
@@ -138,7 +137,9 @@ int ntp_augeas_init(augeas** a, char** msg);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
+int ntp_augeas_add(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
+
+void ntp_augeas_rm(const char* item);
 
 /**
  * @brief find a server in augeas NTP config
@@ -151,22 +152,7 @@ int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool ib
  * @return augeas item unique name
  * @return NULL if error occured
  */
-char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
-
-/**
- * @brief read values of the server with index
- * @param a initialized augeas
- * @param association_type association type
- * @param index server index
- * @param udp_address NTP server address
- * @param iburst whether it had iburst set
- * @param prefer whether it had prefer set
- * @param msg error message in case of an error
- * @return -1 NULL arguments
- * @return 0 index out-of-bounds
- * @return 1 index found, valid values returned in the pointers
- */
-int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** udp_address, bool* iburst, bool* prefer, char** msg);
+char* ntp_augeas_find(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief resolve an URL in both IPv4 and IPv6

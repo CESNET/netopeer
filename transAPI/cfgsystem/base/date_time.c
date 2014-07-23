@@ -281,69 +281,173 @@ int ntp_status(void)
 	}
 }
 
-int ntp_rewrite_conf(char* new_conf)
-{
-	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt"); /*"/etc/ntp.conf"*/
+static augeas *augeas_ntp = NULL;
 
-	if (distribution_id == 0) {
-		identity_detect();
-	}
-
-	if (f == NULL) {
-		return 1;
-	}
-
-	fprintf(f, "%s", new_conf);
-	fclose(f);
-
-	ntp_restart();
-	return 0;
-}
-
-int ntp_augeas_init(augeas** a, char** msg)
+int ntp_augeas_init(char** msg)
 {
 	int ret;
 
-	*a = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
-	if (aug_error(*a) != AUG_NOERROR) {
-		asprintf(msg, "Augeas NTP initialization failed: %s", aug_error_message(*a));
+	if (augeas_ntp != NULL) {
+		/* already initiated */
+		return EXIT_SUCCESS;
+	}
+
+	augeas_ntp = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
+	if (aug_error(augeas_ntp) != AUG_NOERROR) {
+		asprintf(msg, "Augeas NTP initialization failed (%s)", aug_error_message(augeas_ntp));
 		return EXIT_FAILURE;
 	}
-	aug_set(*a, "/augeas/load/Ntp/lens", "Ntp.lns");
-	aug_set(*a, "/augeas/load/Ntp/incl", NTP_CONF_FILE_PATH);
+	aug_set(augeas_ntp, "/augeas/load/Ntp/lens", "Ntp.lns");
+	aug_set(augeas_ntp, "/augeas/load/Ntp/incl", NTP_CONF_FILE_PATH);
+	aug_load(augeas_ntp);
 
-	aug_load(*a);
-	ret = aug_match(*a, "/augeas//error", NULL);
+	ret = aug_match(augeas_ntp, "/augeas//error", NULL);
 	/* Error (or more of them) occured */
-	if (ret == 1) {
-		aug_get(*a, "/augeas//error/message", (const char**) msg);
+	if (ret != 0) {
+		aug_get(augeas_ntp, "/augeas//error[1]/message", (const char**) msg);
 		asprintf(msg, "Accessing \"%s\": %s.\n", NTP_CONF_FILE_PATH, *msg);
-		aug_close(*a);
-		return EXIT_FAILURE;
-	} else if (ret > 1) {
-		asprintf(msg, "Accessing \"%s\" failed.\n", NTP_CONF_FILE_PATH);
-		aug_close(*a);
+		ntp_augeas_close();
 		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-int ntp_augeas_add(augeas* a, char* udp_address, char* association_type,
-bool iburst, bool prefer, char** msg)
+int ntp_augeas_save(char** msg)
+{
+	if (aug_save(augeas_ntp) != 0) {
+		asprintf(msg, "Saving the modified NTP configuration failed: %s", aug_error_message(augeas_ntp));
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+void ntp_augeas_close(void)
+{
+	aug_close(augeas_ntp);
+	augeas_ntp = NULL;
+}
+
+xmlNodePtr ntp_augeas_getxml(char** msg, xmlNsPtr ns)
+{
+	int i, j;
+	const char* type[2] = {"server", "peer"};
+	const char* value;
+	char* path;
+	xmlNodePtr ntp_node, server, aux_node;
+
+	if (augeas_ntp == NULL) {
+		if (ntp_augeas_init(msg) != 0) {
+			return (NULL);
+		}
+	}
+
+	/* ntp */
+	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
+
+	/* ntp/enabled */
+	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (ntp_status() == 1) ? BAD_CAST "true" : BAD_CAST "false");
+
+	/* ntp/server[] */
+	j = 0;
+loop:
+	for (i = 1; j < 2; i++) {
+		path = NULL;
+		asprintf(&path, "/files/"NTP_CONF_FILE_PATH"/%s[%d]", type[j], i);
+		switch(aug_match(augeas_ntp, path, NULL)) {
+		case -1:
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_ntp));
+			free(path);
+			xmlFreeNode(ntp_node);
+			return (NULL);
+		case 0:
+			/* index out of bounds, continue with next server type */
+			free(path);
+			j++;
+			goto loop;
+		default: /* 1 */
+			/* ntp/server/ */
+			server = xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "server", NULL);
+
+			/* ntp/server/udp/address */
+			aug_get(augeas_ntp, path, &value);
+			aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp", NULL);
+			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST value);
+			/* port specification is not supported by Linux ntp implementation */
+
+			/* ntp/server/name */
+			free(path); path = NULL;
+			asprintf(&path, "%s-%d", type[j], i);
+			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST path);
+
+			/* ntp/server/association-type */
+			xmlNewChild(server, server->ns, BAD_CAST "association-type", BAD_CAST type[j]);
+
+			/* ntp/server/iburst */
+			free(path); path = NULL;
+			asprintf(&path, "/files/"NTP_CONF_FILE_PATH"/%s[%d]/iburst", type[j], i);
+			switch(aug_match(augeas_ntp, path, NULL)) {
+			case -1:
+				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_ntp));
+				free(path);
+				xmlFreeNode(ntp_node);
+				return (NULL);
+			case 0:
+				/* iburst not set */
+				xmlNewChild(server, server->ns, BAD_CAST "iburst", BAD_CAST "false");
+				break;
+			default: /* 1 */
+				/* iburst set */
+				xmlNewChild(server, server->ns, BAD_CAST "iburst", BAD_CAST "true");
+				break;
+			}
+
+			/* ntp/server/prefer */
+			free(path); path = NULL;
+			asprintf(&path, "/files/"NTP_CONF_FILE_PATH"/%s[%d]/prefer", type[j], i);
+			switch(aug_match(augeas_ntp, path, NULL)) {
+			case -1:
+				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_ntp));
+				free(path);
+				xmlFreeNode(ntp_node);
+				return (NULL);
+			case 0:
+				/* prefer not set */
+				xmlNewChild(server, server->ns, BAD_CAST "prefer", BAD_CAST "false");
+				break;
+			default: /* 1 */
+				/* prefer set */
+				xmlNewChild(server, server->ns, BAD_CAST "prefer", BAD_CAST "true");
+				break;
+			}
+			free(path); path = NULL;
+		}
+	}
+
+	return (ntp_node);
+}
+
+int ntp_augeas_add(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg)
 {
 	int ret;
 	char* path;
 
-	if (a == NULL || udp_address == NULL || association_type == NULL) {
+	if (augeas_ntp == NULL) {
+		if (ntp_augeas_init(msg) != 0) {
+			return EXIT_FAILURE;
+		}
+	}
+
+	if (udp_address == NULL || association_type == NULL) {
 		asprintf(msg, "NULL arguments.");
 		return EXIT_FAILURE;
 	}
 
 	asprintf(&path, "/files/%s/%s", NTP_CONF_FILE_PATH, association_type);
-	ret = aug_match(a, path, NULL);
+	ret = aug_match(augeas_ntp, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_ntp));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -351,55 +455,65 @@ bool iburst, bool prefer, char** msg)
 	free(path);
 
 	asprintf(&path, "/files/%s/%s[%d]", NTP_CONF_FILE_PATH, association_type, ret);
-	aug_set(a, path, udp_address);
+	aug_set(augeas_ntp, path, udp_address);
 	free(udp_address);
 	free(path);
 
 	if (iburst) {
 		asprintf(&path, "/files/%s/%s[%d]/iburst", NTP_CONF_FILE_PATH, association_type, ret);
-		aug_set(a, path, NULL);
+		aug_set(augeas_ntp, path, NULL);
 		free(path);
 	}
 
 	if (prefer) {
 		asprintf(&path, "/files/%s/%s[%d]/prefer", NTP_CONF_FILE_PATH, association_type, ret);
-		aug_set(a, path, NULL);
+		aug_set(augeas_ntp, path, NULL);
 		free(path);
 	}
 
 	return EXIT_SUCCESS;
 }
 
-char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type,
-bool iburst, bool prefer, char** msg)
+void ntp_augeas_rm(const char* item)
+{
+	aug_rm(augeas_ntp, item);
+}
+
+char* ntp_augeas_find(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg)
 {
 	int ret, ret2, i, j;
 	char* path, *match;
 	const char* value;
 	char** matches, **item_match;
 
-	if (a == NULL || udp_address == NULL || association_type == NULL) {
+	if (augeas_ntp == NULL) {
+		if (ntp_augeas_init(msg) != 0) {
+			return NULL;
+		}
+	}
+
+	if (udp_address == NULL || association_type == NULL) {
 		asprintf(msg, "NULL arguments.");
 		return NULL;
 	}
 
 	asprintf(&path, "/files/%s/%s", NTP_CONF_FILE_PATH, association_type);
-	ret = aug_match(a, path, &matches);
+	ret = aug_match(augeas_ntp, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_ntp));
 		free(path);
 		return NULL;
 	}
 	free(path);
 
 	for (i = 0; i < ret; ++i) {
-		aug_get(a, matches[i], &value);
+		aug_get(augeas_ntp, matches[i], &value);
 		if (value == NULL || strcmp(value, udp_address) != 0) {
 			continue;
 		}
 
 		asprintf(&path, "/files/%s/%s[%d]/*", NTP_CONF_FILE_PATH, association_type, i + 1);
-		ret2 = aug_match(a, path, &item_match);
+		ret2 = aug_match(augeas_ntp, path, &item_match);
 		free(path);
 		if (ret2 > 2) {
 			continue;
@@ -459,68 +573,6 @@ bool iburst, bool prefer, char** msg)
 	}
 	free(matches);
 	return match;
-}
-
-int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** udp_address, bool* iburst, bool* prefer, char** msg)
-{
-	const char* value;
-	char* path;
-	int ret;
-
-	if (a == NULL || association_type == NULL || index < 1 || udp_address == NULL || iburst == NULL || prefer == NULL) {
-		asprintf(msg, "NULL argument.");
-		return -1;
-	}
-
-	asprintf(&path, "/files/%s/%s[%d]", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		return -1;
-	}
-	if (ret == 0) {
-		/* Index out-of-bounds */
-		free(path);
-		return 0;
-	}
-
-	aug_get(a, path, &value);
-	*udp_address = strdup(value);
-
-	free(path);
-	asprintf(&path, "/files/%s/%s[%d]/iburst", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		free(*udp_address);
-		return -1;
-	}
-	if (ret == 0) {
-		*iburst = false;
-	} else {
-		*iburst = true;
-	}
-
-	free(path);
-	asprintf(&path, "/files/%s/%s[%d]/prefer", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		free(*udp_address);
-		return -1;
-	}
-	if (ret == 0) {
-		*prefer = false;
-	} else {
-		*prefer = true;
-	}
-
-	free(path);
-	return 1;
 }
 
 char** ntp_resolve_server(char* server_name, char** msg)

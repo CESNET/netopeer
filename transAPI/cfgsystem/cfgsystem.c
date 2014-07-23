@@ -136,27 +136,6 @@ static int fail(struct nc_err** error, char* msg, int ret)
 	return ret;
 }
 
-static int fail_with_aug(struct nc_err** error, char* msg, augeas* a, int ret)
-{
-	if (a != NULL) {
-		aug_close(a);
-	}
-
-	if (error != NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		if (msg != NULL) {
-			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		}
-	}
-
-	if (msg != NULL) {
-		nc_verb_error(msg);
-		free(msg);
-	}
-
-	return ret;
-}
-
 static const char* get_node_content(const xmlNodePtr node)
 {
 	if (node == NULL || node->children == NULL || node->children->type != XML_TEXT_NODE) {
@@ -172,25 +151,19 @@ static const char* get_node_content(const xmlNodePtr node)
  * @param[out] running	Current configuration of managed device.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-PUBLIC int transapi_init(xmlDocPtr* running)
+PUBLIC int transapi_init(xmlDocPtr *running)
 {
-	xmlNodePtr running_root, container_cur, cur;
+	xmlNodePtr root, container_cur, cur;
+	xmlNsPtr ns;
 	char* msg = NULL, *tmp;
-	int ret, index, auth_order_len;
-	bool iburst, prefer;
-	char* udp_address, *domain, *timeout, *attempts;
 #define HOSTNAME_LENGTH 256
 	char hostname[HOSTNAME_LENGTH];
-	char** auth_order = NULL;
-	struct passwd* pwd;
-	struct spwd* spwd;
-	struct ssh_key** key;
-	augeas* a;
 
 	*running = xmlNewDoc(BAD_CAST "1.0");
-	running_root = xmlNewNode(NULL, BAD_CAST "system");
-	xmlDocSetRootElement(*running, running_root);
-	xmlNewProp(running_root, BAD_CAST "xmlns", BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system");
+	root = xmlNewNode(NULL, BAD_CAST "system");
+	xmlDocSetRootElement(*running, root);
+	ns = xmlNewNs(root, (xmlChar *) "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
+	xmlSetNs(root, ns);
 
 	/* hostname */
 	hostname[HOSTNAME_LENGTH - 1] = '\0';
@@ -199,231 +172,55 @@ PUBLIC int transapi_init(xmlDocPtr* running)
 		asprintf(&msg, "Failed to get the local hostname (%s).", strerror(errno));
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
-	xmlNewChild(running_root, NULL, BAD_CAST "hostname", BAD_CAST hostname);
+	xmlNewChild(root, root->ns, BAD_CAST "hostname", BAD_CAST hostname);
 
 	/* clock */
-	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
+	container_cur = xmlNewChild(root, root->ns, BAD_CAST "clock", NULL);
 	if (ncds_feature_isenabled("ietf-system", "timezone-name")) {
 		/* clock/timezone-name */
-		xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", BAD_CAST get_tz());
+		xmlNewChild(container_cur, container_cur->ns, BAD_CAST "timezone-name", BAD_CAST get_tz());
 	} else {
 		/* clock/timezone-utc-offset */
 		tmp = NULL;
 		asprintf(&tmp, "%ld", get_tz_offset());
-		xmlNewChild(container_cur, NULL, BAD_CAST "timezone-name", BAD_CAST tmp);
+		xmlNewChild(container_cur, container_cur->ns, BAD_CAST "timezone-name", BAD_CAST tmp);
 		free(tmp);
 	}
 
 	/* ntp */
-	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "ntp", NULL);
+	if (ncds_feature_isenabled("ietf-system", "ntp")) {
+		if (ntp_augeas_init(&msg) != EXIT_SUCCESS) {
+			return fail(NULL, msg, EXIT_FAILURE);
+		}
 
-	/* enabled */
-	ret = ntp_status();
-	xmlNewChild(container_cur, NULL, BAD_CAST "enabled", (ret != 0) ? BAD_CAST "true" : BAD_CAST "false");
-
-	/* server */
-	if (ntp_augeas_init(&a, &msg) != EXIT_SUCCESS) {
-		return fail(NULL, msg, EXIT_FAILURE);
-	}
-	index = 1;
-	while ((ret = ntp_augeas_next_server(a, "server", index, &udp_address, &iburst, &prefer, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
-		/* name */
-		asprintf(&tmp, "server%d", index);
-		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
-		free(tmp);
-
-		/* association-type */
-		xmlNewChild(cur, NULL, BAD_CAST "association-type", BAD_CAST "server");
-
-		/* iburst */
-		xmlNewChild(cur, NULL, BAD_CAST "iburst", (iburst) ? BAD_CAST "true" : BAD_CAST "false");
-
-		/* prefer */
-		xmlNewChild(cur, NULL, BAD_CAST "prefer", (prefer) ? BAD_CAST "true" : BAD_CAST "false");
-
-		/* udp address */
-		cur = xmlNewChild(cur, NULL, BAD_CAST "udp", NULL);
-		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
-		free(udp_address);
-
-		++index;
-	}
-	if (ret == -1) {
-		return fail_with_aug(NULL, msg, a, EXIT_FAILURE);
-	}
-	index = 1;
-	while ((ret = ntp_augeas_next_server(a, "peer", index, &udp_address, &iburst, &prefer, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
-		/* name */
-		asprintf(&tmp, "server%d", index);
-		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
-		free(tmp);
-
-		/* association-type */
-		xmlNewChild(cur, NULL, BAD_CAST "association-type", BAD_CAST "peer");
-
-		/* iburst */
-		xmlNewChild(cur, NULL, BAD_CAST "iburst", iburst ? BAD_CAST "true" : BAD_CAST "false");
-
-		/* prefer */
-		xmlNewChild(cur, NULL, BAD_CAST "prefer", prefer ? BAD_CAST "true" : BAD_CAST "false");
-
-		/* udp address */
-		cur = xmlNewChild(cur, NULL, BAD_CAST "udp", NULL);
-		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
-		free(udp_address);
-
-		++index;
-	}
-	aug_close(a);
-	if (ret == -1) {
-		return fail(NULL, msg, EXIT_FAILURE);
+		if ((cur =  ntp_augeas_getxml(&msg, root->ns)) != NULL) {
+			xmlAddChild(root, cur);
+		} else if (msg != NULL) {
+			return fail(NULL, msg, EXIT_FAILURE);
+		}
 	}
 
 	/* dns-resolver */
-	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "dns-resolver", NULL);
-
-	if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
-	/* search */
-	index = 1;
-	while ((ret = dns_augeas_next_search_domain(a, index, &domain, &msg)) == 1) {
-		xmlNewChild(container_cur, NULL, BAD_CAST "search", BAD_CAST domain);
-		free(domain);
-
-		++index;
-	}
-	if (ret == -1) {
-		return fail_with_aug(NULL, msg, a, EXIT_FAILURE);
-	}
-
-	/* server */
-	index = 1;
-	while ((ret = dns_augeas_next_nameserver(a, index, &udp_address, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, BAD_CAST "server", NULL);
-		/* name */
-		asprintf(&tmp, "nameserver%d", index);
-		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST tmp);
-		free(tmp);
-
-		/* udp-and-tcp address */
-		cur = xmlNewChild(cur, NULL, BAD_CAST "udp-and-tcp", NULL);
-		cur = xmlNewChild(cur, NULL, BAD_CAST "udp-and-tcp", NULL);
-		xmlNewChild(cur, NULL, BAD_CAST "address", BAD_CAST udp_address);
-		free(udp_address);
-
-		++index;
-	}
-	if (ret == -1) {
-		return fail_with_aug(NULL, msg, a, EXIT_FAILURE);
-	}
-
-	/* options */
-	if ((ret = dns_augeas_read_options(a, &timeout, &attempts, &msg)) == 1) {
-		cur = xmlNewChild(container_cur, NULL, BAD_CAST "options", NULL);
-		if (timeout != NULL) {
-			xmlNewChild(cur, NULL, BAD_CAST "timeout", BAD_CAST timeout);
-			free(timeout);
-		}
-		if (attempts != NULL) {
-			xmlNewChild(cur, NULL, BAD_CAST "attempts", BAD_CAST attempts);
-			free(attempts);
-		}
-	}
-	aug_close(a);
-	if (ret == -1) {
+	if ((cur =  dns_augeas_getxml(&msg, root->ns)) != NULL) {
+		xmlAddChild(root, cur);
+	} else if (msg != NULL) {
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
 
 	/* authentication */
-	container_cur = xmlNewChild(running_root, NULL, BAD_CAST "authentication", NULL);
-
-	/* user-authentication-order */
-	/* !! no entries mean the PAM config file of SSHD was not 
-	 * configured by this module before and the current settings
-	 * are kept !! */
-	if (users_augeas_init(&a, &msg) != EXIT_SUCCESS) {
-		return fail(NULL, msg, EXIT_FAILURE);
-	}
-	if (users_augeas_get_sshd_auth_order(a, &auth_order, &auth_order_len, &msg) != EXIT_SUCCESS) {
-		return fail_with_aug(NULL, msg, a, EXIT_FAILURE);
-	}
-	aug_close(a);
-	if (auth_order != NULL) {
-		for (index = 0; index < auth_order_len; ++index) {
-			xmlNewChild(running_root, NULL, BAD_CAST "user-authentication-order", BAD_CAST auth_order[index]);
-			free(auth_order[index]);
-		}
-		free(auth_order);
-	}
-
-	/* user */
-	setpwent();
-	if (lckpwdf() != 0) {
-		asprintf(&msg, "Failed to acquire shadow file lock.");
-		return fail(NULL, msg, EXIT_FAILURE);
-	}
-	while ((pwd = getpwent()) != NULL) {
-		/* user */
-		cur = xmlNewChild(container_cur, NULL, BAD_CAST "user", NULL);
-
-		/* name */
-		xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST pwd->pw_name);
-
-		/* passwd */
-		if (pwd->pw_passwd[0] == 'x') {
-			setspent();
-			spwd = getspnam(pwd->pw_name);
-			if (spwd == NULL) {
-				asprintf(&msg, "Failed to retrieve shadow password for the user \"%s\".", pwd->pw_name);
-				xmlFreeDoc(*running);
-				endspent();
-				ulckpwdf();
-				endpwent();
-				return fail(NULL, msg, EXIT_FAILURE);
-			}
-			if (spwd->sp_pwdp[0] != '*' && spwd->sp_pwdp[0] != '!') {
-				xmlNewChild(cur, NULL, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
-			}
-		} else if (pwd->pw_passwd[0] != '*') {
-			xmlNewChild(cur, NULL, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
-		}
-
-		/* ssh-key */
-		if (users_get_ssh_keys(pwd->pw_dir, &key, &msg) != EXIT_SUCCESS) {
+	if (ncds_feature_isenabled("ietf-system", "authentication")) {
+		if (users_augeas_init(&msg) != EXIT_SUCCESS) {
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
-		if (key == NULL) {
-			continue;
+		if ((cur =  users_augeas_getxml(&msg, root->ns)) != NULL) {
+			xmlAddChild(root, cur);
+		} else if (msg != NULL) {
+			return fail(NULL, msg, EXIT_FAILURE);
 		}
-
-		index = 0;
-		while (key[index] != NULL) {
-			cur = xmlNewChild(cur, NULL, BAD_CAST "authorized-key", NULL);
-
-			/* name */
-			xmlNewChild(cur, NULL, BAD_CAST "name", BAD_CAST key[index]->name);
-			free(key[index]->name);
-
-			/* algorithm */
-			xmlNewChild(cur, NULL, BAD_CAST "algorithm", BAD_CAST key[index]->alg);
-			free(key[index]->alg);
-
-			/* key-data */
-			xmlNewChild(cur, NULL, BAD_CAST "key-data", BAD_CAST key[index]->data);
-			free(key[index]->data);
-
-			free(key[index]);
-			++index;
-		}
-		free(key);
 	}
-
-	endspent();
-	ulckpwdf();
-	endpwent();
 
 	/* Reset REORDER and MOD flags */
 	dns_nmsrv_mod_reorder = 0;
@@ -652,15 +449,10 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 	xmlNodePtr cur, child;
 	int i;
 	char* msg = NULL, *item, **resolved = NULL;
-	augeas* a;
 	char* udp_address = NULL;
 	char* association_type = NULL;
 	bool iburst = NTP_SERVER_IBURST_DEFAULT;
 	bool prefer = NTP_SERVER_PREFER_DEFAULT;
-
-	if (ntp_augeas_init(&a, &msg) != EXIT_SUCCESS) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_REM) || (op & XMLDIFF_MOD)) {
 		child = node->children;
@@ -700,7 +492,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 
 		if (udp_address == NULL) {
 			free(association_type);
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+			return fail(error, msg, EXIT_FAILURE);
 		}
 
 		if (association_type == NULL) {
@@ -727,28 +519,28 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 		do {
 			if (op & XMLDIFF_ADD) {
 				/* Write the new values into Augeas structure */
-				if (ntp_augeas_add(a, udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
+				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
 			} else if (op & XMLDIFF_REM) {
 				/* Delete this item from the config */
-				if ((item = ntp_augeas_find(a, udp_address, association_type, iburst, prefer, &msg)) == NULL) {
+				if ((item = ntp_augeas_find(udp_address, association_type, iburst, prefer, &msg)) == NULL) {
 					if (msg == NULL) {
 						asprintf(&msg, "Deleting an NTP server failed: not found.");
 					}
 					goto error;
 				}
-				aug_rm(a, item);
+				ntp_augeas_rm(item);
 			} else { /* XMLDIFF_MOD */
 				/* Update this item from the config */
-				if ((item = ntp_augeas_find(a, udp_address, association_type, iburst, prefer, &msg)) == NULL) {
+				if ((item = ntp_augeas_find(udp_address, association_type, iburst, prefer, &msg)) == NULL) {
 					if (msg == NULL) {
 						asprintf(&msg, "Updating an NTP server failed: not found.");
 					}
 					goto error;
 				}
-				aug_rm(a, item);
-				if (ntp_augeas_add(a, udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
+				ntp_augeas_rm(item);
+				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
 			}
@@ -770,7 +562,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-name callback.", op);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	/* Restart NTP daemon if enabled */
@@ -790,11 +582,9 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 	}
 
 	/* Save the changes */
-	if (aug_save(a) != 0) {
-		asprintf(&msg, "Saving the modified NTP configuration failed: %s", aug_error_message(a));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	if (ntp_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-	aug_close(a);
 
 	return EXIT_SUCCESS;
 
@@ -811,7 +601,7 @@ error:
 	free(udp_address);
 	free(association_type);
 
-	return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	return fail(error, msg, EXIT_FAILURE);
 }
 
 /**
@@ -872,14 +662,13 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 	int index, count, total_len;
 	bool found;
 	char* msg = NULL;
-	augeas* a;
 
 	/* Already processed, skip */
 	if ((op & XMLDIFF_SIBLING) && (dns_search_reorder == 1)) {
 		return EXIT_SUCCESS;
 	}
 
-	if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -913,29 +702,29 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 
 		if (count > DNS_SEARCH_DOMAIN_MAX) {
 			asprintf(&msg, "Too many domains in the search list for host-name lookup (max %d).", DNS_SEARCH_DOMAIN_MAX);
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+			return fail(error, msg, EXIT_FAILURE);
 		}
 
 		if (total_len > DNS_SEARCH_DOMAINLIST_LEN_MAX) {
 			asprintf(&msg, "Too long domain names in the search list for host-name lookup (max total characters are %d).", DNS_SEARCH_DOMAINLIST_LEN_MAX);
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		if (dns_augeas_add_search_domain(a, get_node_content(node), index, &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_add_search_domain(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_search_domain(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_rem_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_SIBLING) {
-		if (!dns_augeas_equal_search_count(a, node, &msg)) {
+		if (!dns_augeas_equal_search_count(node, &msg)) {
 			if (msg != NULL) {
-				return fail_with_aug(error, msg, a, EXIT_FAILURE);
+				return fail(error, msg, EXIT_FAILURE);
 			}
 			nc_verb_warning("Mismatch Resolv domain count and configuration domain count, Resolv domains will be rewritten.");
 		}
-		dns_augeas_rem_all_search_domains(a);
+		dns_augeas_rem_all_search_domains();
 
 		index = 1;
 		cur = node->parent->children;
@@ -944,8 +733,8 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 				cur = cur->next;
 				continue;
 			}
-			if (dns_augeas_add_search_domain(a, get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
-				return fail_with_aug(error, msg, a, EXIT_FAILURE);
+			if (dns_augeas_add_search_domain(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
 			}
 			++index;
 			cur = cur->next;
@@ -955,15 +744,13 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		dns_search_reorder = 1;
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-search callback.", op);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg,  EXIT_FAILURE);
 	}
 
 	/* Save the changes */
-	if (aug_save(a) != 0) {
-		asprintf(&msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(a));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	if (dns_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-	aug_close(a);
 
 	return EXIT_SUCCESS;
 }
@@ -984,7 +771,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 	xmlNodePtr cur;
 	int index;
 	char* msg = NULL;
-	augeas* a;
 
 	/* Somewhat special case, we want to defer the processing to the parent callback */
 	if (op & XMLDIFF_MOD) {
@@ -992,7 +778,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 		return EXIT_SUCCESS;
 	}
 
-	if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -1008,24 +794,22 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 			++index;
 		}
 
-		if (dns_augeas_add_nameserver(a, get_node_content(node), index, &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_add_nameserver(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_nameserver(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_rem_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-server-address callback.", op);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	/* Save the changes */
-	if (aug_save(a) != 0) {
-		asprintf(&msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(a));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	if (dns_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-	aug_close(a);
 
 	return EXIT_SUCCESS;
 }
@@ -1044,29 +828,28 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
-	augeas* a;
 	char* msg = NULL;
 	int index;
 
-	if (dns_nmsrv_mod_reorder == 2 || (op & XMLDIFF_SIBLING && dns_nmsrv_mod_reorder == 0)) {
+	if (dns_nmsrv_mod_reorder == 2 || ((op & XMLDIFF_SIBLING) && dns_nmsrv_mod_reorder == 0)) {
 
-		if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+		if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		if (!dns_augeas_equal_nameserver_count(a, node, &msg)) {
+		if (!dns_augeas_equal_nameserver_count(node, &msg)) {
 			if (msg != NULL) {
-				return fail_with_aug(error, msg, a, EXIT_FAILURE);
+				return fail(error, msg, EXIT_FAILURE);
 			}
 			nc_verb_warning("Mismatch Resolv nameserver count and configuration nameserver count, Resolv nameservers will be rewritten.");
 		}
-		dns_augeas_rem_all_nameservers(a);
+		dns_augeas_rem_all_nameservers();
 
 		index = 1;
 		cur = node->parent->children;
 		while (cur != NULL) {
-			if (dns_augeas_add_nameserver(a, get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
-				return fail_with_aug(error, msg, a, EXIT_FAILURE);
+			if (dns_augeas_add_nameserver(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
 			}
 			++index;
 			cur = cur->next;
@@ -1076,11 +859,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 		dns_nmsrv_mod_reorder = 1;
 
 		/* Save the changes */
-		if (aug_save(a) != 0) {
-			asprintf(&msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(a));
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_save(&msg) != 0) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
-		aug_close(a);
 	}
 
 	return EXIT_SUCCESS;
@@ -1100,10 +881,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
-	augeas* a;
 	int num;
 
-	if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -1111,36 +891,34 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	num = strtol(get_node_content(node), &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Timeout \"%s\" is not a number.", get_node_content(node));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 	if (num > DNS_TIMEOUT_MAX) {
 		asprintf(&msg, "Timeout %d is too long (max %d).", num, DNS_TIMEOUT_MAX);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	if (op & XMLDIFF_ADD) {
-		if (dns_augeas_add_opt_timeout(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_add_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_opt_timeout(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_rem_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_MOD) {
-		if (dns_augeas_mod_opt_timeout(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_mod_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-timeout callback.", op);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	/* Save the changes */
-	if (aug_save(a) != 0) {
-		asprintf(&msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(a));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	if (dns_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-	aug_close(a);
 
 	return EXIT_SUCCESS;
 }
@@ -1159,10 +937,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
-	augeas* a;
 	int num;
 
-	if (dns_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -1170,36 +947,34 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	num = strtol(get_node_content(node), &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Attempts \"%s\" is not a number.", get_node_content(node));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 	if (num > DNS_ATTEMPTS_MAX) {
 		asprintf(&msg, "%d attempts are too much (max %d).", num, DNS_ATTEMPTS_MAX);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	if (op & XMLDIFF_ADD) {
-		if (dns_augeas_add_opt_attempts(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_add_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_opt_attempts(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_rem_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_MOD) {
-		if (dns_augeas_mod_opt_attempts(a, get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (dns_augeas_mod_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-attempts callback.", op);
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	/* Save the changes */
-	if (aug_save(a) != 0) {
-		asprintf(&msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(a));
-		return fail_with_aug(error, msg, a, EXIT_FAILURE);
+	if (dns_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-	aug_close(a);
 
 	return EXIT_SUCCESS;
 }
@@ -1475,34 +1250,31 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
 {
 	xmlNodePtr cur;
 	char* msg;
-	augeas* a;
 
 	/* user-authentication-order */
 	if (op & (XMLDIFF_MOD | XMLDIFF_REORDER)) {
-		if (users_augeas_init(&a, &msg) != EXIT_SUCCESS) {
+		if (users_augeas_init(&msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		if (users_augeas_rem_all_sshd_auth_order(a, &msg) != EXIT_SUCCESS) {
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (users_augeas_rem_all_sshd_auth_order(&msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
 
 		cur = node->last;
 		while (cur != NULL) {
 			if (xmlStrcmp(cur->name, BAD_CAST "user-authentication-order") == 0) {
-				if (users_augeas_add_first_sshd_auth_order(a, get_node_content(cur), &msg) != EXIT_SUCCESS) {
-					return fail_with_aug(error, msg, a, EXIT_FAILURE);
+				if (users_augeas_add_first_sshd_auth_order(get_node_content(cur), &msg) != EXIT_SUCCESS) {
+					return fail(error, msg, EXIT_FAILURE);
 				}
 			}
 			cur = cur->prev;
 		}
 
 		/* Save the changes */
-		if (aug_save(a) != 0) {
-			asprintf(&msg, "Saving the modified SSHD PAM configuration failed: %s", aug_error_message(a));
-			return fail_with_aug(error, msg, a, EXIT_FAILURE);
+		if (users_augeas_save(&msg) != 0) {
+			return fail(error, msg, EXIT_FAILURE);
 		}
-		aug_close(a);
 	}
 
 	return EXIT_SUCCESS;
