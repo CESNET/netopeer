@@ -262,13 +262,13 @@ int ntp_status(void)
 
 	switch (distribution_id) {
 	case REDHAT:
-		output = system("service" REDHAT_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
+		output = system("/sbin/service " REDHAT_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	case SUSE:
-		output = system("service" SUSE_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
+		output = system("/sbin/service " SUSE_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	case DEBIAN:
-		output = system("service" DEBIAN_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
+		output = system("/sbin/service " DEBIAN_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
 		break;
 	default:
 		return -1; /*unknown distribution*/
