@@ -213,6 +213,7 @@ void load_config (struct nc_cpblts **cpblts)
 			}
 		}
 	}
+	free(trusted_dir);
 #endif /* ENABLE_TLS */
 
 	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
