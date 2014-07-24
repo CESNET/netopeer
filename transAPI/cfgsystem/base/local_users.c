@@ -427,7 +427,7 @@ int users_augeas_init(char** msg)
 		return EXIT_SUCCESS;
 	}
 
-	augeas_auth = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
+	augeas_auth = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
 	if (aug_error(augeas_auth) != AUG_NOERROR) {
 		asprintf(msg, "Augeas DNS resolver initialization failed (%s)", aug_error_message(augeas_auth));
 		return EXIT_FAILURE;
