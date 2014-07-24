@@ -144,6 +144,14 @@ case $host_cpu in
         ;;
 esac
 
+# Check for c_rehash
+if test "$tls" = "yes"; then
+	AC_CHECK_PROG(C_REHASH, c_rehash, yes, no)
+	if test "$C_REHASH" = "no"; then
+		AC_MSG_ERROR(["c_rehash not found!"])
+	fi
+fi
+
 # Check for rpmbuild
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild, no)
 
@@ -213,7 +221,13 @@ fi
 if test "$tls" = "yes"; then
 	AC_SEARCH_LIBS([nc_tls_init], [netconf],
 		[CPPFLAGS="$CPPFLAGS -DENABLE_TLS"],
-		[AC_MSG_WARN([libnetconf does not support TLS transport, disabling it.])]
+		[AC_MSG_WARN([libnetconf does not support TLS transport, disabling it.]); tls = "no"]
+	)
+fi
+if test "$tls" = "yes"; then
+	AC_SEARCH_LIBS([X509_free], [crypto],
+		[],
+		[AC_MSG_ERROR([libcrypto not found.])]
 	)
 fi
 AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found.]))

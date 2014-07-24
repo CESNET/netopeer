@@ -61,6 +61,7 @@
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
 #ifdef ENABLE_TLS
+#	include <openssl/pem.h>
 #	include <libnetconf_tls.h>
 #endif
 
@@ -107,6 +108,9 @@ COMMAND commands[] = {
 		{"validate", cmd_validate, "NETCONF <validate> operation"},
 #ifndef DISABLE_NOTIFICATIONS
 		{"subscribe", cmd_subscribe, "NETCONF Event Notifications <create-subscription> operation"},
+#endif
+#ifdef ENABLE_TLS
+		{"cert", cmd_cert, "Manage trusted or your own certificates"},
 #endif
 		{"status", cmd_status, "Print information about the current NETCONF session"},
 		{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
@@ -1871,6 +1875,394 @@ int cmd_listen (const char* arg)
 	clear_arglist(&cmd);
 	return (EXIT_SUCCESS);
 }
+
+#ifdef ENABLE_TLS
+int cp(const char *to, const char *from) {
+	int fd_to, fd_from;
+	char buf[4096];
+	ssize_t nread;
+	int saved_errno;
+
+	fd_from = open(from, O_RDONLY);
+	if (fd_from < 0)
+		return -1;
+
+	fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd_to < 0)
+		goto out_error;
+
+	while (nread = read(fd_from, buf, sizeof buf), nread > 0)
+	{
+		char *out_ptr = buf;
+		ssize_t nwritten;
+
+		do {
+			nwritten = write(fd_to, out_ptr, nread);
+
+			if (nwritten >= 0)
+			{
+				nread -= nwritten;
+				out_ptr += nwritten;
+			}
+			else if (errno != EINTR)
+			{
+				goto out_error;
+			}
+		} while (nread > 0);
+	}
+
+	if (nread == 0)
+	{
+		if (close(fd_to) < 0)
+		{
+			fd_to = -1;
+			goto out_error;
+		}
+		close(fd_from);
+
+		/* Success! */
+		return 0;
+	}
+
+	out_error:
+	saved_errno = errno;
+
+	close(fd_from);
+	if (fd_to >= 0)
+		close(fd_to);
+
+	errno = saved_errno;
+	return -1;
+}
+
+char* format_cert_info(char* info) {
+	char* ret, *ptr, *tmp;
+	tmp = strtok_r(info, "/", &ptr);
+	ret = strdup(tmp);
+	while (*ptr != '\0') {
+		tmp = strtok_r(NULL, "/", &ptr);
+		ret = realloc(ret, strlen(ret)+2+strlen(tmp)+1);
+		strcat(ret, ", ");
+		strcat(ret, tmp);
+	}
+
+	return ret;
+}
+
+void parse_cert(const char* name, const char* path) {
+	char* subj, *issuer, *str;
+	FILE *fp;
+	X509 *cert;
+
+	fp = fopen(path, "r");
+	if (fp == NULL) {
+		ERROR("parse_cert", "Unable to open: %s\n", path);
+		return;
+	}
+	cert = PEM_read_X509(fp, NULL, NULL, NULL);
+	if (cert == NULL) {
+		ERROR("parse_cert", "Unable to parse certificate: %s\n", path);
+		fclose(fp);
+		return;
+	}
+
+	str = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
+	subj = format_cert_info(str);
+	free(str);
+
+	str = X509_NAME_oneline(X509_get_issuer_name(cert), NULL, 0);
+	issuer = format_cert_info(str);
+	free(str);
+
+	fprintf(stdout, "%s: %s ## %s\n", name, subj, issuer);
+
+	free(subj);
+	free(issuer);
+	X509_free(cert);
+	fclose(fp);
+}
+
+void cmd_cert_help ()
+{
+	fprintf (stdout, "cert [--help | display | add <cert_path> | remove <cert_name> | displayown | replaceown (<cert_path.pem> | <cert_path.crt> <key_path.key>)]\n");
+}
+
+int cmd_cert (const char* arg)
+{
+	int ret;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *path, *path2, *dest;
+	char* trusted_dir, *netconf_dir, *c_rehash_cmd;
+	DIR* dir;
+	struct dirent *d;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_cert_help();
+
+	} else if (strcmp(cmd, "display") == 0) {
+		int none = 1;
+		char* name;
+		trusted_dir = get_default_trustedCA_dir();
+		if (trusted_dir == NULL) {
+			ERROR("cert display", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		dir = opendir(trusted_dir);
+		while ((d = readdir(dir)) != NULL) {
+			if (strcmp(d->d_name+strlen(d->d_name)-4, ".pem") == 0) {
+				none = 0;
+				name = strdup(d->d_name);
+				name[strlen(name)-4] = '\0';
+				asprintf(&path, "%s/%s", trusted_dir, d->d_name);
+				parse_cert(name, path);
+				free(name);
+				free(path);
+			}
+		}
+		closedir(dir);
+		if (none) {
+			fprintf(stdout, "No certificates found in the default trusted CA directory.\n");
+		}
+		free(trusted_dir);
+
+	} else if (strcmp(cmd, "add") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("cert add", "Missing or wrong path to the certificate");
+			return (EXIT_FAILURE);
+		}
+		if (access(path, R_OK) != 0) {
+			ERROR("cert add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		trusted_dir = get_default_trustedCA_dir();
+		if (trusted_dir == NULL) {
+			ERROR("cert add", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s", trusted_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
+			ERROR("cert add", "Memory allocation failed");
+			free(trusted_dir);
+			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+
+		if (strcmp(path+strlen(path)-4, ".crt") == 0) {
+			ERROR("cert add", "CA certificates are normally in *.pem format, changing the extension");
+			strcpy(dest+strlen(dest)-4, ".pem");
+		} else if (strcmp(path+strlen(path)-4, ".pem") != 0) {
+			ERROR("cert add", "Certificate in an unknown format");
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		if (cp(dest, path) != 0) {
+			ERROR("cert add", "Could not copy the certificate: %s", strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("cert add", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "remove") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("cert remove", "Missing or wrong name of the certificate");
+			return (EXIT_FAILURE);
+		}
+
+		// delete ".pem" if the user unnecessarily included it
+		if (strcmp(path+strlen(path)-4, ".pem") == 0) {
+			path[strlen(path)-4] = '\0';
+		}
+
+		trusted_dir = get_default_trustedCA_dir();
+		if (trusted_dir == NULL) {
+			ERROR("cert remove", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s.pem", trusted_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
+			ERROR("cert remove", "Memory allocation failed");
+			free(trusted_dir);
+			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+
+		if (remove(dest) != 0) {
+			ERROR("cert remove", "Cannot remove certificate \"%s\": %s (use the name from \"cert list\" output)", path, strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("cert remove", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "displayown") == 0) {
+		int crt = 0, key = 0, pem = 0;
+
+		netconf_dir = get_netconf_dir();
+		if (netconf_dir == NULL) {
+			ERROR("cert displayown", "Could not get the client home directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/client.pem", netconf_dir) == -1) {
+			ERROR("cert displayown", "Memory allocation failed");
+			free(netconf_dir);
+			return (EXIT_FAILURE);
+		}
+		free(netconf_dir);
+		if (access(dest, R_OK) == 0) {
+			pem = 1;
+		}
+
+		strcpy(dest+strlen(dest)-4, ".key");
+		if (access(dest, R_OK) == 0) {
+			key = 1;
+		}
+
+		strcpy(dest+strlen(dest)-4, ".crt");
+		if (access(dest, R_OK) == 0) {
+			crt = 1;
+		}
+
+		if (!crt && !key && !pem) {
+			fprintf(stdout, "FAIL: No client certificate found, use \"cert replaceown\" to set some.\n");
+		} else if (crt && !key && !pem) {
+			fprintf(stdout, "FAIL: Client *.crt certificate found, but is of no use without its private key *.key.\n");
+		} else if (!crt && key && !pem) {
+			fprintf(stdout, "FAIL: Private key *.key found, but is of no use without a certificate.\n");
+		} else if (!crt && !key && pem) {
+			fprintf(stdout, "OK: Using *.pem client certificate with the included private key.\n");
+		} else if (crt && key && !pem) {
+			fprintf(stdout, "OK: Using *.crt certificate with a separate private key.\n");
+		} else if (crt && !key && pem) {
+			fprintf(stdout, "WORKING: Using *.pem client certificate with the included private key (leftover certificate *.crt detected).\n");
+		} else if (!crt && key && pem) {
+			fprintf(stdout, "WORKING: Using *.pem client certificate with the included private key (leftover private key detected).\n");
+		} else if (crt && key && pem) {
+			fprintf(stdout, "WORKING: Using *.crt certificate with a separate private key (lower-priority *.pem certificate with a private key detected).\n");
+		}
+
+		if (crt) {
+			parse_cert("CRT", dest);
+		}
+		if (pem) {
+			strcpy(dest+strlen(dest)-4, ".pem");
+			parse_cert("PEM", dest);
+		}
+		free(dest);
+
+	} else if (strcmp(cmd, "replaceown") == 0) {
+		int crt;
+
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5 || (strcmp(path+strlen(path)-4, ".crt") != 0 &&
+			strcmp(path+strlen(path)-4, ".pem") != 0 && strcmp(path+strlen(path)-4, ".key") != 0) || access(path, R_OK) != 0) {
+
+			ERROR("cert replaceown", "Missing or unknown format replacing certificate path");
+			return (EXIT_FAILURE);
+		}
+
+		if (strcmp(path+strlen(path)-4, ".crt") == 0) {
+			path2 = strtok_r(NULL, " ", &ptr);
+			if (path2 == NULL || strlen(path2) < 5 || strcmp(path2+strlen(path2)-4, ".key") != 0 || access(path2, R_OK) != 0) {
+				ERROR("cert replaceown", "Missing or wrong private key to go with the certificate");
+				return (EXIT_FAILURE);
+			}
+			crt = 1;
+		} else if (strcmp(path+strlen(path)-4, ".key") == 0) {
+			path2 = path;
+			path = strtok_r(NULL, " ", &ptr);
+			if (path == NULL || strlen(path) < 5 || strcmp(path+strlen(path)-4, ".crt") != 0 || access(path, R_OK) != 0) {
+				ERROR("cert replaceown", "Missing or wrong certificate to go with the private key");
+				return (EXIT_FAILURE);
+			}
+			crt = 1;
+		} else { // *.pem
+			crt = 0;
+		}
+
+		netconf_dir = get_netconf_dir();
+		if (netconf_dir == NULL) {
+			ERROR("cert replaceown", "Could not get the client home directory");
+			return (EXIT_FAILURE);
+		}
+		if (asprintf(&dest, "%s/client.XXX", netconf_dir) == -1) {
+			ERROR("cert replaceown", "Memory allocation failed");
+			free(netconf_dir);
+			return (EXIT_FAILURE);
+		}
+		free(netconf_dir);
+
+		if (crt) {
+			strcpy(dest+strlen(dest)-4, ".pem");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old *.pem certificate");
+			}
+
+			strcpy(dest+strlen(dest)-4, ".key");
+			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the private key: %s", strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+			strcpy(dest+strlen(dest)-4, ".crt");
+			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the *.crt certificate: %s", strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+		} else {
+			strcpy(dest+strlen(dest)-4, ".key");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old *.key private key");
+			}
+			strcpy(dest+strlen(dest)-4, ".crt");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old *.crt private key");
+			}
+
+			strcpy(dest+strlen(dest)-4, ".pem");
+			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the *.pem certificate: %s", strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+		}
+
+		free(dest);
+
+	} else {
+		ERROR("cert", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+#endif
 
 void cmd_connect_help ()
 {

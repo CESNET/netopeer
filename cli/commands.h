@@ -29,6 +29,9 @@ int cmd_subscribe(const char *arg);
 int cmd_unlock(const char *arg);
 int cmd_validate(const char *arg);
 int cmd_status(const char* arg);
+#ifdef ENABLE_TLS
+int cmd_cert(const char* arg);
+#endif
 int cmd_quit(const char* arg);
 int cmd_debug(const char *arg);
 int cmd_verbose(const char *arg);
