@@ -245,6 +245,14 @@ case $target_cpu in
         ;;
 esac
 
+#check for c_rehash
+if test "$tls" = "yes"; then
+	AC_CHECK_PROG([C_REHASH], [c_rehash], [yes], [no])
+	if test "$C_REHASH" = "no"; then
+		AC_MSG_ERROR(["c_rehash not found!"])
+	fi
+fi
+
 # Check python for manager and configurator
 AX_PYTHON_MODULE(os, fatal)
 AX_PYTHON_MODULE(curses, fatal)
