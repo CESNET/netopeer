@@ -123,7 +123,7 @@ typedef enum GENERIC_OPS {
 	GO_COMMIT,
 	GO_DISCARD_CHANGES
 } GENERIC_OPS;
-int cmd_generic_op(GENERIC_OPS op, char *arg);
+int cmd_generic_op(GENERIC_OPS op, const char *arg);
 
 struct arglist {
 	char **list;
@@ -231,7 +231,7 @@ void addargs (struct arglist *args, char *format, ...)
 	free(aux1);
 }
 
-int cmd_status (char* UNUSED(arg))
+int cmd_status (const char* UNUSED(arg))
 {
 	const char *s;
 	struct nc_cpblts* cpblts;
@@ -534,7 +534,7 @@ void cmd_editconfig_help()
 	fprintf (stdout, "\nIf neither --config nor --url is specified, user is prompted to set edit data manually.\n");
 }
 
-int cmd_editconfig (char *arg)
+int cmd_editconfig (const char *arg)
 {
 	int c;
 	char *config_m = NULL, *config = NULL;
@@ -752,7 +752,7 @@ void cmd_validate_help ()
 	}
 }
 
-int cmd_validate (char *arg)
+int cmd_validate (const char *arg)
 {
 	int c;
 	int config_fd;
@@ -892,7 +892,7 @@ void cmd_copyconfig_help ()
 			ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_copyconfig (char *arg)
+int cmd_copyconfig (const char *arg)
 {
 	int c;
 	int config_fd;
@@ -1059,7 +1059,7 @@ void cmd_get_help ()
 }
 
 
-int cmd_get (char *arg)
+int cmd_get (const char *arg)
 {
 	int c;
 	struct nc_filter *filter = NULL;
@@ -1173,7 +1173,7 @@ void cmd_deleteconfig_help ()
 	fprintf (stdout, "delete-config [--help]  %s%s%s\n", ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_deleteconfig (char *arg)
+int cmd_deleteconfig (const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1247,7 +1247,7 @@ void cmd_killsession_help ()
 	fprintf (stdout, "kill-session [--help] <sessionID>\n");
 }
 
-int cmd_killsession (char *arg)
+int cmd_killsession (const char *arg)
 {
 	int c;
 	char *id;
@@ -1331,7 +1331,7 @@ void cmd_capability_help (void)
 	fprintf (stdout, "capability {--help|--add <uri>|--rem {<uri>|*}|--list|--default\n");
 }
 
-int cmd_capability (char * arg)
+int cmd_capability (const char * arg)
 {
 	struct arglist cmd;
 	int c = -1;
@@ -1436,7 +1436,7 @@ void cmd_getconfig_help ()
 	fprintf (stdout, "\n");
 }
 
-int cmd_getconfig (char *arg)
+int cmd_getconfig (const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1521,7 +1521,7 @@ void cmd_getschema_help ()
 	fprintf (stdout, "get-schema [--help] [--version <version>] [--format <format>] <identifier>\n");
 }
 
-int cmd_getschema (char *arg)
+int cmd_getschema (const char *arg)
 {
 	int c;
 	char *format = NULL, *version = NULL, *identifier = NULL;
@@ -1621,7 +1621,7 @@ void cmd_un_lock_help (char* operation)
 
 #define LOCK_OP 1
 #define UNLOCK_OP 2
-int cmd_un_lock (int op, char *arg)
+int cmd_un_lock (int op, const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1699,12 +1699,12 @@ int cmd_un_lock (int op, char *arg)
 	return (send_recv_process(operation, rpc));
 }
 
-int cmd_lock (char *arg)
+int cmd_lock (const char *arg)
 {
 	return cmd_un_lock (LOCK_OP, arg);
 }
 
-int cmd_unlock (char *arg)
+int cmd_unlock (const char *arg)
 {
 	return cmd_un_lock (UNLOCK_OP, arg);
 }
@@ -1866,7 +1866,7 @@ void cmd_connect_help ()
 
 #define DEFAULT_PORT_SSH 830
 #define DEFAULT_PORT_TLS 6513
-int cmd_connect (char* arg)
+int cmd_connect (const char* arg)
 {
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
@@ -2005,7 +2005,7 @@ int cmd_connect (char* arg)
 	return (EXIT_SUCCESS);
 }
 
-int cmd_disconnect (char* UNUSED(arg))
+int cmd_disconnect (const char* UNUSED(arg))
 {
 	if (session == NULL) {
 		ERROR("disconnect", "not connected to any NETCONF server.");
@@ -2017,7 +2017,7 @@ int cmd_disconnect (char* UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_quit (char* UNUSED(arg))
+int cmd_quit (const char* UNUSED(arg))
 {
 	done = 1;
 	if (session != NULL) {
@@ -2026,7 +2026,7 @@ int cmd_quit (char* UNUSED(arg))
 	return (0);
 }
 
-int cmd_verbose (char *UNUSED(arg))
+int cmd_verbose (const char *UNUSED(arg))
 {
 	if (verb_level != 1) {
 		verb_level = 1;
@@ -2041,7 +2041,7 @@ int cmd_verbose (char *UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_debug (char *UNUSED(arg))
+int cmd_debug (const char *UNUSED(arg))
 {
 	if (verb_level != 2) {
 		verb_level = 2;
@@ -2056,13 +2056,14 @@ int cmd_debug (char *UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_help (char* arg)
+int cmd_help (const char* arg)
 {
 	int i;
+	char *args = strdupa(arg);
 	char *cmd = NULL;
 	char cmdline[BUFFER_SIZE];
 
-	strtok (arg, " ");
+	strtok (args, " ");
 	if ((cmd = strtok (NULL, " ")) == NULL) {
 		/* generic help for the application */
 		print_version ();
@@ -2144,7 +2145,7 @@ void cmd_subscribe_help()
 	fprintf (stdout, "\t\t-<num>  - current time minus the given number of seconds.\n");
 }
 
-int cmd_subscribe(char *arg)
+int cmd_subscribe(const char *arg)
 {
 	int c;
 	struct nc_filter *filter = NULL;
@@ -2297,7 +2298,7 @@ void cmd_userrpc_help()
 	"If \'--file\' is omitted, user is asked to enter content manually.\n");
 }
 
-int cmd_userrpc(char *arg)
+int cmd_userrpc(const char *arg)
 {
 	int c;
 	int config_fd;
@@ -2393,7 +2394,7 @@ void cmd_discardchanges_help()
 	fprintf (stdout, "discard-changes\n");
 }
 
-int cmd_discardchanges(char *arg)
+int cmd_discardchanges(const char *arg)
 {
 	return (cmd_generic_op(GO_DISCARD_CHANGES, arg));
 }
@@ -2403,14 +2404,15 @@ void cmd_commit_help()
 	fprintf (stdout, "commit\n");
 }
 
-int cmd_commit(char *arg)
+int cmd_commit(const char *arg)
 {
 	return (cmd_generic_op(GO_COMMIT, arg));
 }
 
-int cmd_generic_op(GENERIC_OPS op, char *arg)
+int cmd_generic_op(GENERIC_OPS op, const char *arg)
 {
 	int i;
+	char* args = strdupa(arg);
 	char* op_string = NULL;
 	nc_rpc* (*op_func)(void);
 	void (*op_help)(void);
@@ -2434,10 +2436,10 @@ int cmd_generic_op(GENERIC_OPS op, char *arg)
 
 	/* check input parameters - no parameter is accepted */
 	/* remove trailing white spaces */
-	for (i = strlen(arg) - 1; i >= 0 && isspace(arg[i]); i--) {
-		arg[i] = '\0';
+	for (i = strlen(args) - 1; i >= 0 && isspace(args[i]); i--) {
+		args[i] = '\0';
 	}
-	if (strcmp(arg, op_string) != 0) {
+	if (strcmp(args, op_string) != 0) {
 		op_help();
 		return (EXIT_FAILURE);
 	}

@@ -145,7 +145,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 
 		/* execute the command if any valid specified */
 		if (commands[i].name) {
-			commands[i].func(cmdstart);
+			commands[i].func((const char*)cmdstart);
 		} else {
 			/* if unknown command specified, tell it to user */
 			fprintf(stdout, "%s: no such command, type 'help' for more information.\n", cmd);
