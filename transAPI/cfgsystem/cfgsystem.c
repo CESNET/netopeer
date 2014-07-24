@@ -234,6 +234,9 @@ PUBLIC int transapi_init(xmlDocPtr *running)
  */
 PUBLIC void transapi_close(void)
 {
+	ntp_augeas_close();
+	users_augeas_close();
+	dns_augeas_close();
 	return;
 }
 
