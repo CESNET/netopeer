@@ -114,6 +114,7 @@ void get_default_client_cert(char** cert, char** key) {
 	if (asprintf(cert, "%s/%s", netconf_dir, "client.crt") == -1 || asprintf(key, "%s/%s", netconf_dir, "client.key") == -1) {
 		ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+		free(netconf_dir);
 		return;
 	}
 
@@ -125,6 +126,7 @@ void get_default_client_cert(char** cert, char** key) {
 		if (asprintf(cert, "%s/%s", netconf_dir, "client.pem") == -1) {
 			ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 			ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+			free(netconf_dir);
 			return;
 		}
 
@@ -134,11 +136,14 @@ void get_default_client_cert(char** cert, char** key) {
 			ERROR("get_default_client_cert", "Unable to find the default client certificate.");
 			free(*cert);
 			*cert = NULL;
+			free(netconf_dir);
 			return;
 		}
 
 		ERROR("get_default_client_cert", "Using \"client.pem\" but this may be a security risk and separate certificate and key files should be used.");
 	}
+
+	free(netconf_dir);
 
 	return;
 }
