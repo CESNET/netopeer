@@ -51,6 +51,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <time.h>
 
 #ifndef DISABLE_NOTIFICATIONS
@@ -1721,12 +1722,14 @@ void cmd_listen_help ()
 #define DEFAULT_PORT_CH_SSH 6666
 #define DEFAULT_PORT_CH_TLS 6667
 #define ACCEPT_TIMEOUT 60000 /* 1 minute */
-int cmd_listen (char* arg)
+int cmd_listen (const char* arg)
 {
 	static unsigned short listening = 0;
 	char *user = NULL;
 #ifdef ENABLE_TLS
-	int usetls = 0;
+	DIR* dir;
+	struct dirent* d;
+	int usetls = 0, n;
 	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
 #endif
 	unsigned short port = 0;
@@ -1817,6 +1820,20 @@ int cmd_listen (char* arg)
 			ERROR("listen", "Could not use the trusted CA directory.");
 			return (EXIT_FAILURE);
 		}
+
+		/* check whether we have any trusted CA, verification should fail otherwise */
+		dir = opendir(trusted_dir);
+		n = 0;
+		while ((d = readdir(dir)) != NULL) {
+			if (++n > 2) {
+				break;
+			}
+		}
+		closedir(dir);
+		if (n <= 2) {
+			ERROR("listen", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+		}
+
 		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
@@ -1870,7 +1887,9 @@ int cmd_connect (const char* arg)
 {
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
-	int usetls = 0;
+	DIR* dir;
+	struct dirent* d;
+	int usetls = 0, n;
 	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
 #endif
 	int hostfree = 0;
@@ -1957,6 +1976,20 @@ int cmd_connect (const char* arg)
 			ERROR("connect", "Could not use the trusted CA directory.");
 			return (EXIT_FAILURE);
 		}
+
+		/* check whether we have any trusted CA, verification should fail otherwise */
+		dir = opendir(trusted_dir);
+		n = 0;
+		while ((d = readdir(dir)) != NULL) {
+			if (++n > 2) {
+				break;
+			}
+		}
+		closedir(dir);
+		if (n <= 2) {
+			ERROR("connect", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+		}
+
 		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
 			return (EXIT_FAILURE);

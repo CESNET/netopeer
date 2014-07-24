@@ -144,10 +144,8 @@ void get_default_client_cert(char** cert, char** key) {
 }
 
 char* get_default_trustedCA_dir() {
-	int n = 0;
 	char* netconf_dir, *cert_dir;
 	DIR* dir;
-	struct dirent *d;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return NULL;
@@ -156,24 +154,17 @@ char* get_default_trustedCA_dir() {
 	if (asprintf(&cert_dir, "%s/%s", netconf_dir, "certs") == -1) {
 		ERROR("get_default_trustedCA_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("get_default_trustedCA_dir", "Unable to use the trusted CA directory due to the previous error.");
+		free(netconf_dir);
 		return NULL;
 	}
+	free(netconf_dir);
 
 	if ((dir = opendir(cert_dir)) == NULL) {
 		ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory.");
 		free(cert_dir);
 		return NULL;
 	}
-
-	while ((d = readdir(dir)) != NULL) {
-		if (++n > 2) {
-			break;
-		}
-	}
 	closedir(dir);
-	if (n <= 2) {
-		ERROR("get_default_trustedCA_dir", "Trusted CA directory empty, use \"!!TODO!!\" command to add certificates.");
-	}
 
 	return cert_dir;
 }
