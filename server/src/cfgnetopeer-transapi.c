@@ -510,6 +510,9 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 						free(module);
 						return(EXIT_FAILURE);
 					}
+				} else {
+					free(module->name);
+					free(module);
 				}
 				free(module_allowed);
 				break;
