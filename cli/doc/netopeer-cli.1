@@ -3,7 +3,7 @@
 .\"
 .TH "netopeer-cli" 1 "Tue May 27 2014" "Netopeer"
 .SH NAME
-netopeer-cli \- NETCONF client with command line interface 
+netopeer-cli \- NETCONF client with command line interface
 .SH DESCRIPTION
 .B netopeer-cli
 serves as a generic NETCONF client providing a simple interactive command line
@@ -51,6 +51,46 @@ details).
 Per user history of executed commands.
 .RE
 .PP
+.I ~/.netopeer-cli/client.pem
+.RS
+Per user certificate with its private key that is sent to the server for verification. If present together with
+.B client.crt
+and
+.B client.key
+it is not utilized.
+.PP
+This file is used only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.I ~/.netopeer-cli/client.crt
+.RS
+Per user certificate that is sent to the server for verification. Needs a corresponding private key to be utilized.
+.PP
+This file is used only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.I ~/.netopeer-cli/client.key
+.RS
+Per user private key for the user certificate. Needs a corresponding certificate to be utilized.
+.PP
+This file is used only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.I ~/.netopeer-cli/certs
+.RS
+Per user trusted Certificate Authority directory that is searched when verifying a server certificate.
+.PP
+This directory is used only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
 .I ~/.ssh/netconf_known_hosts
 .RS
 Alternative known_hosts file if the original file contains libssh2 incompatible
@@ -59,11 +99,11 @@ records.
 .SS help
 Display list of commands. \fI\-\-help\fR option is also accepted by all commands
 to show detailed information about the command.
-.SS connect 
+.SS connect
 Connect to a NETCONF server.
 .PP
 .B connect
-[\-\-help] [\-\-login \fIusername\fR] [\-\-tls \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-port \fInum\fR]  \fIhost\fR
+[\-\-help] [\-\-login \fIusername\fR] [\-\-tls] [\-\-cert \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-trusted \fItrusted_CA_store\fR] [\-\-port \fInum\fR]  \fIhost\fR
 .PP
 .RS 4
 .B \-\-login
@@ -74,13 +114,22 @@ local username is taken.
 .RE
 .PP
 .B \-\-tls
+.RS 4
+Use NETCONF over TLS transport instead of default SSH. Default client certificate and trusted CA directory are used for TLS handshake.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-cert
 \fIcert_path\fR
 .RS 4
-Use NETCONF over TLS transport instead of default SSH. \fIcert_path\fR specifies
-path to the client certificate. If
+Use a specific certificate for TLS handshake. \fIcert_path\fR specifies
+path to the client certificate in CRT format. If
 .B \-\-key
 option is not specified, \fIcert_path\fR is expected to contain also the private
-key for the client certificate.
+key for the client certificate, in PEM format.
 .PP
 This option is available only when the
 .B netopeer-cli
@@ -90,9 +139,19 @@ is compiled with configure's \-\-enable-tls option.
 .B \-\-key
 \fIkey_path\fR
 .RS 4
-Specifies path to the private key for the client certificate. If not specified,
+Specifies path to the private key for the client certificate in KEY format. If not specified,
 \fIcert_path\fR is expected to contain also the private key for the client
-certificate.
+certificate, in PEM format.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-trusted
+\fItrusted_CA_store\fR
+.RS 4
+Specifies path to a trusted CA certificate bundle in PEM format to be used exclusively for server verification for this connection instead of the default CA directory.
 .PP
 This option is available only when the
 .B netopeer-cli
@@ -115,7 +174,7 @@ Hostname of the target NETCONF server.
 Listen for a NETCONF Call Home.
 .PP
 .B listen
-[\-\-help] [\-\-login \fIusername\fR] [\-\-tls \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-port \fInum\fR]
+[\-\-help] [\-\-login \fIusername\fR] [\-\-tls] [\-\-cert \fIcert_path\fR [\-\-key \fIkey_path\fR]] [\-\-trusted \fItrusted_CA_store\fR] [\-\-port \fInum\fR]
 .PP
 .RS 4
 .B \-\-login
@@ -126,13 +185,22 @@ local username is taken.
 .RE
 .PP
 .B \-\-tls
+.RS 4
+Use NETCONF over TLS transport instead of default SSH. Default client certificate and trusted CA directory are used for TLS handshake.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-cert
 \fIcert_path\fR
 .RS 4
-Use NETCONF over TLS transport instead of default SSH. \fIcert_path\fR specifies
-path to the client certificate. If
+Use a specific certificate for TLS handshake. \fIcert_path\fR specifies
+path to the client certificate in CRT format. If
 .B \-\-key
 option is not specified, \fIcert_path\fR is expected to contain also the private
-key for the client certificate.
+key for the client certificate, in PEM format.
 .PP
 This option is available only when the
 .B netopeer-cli
@@ -142,9 +210,19 @@ is compiled with configure's \-\-enable-tls option.
 .B \-\-key
 \fIkey_path\fR
 .RS 4
-Specifies path to the private key for the client certificate. If not specified,
+Specifies path to the private key for the client certificate in KEY format. If not specified,
 \fIcert_path\fR is expected to contain also the private key for the client
-certificate.
+certificate, in PEM format.
+.PP
+This option is available only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
+.B \-\-trusted
+\fItrusted_CA_store\fR
+.RS 4
+Specifies path to a trusted CA certificate bundle in PEM format to be used exclusively for server verification for this connection instead of the default CA directory.
 .PP
 This option is available only when the
 .B netopeer-cli
@@ -173,7 +251,7 @@ Perform NETCONF <copy-config> operation. For more details see \fIRFC 6241 sectio
 \fImode\fR
 .RS 4
 Use :with-defaults capability with specified retrieval mode. For more details
-see \fIRFC 6243 section 3\fR or 
+see \fIRFC 6243 section 3\fR or
 .B WITH\-DEFAULTS
 section of this manual.
 .RE
@@ -202,9 +280,9 @@ This option alternates the \fI\-\-source\fR option.
 .RS 4
 Target datastore to be rewritten. For description of possible values, see the
 .B DATASTORES
-section of this manual. 
+section of this manual.
 .RE
-.SS delete-config   
+.SS delete-config
 Perform NETCONF <delete-config> operation. For more details see \fIRFC 6241 section 7.4\fR.
 .PP
 .B delete\-config
@@ -215,18 +293,18 @@ Perform NETCONF <delete-config> operation. For more details see \fIRFC 6241 sect
 .RS 4
 Target datastore to delete. For description of possible values, see the
 .B DATASTORES
-section of this manual. Note, that the 
+section of this manual. Note, that the
 .I running
 configuration datastore cannot be deleted.
 .RE
 .RE
-.SS discard-changes 
-Perform NETCONF <discard-changes> operation. It reverts the 
+.SS discard-changes
+Perform NETCONF <discard-changes> operation. It reverts the
 .I candidate
 configuration to the current
 .I running
 configuration. For more details see \fIRFC 6241 section 8.3.4.2\fR.
-.SS edit-config     
+.SS edit-config
 Perform NETCONF <edit-config> operation. For more details see \fIRFC 6241 section 7.2\fR.
 .PP
 .B edit-config
@@ -244,9 +322,9 @@ Edit configuration data completely replaces the configuration in the target
 datastore.
 .IP none
 The target datastore is unaffected by the edit configuration data, unless and
-until the edit configuration data contains the 
+until the edit configuration data contains the
 .I operation
-attribute to request a different operation. For more info, see the 
+attribute to request a different operation. For more info, see the
 .B EDIT-CONFIG
 section of this document.
 .RE
@@ -286,7 +364,7 @@ This is the default value.
 Specify path to a file containing edit configuration data. The content of the
 file is placed into the <config> element of the \fIedit-config\fR operation.
 Therefore, it don't have to be a well-formed XML document with only a single
-root element. If neither \fI\-\-config\fR nor \fI\-\-url\fR is specified, user 
+root element. If neither \fI\-\-config\fR nor \fI\-\-url\fR is specified, user
 is prompted to write edit configuration data manually. For examples, see the
 .B EDIT-CONFIG
 section of this document.
@@ -306,12 +384,12 @@ element is not expected.
 .RS 4
 Target datastore to modify. For description of possible values, see the
 .B DATASTORES
-section of this manual. Note, that the 
+section of this manual. Note, that the
 .I url
 configuration datastore cannot be modified.
 .RE
 .RE
-.SS get             
+.SS get
 Perform NETCONF <get> operation. Receives both status as well as configuration
 data from the current running datastore. For more details see \fIRFC 6241 section 7.7\fR.
 .PP
@@ -323,7 +401,7 @@ data from the current running datastore. For more details see \fIRFC 6241 sectio
 \fImode\fR
 .RS 4
 Use :with-defaults capability with specified retrieval mode. For more details
-see \fIRFC 6243 section 3\fR or 
+see \fIRFC 6243 section 3\fR or
 .B WITH\-DEFAULTS
 section of this manual.
 .RE
@@ -337,7 +415,7 @@ specification. If the path is not specified, user is prompted to write the
 filter specification manually.
 .RE
 .RE
-.SS get-config            
+.SS get-config
 Perform NETCONF <get-config> operation. Retrieves only configuration data from
 the specified \fItarget_datastore\fR. For more details see \fIRFC 6241 section 7.1\fR.
 .PP
@@ -349,7 +427,7 @@ the specified \fItarget_datastore\fR. For more details see \fIRFC 6241 section 7
 \fImode\fR
 .RS 4
 Use :with-defaults capability with specified retrieval mode. For more details
-see \fIRFC 6243 section 3\fR or 
+see \fIRFC 6243 section 3\fR or
 .B WITH\-DEFAULTS
 section of this manual.
 .RE
@@ -367,7 +445,7 @@ filter specification manually.
 .RS 4
 Target datastore to retrieve. For description of possible values, see the
 .B DATASTORES
-section of this manual. Note, that the 
+section of this manual. Note, that the
 .I url
 configuration datastore cannot be retrieved.
 .RE
@@ -379,7 +457,7 @@ Module for NETCONF Monitoring. The list of available schemas can be retrieved fr
 .I /netconf-state/schemas
 subtree via the <get> operation. For more details see \fIRFC 6022 sections 3.1 and 4\fR.
 .PP
-.B get-schema 
+.B get-schema
 [\-\-help] [\-\-version \fIversion\fR] [\-\-format \fIformat\fR] \fIidentifier\fR
 .PP
 .RS 4
@@ -414,7 +492,7 @@ command. For more details see \fIRFC 6241 section 7.9\fR.
 Session identifier of the NETCONF session to be terminated.
 .RE
 .RE
-.SS lock    
+.SS lock
 Perform the NETCONF <lock> operation to lock the entire configuration datastore
 of a server. For more details see \fIRFC 6241 section 7.5\fR.
 .PP
@@ -426,7 +504,7 @@ of a server. For more details see \fIRFC 6241 section 7.5\fR.
 .RS 4
 Target datastore to lock. For description of possible values, see the
 .B DATASTORES
-section of this manual. Note, that the 
+section of this manual. Note, that the
 .I url
 configuration datastore cannot be locked.
 .RE
@@ -443,7 +521,7 @@ previously obtained with the <lock> operation. For more details see \fIRFC 6241 
 .RS 4
 Target datastore to unlock. For description of possible values, see the
 .B DATASTORES
-section of this manual. Note, that the 
+section of this manual. Note, that the
 .I url
 configuration datastore cannot be unlocked.
 .RE
@@ -515,7 +593,7 @@ Current time minus the given number of seconds.
 .B \-\-output
 \fIstream\fR
 .RS 4
-Print received notifications into the specified file instead of printing on 
+Print received notifications into the specified file instead of printing on
 terminal.
 .RE
 .PP
@@ -527,6 +605,49 @@ stream is received. The list of available streams can be retrieved from
 subtree via the <get> operation.
 .RE
 .RE
+.SS  cert
+Manage client and trusted Certificate Authority certificates that are used for TLS verification stored in \fI~/.netopeer-cli/client.*\fR and \fI~/.netopeer-cli/certs\fR respectively.
+.PP
+This command is available only when
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.PP
+.B cert
+[\-\-help | display | add \fIcert_path\fR | remove \fIcert_name\fR | displayown | replaceown \fIcert_path\fR [\fIkey_path\fR])]
+.PP
+.RS 4
+.B \-\-display
+.RS 4
+Displays all the recognized certificates in \fI~/.netopeer-cli/certs\fR. First the file name, then the subject and the issuer are shown for each certificate.
+.RE
+.PP
+.B \-\-add
+\fIcert_path\fR
+.RS 4
+Adds the \fIcert_path\fR certificate to the trusted CA dir \fI~/.netopeer-cli/certs\fR and recalculates hashes of all the certificates.
+.RE
+.PP
+.B \-\-remove
+\fIcert_name\fR
+.RS 4
+Removes the \fIcert_name\fR certificate from the trusted CA dir \fI~/.netopeer-cli/certs\fR and recalculates hashes of all the certificates. \fIcert_name\fR is the certificate file name, as displayed in
+.B cert display
+command output.
+.RE
+.PP
+.B \-\-displayown
+.RS 4
+Shows information about the status of the default client certificates and displays information about any relevant found client certificates \fI~/.netopeer-cli/client.crt\fR and \fI~/.netopeer-cli/client.pem\fR.
+.RE
+.PP
+.B \-\-replaceown
+\fIcert_path\fR [\fIkey_path\fR]
+.RS 4
+Replaces the default client certificates with the PEM certificate in \fIcert_path\fR or the CRT certificate \fIcert_path\fR and private key \fIkey_path\fR.
+.B All
+previous client certificates are deleted.
+.RE
+.PP
 .SS  status
 Print information about the current NETCONF session.
 .SS  user-rpc
@@ -557,7 +678,7 @@ Quit the program.
 .SH DATASTORES
 .IP running
 Base NETCONF configuration datastore holding the complete configuration
-currently active on the device. This datastore always exists. 
+currently active on the device. This datastore always exists.
 .IP startup
 The configuration datastore holding the configuration loaded by the device when
 it boots. Only present on servers that implement :startup capability.
