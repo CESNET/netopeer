@@ -578,9 +578,8 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg)
 	free(path);
 
 	if (ret == 0) {
-		/* No options in the config file */
-		asprintf(msg, "No options in the configuration file.");
-		return EXIT_FAILURE;
+		/* No options in the config file, it might be a default value */
+		return EXIT_SUCCESS;
 	}
 
 	/* Some options already defined */
@@ -738,9 +737,8 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg)
 	free(path);
 
 	if (ret == 0) {
-		/* No options in the config file */
-		asprintf(msg, "No options in the configuration file.");
-		return EXIT_FAILURE;
+		/* No options in the config file, it might be a default value */
+		return EXIT_SUCCESS;
 	}
 
 	/* Some options already defined */
