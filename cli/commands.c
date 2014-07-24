@@ -1717,7 +1717,7 @@ int cmd_unlock (const char *arg)
 void cmd_listen_help ()
 {
 #ifdef ENABLE_TLS
-	fprintf (stdout, "listen [--help] [--tls] [--cert <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
+	fprintf (stdout, "listen [--help] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>] [--port <num>] [--login <username>]\n");
 #else
 	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
 #endif
@@ -1734,7 +1734,7 @@ int cmd_listen (const char* arg)
 	DIR* dir;
 	struct dirent* d;
 	int usetls = 0, n;
-	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *trusted_store = NULL;
 #endif
 	unsigned short port = 0;
 	int c;
@@ -1748,6 +1748,7 @@ int cmd_listen (const char* arg)
 			{"tls", 0, 0, 't'},
 			{"cert", 1, 0, 'c'},
 			{"key", 1, 0, 'k'},
+			{"trusted", 1, 0, 's'},
 #endif
 			{0, 0, 0, 0}
 	};
@@ -1768,7 +1769,12 @@ int cmd_listen (const char* arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
+#ifdef ENABLE_TLS
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
+#else
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
+#endif
+	{
 		switch (c) {
 		case 'h':
 			cmd_listen_help ();
@@ -1800,12 +1806,14 @@ int cmd_listen (const char* arg)
 		case 'k':
 			asprintf(&key, "%s", optarg);
 			break;
+		case 's':
+			trusted_store = optarg;
+			break;
 #endif
 		default:
 			ERROR("listen", "unknown option -%c.", c);
 			cmd_listen_help ();
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			goto error_cleanup;
 		}
 	}
 	if (port == 0) {
@@ -1814,38 +1822,48 @@ int cmd_listen (const char* arg)
 #ifdef ENABLE_TLS
 	if (usetls) {
 		if (cert == NULL) {
+			if (key != NULL) {
+				ERROR("listen", "Key specified without a certificate.");
+				goto error_cleanup;
+			}
 			get_default_client_cert(&cert, &key);
 			if (cert == NULL) {
 				ERROR("listen", "Could not find the default client certificate.");
-				return (EXIT_FAILURE);
+				goto error_cleanup;
 			}
 		}
-		if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
-			ERROR("listen", "Could not use the trusted CA directory.");
-			return (EXIT_FAILURE);
-		}
+		if (trusted_store == NULL) {
+			if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+				ERROR("listen", "Could not use the trusted CA directory.");
+				goto error_cleanup;
+			}
 
-		/* check whether we have any trusted CA, verification should fail otherwise */
-		dir = opendir(trusted_dir);
-		n = 0;
-		while ((d = readdir(dir)) != NULL) {
-			if (++n > 2) {
-				break;
+			/* check whether we have any trusted CA, verification should fail otherwise */
+			dir = opendir(trusted_dir);
+			n = 0;
+			while ((d = readdir(dir)) != NULL) {
+				if (++n > 2) {
+					break;
+				}
+			}
+			closedir(dir);
+			if (n <= 2) {
+				ERROR("listen", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+			}
+		} else {
+			if (access(trusted_store, R_OK) != 0) {
+				ERROR("listen", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
+				goto error_cleanup;
+			}
+			if (strlen(trusted_store) < 5 || strcmp(trusted_store+strlen(trusted_store)-4, ".pem") != 0) {
+				ERROR("listen", "Trusted CA store in an unknown format.");
+				goto error_cleanup;
 			}
 		}
-		closedir(dir);
-		if (n <= 2) {
-			ERROR("listen", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
-		}
 
-		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, trusted_store, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
-			return (EXIT_FAILURE);
-		}
-		free(trusted_dir);
-		free(cert);
-		if (key != NULL) {
-			free(key);
+			goto error_cleanup;
 		}
 	}
 #endif
@@ -1854,8 +1872,7 @@ int cmd_listen (const char* arg)
 	if (!listening) {
 		if (nc_callhome_listen(port) == EXIT_FAILURE) {
 			ERROR("listen", "unable to start listening for incoming Call Home");
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			goto error_cleanup;
 		}
 		listening = port;
 	}
@@ -1874,6 +1891,21 @@ int cmd_listen (const char* arg)
 
 	clear_arglist(&cmd);
 	return (EXIT_SUCCESS);
+
+error_cleanup:
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
+	clear_arglist(&cmd);
+	return (EXIT_FAILURE);
 }
 
 #ifdef ENABLE_TLS
@@ -2267,7 +2299,7 @@ int cmd_cert (const char* arg)
 void cmd_connect_help ()
 {
 #ifdef ENABLE_TLS
-	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] host\n");
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>] host\n");
 #else
 	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
 #endif
@@ -2282,7 +2314,7 @@ int cmd_connect (const char* arg)
 	DIR* dir;
 	struct dirent* d;
 	int usetls = 0, n;
-	char *cert = NULL, *key = NULL, *trusted_dir = NULL;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *trusted_store = NULL;
 #endif
 	int hostfree = 0;
 	unsigned short port = 0;
@@ -2296,6 +2328,7 @@ int cmd_connect (const char* arg)
 			{"tls", 0, 0, 't'},
 			{"cert", 1, 0, 'c'},
 			{"key", 1, 0, 'k'},
+			{"trusted", 1, 0, 's'},
 #endif
 			{0, 0, 0, 0}
 	};
@@ -2316,7 +2349,12 @@ int cmd_connect (const char* arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
+#ifdef ENABLE_TLS
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
+#else
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
+#endif
+	{
 		switch (c) {
 		case 'h':
 			cmd_connect_help ();
@@ -2344,12 +2382,14 @@ int cmd_connect (const char* arg)
 		case 'k':
 			asprintf(&key, "%s", optarg);
 			break;
+		case 's':
+			trusted_store = optarg;
+			break;
 #endif
 		default:
 			ERROR("connect", "unknown option -%c.", c);
 			cmd_connect_help ();
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			goto error_cleanup;
 		}
 	}
 	if (port == 0) {
@@ -2358,38 +2398,48 @@ int cmd_connect (const char* arg)
 #ifdef ENABLE_TLS
 	if (usetls) {
 		if (cert == NULL) {
+			if (key != NULL) {
+				ERROR("connect", "Key specified without a certificate.");
+				goto error_cleanup;
+			}
 			get_default_client_cert(&cert, &key);
 			if (cert == NULL) {
 				ERROR("connect", "Could not find the default client certificate, check with \"cert displayown\" command.");
-				return (EXIT_FAILURE);
+				goto error_cleanup;
 			}
 		}
-		if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
-			ERROR("connect", "Could not use the trusted CA directory.");
-			return (EXIT_FAILURE);
-		}
+		if (trusted_store == NULL) {
+			if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+				ERROR("connect", "Could not use the trusted CA directory.");
+				goto error_cleanup;
+			}
 
-		/* check whether we have any trusted CA, verification should fail otherwise */
-		dir = opendir(trusted_dir);
-		n = 0;
-		while ((d = readdir(dir)) != NULL) {
-			if (++n > 2) {
-				break;
+			/* check whether we have any trusted CA, verification should fail otherwise */
+			dir = opendir(trusted_dir);
+			n = 0;
+			while ((d = readdir(dir)) != NULL) {
+				if (++n > 2) {
+					break;
+				}
+			}
+			closedir(dir);
+			if (n <= 2) {
+				ERROR("connect", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+			}
+		} else {
+			if (access(trusted_store, R_OK) != 0) {
+				ERROR("connect", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
+				goto error_cleanup;
+			}
+			if (strlen(trusted_store) < 5 || strcmp(trusted_store+strlen(trusted_store)-4, ".pem") != 0) {
+				ERROR("connect", "Trusted CA store in an unknown format.");
+				goto error_cleanup;
 			}
 		}
-		closedir(dir);
-		if (n <= 2) {
-			ERROR("connect", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
-		}
 
-		if (nc_tls_init(cert, key, NULL, trusted_dir) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, trusted_store, trusted_dir) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
-			return (EXIT_FAILURE);
-		}
-		free(trusted_dir);
-		free(cert);
-		if (key != NULL) {
-			free(key);
+			goto error_cleanup;
 		}
 	}
 #endif
@@ -2398,15 +2448,13 @@ int cmd_connect (const char* arg)
 		host = malloc (sizeof(char) * BUFFER_SIZE);
 		if (host == NULL) {
 			ERROR("connect", "memory allocation error (%s).", strerror (errno));
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			goto error_cleanup;
 		}
 		hostfree = 1;
 		INSTRUCTION("Hostname to connect to: ");
 		if (scanf ("%1023s", host) == EOF) {
 			ERROR("connect", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			goto error_cleanup;
 		}
 	} else if ((optind + 1) == cmd.count) {
 		host = cmd.list[optind];
@@ -2419,8 +2467,7 @@ int cmd_connect (const char* arg)
 		if (hostfree) {
 			free (host);
 		}
-		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		goto error_cleanup;
 	}
 	if (hostfree) {
 		free (host);
@@ -2428,6 +2475,21 @@ int cmd_connect (const char* arg)
 	clear_arglist(&cmd);
 
 	return (EXIT_SUCCESS);
+
+error_cleanup:
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
+	clear_arglist(&cmd);
+	return (EXIT_FAILURE);
 }
 
 int cmd_disconnect (const char* UNUSED(arg))
