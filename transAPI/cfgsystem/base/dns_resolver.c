@@ -670,8 +670,8 @@ int dns_augeas_mod_opt_timeout(const char* number, char** msg)
 
 int dns_augeas_add_opt_attempts(const char* number, char** msg)
 {
-	int ret, i;
-	char* path, **matches;
+	int i, c;
+	char **matches;
 
 	assert(number);
 
@@ -681,32 +681,21 @@ int dns_augeas_add_opt_attempts(const char* number, char** msg)
 		}
 	}
 
-	asprintf(&path, "/files/%s/options", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
-		free(path);
+	switch (c = aug_match(augeas_dns, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", &matches)) {
+	case -1:
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", aug_error_message(augeas_dns));
 		return EXIT_FAILURE;
-	}
-	free(path);
-
-	if (ret != 0) {
-		/* Some options already defined */
-		asprintf(&path, "/files/%s/options/attempts", RESOLV_CONF_FILE_PATH);
-		for (i = 0; i < ret; ++i) {
-			if (strcmp(matches[i], path) == 0) {
-				asprintf(msg, "Attempts already defined in the configuration file.");
-				free(path);
-				return EXIT_FAILURE;
-			}
+	default:
+		/* option already exists, remove it before adding it (or just free matches) */
+		for (i = 0; i < c; i++) {
+			aug_rm(augeas_dns, matches[i]);
+			free(matches[i]);
 		}
-		free(path);
+		free(matches);
 	}
 
 	/* Set the attempts-times */
-	asprintf(&path, "/files/%s/options/attempts", RESOLV_CONF_FILE_PATH);
-	aug_set(augeas_dns, path, number);
-	free(path);
+	aug_set(augeas_dns, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", number);
 
 	return EXIT_SUCCESS;
 }
