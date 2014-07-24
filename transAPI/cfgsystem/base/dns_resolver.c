@@ -42,6 +42,7 @@
 
 #define _GNU_SOURCE
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -673,10 +674,7 @@ int dns_augeas_add_opt_attempts(const char* number, char** msg)
 	int ret, i;
 	char* path, **matches;
 
-	if (number == NULL) {
-		asprintf(msg, "NULL arguments.");
-		return EXIT_FAILURE;
-	}
+	assert(number);
 
 	if (augeas_dns == NULL) {
 		if (dns_augeas_init(msg) != 0) {
