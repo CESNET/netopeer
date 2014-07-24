@@ -2360,7 +2360,7 @@ int cmd_connect (const char* arg)
 		if (cert == NULL) {
 			get_default_client_cert(&cert, &key);
 			if (cert == NULL) {
-				ERROR("connect", "Could not find the default client certificate.");
+				ERROR("connect", "Could not find the default client certificate, check with \"cert displayown\" command.");
 				return (EXIT_FAILURE);
 			}
 		}
