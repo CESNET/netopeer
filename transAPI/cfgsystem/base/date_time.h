@@ -137,7 +137,7 @@ xmlNodePtr ntp_augeas_getxml(char** msg, xmlNsPtr ns);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int ntp_augeas_add(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
+int ntp_augeas_add(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 void ntp_augeas_rm(const char* item);
 
@@ -152,7 +152,7 @@ void ntp_augeas_rm(const char* item);
  * @return augeas item unique name
  * @return NULL if error occured
  */
-char* ntp_augeas_find(char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
+char* ntp_augeas_find(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief resolve an URL in both IPv4 and IPv6
@@ -161,7 +161,7 @@ char* ntp_augeas_find(char* udp_address, char* association_type, bool iburst, bo
  * @return list of IP addresses ended with NULL
  * @return NULL if error occured
  */
-char** ntp_resolve_server(char* server_name, char** msg);
+char** ntp_resolve_server(const char* server_name, char** msg);
 
 /**
  * @brief get the current timezone offset

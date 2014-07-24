@@ -385,6 +385,8 @@ PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(
 	return EXIT_SUCCESS;
 }
 
+static bool ntp_restart_flag = false;
+
 /**
  * @brief This callback will be run when node in path /systemns:system/systemns:ntp/systemns:enabled changes
  *
@@ -398,33 +400,28 @@ PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	int ret;
-	bool ignore = false;
 	char* msg = NULL;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
 		if (strcmp(get_node_content(node), "true") == 0) {
-			ret = ntp_start();
+			if (ntp_start() == EXIT_SUCCESS) {
+				/* flag for parent callback */
+				ntp_restart_flag = false;
+			} else {
+				asprintf(&msg, "Failed to start NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
 		} else if (strcmp(get_node_content(node), "false") == 0) {
-			ret = ntp_stop();
-			/* In case NTP is not running when starting this module */
-			if (op & XMLDIFF_ADD) {
-				ignore = true;
+			if (ntp_stop() != EXIT_SUCCESS) {
+				asprintf(&msg, "Failed to stop NTP.");
+				return fail(error, msg, EXIT_FAILURE);
 			}
 		} else {
 			asprintf(&msg, "Unkown value \"%s\" in the NTP enabled field.", get_node_content(node));
 			return fail(error, msg, EXIT_FAILURE);
 		}
-
-		if (ret == 1 && !ignore) {
-			asprintf(&msg, "Failed to start/stop NTP.");
-			return fail(error, msg, EXIT_FAILURE);
-		} else if (ret == 2) {
-			asprintf(&msg, "Could not recognize the Linux distribution.");
-			return fail(error, msg, EXIT_FAILURE);
-		}
 	} else if (op & XMLDIFF_REM) {
-		/* Nothing for us to do */
+		/* Nothing to do for us, should never happen since there is a default value */
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the ntp-enabled callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
@@ -448,55 +445,53 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 {
 	xmlNodePtr cur, child;
 	int i;
-	char* msg = NULL, *item, **resolved = NULL;
-	char* udp_address = NULL;
-	char* association_type = NULL;
+	char* msg = NULL, *item = NULL, **resolved = NULL;
+	const char* udp_address = NULL;
+	const char* association_type = NULL;
 	bool iburst = NTP_SERVER_IBURST_DEFAULT;
 	bool prefer = NTP_SERVER_PREFER_DEFAULT;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_REM) || (op & XMLDIFF_MOD)) {
-		child = node->children;
-		while (child != NULL) {
+		for (child = node->children; child != NULL; child = child->next) {
+			if (child->type != XML_ELEMENT_NODE) {
+				continue;
+			}
 			/* udp */
 			if (xmlStrcmp(child->name, BAD_CAST "udp") == 0) {
-				cur = child->children->children;
-				while (cur != NULL) {
-					if (xmlStrcmp(cur->name, BAD_CAST "address") == 0) {
-						udp_address = strdup(get_node_content(cur));
+				for (cur = child->children; cur != NULL; cur = cur->next) {
+					if (cur->type != XML_ELEMENT_NODE) {
+						continue;
 					}
-					cur = cur->next;
+					if (xmlStrcmp(cur->name, BAD_CAST "address") == 0) {
+						udp_address = (char*)get_node_content(cur);
+					}
 				}
 			}
 
 			/* association-type */
 			if (xmlStrcmp(child->name, BAD_CAST "association-type") == 0) {
-				association_type = strdup(get_node_content(child));
+				association_type = get_node_content(child);
 			}
 
 			/* iburst */
 			if (xmlStrcmp(child->name, BAD_CAST "iburst") == 0) {
 				if (strcmp(get_node_content(child), "true") == 0) {
 					iburst = true;
-				}
+				} /* else false is default value */
 			}
 
 			/* prefer */
 			if (xmlStrcmp(child->name, BAD_CAST "prefer") == 0) {
 				if (strcmp(get_node_content(child), "true") == 0) {
 					prefer = true;
-				}
+				} /* else false is default value */
 			}
-
-			child = child->next;
 		}
 
+		/* check that we have necessary info */
 		if (udp_address == NULL) {
-			free(association_type);
+			msg = strdup("Missing address of the NTP server.");
 			return fail(error, msg, EXIT_FAILURE);
-		}
-
-		if (association_type == NULL) {
-			association_type = strdup(NTP_SERVER_ASSOCTYPE_DEFAULT);
 		}
 
 		/* Manual address resolution if pool used */
@@ -505,18 +500,16 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 			if (resolved == NULL) {
 				goto error;
 			}
-			free(association_type);
-			association_type = strdup("server");
-		}
-
-		i = 0;
-		if (resolved != NULL) {
-			free(udp_address);
-			udp_address = resolved[i];
+			udp_address = resolved[0];
+			association_type = "server";
+		} else if (association_type == NULL) {
+			/* set default value if needed (shouldn't be) */
+			association_type = NTP_SERVER_ASSOCTYPE_DEFAULT;
 		}
 
 		/* This loop may be executed more than once only with the association type pool */
-		do {
+		i = 0;
+		while (udp_address) {
 			if (op & XMLDIFF_ADD) {
 				/* Write the new values into Augeas structure */
 				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
@@ -531,6 +524,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 					goto error;
 				}
 				ntp_augeas_rm(item);
+				free(item);
 			} else { /* XMLDIFF_MOD */
 				/* Update this item from the config */
 				if ((item = ntp_augeas_find(udp_address, association_type, iburst, prefer, &msg)) == NULL) {
@@ -540,66 +534,44 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 					goto error;
 				}
 				ntp_augeas_rm(item);
+				free(item);
 				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
 			}
 
+			/* in case of pool, move on to another server address */
 			if (resolved != NULL) {
-				++i;
-				if (resolved[i] == NULL) {
-					free(resolved);
-					resolved = NULL;
-				} else {
-					free(udp_address);
-					udp_address = resolved[i];
-				}
+				udp_address = resolved[++i];
+			} else {
+				udp_address = NULL;
 			}
-		} while (resolved != NULL);
+		}
 
-		free(udp_address);
-		free(association_type);
+		if (resolved) {
+			free(resolved);
+		}
 
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the clock-timezone-name callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
-	/* Restart NTP daemon if enabled */
-	cur = node->parent->children;
-	while (cur != NULL && xmlStrcmp(cur->name, BAD_CAST "enabled") != 0) {
-		cur = cur->next;
-	}
-	if (cur == NULL) {
-		asprintf(&msg, "Could not apply NTP changes, enabled node not found.");
-		return fail(error, msg, EXIT_FAILURE);
-	}
-	if (strcmp(get_node_content(cur), "true") == 0) {
-		if (ntp_restart() != 0) {
-			asprintf(&msg, "Failed to restart NTPD.");
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	}
+	/* saving augeas data is postponed to the parent callback ntp */
 
-	/* Save the changes */
-	if (ntp_augeas_save(&msg) != 0) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
+	/* flag for parent callback */
+	ntp_restart_flag = true;
 
 	return EXIT_SUCCESS;
 
 error:
-	while (resolved != NULL) {
-		++i;
-		if (resolved[i] == NULL) {
-			free(resolved);
-			resolved = NULL;
-		} else {
+	if (resolved) {
+		for (i = 0; resolved[i] != NULL; i++) {
 			free(resolved[i]);
 		}
+		free(resolved);
 	}
-	free(udp_address);
-	free(association_type);
+	free(item);
 
 	return fail(error, msg, EXIT_FAILURE);
 }
@@ -617,29 +589,31 @@ error:
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	xmlNodePtr cur;
-	bool enabled = false;
 	char* msg;
-	int ret;
 
-	/* The only op we care about, on XMLDIFF_ADD the enabled callback (if true) takes care of starting NTP daemon */
+	/* Save the changes made by children callbacks via augeas */
+	if (ntp_augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
 	if (op & XMLDIFF_REM) {
-		cur = node->children;
-		while (cur != NULL) {
-			if (xmlStrcmp(cur->name, BAD_CAST "enabled") == 0) {
-				if (strcmp(get_node_content(cur), "true") == 0) {
-					enabled = true;
-				}
-			}
-			cur = cur->next;
-		}
-
-		ret = ntp_stop();
-		if (enabled && ret == 1) {
+		/* stop NTP daemon */
+		if (ntp_stop() != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to stop NTP.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
-		/* If !enabled and ret == 1, we just hope NTP was not actually running */
+	} else if (op & XMLDIFF_CHAIN) {
+		/* apply configuration changes if needed */
+		if (ntp_status() == 1 && ntp_restart_flag) {
+			if (ntp_restart() != EXIT_SUCCESS) {
+				asprintf(&msg, "Failed to restart NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
+			ntp_restart_flag = false;
+		}
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the system-ntp callback.", op);
+		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	return EXIT_SUCCESS;
@@ -1286,40 +1260,40 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-		.callbacks_count = 15,
-        .data = NULL,
-        .callbacks = {
-        		{ .path = "/systemns:system/systemns:hostname",
-        				.func = callback_systemns_system_systemns_hostname },
-                { .path = "/systemns:system/systemns:clock/systemns:timezone-name",
-                        .func = callback_systemns_system_systemns_clock_systemns_timezone_name },
-                { .path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset",
-                        .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset },
-                { .path = "/systemns:system/systemns:ntp/systemns:enabled",
-                        .func = callback_systemns_system_systemns_ntp_systemns_enabled },
-                { .path = "/systemns:system/systemns:ntp/systemns:server",
-                        .func = callback_systemns_system_systemns_ntp_systemns_server },
-                { .path = "/systemns:system/systemns:ntp",
-                        .func = callback_systemns_system_systemns_ntp },
-                { .path = "/systemns:system/systemns:dns-resolver/systemns:search",
-                        .func = callback_systemns_system_systemns_dns_resolver_systemns_search },
-                { .path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:udp-and-tcp/systemns:address",
-                        .func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address },
-                { .path = "/systemns:system/systemns:dns-resolver/systemns:server",
-                        .func = callback_systemns_system_systemns_dns_resolver_systemns_server },
-                { .path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout",
-                        .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout },
-                { .path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts",
-                        .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts },
-                { .path = "/systemns:system/systemns:dns-resolver",
-                        .func = callback_systemns_system_systemns_dns_resolver },
-                { .path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key",
-                        .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key },
-                { .path = "/systemns:system/systemns:authentication/systemns:user",
-                        .func = callback_systemns_system_systemns_authentication_systemns_user },
-                { .path = "/systemns:system/systemns:authentication",
-                        .func = callback_systemns_system_systemns_authentication }
-		}
+	.callbacks_count = 15,
+	.data = NULL,
+	.callbacks = {
+		{.path = "/systemns:system/systemns:hostname",
+			.func = callback_systemns_system_systemns_hostname},
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-name",
+			.func = callback_systemns_system_systemns_clock_systemns_timezone_name},
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset",
+			.func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset},
+		{.path = "/systemns:system/systemns:ntp/systemns:server",
+			.func = callback_systemns_system_systemns_ntp_systemns_server},
+		{ .path = "/systemns:system/systemns:ntp/systemns:enabled",
+			.func = callback_systemns_system_systemns_ntp_systemns_enabled},
+		{.path = "/systemns:system/systemns:ntp",
+			.func = callback_systemns_system_systemns_ntp},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:search",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_search},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:udp-and-tcp/systemns:address",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:server",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_server},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
+		{.path = "/systemns:system/systemns:dns-resolver",
+			.func = callback_systemns_system_systemns_dns_resolver},
+		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key",
+			.func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
+		{.path = "/systemns:system/systemns:authentication/systemns:user",
+			.func = callback_systemns_system_systemns_authentication_systemns_user},
+		{.path = "/systemns:system/systemns:authentication",
+			.func = callback_systemns_system_systemns_authentication }
+	}
 };
 
 /*
