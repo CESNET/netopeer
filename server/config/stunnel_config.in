@@ -20,9 +20,12 @@ cert = {CFGDIR}/server.pem
 ; Verify peer with trusted CA chain.
 verify = 2
 
-; CA certificates directory, with verify level 3, it also includes allowed client
-; certificates.
+; CA certificates directory, with verify level 3, it also includes allowed
+; client certificates.
 CApath = {CFGDIR}/certs
+
+; Certificate Revocation List directory
+CRLpath = {CFGDIR}/crl
 
 ; Disable support for insecure SSLv2 protocol
 options = NO_SSLv2

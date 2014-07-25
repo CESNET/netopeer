@@ -267,6 +267,7 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		rm -rf config/stunnel_config; \
 		$(INSTALL_DATA_PRIVATE) stunnel/server.* $(CFGDIR)/stunnel; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/certs; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/crl; \
 		$(INSTALL_DATA_PRIVATE) stunnel/rootCA.pem $(CFGDIR)/stunnel/certs; \
 		c_rehash $(CFGDIR)/stunnel/certs; \
 		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF TLS server configuration."; \
