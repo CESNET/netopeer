@@ -2152,7 +2152,7 @@ int cmd_cert (const char* arg)
 		free(trusted_dir);
 
 		if (remove(dest) != 0) {
-			ERROR("cert remove", "Cannot remove certificate \"%s\": %s (use the name from \"cert list\" output)", path, strerror(errno));
+			ERROR("cert remove", "Cannot remove certificate \"%s\": %s (use the name from \"cert display\" output)", path, strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
 			return (EXIT_FAILURE);
