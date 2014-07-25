@@ -97,7 +97,7 @@ int users_mod_user(const char* name, const char* passwd, char** msg);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int users_rem_user(const char* name, char** msg);
+int users_rm_user(const char* name, char** msg);
 
 /**
  * @brief get the home directory of a user

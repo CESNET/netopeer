@@ -198,7 +198,7 @@ int users_mod_user(const char* name, const char* passwd, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int users_rem_user(const char* name, char** msg)
+int users_rm_user(const char* name, char** msg)
 {
 	int ret;
 	char* tmp;

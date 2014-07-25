@@ -126,7 +126,7 @@ struct tmz {
     {0, NULL}
 };
 
-int set_timezone(const char *name, char** errmsg)
+int tz_set(const char *name, char** errmsg)
 {
 	struct stat statbuf;
 	char *tmp = NULL;
@@ -173,10 +173,10 @@ int set_gmt_offset(int offset, char** errmsg)
 		return EXIT_FAILURE;
 	}
 
-	return set_timezone(timezones[i].timezone_file, errmsg);
+	return tz_set(timezones[i].timezone_file, errmsg);
 }
 
-time_t get_boottime(void)
+time_t boottime_get(void)
 {
 	struct sysinfo s_info;
 	time_t cur_time = time(NULL);
@@ -249,7 +249,7 @@ int ntp_status(void)
 	}
 }
 
-xmlNodePtr ntp_augeas_getxml(char** msg, xmlNsPtr ns)
+xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns)
 {
 	int i, j;
 	const char* type[2] = {"server", "peer"};
@@ -347,7 +347,7 @@ loop:
 	return (ntp_node);
 }
 
-int ntp_augeas_add(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
+int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
 {
 	int ret;
 	char* path = NULL;
@@ -505,7 +505,7 @@ char** ntp_resolve_server(const char* server_name, char** msg)
 	return ret;
 }
 
-long get_tz_offset(void)
+long tz_get_offset(void)
 {
 	tzset();
 
@@ -513,7 +513,7 @@ long get_tz_offset(void)
 	return (timezone / 60);
 }
 
-const char* get_tz(void)
+const char* tz_get(void)
 {
 	static char buf[128];
 	char* tz;

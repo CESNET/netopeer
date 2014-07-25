@@ -185,18 +185,18 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 	container_cur = xmlNewChild(root, root->ns, BAD_CAST "clock", NULL);
 	if (ncds_feature_isenabled("ietf-system", "timezone-name")) {
 		/* clock/timezone-name */
-		xmlNewChild(container_cur, container_cur->ns, BAD_CAST "timezone-name", BAD_CAST get_tz());
+		xmlNewChild(container_cur, container_cur->ns, BAD_CAST "timezone-name", BAD_CAST tz_get());
 	} else {
 		/* clock/timezone-utc-offset */
 		tmp = NULL;
-		asprintf(&tmp, "%ld", get_tz_offset());
+		asprintf(&tmp, "%ld", tz_get_offset());
 		xmlNewChild(container_cur, container_cur->ns, BAD_CAST "timezone-name", BAD_CAST tmp);
 		free(tmp);
 	}
 
 	/* ntp */
 	if (ncds_feature_isenabled("ietf-system", "ntp")) {
-		if ((cur =  ntp_augeas_getxml(&msg, root->ns)) != NULL) {
+		if ((cur =  ntp_getconfig(&msg, root->ns)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
 			augeas_close();
@@ -206,7 +206,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 	}
 
 	/* dns-resolver */
-	if ((cur =  dns_augeas_getxml(&msg, root->ns)) != NULL) {
+	if ((cur =  dns_getconfig(&msg, root->ns)) != NULL) {
 		xmlAddChild(root, cur);
 	} else if (msg != NULL) {
 		augeas_close();
@@ -278,7 +278,7 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_er
 	/* Add clock leaf children */
 	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "current-datetime", BAD_CAST (s = nc_time2datetime(time(NULL), NULL)));
 	free(s);
-	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "boot-datetime", BAD_CAST (s = nc_time2datetime(get_boottime(), NULL)));
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "boot-datetime", BAD_CAST (s = nc_time2datetime(boottime_get(), NULL)));
 	free(s);
 
 	return state_doc;
@@ -346,7 +346,7 @@ PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name(void**
 	char* msg = NULL;
 
 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		if (set_timezone(get_node_content(node), &msg) != 0) {
+		if (tz_set(get_node_content(node), &msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -515,7 +515,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 		while (udp_address) {
 			if (op & XMLDIFF_ADD) {
 				/* Write the new values into Augeas structure */
-				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
+				if (ntp_add_server(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
 			} else if (op & XMLDIFF_REM) {
@@ -538,7 +538,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 				}
 				ntp_augeas_rm(item);
 				free(item);
-				if (ntp_augeas_add(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
+				if (ntp_add_server(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
 			}
@@ -683,11 +683,11 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		if (dns_augeas_add_search_domain(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+		if (dns_add_search_domain(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_SIBLING) {
@@ -697,7 +697,8 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 			}
 			nc_verb_warning("Mismatch Resolv domain count and configuration domain count, Resolv domains will be rewritten.");
 		}
-		dns_augeas_rem_all_search_domains();
+
+		dns_rm_search_domain_all();
 
 		index = 1;
 		cur = node->parent->children;
@@ -706,7 +707,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 				cur = cur->next;
 				continue;
 			}
-			if (dns_augeas_add_search_domain(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
+			if (dns_add_search_domain(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 			++index;
@@ -763,11 +764,11 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 			++index;
 		}
 
-		if (dns_augeas_add_nameserver(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+		if (dns_add_nameserver(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -808,12 +809,12 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 			}
 			nc_verb_warning("Mismatch Resolv nameserver count and configuration nameserver count, Resolv nameservers will be rewritten.");
 		}
-		dns_augeas_rem_all_nameservers();
+		dns_rm_nameserver_all();
 
 		index = 1;
 		cur = node->parent->children;
 		while (cur != NULL) {
-			if (dns_augeas_add_nameserver(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
+			if (dns_add_nameserver(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 			++index;
@@ -860,15 +861,15 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	}
 
 	if (op & XMLDIFF_ADD) {
-		if (dns_augeas_add_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_add_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_MOD) {
-		if (dns_augeas_mod_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_mod_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -912,15 +913,15 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	}
 
 	if (op & XMLDIFF_ADD) {
-		if (dns_augeas_add_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_add_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_augeas_rem_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_MOD) {
-		if (dns_augeas_mod_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_mod_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -1038,7 +1039,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
 		}
 
 		/* Removing a user */
-		if ((op & XMLDIFF_REM) && (users_rem_user(name, &msg) != EXIT_SUCCESS)) {
+		if ((op & XMLDIFF_REM) && (users_rm_user(name, &msg) != EXIT_SUCCESS)) {
 			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
 				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
 				free(msg);
@@ -1355,7 +1356,7 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 		}
 	}
 
-	rollback_timezone = get_tz();
+	rollback_timezone = tz_get();
 	if (set_gmt_offset(offset, &msg) != 0) {
 		goto error;
 	}
@@ -1364,7 +1365,7 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 	new_time = nc_datetime2time(get_node_content(current_datetime));
 	if (stime(&new_time) == -1) {
 		/* rollback timezone */
-		set_timezone(rollback_timezone, &msg);
+		tz_set(rollback_timezone, &msg);
 		free(msg); /* ignore rollback result, just do the best */
 		msg = NULL;
 

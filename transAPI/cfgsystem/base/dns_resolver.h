@@ -45,7 +45,7 @@
 
 #include <stdbool.h>
 
-xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns);
+xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns);
 
 /**
  * @brief check the number of search domains for equality
@@ -66,7 +66,7 @@ bool dns_augeas_equal_search_count(xmlNodePtr search_node, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_add_search_domain(const char* domain, int index, char** msg);
+int dns_add_search_domain(const char* domain, int index, char** msg);
 
 /**
  * @brief remove a search domain from the resolv configuration file
@@ -76,13 +76,13 @@ int dns_augeas_add_search_domain(const char* domain, int index, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_rem_search_domain(const char* domain, char** msg);
+int dns_rm_search_domain(const char* domain, char** msg);
 
 /**
  * @brief remove all search domains from the resolv configuration file
  * @param a augeas structure to use
  */
-void dns_augeas_rem_all_search_domains(void);
+void dns_rm_search_domain_all(void);
 
 /**
  * @brief add a new nameserver to the resolv configuration file
@@ -93,7 +93,7 @@ void dns_augeas_rem_all_search_domains(void);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_add_nameserver(const char* address, int index, char** msg);
+int dns_add_nameserver(const char* address, int index, char** msg);
 
 /**
  * @brief remove a nameserver from the resolv configuration file
@@ -103,7 +103,7 @@ int dns_augeas_add_nameserver(const char* address, int index, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_rem_nameserver(const char* address, char** msg);
+int dns_rm_nameserver(const char* address, char** msg);
 
 /**
  * @brief check the number of nameservers for equality
@@ -119,7 +119,7 @@ bool dns_augeas_equal_nameserver_count(xmlNodePtr address_node, char** msg);
  * @brief remove all nameservers from the resolv configuration file
  * @param a augeas structure to use
  */
-void dns_augeas_rem_all_nameservers(void);
+void dns_rm_nameserver_all(void);
 
 /**
  * @brief add the timeout option to the resolv configuration file
@@ -129,7 +129,7 @@ void dns_augeas_rem_all_nameservers(void);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_add_opt_timeout(const char* number, char** msg);
+int dns_add_opt_timeout(const char* number, char** msg);
 
 /**
  * @brief remove the timeout option from the resolv configuration file
@@ -139,7 +139,7 @@ int dns_augeas_add_opt_timeout(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_rem_opt_timeout(const char* number, char** msg);
+int dns_rm_opt_timeout(const char* number, char** msg);
 
 /**
  * @brief modify the timeout option in the resolv configuration file
@@ -149,7 +149,7 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_mod_opt_timeout(const char* number, char** msg);
+int dns_mod_opt_timeout(const char* number, char** msg);
 
 /**
  * @brief add the attempts option to the resolv configuration file
@@ -159,7 +159,7 @@ int dns_augeas_mod_opt_timeout(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_add_opt_attempts(const char* number, char** msg);
+int dns_add_opt_attempts(const char* number, char** msg);
 
 /**
  * @brief remove the attempts option from the resolv configuration file
@@ -169,7 +169,7 @@ int dns_augeas_add_opt_attempts(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_rem_opt_attempts(const char* number, char** msg);
+int dns_rm_opt_attempts(const char* number, char** msg);
 
 /**
  * @brief modify the attempts option in the resolv configuration file
@@ -179,6 +179,6 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_augeas_mod_opt_attempts(const char* number, char** msg);
+int dns_mod_opt_attempts(const char* number, char** msg);
 
 #endif /* DNS_RESOLVER_H_ */

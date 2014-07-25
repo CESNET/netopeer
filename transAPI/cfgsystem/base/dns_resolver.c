@@ -55,7 +55,7 @@
 /* from common.c */
 extern augeas *sysaugeas;
 
-xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
+xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns)
 {
 	int i, done;
 	char* path;
@@ -192,7 +192,7 @@ bool dns_augeas_equal_search_count(xmlNodePtr search_node, char** msg)
 	}
 }
 
-int dns_augeas_add_search_domain(const char* domain, int index, char** msg)
+int dns_add_search_domain(const char* domain, int index, char** msg)
 {
 	int ret;
 	char* path;
@@ -242,7 +242,7 @@ int dns_augeas_add_search_domain(const char* domain, int index, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_search_domain(const char* domain, char** msg)
+int dns_rm_search_domain(const char* domain, char** msg)
 {
 	int i, ret;
 	char* path, **matches;
@@ -288,7 +288,7 @@ int dns_augeas_rem_search_domain(const char* domain, char** msg)
 	return EXIT_SUCCESS;
 }
 
-void dns_augeas_rem_all_search_domains(void)
+void dns_rm_search_domain_all(void)
 {
 	char* path;
 
@@ -297,7 +297,7 @@ void dns_augeas_rem_all_search_domains(void)
 	free(path);
 }
 
-int dns_augeas_add_nameserver(const char* address, int index, char** msg)
+int dns_add_nameserver(const char* address, int index, char** msg)
 {
 	int ret;
 	char* path;
@@ -347,7 +347,7 @@ int dns_augeas_add_nameserver(const char* address, int index, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_nameserver(const char* address, char** msg)
+int dns_rm_nameserver(const char* address, char** msg)
 {
 	int i, ret;
 	char* path, **matches;
@@ -416,7 +416,7 @@ bool dns_augeas_equal_nameserver_count(xmlNodePtr server_node, char** msg)
 	}
 }
 
-void dns_augeas_rem_all_nameservers(void)
+void dns_rm_nameserver_all(void)
 {
 	char* path;
 
@@ -425,7 +425,7 @@ void dns_augeas_rem_all_nameservers(void)
 	free(path);
 }
 
-int dns_augeas_add_opt_timeout(const char* number, char** msg)
+int dns_add_opt_timeout(const char* number, char** msg)
 {
 	int ret, i;
 	char* path, **matches;
@@ -465,7 +465,7 @@ int dns_augeas_add_opt_timeout(const char* number, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_opt_timeout(const char* number, char** msg)
+int dns_rm_opt_timeout(const char* number, char** msg)
 {
 	int ret, i;
 	char* path, **matches, *match = NULL;
@@ -533,7 +533,7 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_mod_opt_timeout(const char* number, char** msg)
+int dns_mod_opt_timeout(const char* number, char** msg)
 {
 	int ret;
 	char* path;
@@ -569,7 +569,7 @@ int dns_augeas_mod_opt_timeout(const char* number, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_add_opt_attempts(const char* number, char** msg)
+int dns_add_opt_attempts(const char* number, char** msg)
 {
 	int i, c;
 	char **matches;
@@ -595,7 +595,7 @@ int dns_augeas_add_opt_attempts(const char* number, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_rem_opt_attempts(const char* number, char** msg)
+int dns_rm_opt_attempts(const char* number, char** msg)
 {
 	int ret, i;
 	char* path, **matches, *match = NULL;
@@ -663,7 +663,7 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_augeas_mod_opt_attempts(const char* number, char** msg)
+int dns_mod_opt_attempts(const char* number, char** msg)
 {
 	int ret;
 	char* path;
