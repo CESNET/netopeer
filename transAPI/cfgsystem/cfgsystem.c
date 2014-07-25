@@ -520,24 +520,14 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 				}
 			} else if (op & XMLDIFF_REM) {
 				/* Delete this item from the config */
-				if ((item = ntp_augeas_find(udp_address, association_type, iburst, prefer, &msg)) == NULL) {
-					if (msg == NULL) {
-						asprintf(&msg, "Deleting an NTP server failed: not found.");
-					}
+				if (ntp_rm_server(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
-				ntp_augeas_rm(item);
-				free(item);
 			} else { /* XMLDIFF_MOD */
 				/* Update this item from the config */
-				if ((item = ntp_augeas_find(udp_address, association_type, iburst, prefer, &msg)) == NULL) {
-					if (msg == NULL) {
-						asprintf(&msg, "Updating an NTP server failed: not found.");
-					}
+				if (ntp_rm_server(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}
-				ntp_augeas_rm(item);
-				free(item);
 				if (ntp_add_server(udp_address, association_type, iburst, prefer, &msg) != EXIT_SUCCESS) {
 					goto error;
 				}

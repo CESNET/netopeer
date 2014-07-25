@@ -121,8 +121,6 @@ xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns);
  */
 int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
-void ntp_augeas_rm(const char* item);
-
 /**
  * @brief find a server in augeas NTP config
  * @param a initialized augeas
@@ -134,7 +132,7 @@ void ntp_augeas_rm(const char* item);
  * @return augeas item unique name
  * @return NULL if error occured
  */
-char* ntp_augeas_find(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
+int ntp_rm_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief resolve an URL in both IPv4 and IPv6

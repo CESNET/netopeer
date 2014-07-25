@@ -388,15 +388,10 @@ int ntp_add_server(const char* udp_address, const char* association_type, bool i
 	return EXIT_SUCCESS;
 }
 
-void ntp_augeas_rm(const char* item)
-{
-	aug_rm(sysaugeas, item);
-}
-
-char* ntp_augeas_find(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
+int ntp_rm_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
 {
 	int ret, i, j;
-	char* path, *match;
+	char* path;
 	const char* value;
 	char** matches = NULL;
 
@@ -409,7 +404,7 @@ char* ntp_augeas_find(const char* udp_address, const char* association_type, boo
 	if (ret == -1) {
 		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
-		return NULL;
+		return EXIT_FAILURE;
 	}
 	free(path);
 
@@ -435,25 +430,19 @@ char* ntp_augeas_find(const char* udp_address, const char* association_type, boo
 			continue;
 		}
 
-		break;
-	}
+		/* remove item and finish */
+		aug_rm(sysaugeas, matches[i]);
 
-	if (i == ret) {
-		match = NULL;
-	} else {
-		/* Remove the node and it's children */
-		match = matches[i];
+		break;
 	}
 
 	/* cleanup */
 	for (i = 0; i < ret; ++i) {
-		if (matches[i] != match) {
-			free(matches[i]);
-		}
+		free(matches[i]);
 	}
 	free(matches);
 
-	return match;
+	return EXIT_SUCCESS;
 }
 
 char** ntp_resolve_server(const char* server_name, char** msg)
