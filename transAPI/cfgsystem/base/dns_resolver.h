@@ -109,7 +109,7 @@ void dns_rm_nameserver_all(void);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_add_opt_timeout(const char* number, char** msg);
+int dns_set_opt_timeout(const char* number, char** msg);
 
 /**
  * @brief remove the timeout option from the resolv configuration file
@@ -119,17 +119,7 @@ int dns_add_opt_timeout(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_rm_opt_timeout(const char* number, char** msg);
-
-/**
- * @brief modify the timeout option in the resolv configuration file
- * @param a augeas structure to use
- * @param number new timeout value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
- */
-int dns_mod_opt_timeout(const char* number, char** msg);
+int dns_rm_opt_timeout(void);
 
 /**
  * @brief add the attempts option to the resolv configuration file
@@ -139,7 +129,7 @@ int dns_mod_opt_timeout(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_add_opt_attempts(const char* number, char** msg);
+int dns_set_opt_attempts(const char* number, char** msg);
 
 /**
  * @brief remove the attempts option from the resolv configuration file
@@ -149,16 +139,6 @@ int dns_add_opt_attempts(const char* number, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_rm_opt_attempts(const char* number, char** msg);
-
-/**
- * @brief modify the attempts option in the resolv configuration file
- * @param a augeas structure to use
- * @param number new attempts value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
- */
-int dns_mod_opt_attempts(const char* number, char** msg);
+int dns_rm_opt_attempts(void);
 
 #endif /* DNS_RESOLVER_H_ */

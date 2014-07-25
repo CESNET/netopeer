@@ -69,11 +69,11 @@ PUBLIC const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_
  */
 PUBLIC NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
-/* Indicate address MOD or server REORDER - we have to update the whole config, but only once */
-static int dns_nmsrv_mod_reorder;
+/* reorder done flag for DNS search domains */
+static bool dns_search_reorder_done = false;
 
-/* Similar to the above, for search domains */
-static int dns_search_reorder;
+/* reorder done flag for DNS server */
+static bool dns_server_reorder_done = false;
 
 /* IANA SSH Public Key Algorithm Names */
 struct pub_key_alg {
@@ -225,9 +225,8 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 		}
 	}
 
-	/* Reset REORDER and MOD flags */
-	dns_nmsrv_mod_reorder = 0;
-	dns_search_reorder = 0;
+	/* Reset REORDER flags */
+	dns_search_reorder_done = false;
 
 	return EXIT_SUCCESS;
 }
@@ -602,12 +601,13 @@ PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xml
 				asprintf(&msg, "Failed to restart NTP.");
 				return fail(error, msg, EXIT_FAILURE);
 			}
-			ntp_restart_flag = false;
 		}
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the system-ntp callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
 	}
+
+	ntp_restart_flag = false;
 
 	return EXIT_SUCCESS;
 }
@@ -626,88 +626,53 @@ PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xml
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
-	int index, count, total_len;
-	bool found;
+	int i;
 	char* msg = NULL;
 
 	/* Already processed, skip */
-	if ((op & XMLDIFF_SIBLING) && (dns_search_reorder == 1)) {
+	if (dns_search_reorder_done) {
 		return EXIT_SUCCESS;
 	}
 
 	if (op & XMLDIFF_ADD) {
-		/* Get the index of this domain, check total domain count and length in characters */
-		index = 1;
-		found = false;
-		total_len = 0;
-		count = 0;
-		cur = node->parent->children;
-		while (cur != NULL) {
-			/* We are working with an XML, children can be in any order and we want only the "search" nodes */
-			if (xmlStrcmp(cur->name, BAD_CAST "search") != 0) {
-				cur = cur->next;
+		/* Get the index of this node */
+		/* search<-dns-resolver->first children */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
 				continue;
+			} else if (cur == node) {
+				break;
+			} else if (xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				i++;
 			}
-			if (cur == node) {
-				found = true;
-			}
-			++count;
-			if (!found) {
-				++index;
-			}
-			if (total_len != 0) {
-				++total_len;
-			}
-			total_len += strlen(get_node_content(cur));
-
-			cur = cur->next;
 		}
-
-		if (count > DNS_SEARCH_DOMAIN_MAX) {
-			asprintf(&msg, "Too many domains in the search list for host-name lookup (max %d).", DNS_SEARCH_DOMAIN_MAX);
-			return fail(error, msg, EXIT_FAILURE);
-		}
-
-		if (total_len > DNS_SEARCH_DOMAINLIST_LEN_MAX) {
-			asprintf(&msg, "Too long domain names in the search list for host-name lookup (max total characters are %d).", DNS_SEARCH_DOMAINLIST_LEN_MAX);
-			return fail(error, msg, EXIT_FAILURE);
-		}
-
-		if (dns_add_search_domain(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+		if (dns_add_search_domain(get_node_content(node), i, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
 		if (dns_rm_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_SIBLING) {
-
+	}
+	if (op & XMLDIFF_SIBLING) {
+		/* remove them all */
 		dns_rm_search_domain_all();
 
-		index = 1;
-		cur = node->parent->children;
-		while (cur != NULL) {
-			if (xmlStrcmp(cur->name, BAD_CAST "search") != 0) {
-				cur = cur->next;
-				continue;
+		/* and then add them all in current order */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+					return fail(error, msg, EXIT_FAILURE);
+				}
+				i++;
 			}
-			if (dns_add_search_domain(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
-				return fail(error, msg, EXIT_FAILURE);
-			}
-			++index;
-			cur = cur->next;
 		}
 
 		/* Remember that REORDER was processed for every sibling */
-		dns_search_reorder = 1;
+		dns_search_reorder_done = true;
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-search callback.", op);
 		return fail(error, msg,  EXIT_FAILURE);
-	}
-
-	/* Save the changes */
-	if (augeas_save(&msg) != 0) {
-		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	return EXIT_SUCCESS;
@@ -724,45 +689,39 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	xmlNodePtr cur;
-	int index;
+	int i;
 	char* msg = NULL;
 
-	/* Somewhat special case, we want to defer the processing to the parent callback */
 	if (op & XMLDIFF_MOD) {
-		dns_nmsrv_mod_reorder = 2;
-		return EXIT_SUCCESS;
+		/* translate it to the following two operations */
+		op = XMLDIFF_REM | XMLDIFF_ADD;
+	}
+
+	if (op & XMLDIFF_REM) {
+		if (dns_rm_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
 	}
 
 	if (op & XMLDIFF_ADD) {
 		/* Get the index of this nameserver */
-		index = 1;
-		cur = node->parent->children;
-		while (cur != NULL) {
-			if (cur == node) {
+		/* address<-udp-and-tcp<-server<-dns-resolver->(first node) */
+		for (i = 1, cur = node->parent->parent->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
+			} else if (cur == node->parent->parent) {
 				break;
+			} else if (xmlStrcmp(cur->name, node->parent->parent->name) == 0) {
+				i++;
 			}
-			cur = cur->next;
-			++index;
 		}
 
-		if (dns_add_nameserver(get_node_content(node), index, &msg) != EXIT_SUCCESS) {
+		if (dns_add_nameserver(get_node_content(node), i, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	} else if (op & XMLDIFF_REM) {
-		if (dns_rm_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-server-address callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	/* Save the changes */
-	if (augeas_save(&msg) != 0) {
-		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	return EXIT_SUCCESS;
@@ -783,29 +742,27 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 {
 	xmlNodePtr cur;
 	char* msg = NULL;
-	int index;
+	int i;
 
-	if (dns_nmsrv_mod_reorder == 2 || ((op & XMLDIFF_SIBLING) && dns_nmsrv_mod_reorder == 0)) {
+	/*
+	 * XMLDIFF_ADD is covered by udp-and-tcp address callback
+	 * XMLDIFF_REM is covered by udp-and-tcp address callback,
+	 * XMLDIFF_MOD is covered by udp-and-tcp address callback,
+	 * so cover only reordering
+	 */
+	if ((op & XMLDIFF_SIBLING) && !dns_server_reorder_done) {
 
+		/* remove all */
 		dns_rm_nameserver_all();
 
-		index = 1;
-		cur = node->parent->children;
-		while (cur != NULL) {
-			if (dns_add_nameserver(get_node_content(cur), index, &msg) != EXIT_SUCCESS) {
+		/* and add them again in current order */
+		for (i = 1, cur = node->parent->children; cur != NULL; i++, cur = cur->next) {
+			if (dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
-			++index;
-			cur = cur->next;
 		}
 
-		/* Remember we already processed the change */
-		dns_nmsrv_mod_reorder = 1;
-
-		/* Save the changes */
-		if (augeas_save(&msg) != 0) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
+		dns_server_reorder_done = true;
 	}
 
 	return EXIT_SUCCESS;
@@ -825,38 +782,22 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
-	int num;
 
 	/* Check the timeout value */
-	num = strtol(get_node_content(node), &ptr, 10);
+	strtol(get_node_content(node), &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Timeout \"%s\" is not a number.", get_node_content(node));
 		return fail(error, msg, EXIT_FAILURE);
 	}
-	if (num > DNS_TIMEOUT_MAX) {
-		asprintf(&msg, "Timeout %d is too long (max %d).", num, DNS_TIMEOUT_MAX);
-		return fail(error, msg, EXIT_FAILURE);
-	}
 
-	if (op & XMLDIFF_ADD) {
-		if (dns_add_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		if (dns_set_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_rm_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else if (op & XMLDIFF_MOD) {
-		if (dns_mod_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
+		dns_rm_opt_timeout();
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-timeout callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	/* Save the changes */
-	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -877,38 +818,22 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	char* msg, *ptr;
-	int num;
 
 	/* Check the attempts value */
-	num = strtol(get_node_content(node), &ptr, 10);
+	strtol(get_node_content(node), &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Attempts \"%s\" is not a number.", get_node_content(node));
 		return fail(error, msg, EXIT_FAILURE);
 	}
-	if (num > DNS_ATTEMPTS_MAX) {
-		asprintf(&msg, "%d attempts are too much (max %d).", num, DNS_ATTEMPTS_MAX);
-		return fail(error, msg, EXIT_FAILURE);
-	}
 
-	if (op & XMLDIFF_ADD) {
-		if (dns_add_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		if (dns_set_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_rm_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else if (op & XMLDIFF_MOD) {
-		if (dns_mod_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
+		dns_rm_opt_attempts();
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-attempts callback.", op);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	/* Save the changes */
-	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -928,9 +853,16 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	/* Reset MOD and REORDER flags in order to process these changes in the next configuration change */
-	dns_nmsrv_mod_reorder = 0;
-	dns_search_reorder = 0;
+	char* msg = NULL;
+
+	/* Reset REORDER flags in order to process these changes in the next configuration change */
+	dns_search_reorder_done = false;
+	dns_server_reorder_done = false;
+
+	/* Save the changes made by children callbacks via augeas */
+	if (augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -1235,8 +1167,8 @@ PUBLIC struct transapi_data_callbacks clbks = {
 			.func = callback_systemns_system_systemns_ntp},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:search",
 			.func = callback_systemns_system_systemns_dns_resolver_systemns_search},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:udp-and-tcp/systemns:address",
-			.func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_udp_and_tcp_systemns_address},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:address",
+			.func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_address},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:server",
 			.func = callback_systemns_system_systemns_dns_resolver_systemns_server},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout",
