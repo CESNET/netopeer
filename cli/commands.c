@@ -112,6 +112,7 @@ COMMAND commands[] = {
 #endif
 #ifdef ENABLE_TLS
 		{"cert", cmd_cert, "Manage trusted or your own certificates"},
+		{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
 #endif
 		{"status", cmd_status, "Print information about the current NETCONF session"},
 		{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
@@ -2293,6 +2294,205 @@ int cmd_cert (const char* arg)
 
 	} else {
 		ERROR("cert", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+void parse_crl(const char* name, const char* path) {
+	int i;
+	BIO *bio_out;
+	FILE *fp;
+	X509_CRL *crl;
+	ASN1_INTEGER* bs;
+	X509_REVOKED* rev;
+
+	fp = fopen(path, "r");
+	if (fp == NULL) {
+		ERROR("parse_crl", "Unable to open: %s", path);
+		return;
+	}
+	crl = PEM_read_X509_CRL(fp, NULL, NULL, NULL);
+	if (crl == NULL) {
+		ERROR("parse_crl", "Unable to parse certificate: %s", path);
+		fclose(fp);
+		return;
+	}
+
+	bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
+
+	BIO_printf(bio_out, "-----%s-----\n", name);
+
+	BIO_printf(bio_out, "Issuer: ");
+	X509_NAME_print(bio_out, X509_CRL_get_issuer(crl), 0);
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Last update: ");
+	ASN1_TIME_print(bio_out, X509_CRL_get_lastUpdate(crl));
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Next update: ");
+	ASN1_TIME_print(bio_out, X509_CRL_get_nextUpdate(crl));
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "REVOKED:\n");
+
+	if ((rev = sk_X509_REVOKED_pop(X509_CRL_get_REVOKED(crl))) == NULL) {
+		BIO_printf(bio_out, "\tNone\n");
+	}
+	while (rev != NULL) {
+		bs = rev->serialNumber;
+		BIO_printf(bio_out, "\tSerial no.: ");
+		for (i = 0; i < bs->length; i++) {
+			BIO_printf(bio_out, "%02x", bs->data[i]);
+		}
+		BIO_printf(bio_out, "  Date: ");
+
+		ASN1_TIME_print(bio_out, rev->revocationDate);
+		BIO_printf(bio_out, "\n");
+
+		X509_REVOKED_free(rev);
+		rev = sk_X509_REVOKED_pop(X509_CRL_get_REVOKED(crl));
+	}
+
+	X509_CRL_free(crl);
+	BIO_vfree(bio_out);
+	fclose(fp);
+}
+
+void cmd_crl_help() {
+	fprintf (stdout, "crl [--help | display | add <crl_path> | remove <crl_name>]\n");
+}
+
+int cmd_crl (const char* arg) {
+	int ret;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *path, *dest;
+	char* crl_dir, *c_rehash_cmd;
+	DIR* dir;
+	struct dirent *d;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_crl_help();
+
+	} else if (strcmp(cmd, "display") == 0) {
+		int none = 1;
+		char* name;
+		crl_dir = get_default_CRL_dir();
+		if (crl_dir == NULL) {
+			ERROR("crl display", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		dir = opendir(crl_dir);
+		while ((d = readdir(dir)) != NULL) {
+			if (strcmp(d->d_name+strlen(d->d_name)-4, ".pem") == 0) {
+				none = 0;
+				name = strdup(d->d_name);
+				name[strlen(name)-4] = '\0';
+				asprintf(&path, "%s/%s", crl_dir, d->d_name);
+				parse_crl(name, path);
+				free(name);
+				free(path);
+			}
+		}
+		closedir(dir);
+		if (none) {
+			fprintf(stdout, "No CRLs found in the default CRL directory.\n");
+		}
+		free(crl_dir);
+
+	} else if (strcmp(cmd, "add") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("crl add", "Missing or wrong path to the certificate");
+			return (EXIT_FAILURE);
+		}
+		if (access(path, R_OK) != 0) {
+			ERROR("crl add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		crl_dir = get_default_CRL_dir();
+		if (crl_dir == NULL) {
+			ERROR("crl add", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s", crl_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
+			ERROR("crl add", "Memory allocation failed");
+			free(crl_dir);
+			return (EXIT_FAILURE);
+		}
+		free(crl_dir);
+
+		if (strcmp(dest+strlen(dest)-4, ".pem") != 0) {
+			ERROR("crl add", "CRLs are expected to be in *.pem format");
+			strcpy(dest+strlen(dest)-4, ".pem");
+		}
+
+		if (cp(dest, path) != 0) {
+			ERROR("crl add", "Could not copy the CRL: %s", strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("crl add", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "remove") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL) {
+			ERROR("crl remove", "Missing the certificate name");
+			return (EXIT_FAILURE);
+		}
+
+		// delete ".pem" if the user unnecessarily included it
+		if (strlen(path) > 4 && strcmp(path+strlen(path)-4, ".pem") == 0) {
+			path[strlen(path)-4] = '\0';
+		}
+
+		crl_dir = get_default_CRL_dir();
+		if (crl_dir == NULL) {
+			ERROR("crl remove", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s.pem", crl_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
+			ERROR("crl remove", "Memory allocation failed");
+			free(crl_dir);
+			return (EXIT_FAILURE);
+		}
+		free(crl_dir);
+
+		if (remove(dest) != 0) {
+			ERROR("crl remove", "Cannot remove CRL \"%s\": %s (use the name from \"crl display\" output)", path, strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("crl remove", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else {
+		ERROR("crl", "Unknown argument %s", cmd);
 		return (EXIT_FAILURE);
 	}
 
