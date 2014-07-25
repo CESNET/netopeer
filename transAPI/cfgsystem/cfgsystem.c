@@ -691,12 +691,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_SIBLING) {
-		if (!dns_augeas_equal_search_count(node, &msg)) {
-			if (msg != NULL) {
-				return fail(error, msg, EXIT_FAILURE);
-			}
-			nc_verb_warning("Mismatch Resolv domain count and configuration domain count, Resolv domains will be rewritten.");
-		}
 
 		dns_rm_search_domain_all();
 
@@ -803,12 +797,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 
 	if (dns_nmsrv_mod_reorder == 2 || ((op & XMLDIFF_SIBLING) && dns_nmsrv_mod_reorder == 0)) {
 
-		if (!dns_augeas_equal_nameserver_count(node, &msg)) {
-			if (msg != NULL) {
-				return fail(error, msg, EXIT_FAILURE);
-			}
-			nc_verb_warning("Mismatch Resolv nameserver count and configuration nameserver count, Resolv nameservers will be rewritten.");
-		}
 		dns_rm_nameserver_all();
 
 		index = 1;

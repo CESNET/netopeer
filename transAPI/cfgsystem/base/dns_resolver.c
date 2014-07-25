@@ -160,38 +160,6 @@ xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns)
 	return (dns_node);
 }
 
-bool dns_augeas_equal_search_count(xmlNodePtr search_node, char** msg)
-{
-	xmlNodePtr cur;
-	int old_domain_count = 0, new_domain_count;
-	char* path;
-
-	/* Get the search-node count */
-	cur = search_node;
-	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
-			++new_domain_count;
-		}
-		cur = cur->next;
-	}
-
-	/* Get the configuration-file domain count */
-	asprintf(&path, "/files/%s/search/domain", RESOLV_CONF_FILE_PATH);
-	old_domain_count = aug_match(sysaugeas, path, NULL);
-	if (old_domain_count == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
-		free(path);
-		return false;
-	}
-	free(path);
-
-	if (old_domain_count != new_domain_count) {
-		return false;
-	} else {
-		return true;
-	}
-}
-
 int dns_add_search_domain(const char* domain, int index, char** msg)
 {
 	int ret;
@@ -382,38 +350,6 @@ int dns_rm_nameserver(const char* address, char** msg)
 	}
 
 	return EXIT_SUCCESS;
-}
-
-bool dns_augeas_equal_nameserver_count(xmlNodePtr server_node, char** msg)
-{
-	xmlNodePtr cur;
-	int old_nameserver_count = 0, new_nameserver_count;
-	char* path;
-
-	/* Get the server-node count, go from the beginning */
-	cur = server_node->parent->children;
-	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, BAD_CAST "server") == 0) {
-			++new_nameserver_count;
-		}
-		cur = cur->next;
-	}
-
-	/* Get the configuration-file nameserver count */
-	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	old_nameserver_count = aug_match(sysaugeas, path, NULL);
-	if (old_nameserver_count == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
-		free(path);
-		return false;
-	}
-	free(path);
-
-	if (old_nameserver_count != new_nameserver_count) {
-		return false;
-	} else {
-		return true;
-	}
 }
 
 void dns_rm_nameserver_all(void)

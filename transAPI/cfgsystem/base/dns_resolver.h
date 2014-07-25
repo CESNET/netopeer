@@ -48,16 +48,6 @@
 xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns);
 
 /**
- * @brief check the number of search domains for equality
- * @param a augeas structure to use
- * @param search_node "search" node from the configuration
- * @param msg error message in case of an error
- * @return true equal
- * @return false non-equal
- */
-bool dns_augeas_equal_search_count(xmlNodePtr search_node, char** msg);
-
-/**
  * @brief add a new search domain to the resolv configuration file
  * @param a augeas structure to use
  * @param domain domain name to be added
@@ -104,16 +94,6 @@ int dns_add_nameserver(const char* address, int index, char** msg);
  * @return EXIT_SUCCESS otherwise
  */
 int dns_rm_nameserver(const char* address, char** msg);
-
-/**
- * @brief check the number of nameservers for equality
- * @param a augeas structure to use
- * @param address_node "server" node from the configuration
- * @param msg error message in case of an error
- * @return true equal
- * @return false non-equal
- */
-bool dns_augeas_equal_nameserver_count(xmlNodePtr address_node, char** msg);
 
 /**
  * @brief remove all nameservers from the resolv configuration file
