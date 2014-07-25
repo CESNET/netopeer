@@ -2084,14 +2084,9 @@ int cmd_cert (const char* arg)
 		}
 		free(trusted_dir);
 
-		if (strcmp(path+strlen(path)-4, ".crt") == 0) {
-			ERROR("cert add", "CA certificates are normally in *.pem format, changing the extension");
+		if (strcmp(dest+strlen(dest)-4, ".pem") != 0) {
+			ERROR("cert add", "CA certificates are expected to be in *.pem format");
 			strcpy(dest+strlen(dest)-4, ".pem");
-		} else if (strcmp(path+strlen(path)-4, ".pem") != 0) {
-			ERROR("cert add", "Certificate in an unknown format");
-			free(dest);
-			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
 		}
 
 		if (cp(dest, path) != 0) {
@@ -2208,33 +2203,16 @@ int cmd_cert (const char* arg)
 		free(dest);
 
 	} else if (strcmp(cmd, "replaceown") == 0) {
-		int crt;
-
 		path = strtok_r(NULL, " ", &ptr);
-		if (path == NULL || strlen(path) < 5 || (strcmp(path+strlen(path)-4, ".crt") != 0 &&
-			strcmp(path+strlen(path)-4, ".pem") != 0 && strcmp(path+strlen(path)-4, ".key") != 0) || access(path, R_OK) != 0) {
-
-			ERROR("cert replaceown", "Missing or unknown format replacing certificate path");
+		if (path == NULL || strlen(path) < 5 || access(path, R_OK) != 0) {
+			ERROR("cert replaceown", "Missing or cannot access the certificate \"%s\"", path);
 			return (EXIT_FAILURE);
 		}
 
-		if (strcmp(path+strlen(path)-4, ".crt") == 0) {
-			path2 = strtok_r(NULL, " ", &ptr);
-			if (path2 == NULL || strlen(path2) < 5 || strcmp(path2+strlen(path2)-4, ".key") != 0 || access(path2, R_OK) != 0) {
-				ERROR("cert replaceown", "Missing or wrong private key to go with the certificate");
-				return (EXIT_FAILURE);
-			}
-			crt = 1;
-		} else if (strcmp(path+strlen(path)-4, ".key") == 0) {
-			path2 = path;
-			path = strtok_r(NULL, " ", &ptr);
-			if (path == NULL || strlen(path) < 5 || strcmp(path+strlen(path)-4, ".crt") != 0 || access(path, R_OK) != 0) {
-				ERROR("cert replaceown", "Missing or wrong certificate to go with the private key");
-				return (EXIT_FAILURE);
-			}
-			crt = 1;
-		} else { // *.pem
-			crt = 0;
+		path2 = strtok_r(NULL, " ", &ptr);
+		if (path2 != NULL && (strlen(path2) < 5 || access(path2, R_OK) != 0)) {
+			ERROR("cert replaceown", "Cannot access the private key \"%s\"", path2);
+			return (EXIT_FAILURE);
 		}
 
 		netconf_dir = get_netconf_dir();
@@ -2249,37 +2227,39 @@ int cmd_cert (const char* arg)
 		}
 		free(netconf_dir);
 
-		if (crt) {
+		if (path2 != NULL) {
+			/* CRT & KEY */
 			strcpy(dest+strlen(dest)-4, ".pem");
 			if (remove(dest) != 0 && errno == EACCES) {
-				ERROR("cert replaceown", "Could not remove old *.pem certificate");
+				ERROR("cert replaceown", "Could not remove old certificate (*.pem)");
 			}
 
-			strcpy(dest+strlen(dest)-4, ".key");
+			strcpy(dest+strlen(dest)-4, ".crt");
 			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the certificate: %s", strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+			strcpy(dest+strlen(dest)-4, ".key");
+			if (cp(dest, path2) != 0) {
 				ERROR("cert replaceown", "Could not copy the private key: %s", strerror(errno));
 				free(dest);
 				return (EXIT_FAILURE);
 			}
-			strcpy(dest+strlen(dest)-4, ".crt");
-			if (cp(dest, path) != 0) {
-				ERROR("cert replaceown", "Could not copy the *.crt certificate: %s", strerror(errno));
-				free(dest);
-				return (EXIT_FAILURE);
-			}
 		} else {
+			/* PEM */
 			strcpy(dest+strlen(dest)-4, ".key");
 			if (remove(dest) != 0 && errno == EACCES) {
-				ERROR("cert replaceown", "Could not remove old *.key private key");
+				ERROR("cert replaceown", "Could not remove old private key");
 			}
 			strcpy(dest+strlen(dest)-4, ".crt");
 			if (remove(dest) != 0 && errno == EACCES) {
-				ERROR("cert replaceown", "Could not remove old *.crt private key");
+				ERROR("cert replaceown", "Could not remove old certificate (*.crt)");
 			}
 
 			strcpy(dest+strlen(dest)-4, ".pem");
 			if (cp(dest, path) != 0) {
-				ERROR("cert replaceown", "Could not copy the *.pem certificate: %s", strerror(errno));
+				ERROR("cert replaceown", "Could not copy the certificate: %s", strerror(errno));
 				free(dest);
 				return (EXIT_FAILURE);
 			}
