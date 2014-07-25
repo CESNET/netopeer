@@ -62,6 +62,7 @@
 #include <libnetconf_ssh.h>
 #ifdef ENABLE_TLS
 #	include <openssl/pem.h>
+#	include <openssl/x509v3.h>
 #	include <libnetconf_tls.h>
 #endif
 
@@ -1988,24 +1989,13 @@ int cp(const char *to, const char *from) {
 	return -1;
 }
 
-char* format_cert_info(char* info) {
-	char* ret, *ptr, *tmp;
-	tmp = strtok_r(info, "/", &ptr);
-	ret = strdup(tmp);
-	while (*ptr != '\0') {
-		tmp = strtok_r(NULL, "/", &ptr);
-		ret = realloc(ret, strlen(ret)+2+strlen(tmp)+1);
-		strcat(ret, ", ");
-		strcat(ret, tmp);
-	}
-
-	return ret;
-}
-
 void parse_cert(const char* name, const char* path) {
-	char* subj, *issuer, *str;
+	int i;
+	ASN1_INTEGER *bs;
+	BIO *bio_out;
 	FILE *fp;
 	X509 *cert;
+	/*X509_CINF *ci;*/
 
 	fp = fopen(path, "r");
 	if (fp == NULL) {
@@ -2019,19 +2009,32 @@ void parse_cert(const char* name, const char* path) {
 		return;
 	}
 
-	str = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
-	subj = format_cert_info(str);
-	free(str);
+	bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
 
-	str = X509_NAME_oneline(X509_get_issuer_name(cert), NULL, 0);
-	issuer = format_cert_info(str);
-	free(str);
+	bs = X509_get_serialNumber(cert);
+	BIO_printf(bio_out, "-----%s----- serial: ", name);
+	for (i = 0; i < bs->length; i++) {
+		BIO_printf(bio_out, "%02x", bs->data[i]);
+	}
+	BIO_printf(bio_out, "\n");
 
-	fprintf(stdout, "%s: %s ## %s\n", name, subj, issuer);
+	BIO_printf(bio_out, "Subject: ");
+	X509_NAME_print(bio_out, X509_get_subject_name(cert), 0);
+	BIO_printf(bio_out, "\n");
 
-	free(subj);
-	free(issuer);
+	BIO_printf(bio_out, "Issuer:  ");
+	X509_NAME_print(bio_out, X509_get_issuer_name(cert), 0);
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Valid until: ");
+	ASN1_TIME_print(bio_out, X509_get_notAfter(cert));
+	BIO_printf(bio_out, "\n");
+
+	/*ci = cert->cert_info;
+	X509V3_extensions_print(bio_out, "X509v3 extensions", ci->extensions, X509_FLAG_COMPAT, 0);*/
+
 	X509_free(cert);
+	BIO_vfree(bio_out);
 	fclose(fp);
 }
 
