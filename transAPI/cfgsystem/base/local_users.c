@@ -43,6 +43,7 @@
 #define _GNU_SOURCE
 #define _OW_SOURCE
 
+#include <assert.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <shadow.h>
@@ -77,7 +78,7 @@ static struct supported_auth supported_auth[] = {
     {NULL, NULL}
 };
 
-static augeas *augeas_auth = NULL;
+extern augeas *sysaugeas;
 
 const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg)
 {
@@ -418,52 +419,6 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int users_augeas_init(char** msg)
-{
-	int ret;
-
-	if (augeas_auth != NULL) {
-		/* already initiated */
-		return EXIT_SUCCESS;
-	}
-
-	augeas_auth = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
-	if (aug_error(augeas_auth) != AUG_NOERROR) {
-		asprintf(msg, "Augeas DNS resolver initialization failed (%s)", aug_error_message(augeas_auth));
-		return EXIT_FAILURE;
-	}
-	aug_set(augeas_auth, "/augeas/load/Pam/lens", "Pam.lns");
-	aug_set(augeas_auth, "/augeas/load/Pam/incl", PAM_DIR_PATH"/*");
-	aug_load(augeas_auth);
-
-	ret = aug_match(augeas_auth, "/augeas//error", NULL);
-	/* Error (or more of them) occured */
-	if (ret != 0) {
-		aug_get(augeas_auth, "/augeas//error[1]/message", (const char**) msg);
-		asprintf(msg, "Accessing \"%s\": %s.\n", PAM_DIR_PATH, *msg);
-		users_augeas_close();
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
-int users_augeas_save(char** msg)
-{
-	if (aug_save(augeas_auth) != 0) {
-		asprintf(msg, "Saving the modified SSHD PAM configuration failed: %s", aug_error_message(augeas_auth));
-		return (EXIT_FAILURE);
-	}
-
-	return (EXIT_SUCCESS);
-}
-
-void users_augeas_close(void)
-{
-	aug_close(augeas_auth);
-	augeas_auth = NULL;
-}
-
 xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns)
 {
 	int i;
@@ -472,11 +427,7 @@ xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns)
 	struct spwd *spwd;
 	struct ssh_key** key;
 
-	if (augeas_auth == NULL) {
-		if (users_augeas_init(msg) != 0) {
-			return (NULL);
-		}
-	}
+	assert(sysaugeas);
 
 	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
 		return (NULL);
@@ -560,16 +511,11 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 	const char* value;
 	int ret, i, j;
 
-	if (augeas_auth == NULL) {
-		if (users_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
 
 	asprintf(&path, "/files/%s/sshd", PAM_DIR_PATH);
-	ret = aug_match(augeas_auth, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -582,9 +528,9 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 	i = 1;
 	while (1) {
 		asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, i);
-		ret = aug_match(augeas_auth, path, NULL);
+		ret = aug_match(sysaugeas, path, NULL);
 		if (ret == -1) {
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			return EXIT_FAILURE;
 		}
@@ -596,7 +542,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 		/* type */
 		asprintf(&path, "/files/%s/sshd/%d/type", PAM_DIR_PATH, i);
 		if (ret == -1) {
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			return EXIT_FAILURE;
 		} else if (ret == 0 || ret > 1) {
@@ -604,7 +550,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 			free(path);
 			return EXIT_FAILURE;
 		} else {
-			aug_get(augeas_auth, path, &value);
+			aug_get(sysaugeas, path, &value);
 			free(path);
 			if (strcmp(value, "auth") != 0) {
 				/* Not an auth entry, they must be first - finish */
@@ -615,7 +561,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 		/* control */
 		asprintf(&path, "/files/%s/sshd/%d/control", PAM_DIR_PATH, i);
 		if (ret == -1) {
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			return EXIT_FAILURE;
 		} else if (ret == 0 || ret > 1) {
@@ -623,7 +569,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 			free(path);
 			return EXIT_FAILURE;
 		} else {
-			aug_get(augeas_auth, path, &value);
+			aug_get(sysaugeas, path, &value);
 			free(path);
 			if (strcmp(value, "sufficient") != 0) {
 				/* auth entry, but not configured by this module, we're done */
@@ -634,7 +580,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 		/* module */
 		asprintf(&path, "/files/%s/sshd/%d/module", PAM_DIR_PATH, i);
 		if (ret == -1) {
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			return EXIT_FAILURE;
 		} else if (ret == 0 || ret > 1) {
@@ -642,7 +588,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 			free(path);
 			return EXIT_FAILURE;
 		} else {
-			aug_get(augeas_auth, path, &value);
+			aug_get(sysaugeas, path, &value);
 			free(path);
 			if (value == NULL) {
 				asprintf(msg, "SSHD PAM entry no.%d corrupted.", i);
@@ -654,7 +600,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 				if (strcmp(value, supported_auth[j].module) == 0) {
 					/* A known module */
 					*strrchr(path, '/') = '\0';
-					aug_rm(augeas_auth, path);
+					aug_rm(sysaugeas, path);
 					break;
 				}
 				++j;
@@ -675,7 +621,7 @@ int users_augeas_rem_all_sshd_auth_order(char** msg)
 		while (1) {
 			asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, j);
 			sprintf(tmp, "%d", j - i + 1);
-			ret = aug_rename(augeas_auth, path, tmp);
+			ret = aug_rename(sysaugeas, path, tmp);
 			free(path);
 			if (ret == -1) {
 				break;
@@ -698,12 +644,6 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_auth == NULL) {
-		if (users_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	/* Check the auth type */
 	auth_index = 0;
 	while (supported_auth[auth_index].name != NULL) {
@@ -724,7 +664,7 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 		++i;
 		free(path);
 		asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, i);
-	} while (aug_match(augeas_auth, path, NULL) == 1);
+	} while (aug_match(sysaugeas, path, NULL) == 1);
 	--i;
 	free(path);
 
@@ -732,9 +672,9 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 	while (i > 0) {
 		asprintf(&path, "/files/%s/sshd/%d", PAM_DIR_PATH, i);
 		sprintf(tmp, "%d", i + 1);
-		ret = aug_rename(augeas_auth, path, tmp);
+		ret = aug_rename(sysaugeas, path, tmp);
 		if (ret == -1) {
-			asprintf(msg, "Augeas rename of \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+			asprintf(msg, "Augeas rename of \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			return EXIT_FAILURE;
 		}
@@ -746,9 +686,9 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 	/* Create the new entry */
 	/* type */
 	asprintf(&path, "/files/%s/sshd/1/type", PAM_DIR_PATH);
-	ret = aug_set(augeas_auth, path, "auth");
+	ret = aug_set(sysaugeas, path, "auth");
 	if (ret == -1) {
-		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -756,9 +696,9 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 
 	/* control */
 	asprintf(&path, "/files/%s/sshd/1/control", PAM_DIR_PATH);
-	ret = aug_set(augeas_auth, path, "sufficient");
+	ret = aug_set(sysaugeas, path, "sufficient");
 	if (ret == -1) {
-		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -766,9 +706,9 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 
 	/* module */
 	asprintf(&path, "/files/%s/sshd/1/module", PAM_DIR_PATH);
-	ret = aug_set(augeas_auth, path, supported_auth[auth_index].module);
+	ret = aug_set(sysaugeas, path, supported_auth[auth_index].module);
 	if (ret == -1) {
-		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(augeas_auth));
+		asprintf(msg, "Augeas set for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}

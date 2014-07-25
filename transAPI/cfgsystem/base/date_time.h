@@ -50,11 +50,6 @@
 
 #include <libxml/tree.h>
 
-struct tmz {
-	int minute_offset;
-	char* timezone_file;
-};
-
 /**
  * @brief set the /etc/localtime file to right timezone
  * @param name[in] char * name of new timezone (e.g. "Europe/Prague")
@@ -110,19 +105,6 @@ int ntp_restart(void);
  * @return -1 failed to check ntp status
  */
 int ntp_status(void);
-
-/**
- * @brief init augeas for NTP
- * @param a augeas to initialize
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int ntp_augeas_init(char** msg);
-
-void ntp_augeas_close(void);
-
-int ntp_augeas_save(char** msg);
 
 xmlNodePtr ntp_augeas_getxml(char** msg, xmlNsPtr ns);
 

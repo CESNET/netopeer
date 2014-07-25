@@ -50,57 +50,10 @@
 #include <stdbool.h>
 #include <libxml/tree.h>
 
-#include "dns_resolver.h"
-
 #define RESOLV_CONF_FILE_PATH "/etc/resolv.conf"
 
-static augeas *augeas_dns = NULL;
-
-int dns_augeas_init(char** msg)
-{
-	int ret;
-
-	if (augeas_dns != NULL) {
-		/* already initiated */
-		return EXIT_SUCCESS;
-	}
-
-	augeas_dns = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
-	if (aug_error(augeas_dns) != AUG_NOERROR) {
-		asprintf(msg, "Augeas DNS resolver initialization failed (%s)", aug_error_message(augeas_dns));
-		return EXIT_FAILURE;
-	}
-	aug_set(augeas_dns, "/augeas/load/Resolv/lens", "Resolv.lns");
-	aug_set(augeas_dns, "/augeas/load/Resolv/incl", RESOLV_CONF_FILE_PATH);
-	aug_load(augeas_dns);
-
-	ret = aug_match(augeas_dns, "/augeas//error", NULL);
-	/* Error (or more of them) occured */
-	if (ret != 0) {
-		aug_get(augeas_dns, "/augeas//error[1]/message", (const char**) msg);
-		asprintf(msg, "Accessing \"%s\": %s.\n", RESOLV_CONF_FILE_PATH, *msg);
-		dns_augeas_close();
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
-int dns_augeas_save(char** msg)
-{
-	if (aug_save(augeas_dns) != 0) {
-		asprintf(msg, "Saving the modified Resolv configuration failed: %s", aug_error_message(augeas_dns));
-		return (EXIT_FAILURE);
-	}
-
-	return (EXIT_SUCCESS);
-}
-
-void dns_augeas_close(void)
-{
-	aug_close(augeas_dns);
-	augeas_dns = NULL;
-}
+/* from common.c */
+extern augeas *sysaugeas;
 
 xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 {
@@ -109,11 +62,7 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 	const char* value;
 	xmlNodePtr dns_node, server, aux_node;
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (NULL);
-		}
-	}
+	assert(sysaugeas);
 
 	/* dns-resolver */
 	dns_node = xmlNewNode(ns, BAD_CAST "dns-resolver");
@@ -122,9 +71,9 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 	for (i = 1, done = 0; !done; i++) {
 		path = NULL;
 		asprintf(&path, "/files/"RESOLV_CONF_FILE_PATH"/search/domain[%d]", i);
-		switch (aug_match(augeas_dns, path, NULL)) {
+		switch (aug_match(sysaugeas, path, NULL)) {
 		case -1:
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			xmlFreeNode(dns_node);
 			return (NULL);
@@ -135,7 +84,7 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 			break;
 		default: /* 1 */
 			/* dns-resolver/search */
-			aug_get(augeas_dns, path, &value);
+			aug_get(sysaugeas, path, &value);
 			xmlNewChild(dns_node, dns_node->ns, BAD_CAST "search", BAD_CAST value);
 
 			free(path); path = NULL;
@@ -147,9 +96,9 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 	for (i = 1, done = 0; !done; i++) {
 		path = NULL;
 		asprintf(&path, "/files/"RESOLV_CONF_FILE_PATH"/nameserver[%d]", i);
-		switch (aug_match(augeas_dns, path, NULL)) {
+		switch (aug_match(sysaugeas, path, NULL)) {
 		case -1:
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			xmlFreeNode(dns_node);
 			return (NULL);
@@ -163,7 +112,7 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 			server = xmlNewChild(dns_node, dns_node->ns, BAD_CAST "server", NULL);
 
 			/* dns-resolver/server/udp-and-tcp/address */
-			aug_get(augeas_dns, path, &value);
+			aug_get(sysaugeas, path, &value);
 			aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp-and-tcp", NULL);
 			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST value);
 			/* port specification is not supported by Linux dns resolver implementation */
@@ -179,9 +128,9 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 	}
 
 	/* dns-resolver/options */
-	switch (aug_match(augeas_dns, "/files/"RESOLV_CONF_FILE_PATH"/options", NULL)) {
+	switch (aug_match(sysaugeas, "/files/"RESOLV_CONF_FILE_PATH"/options", NULL)) {
 	case -1:
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		xmlFreeNode(dns_node);
 		return (NULL);
@@ -193,14 +142,14 @@ xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns)
 
 		/* dns-resolver/options/timeout */
 		value = NULL;
-		aug_get(augeas_dns, "/files/"RESOLV_CONF_FILE_PATH"/options/timeout", &value);
+		aug_get(sysaugeas, "/files/"RESOLV_CONF_FILE_PATH"/options/timeout", &value);
 		if (value != NULL) {
 			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "timeout", BAD_CAST value);
 		}
 
 		/* dns-resolver/options/attempts */
 		value = NULL;
-		aug_get(augeas_dns, "/files/"RESOLV_CONF_FILE_PATH"/options/attempts", &value);
+		aug_get(sysaugeas, "/files/"RESOLV_CONF_FILE_PATH"/options/attempts", &value);
 		if (value != NULL) {
 			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "attempts", BAD_CAST value);
 		}
@@ -228,9 +177,9 @@ bool dns_augeas_equal_search_count(xmlNodePtr search_node, char** msg)
 
 	/* Get the configuration-file domain count */
 	asprintf(&path, "/files/%s/search/domain", RESOLV_CONF_FILE_PATH);
-	old_domain_count = aug_match(augeas_dns, path, NULL);
+	old_domain_count = aug_match(sysaugeas, path, NULL);
 	if (old_domain_count == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return false;
 	}
@@ -253,16 +202,10 @@ int dns_augeas_add_search_domain(const char* domain, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/search/domain", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -282,18 +225,18 @@ int dns_augeas_add_search_domain(const char* domain, int index, char** msg)
 		}
 		if (index == 1) {
 			asprintf(&path, "/files/%s/search/domain[1]", RESOLV_CONF_FILE_PATH);
-			aug_insert(augeas_dns, path, "domain", 1);
+			aug_insert(sysaugeas, path, "domain", 1);
 			free(path);
 		} else {
 			asprintf(&path, "/files/%s/search/domain[%d]", RESOLV_CONF_FILE_PATH, index - 1);
-			aug_insert(augeas_dns, path, "domain", 0);
+			aug_insert(sysaugeas, path, "domain", 0);
 			free(path);
 		}
 	}
 
 	/* Set the value of the newly inserted node (or possibly create it, too) */
 	asprintf(&path, "/files/%s/search/domain[%d]", RESOLV_CONF_FILE_PATH, index);
-	aug_set(augeas_dns, path, domain);
+	aug_set(sysaugeas, path, domain);
 	free(path);
 
 	return EXIT_SUCCESS;
@@ -310,23 +253,17 @@ int dns_augeas_rem_search_domain(const char* domain, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/search/domain", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
 	free(path);
 
 	for (i = 0; i < ret; ++i) {
-		aug_get(augeas_dns, matches[i], &value);
+		aug_get(sysaugeas, matches[i], &value);
 		if (strcmp(value, domain) == 0) {
 			break;
 		}
@@ -340,7 +277,7 @@ int dns_augeas_rem_search_domain(const char* domain, char** msg)
 			/* Last search domain, delete the whole search node */
 			*strrchr(matches[0], '/') = '\0';
 		}
-		aug_rm(augeas_dns, matches[i]);
+		aug_rm(sysaugeas, matches[i]);
 	}
 
 	for (i = 0; i < ret; ++i) {
@@ -356,7 +293,7 @@ void dns_augeas_rem_all_search_domains(void)
 	char* path;
 
 	asprintf(&path, "/files/%s/search", RESOLV_CONF_FILE_PATH);
-	aug_rm(augeas_dns, path);
+	aug_rm(sysaugeas, path);
 	free(path);
 }
 
@@ -370,16 +307,10 @@ int dns_augeas_add_nameserver(const char* address, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -399,18 +330,18 @@ int dns_augeas_add_nameserver(const char* address, int index, char** msg)
 		}
 		if (index == 1) {
 			asprintf(&path, "/files/%s/nameserver[1]", RESOLV_CONF_FILE_PATH);
-			aug_insert(augeas_dns, path, "nameserver", 1);
+			aug_insert(sysaugeas, path, "nameserver", 1);
 			free(path);
 		} else {
 			asprintf(&path, "/files/%s/nameserver[%d]", RESOLV_CONF_FILE_PATH, index - 1);
-			aug_insert(augeas_dns, path, "nameserver", 0);
+			aug_insert(sysaugeas, path, "nameserver", 0);
 			free(path);
 		}
 	}
 
 	/* Set the value of the newly inserted node (or possibly create it, too) */
 	asprintf(&path, "/files/%s/nameserver[%d]", RESOLV_CONF_FILE_PATH, index);
-	aug_set(augeas_dns, path, address);
+	aug_set(sysaugeas, path, address);
 	free(path);
 
 	return EXIT_SUCCESS;
@@ -427,23 +358,17 @@ int dns_augeas_rem_nameserver(const char* address, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
 	free(path);
 
 	for (i = 0; i < ret; ++i) {
-		aug_get(augeas_dns, matches[i], &value);
+		aug_get(sysaugeas, matches[i], &value);
 		if (strcmp(value, address) == 0) {
 			break;
 		}
@@ -453,7 +378,7 @@ int dns_augeas_rem_nameserver(const char* address, char** msg)
 		asprintf(msg, "Could not remove the nameserver \"%s\", was not found in the configuration file.", address);
 		return EXIT_FAILURE;
 	} else {
-		aug_rm(augeas_dns, matches[i]);
+		aug_rm(sysaugeas, matches[i]);
 	}
 
 	return EXIT_SUCCESS;
@@ -464,12 +389,6 @@ bool dns_augeas_equal_nameserver_count(xmlNodePtr server_node, char** msg)
 	xmlNodePtr cur;
 	int old_nameserver_count = 0, new_nameserver_count;
 	char* path;
-
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (false);
-		}
-	}
 
 	/* Get the server-node count, go from the beginning */
 	cur = server_node->parent->children;
@@ -482,9 +401,9 @@ bool dns_augeas_equal_nameserver_count(xmlNodePtr server_node, char** msg)
 
 	/* Get the configuration-file nameserver count */
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	old_nameserver_count = aug_match(augeas_dns, path, NULL);
+	old_nameserver_count = aug_match(sysaugeas, path, NULL);
 	if (old_nameserver_count == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return false;
 	}
@@ -502,7 +421,7 @@ void dns_augeas_rem_all_nameservers(void)
 	char* path;
 
 	asprintf(&path, "/files/%s/nameserver", RESOLV_CONF_FILE_PATH);
-	aug_rm(augeas_dns, path);
+	aug_rm(sysaugeas, path);
 	free(path);
 }
 
@@ -516,16 +435,10 @@ int dns_augeas_add_opt_timeout(const char* number, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/options", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -546,7 +459,7 @@ int dns_augeas_add_opt_timeout(const char* number, char** msg)
 
 	/* Set the timeout */
 	asprintf(&path, "/files/%s/options/timeout", RESOLV_CONF_FILE_PATH);
-	aug_set(augeas_dns, path, number);
+	aug_set(sysaugeas, path, number);
 	free(path);
 
 	return EXIT_SUCCESS;
@@ -562,16 +475,10 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/options", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -584,9 +491,9 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg)
 
 	/* Some options already defined */
 	asprintf(&path, "/files/%s/options/*", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -619,7 +526,7 @@ int dns_augeas_rem_opt_timeout(const char* number, char** msg)
 			/* Remove options node too */
 			*strrchr(match, '/') = '\0';
 		}
-		aug_rm(augeas_dns, match);
+		aug_rm(sysaugeas, match);
 	}
 
 	free(match);
@@ -636,16 +543,10 @@ int dns_augeas_mod_opt_timeout(const char* number, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/options/timeout", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -662,7 +563,7 @@ int dns_augeas_mod_opt_timeout(const char* number, char** msg)
 
 	/* Set/modify the timeout */
 	asprintf(&path, "/files/%s/options/timeout", RESOLV_CONF_FILE_PATH);
-	aug_set(augeas_dns, path, number);
+	aug_set(sysaugeas, path, number);
 	free(path);
 
 	return EXIT_SUCCESS;
@@ -675,27 +576,21 @@ int dns_augeas_add_opt_attempts(const char* number, char** msg)
 
 	assert(number);
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
-	switch (c = aug_match(augeas_dns, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", &matches)) {
+	switch (c = aug_match(sysaugeas, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", &matches)) {
 	case -1:
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", aug_error_message(sysaugeas));
 		return EXIT_FAILURE;
 	default:
 		/* option already exists, remove it before adding it (or just free matches) */
 		for (i = 0; i < c; i++) {
-			aug_rm(augeas_dns, matches[i]);
+			aug_rm(sysaugeas, matches[i]);
 			free(matches[i]);
 		}
 		free(matches);
 	}
 
 	/* Set the attempts-times */
-	aug_set(augeas_dns, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", number);
+	aug_set(sysaugeas, "/files/" RESOLV_CONF_FILE_PATH "/options/attempts", number);
 
 	return EXIT_SUCCESS;
 }
@@ -710,16 +605,10 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/options", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -732,9 +621,9 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg)
 
 	/* Some options already defined */
 	asprintf(&path, "/files/%s/options/*", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, &matches);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -767,7 +656,7 @@ int dns_augeas_rem_opt_attempts(const char* number, char** msg)
 			/* Remove options node too */
 			*strrchr(match, '/') = '\0';
 		}
-		aug_rm(augeas_dns, match);
+		aug_rm(sysaugeas, match);
 	}
 
 	free(match);
@@ -784,16 +673,10 @@ int dns_augeas_mod_opt_attempts(const char* number, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	if (augeas_dns == NULL) {
-		if (dns_augeas_init(msg) != 0) {
-			return (EXIT_FAILURE);
-		}
-	}
-
 	asprintf(&path, "/files/%s/options/attempts", RESOLV_CONF_FILE_PATH);
-	ret = aug_match(augeas_dns, path, NULL);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(augeas_dns));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
@@ -810,7 +693,7 @@ int dns_augeas_mod_opt_attempts(const char* number, char** msg)
 
 	/* Set/modify the number of attempts */
 	asprintf(&path, "/files/%s/options/attempts", RESOLV_CONF_FILE_PATH);
-	aug_set(augeas_dns, path, number);
+	aug_set(sysaugeas, path, number);
 	free(path);
 
 	return EXIT_SUCCESS;

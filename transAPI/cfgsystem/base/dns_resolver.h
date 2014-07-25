@@ -45,19 +45,6 @@
 
 #include <stdbool.h>
 
-/**
- * @brief init augeas for Resolv
- * @param a augeas to initialize
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int dns_augeas_init(char** msg);
-
-int dns_augeas_save(char** msg);
-
-void dns_augeas_close(void);
-
 xmlNodePtr dns_augeas_getxml(char** msg, xmlNsPtr ns);
 
 /**

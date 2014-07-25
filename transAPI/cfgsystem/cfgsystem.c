@@ -20,6 +20,7 @@
 #include <shadow.h>
 #include <errno.h>
 
+#include "base/common.h"
 #include "base/date_time.h"
 #include "base/platform.h"
 #include "base/dns_resolver.h"
@@ -159,6 +160,11 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 #define HOSTNAME_LENGTH 256
 	char hostname[HOSTNAME_LENGTH];
 
+	/* init augeas */
+	if (augeas_init(&msg) != EXIT_SUCCESS) {
+		return fail(NULL, msg, EXIT_FAILURE);
+	}
+
 	*running = xmlNewDoc(BAD_CAST "1.0");
 	root = xmlNewNode(NULL, BAD_CAST "system");
 	xmlDocSetRootElement(*running, root);
@@ -168,6 +174,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 	/* hostname */
 	hostname[HOSTNAME_LENGTH - 1] = '\0';
 	if (gethostname(hostname, HOSTNAME_LENGTH - 1) == -1) {
+		augeas_close();
 		xmlFreeDoc(*running); *running = NULL;
 		asprintf(&msg, "Failed to get the local hostname (%s).", strerror(errno));
 		return fail(NULL, msg, EXIT_FAILURE);
@@ -189,35 +196,31 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 
 	/* ntp */
 	if (ncds_feature_isenabled("ietf-system", "ntp")) {
-		if (ntp_augeas_init(&msg) != EXIT_SUCCESS) {
-			return fail(NULL, msg, EXIT_FAILURE);
-		}
-
 		if ((cur =  ntp_augeas_getxml(&msg, root->ns)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
+			augeas_close();
+			xmlFreeDoc(*running); *running = NULL;
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
 	}
 
 	/* dns-resolver */
-	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-		return fail(NULL, msg, EXIT_FAILURE);
-	}
 	if ((cur =  dns_augeas_getxml(&msg, root->ns)) != NULL) {
 		xmlAddChild(root, cur);
 	} else if (msg != NULL) {
+		augeas_close();
+		xmlFreeDoc(*running); *running = NULL;
 		return fail(NULL, msg, EXIT_FAILURE);
 	}
 
 	/* authentication */
 	if (ncds_feature_isenabled("ietf-system", "authentication")) {
-		if (users_augeas_init(&msg) != EXIT_SUCCESS) {
-			return fail(NULL, msg, EXIT_FAILURE);
-		}
 		if ((cur =  users_augeas_getxml(&msg, root->ns)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
+			augeas_close();
+			xmlFreeDoc(*running); *running = NULL;
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
 	}
@@ -234,9 +237,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
  */
 PUBLIC void transapi_close(void)
 {
-	ntp_augeas_close();
-	users_augeas_close();
-	dns_augeas_close();
+	augeas_close();
 	return;
 }
 
@@ -594,7 +595,7 @@ PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xml
 	char* msg;
 
 	/* Save the changes made by children callbacks via augeas */
-	if (ntp_augeas_save(&msg) != 0) {
+	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -642,10 +643,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 	/* Already processed, skip */
 	if ((op & XMLDIFF_SIBLING) && (dns_search_reorder == 1)) {
 		return EXIT_SUCCESS;
-	}
-
-	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-		return fail(error, msg, EXIT_FAILURE);
 	}
 
 	if (op & XMLDIFF_ADD) {
@@ -724,7 +721,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 	}
 
 	/* Save the changes */
-	if (dns_augeas_save(&msg) != 0) {
+	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -754,10 +751,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 		return EXIT_SUCCESS;
 	}
 
-	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
 	if (op & XMLDIFF_ADD) {
 		/* Get the index of this nameserver */
 		index = 1;
@@ -783,7 +776,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 	}
 
 	/* Save the changes */
-	if (dns_augeas_save(&msg) != 0) {
+	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -809,10 +802,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 
 	if (dns_nmsrv_mod_reorder == 2 || ((op & XMLDIFF_SIBLING) && dns_nmsrv_mod_reorder == 0)) {
 
-		if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-
 		if (!dns_augeas_equal_nameserver_count(node, &msg)) {
 			if (msg != NULL) {
 				return fail(error, msg, EXIT_FAILURE);
@@ -835,7 +824,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 		dns_nmsrv_mod_reorder = 1;
 
 		/* Save the changes */
-		if (dns_augeas_save(&msg) != 0) {
+		if (augeas_save(&msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	}
@@ -858,10 +847,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 {
 	char* msg, *ptr;
 	int num;
-
-	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
 
 	/* Check the timeout value */
 	num = strtol(get_node_content(node), &ptr, 10);
@@ -892,7 +877,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	}
 
 	/* Save the changes */
-	if (dns_augeas_save(&msg) != 0) {
+	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -914,10 +899,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 {
 	char* msg, *ptr;
 	int num;
-
-	if (dns_augeas_init(&msg) != EXIT_SUCCESS) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
 
 	/* Check the attempts value */
 	num = strtol(get_node_content(node), &ptr, 10);
@@ -948,7 +929,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 	}
 
 	/* Save the changes */
-	if (dns_augeas_save(&msg) != 0) {
+	if (augeas_save(&msg) != 0) {
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
@@ -1229,10 +1210,6 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
 
 	/* user-authentication-order */
 	if (op & (XMLDIFF_MOD | XMLDIFF_REORDER)) {
-		if (users_augeas_init(&msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-
 		if (users_augeas_rem_all_sshd_auth_order(&msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -1248,7 +1225,7 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
 		}
 
 		/* Save the changes */
-		if (users_augeas_save(&msg) != 0) {
+		if (augeas_save(&msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	}

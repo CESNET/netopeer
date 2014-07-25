@@ -128,19 +128,6 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
  */
 int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg);
 
-/**
- * @brief init augeas for PAM
- * @param a augeas to initialize
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_init(char** msg);
-
-void users_augeas_close(void);
-
-int users_augeas_save(char** msg);
-
 xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns);
 
 /**

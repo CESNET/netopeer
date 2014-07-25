@@ -50,7 +50,6 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <errno.h>
-#include <augeas.h>
 #include <libnetconf.h>
 
 #include "platform.h"
@@ -63,24 +62,19 @@
 #define SUSE_HOSTNAME_PATH "/etc/HOSTNAME"
 #define DEBIAN_HOSTNAME_PATH "/etc/hostname"
 
-#define HOSTS_PATH "/etc/hosts"
-
 DISTRO distribution_id = 0;
 
-static struct utsname *kernel = NULL;
+static struct utsname kernel;
+static char kernel_filled = 0;
 
 static void fill_kernel(void)
 {
-	if ((kernel = malloc(sizeof(struct utsname))) == NULL) {
-		nc_verb_error("Memory allocation failed - %s (%s:%d).", strerror(errno), __FILE__, __LINE__);
+	if (uname(&kernel) == -1) {
+		nc_verb_error("uname(2) failed (%s).", strerror(errno));
 		return;
 	}
 
-	if (uname(kernel) == -1) {
-		nc_verb_error("uname(2) failed (%s).", strerror(errno));
-		kernel = NULL;
-		return;
-	}
+	kernel_filled = 1;
 }
 
 void identity_detect(void)
@@ -113,42 +107,42 @@ void identity_detect(void)
 
 const char* get_nodename(void)
 {
-	if (!kernel) {
+	if (!kernel_filled) {
 		fill_kernel();
 	}
-	return kernel->nodename;
+	return kernel.nodename;
 }
 
 const char* get_os_release(void)
 {
-	if (!kernel) {
+	if (!kernel_filled) {
 		fill_kernel();
 	}
-	return kernel->release;
+	return kernel.release;
 }
 
 const char* get_os_version(void)
 {
-	if (!kernel) {
+	if (!kernel_filled) {
 		fill_kernel();
 	}
-	return kernel->version;
+	return kernel.version;
 }
 
 /* co všechno nechám vracet nclc_get_os_machine */
 const char* get_os_machine(void)
 {
-	if (!kernel) {
+	if (!kernel_filled) {
 		fill_kernel();
 	}
-	return kernel->machine;
+	return kernel.machine;
 }
 
 const char* get_sysname(void)
 {
-	if (!kernel) {
+	if (!kernel_filled) {
 		fill_kernel();
 	}
-	return kernel->sysname;
+	return kernel.sysname;
 }
 
