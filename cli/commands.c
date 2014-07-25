@@ -2128,13 +2128,13 @@ int cmd_cert (const char* arg)
 
 	} else if (strcmp(cmd, "remove") == 0) {
 		path = strtok_r(NULL, " ", &ptr);
-		if (path == NULL || strlen(path) < 5) {
-			ERROR("cert remove", "Missing or wrong name of the certificate");
+		if (path == NULL) {
+			ERROR("cert remove", "Missing the certificate name");
 			return (EXIT_FAILURE);
 		}
 
 		// delete ".pem" if the user unnecessarily included it
-		if (strcmp(path+strlen(path)-4, ".pem") == 0) {
+		if (strlen(path) > 4 && strcmp(path+strlen(path)-4, ".pem") == 0) {
 			path[strlen(path)-4] = '\0';
 		}
 
