@@ -2009,12 +2009,12 @@ void parse_cert(const char* name, const char* path) {
 
 	fp = fopen(path, "r");
 	if (fp == NULL) {
-		ERROR("parse_cert", "Unable to open: %s\n", path);
+		ERROR("parse_cert", "Unable to open: %s", path);
 		return;
 	}
 	cert = PEM_read_X509(fp, NULL, NULL, NULL);
 	if (cert == NULL) {
-		ERROR("parse_cert", "Unable to parse certificate: %s\n", path);
+		ERROR("parse_cert", "Unable to parse certificate: %s", path);
 		fclose(fp);
 		return;
 	}
