@@ -174,12 +174,38 @@ char* get_default_trustedCA_dir() {
 	return cert_dir;
 }
 
+char* get_default_CRL_dir() {
+	char* netconf_dir, *crl_dir;
+	DIR* dir;
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return NULL;
+	}
+
+	if (asprintf(&crl_dir, "%s/%s", netconf_dir, "crl") == -1) {
+		ERROR("get_default_CRL_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_CRL_dir", "Unable to use the trusted CA directory due to the previous error.");
+		free(netconf_dir);
+		return NULL;
+	}
+	free(netconf_dir);
+
+	if ((dir = opendir(crl_dir)) == NULL) {
+		ERROR("get_default_CRL_dir", "Unable to open the default CRL directory.");
+		free(crl_dir);
+		return NULL;
+	}
+	closedir(dir);
+
+	return crl_dir;
+}
+
 void load_config (struct nc_cpblts **cpblts)
 {
 	char * netconf_dir, * history_file, *config_file;
 #ifdef ENABLE_TLS
 	struct stat st;
-	char* trusted_dir;
+	char* trusted_dir, *crl_dir;
 #endif
 	char * tmp_cap;
 	int ret, history_fd, config_fd;
@@ -219,6 +245,28 @@ void load_config (struct nc_cpblts **cpblts)
 		}
 	}
 	free(trusted_dir);
+
+	if (asprintf (&crl_dir, "%s/crl", netconf_dir) == -1) {
+		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("load_config", "Unable to check CRL directory due to the previous error.");
+		crl_dir = NULL;
+	} else {
+		if (stat(crl_dir, &st) == -1) {
+			if (errno == ENOENT) {
+				ERROR("load_config", "CRL directory (%s) does not exist, creating it", crl_dir);
+				if (mkdir(crl_dir, 0700) == -1) {
+					ERROR("load_config", "CRL directory cannot be created (%s)", strerror(errno));
+				}
+			} else {
+				ERROR("load_config", "Accessing the CRL directory failed (%s)", strerror(errno));
+			}
+		} else {
+			if (!S_ISDIR(st.st_mode)) {
+				ERROR("load_config", "Accessing the CRL directory failed (Not a directory)");
+			}
+		}
+	}
+	free(crl_dir);
 #endif /* ENABLE_TLS */
 
 	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {

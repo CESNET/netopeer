@@ -1734,7 +1734,7 @@ int cmd_listen (const char* arg)
 	DIR* dir;
 	struct dirent* d;
 	int usetls = 0, n;
-	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *trusted_store = NULL;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
 #endif
 	unsigned short port = 0;
 	int c;
@@ -1860,8 +1860,12 @@ int cmd_listen (const char* arg)
 				goto error_cleanup;
 			}
 		}
+		if ((crl_dir = get_default_CRL_dir()) == NULL) {
+			ERROR("listen", "Could not use the CRL directory.");
+			goto error_cleanup;
+		}
 
-		if (nc_tls_init(cert, key, trusted_store, trusted_dir) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, trusted_store, trusted_dir, NULL, crl_dir) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
 			goto error_cleanup;
 		}
@@ -1889,6 +1893,20 @@ int cmd_listen (const char* arg)
 		}
 	}
 
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
+	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
 	clear_arglist(&cmd);
 	return (EXIT_SUCCESS);
 
@@ -1896,6 +1914,9 @@ error_cleanup:
 #ifdef ENABLE_TLS
 	if (trusted_dir != NULL) {
 		free(trusted_dir);
+	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
 	}
 	if (cert != NULL) {
 		free(cert);
@@ -2294,7 +2315,7 @@ int cmd_connect (const char* arg)
 	DIR* dir;
 	struct dirent* d;
 	int usetls = 0, n;
-	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *trusted_store = NULL;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
 #endif
 	int hostfree = 0;
 	unsigned short port = 0;
@@ -2416,8 +2437,12 @@ int cmd_connect (const char* arg)
 				goto error_cleanup;
 			}
 		}
+		if ((crl_dir = get_default_CRL_dir()) == NULL) {
+			ERROR("connect", "Could not use the CRL directory.");
+			goto error_cleanup;
+		}
 
-		if (nc_tls_init(cert, key, trusted_store, trusted_dir) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, trusted_store, trusted_dir, NULL, crl_dir) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
 			goto error_cleanup;
 		}
@@ -2452,6 +2477,21 @@ int cmd_connect (const char* arg)
 	if (hostfree) {
 		free (host);
 	}
+
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
+	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
 	clear_arglist(&cmd);
 
 	return (EXIT_SUCCESS);
@@ -2460,6 +2500,9 @@ error_cleanup:
 #ifdef ENABLE_TLS
 	if (trusted_dir != NULL) {
 		free(trusted_dir);
+	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
 	}
 	if (cert != NULL) {
 		free(cert);

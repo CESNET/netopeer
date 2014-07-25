@@ -91,6 +91,15 @@ This directory is used only when the
 is compiled with configure's \-\-enable-tls option.
 .RE
 .PP
+.I ~/.netopeer-cli/crl
+.RS
+Per user Certificate Revocation List directory that is searched when verifying a server certificate.
+.PP
+This directory is used only when the
+.B netopeer-cli
+is compiled with configure's \-\-enable-tls option.
+.RE
+.PP
 .I ~/.ssh/netconf_known_hosts
 .RS
 Alternative known_hosts file if the original file contains libssh2 incompatible
