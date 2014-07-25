@@ -162,7 +162,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 	*running = xmlNewDoc(BAD_CAST "1.0");
 	root = xmlNewNode(NULL, BAD_CAST "system");
 	xmlDocSetRootElement(*running, root);
-	ns = xmlNewNs(root, (xmlChar *) "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
+	ns = xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
 	xmlSetNs(root, ns);
 
 	/* hostname */
@@ -248,37 +248,36 @@ PUBLIC void transapi_close(void)
  * @param[out] err  Double poiter to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running,
-        struct nc_err **err)
+PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
 {
 	xmlNodePtr container_cur, state_root;
 	xmlDocPtr state_doc;
+	xmlNsPtr ns;
 	char *s;
 
 	/* Create the beginning of the state XML document */
 	state_doc = xmlNewDoc(BAD_CAST "1.0");
 	state_root = xmlNewNode(NULL, BAD_CAST "system-state");
 	xmlDocSetRootElement(state_doc, state_root);
-	xmlNewProp(state_root, BAD_CAST "xmlns", BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system");
+	ns = xmlNewNs(state_root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
+	xmlSetNs(state_root, ns);
 
 	/* Add the platform container */
-	container_cur = xmlNewNode(NULL, BAD_CAST "platform");
-	xmlAddChild(state_root, container_cur);
+	container_cur = xmlNewChild(state_root, state_root->ns, BAD_CAST "platform", NULL);
 
 	/* Add platform leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-name", BAD_CAST get_sysname());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-release", BAD_CAST get_os_release());
-	xmlNewChild(container_cur, NULL, BAD_CAST "os-version", BAD_CAST get_os_version());
-	xmlNewChild(container_cur, NULL, BAD_CAST "machine", BAD_CAST get_os_machine());
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "os-name", BAD_CAST get_sysname());
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "os-release", BAD_CAST get_os_release());
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "os-version", BAD_CAST get_os_version());
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "machine", BAD_CAST get_os_machine());
 
 	/* Add the clock container */
-	container_cur = xmlNewNode(NULL, BAD_CAST "clock");
-	xmlAddChild(state_root, container_cur);
+	container_cur = xmlNewChild(state_root, state_root->ns, BAD_CAST "clock", NULL);
 
 	/* Add clock leaf children */
-	xmlNewChild(container_cur, NULL, BAD_CAST "current-datetime", BAD_CAST (s = nc_time2datetime(time(NULL), NULL)));
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "current-datetime", BAD_CAST (s = nc_time2datetime(time(NULL), NULL)));
 	free(s);
-	xmlNewChild(container_cur, NULL, BAD_CAST "boot-datetime", BAD_CAST (s = nc_time2datetime(get_boottime(), NULL)));
+	xmlNewChild(container_cur, container_cur->ns, BAD_CAST "boot-datetime", BAD_CAST (s = nc_time2datetime(get_boottime(), NULL)));
 	free(s);
 
 	return state_doc;
