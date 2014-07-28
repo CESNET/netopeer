@@ -250,6 +250,24 @@ void dns_rm_search_domain_all(void)
 	aug_rm(sysaugeas, path);
 }
 
+int dns_mod_nameserver(const char* address, int index, char** msg)
+{
+	char *path = NULL;
+
+	assert(address);
+	assert(index >= 1);
+
+	asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, index);
+	if (aug_set(sysaugeas, path, address) == -1) {
+		asprintf(msg, "Changing DNS server failed (%s)", aug_error_message(sysaugeas));
+		free(path);
+		return (EXIT_FAILURE);
+	}
+	free(path);
+
+	return EXIT_SUCCESS;
+}
+
 int dns_add_nameserver(const char* address, int index, char** msg)
 {
 	int ret;
@@ -288,39 +306,34 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 
 	/* Set the value of the newly inserted node (or possibly create it, too) */
 	asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, index);
-	aug_set(sysaugeas, path, address);
+	if (aug_set(sysaugeas, path, address) != 0) {
+		asprintf(msg, "Setting new DNS server failed (%s)", aug_error_message(sysaugeas));
+		free(path);
+		return (EXIT_FAILURE);
+	}
 	free(path);
 
 	return EXIT_SUCCESS;
 }
 
-int dns_rm_nameserver(const char* address, char** msg)
+int dns_rm_nameserver(int i, char** msg)
 {
-	int i, ret;
-	const char* path = "/files/"AUGEAS_DNS_CONF"/nameserver";
-	char** matches;
-	const char* value;
+	char* path = NULL;
 
-	assert(address);
-
-	if ((ret = aug_match(sysaugeas, path, &matches)) == -1) {
+	asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, i);
+	switch (aug_match(sysaugeas, path, NULL)) {
+	case -1:
 		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+		free(path);
 		return EXIT_FAILURE;
+	case 0:
+		/* do nothing */
+		break;
+	default:
+		/* 1 */
+		aug_rm(sysaugeas, path);
 	}
-
-	for (i = 0; i < ret; ++i) {
-		aug_get(sysaugeas, matches[i], &value);
-		if (strcmp(value, address) == 0) {
-			aug_rm(sysaugeas, matches[i]);
-			break;
-		}
-	}
-
-	/* cleanup */
-	for (i = 0; i < ret; ++i) {
-		free(matches[i]);
-	}
-	free(matches);
+	free(path);
 
 	return EXIT_SUCCESS;
 }
