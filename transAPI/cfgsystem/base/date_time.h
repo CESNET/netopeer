@@ -47,12 +47,8 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include <augeas.h>
 
-struct tmz {
-	int minute_offset;
-	char* timezone_file;
-};
+#include <libxml/tree.h>
 
 /**
  * @brief set the /etc/localtime file to right timezone
@@ -62,7 +58,7 @@ struct tmz {
  * @return 1 file not found
  * @return 2 permission denied
  */
-int set_timezone(const char *name);
+int tz_set(const char *name, char** errmsg);
 
 /**
  * @brief set the /etc/localtime file to right timezone
@@ -72,13 +68,13 @@ int set_timezone(const char *name);
  * @return 1 timezone not found
  * @return 2 permission denied
  */
-int set_gmt_offset(int offset);
+int set_gmt_offset(int offset, char** errmsg);
 
 /**
  * @brief return boot time as seconds since Epoch
  * @return boot time, 0 on failure
  */
-time_t get_boottime(void);
+time_t boottime_get(void);
 
 /**
  * @brief start ntp program on your system
@@ -110,22 +106,7 @@ int ntp_restart(void);
  */
 int ntp_status(void);
 
-/**
- * @brief rewrite /etc/ntp.conf file with new configuration
- * @param naw_conf[in] char * new configuration
- * @return 0 success
- * @return 1 imposible to open /etc/ntp.conf
- */
-int ntp_rewrite_conf(char* new_conf);
-
-/**
- * @brief init augeas for NTP
- * @param a augeas to initialize
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int ntp_augeas_init(augeas** a, char** msg);
+xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns);
 
 /**
  * @brief add new server into augeas NTP config
@@ -138,7 +119,7 @@ int ntp_augeas_init(augeas** a, char** msg);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
+int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief find a server in augeas NTP config
@@ -151,22 +132,7 @@ int ntp_augeas_add(augeas* a, char* udp_address, char* association_type, bool ib
  * @return augeas item unique name
  * @return NULL if error occured
  */
-char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type, bool iburst, bool prefer, char** msg);
-
-/**
- * @brief read values of the server with index
- * @param a initialized augeas
- * @param association_type association type
- * @param index server index
- * @param udp_address NTP server address
- * @param iburst whether it had iburst set
- * @param prefer whether it had prefer set
- * @param msg error message in case of an error
- * @return -1 NULL arguments
- * @return 0 index out-of-bounds
- * @return 1 index found, valid values returned in the pointers
- */
-int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** udp_address, bool* iburst, bool* prefer, char** msg);
+int ntp_rm_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief resolve an URL in both IPv4 and IPv6
@@ -175,15 +141,19 @@ int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** 
  * @return list of IP addresses ended with NULL
  * @return NULL if error occured
  */
-char** ntp_resolve_server(char* server_name, char** msg);
+char** ntp_resolve_server(const char* server_name, char** msg);
+
+/**
+ * @brief get the current timezone offset
+ * @return timezone offset in minutes, cannot fail
+ */
+long tz_get_offset(void);
 
 /**
  * @brief get the current timezone
- * @param msg error message in case of an error
- * @return timezone name
- * @return NULL if error occured
+ * @return timezone identification, cannot fail
  */
-char* get_timezone(char** msg);
+const char* tz_get(void);
 
 #endif /* DATE_TIME_H_ */
 

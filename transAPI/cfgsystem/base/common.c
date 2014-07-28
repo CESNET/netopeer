@@ -1,11 +1,10 @@
 /**
- * \file platform.c
- * \brief Functions for getting onformation about platform
- * \author Michal Vasko <mvasko@cesnet.cz>
- * \author Tomas Cejka <cejkat@cesnet.cz>
- * \date 2013
+ * \file common.c
+ * \brief Internal functions for cfgsystem module
+ * \author Radek Krejci <rkrejci@cesnet.cz>
+ * \date 2014
  *
- * Copyright (C) 2013 CESNET
+ * Copyright (C) 2014 CESNET
  *
  * LICENSE TERMS
  *
@@ -40,67 +39,67 @@
  * if advised of the possibility of such damage.
  *
  */
+#define _GNU_SOURCE
 
-#ifndef PLATFORM_H_
-#define PLATFORM_H_
+#include <assert.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-/**
- * @brief enumeration of linux distribution
- * - UNKNOWN - distribution type not detected
- * - REDHAT - fedora, sciencific linux
- * - SUSE - openSuSE
- * - DEBIAN - debian, ubuntu
- */
-typedef enum {
-	UNKNOWN,/*0*/
-	REDHAT,	/*1*/
-	SUSE,	/*2*/
-	DEBIAN	/*3*/
-} DISTRO;
+#include <augeas.h>
 
-/**
- * @brief int which indicate kernel version (2., 3., ...)
- */
-extern int version_id;
+#include "common.h"
 
-/**
- * @brief set global variables distribution_id and version_id
- */
-void identity_detect(void);
+augeas *sysaugeas = NULL;
 
-/**
- * @brief return same information as uname -n
- * @return NULL allocation fail
- * @return char * node network name
- */
-const char* get_nodename(void);
+int augeas_init(char** msg)
+{
+	assert(msg);
 
-/**
- * @brief return same information as uname -r
- * @return NULL allocation fail
- * @return char * kernel release
- */
-const char* get_os_release(void);
+	if (sysaugeas != NULL) {
+		/* already initiated */
+		return EXIT_SUCCESS;
+	}
 
-/**
- * @brief return same information as uname -v
- * @return NULL allocation fail
- * @return char * kernel version
- */
-const char* get_os_version(void);
+	sysaugeas = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
+	if (aug_error(sysaugeas) != AUG_NOERROR) {
+		asprintf(msg, "Augeas NTP initialization failed (%s)", aug_error_message(sysaugeas));
+		return EXIT_FAILURE;
+	}
+	/* NTP */
+	aug_set(sysaugeas, "/augeas/load/Ntp/lens", "Ntp.lns");
+	aug_set(sysaugeas, "/augeas/load/Ntp/incl", AUGEAS_NTP_CONF);
+	/* DNS resolver */
+	aug_set(sysaugeas, "/augeas/load/Resolv/lens", "Resolv.lns");
+	aug_set(sysaugeas, "/augeas/load/Resolv/incl", AUGEAS_DNS_CONF);
+	/* authentication */
+	aug_set(sysaugeas, "/augeas/load/Pam/lens", "Pam.lns");
+	aug_set(sysaugeas, "/augeas/load/Pam/incl", AUGEAS_PAM_DIR"/*");
 
-/**
- * @brief return same information as uname -m
- * @return NULL allocation fail
- * @return char * machine hardware name
- */
-const char* get_os_machine(void);
+	aug_load(sysaugeas);
 
-/**
- * @brief return same information uname -s
- * @return NULL allocation fail
- * @return char * NIS or YP domain name
- */
-const char* get_sysname(void);
+	if (aug_match(sysaugeas, "/augeas//error", NULL) != 0) {
+		aug_get(sysaugeas, "/augeas//error[1]/message", (const char**) msg);
+		asprintf(msg, "Initiating augeas failed (%s)", *msg);
+		augeas_close();
+		return EXIT_FAILURE;
+	}
 
-#endif /* PLATFORM_H_ */
+	return EXIT_SUCCESS;
+}
+
+int augeas_save(char** msg)
+{
+	if (aug_save(sysaugeas) != 0) {
+		asprintf(msg, "Saving configuration failed (%s)", aug_error_message(sysaugeas));
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+void augeas_close(void)
+{
+	aug_close(sysaugeas);
+	sysaugeas = NULL;
+}

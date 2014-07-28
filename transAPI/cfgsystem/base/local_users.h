@@ -97,7 +97,7 @@ int users_mod_user(const char* name, const char* passwd, char** msg);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int users_rem_user(const char* name, char** msg);
+int users_rm_user(const char* name, char** msg);
 
 /**
  * @brief get the home directory of a user
@@ -128,25 +128,7 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
  */
 int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg);
 
-/**
- * @brief init augeas for PAM
- * @param a augeas to initialize
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_init(augeas** a, char** msg);
-
-/**
- * @brief get SSHD PAM authentication type ordered by priority
- * @param a augeas structure to use
- * @param auth_order array of the authentication types
- * @param auth_order_len length of auth_order
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_order_len, char** msg);
+xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns);
 
 /**
  * @brief remove all known SSHD PAM authentication types
@@ -155,7 +137,7 @@ int users_augeas_get_sshd_auth_order(augeas* a, char*** auth_order, int* auth_or
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg);
+int users_augeas_rem_all_sshd_auth_order(char** msg);
 
 /**
  * @brief add an SSHD PAM authentication type with the highest priority
@@ -165,6 +147,6 @@ int users_augeas_rem_all_sshd_auth_order(augeas* a, char** msg);
  * @return EXIT_SUCCESS success
  * @return EXIT_FAILURE error occured
  */
-int users_augeas_add_first_sshd_auth_order(augeas* a, const char* auth_type, char** msg);
+int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg);
 
 #endif /* LOCAL_USERS_H_ */

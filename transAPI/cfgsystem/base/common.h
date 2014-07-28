@@ -1,11 +1,10 @@
 /**
- * \file platform.c
- * \brief Functions for getting onformation about platform
- * \author Michal Vasko <mvasko@cesnet.cz>
- * \author Tomas Cejka <cejkat@cesnet.cz>
- * \date 2013
+ * \file common.h
+ * \brief Internal header file for cfgsystem module
+ * \author Radek Krejci <rkrejci@cesnet.cz>
+ * \date 2014
  *
- * Copyright (C) 2013 CESNET
+ * Copyright (C) 2014 CESNET
  *
  * LICENSE TERMS
  *
@@ -41,66 +40,17 @@
  *
  */
 
-#ifndef PLATFORM_H_
-#define PLATFORM_H_
+#ifndef COMMON_H_
+#define COMMON_H_
 
-/**
- * @brief enumeration of linux distribution
- * - UNKNOWN - distribution type not detected
- * - REDHAT - fedora, sciencific linux
- * - SUSE - openSuSE
- * - DEBIAN - debian, ubuntu
- */
-typedef enum {
-	UNKNOWN,/*0*/
-	REDHAT,	/*1*/
-	SUSE,	/*2*/
-	DEBIAN	/*3*/
-} DISTRO;
+#define AUGEAS_NTP_CONF "/etc/ntp.conf"
+#define AUGEAS_DNS_CONF "/etc/resolv.conf"
+#define AUGEAS_PAM_DIR "/etc/pam.d"
 
-/**
- * @brief int which indicate kernel version (2., 3., ...)
- */
-extern int version_id;
+int augeas_init(char** msg);
 
-/**
- * @brief set global variables distribution_id and version_id
- */
-void identity_detect(void);
+int augeas_save(char** msg);
 
-/**
- * @brief return same information as uname -n
- * @return NULL allocation fail
- * @return char * node network name
- */
-const char* get_nodename(void);
+void augeas_close(void);
 
-/**
- * @brief return same information as uname -r
- * @return NULL allocation fail
- * @return char * kernel release
- */
-const char* get_os_release(void);
-
-/**
- * @brief return same information as uname -v
- * @return NULL allocation fail
- * @return char * kernel version
- */
-const char* get_os_version(void);
-
-/**
- * @brief return same information as uname -m
- * @return NULL allocation fail
- * @return char * machine hardware name
- */
-const char* get_os_machine(void);
-
-/**
- * @brief return same information uname -s
- * @return NULL allocation fail
- * @return char * NIS or YP domain name
- */
-const char* get_sysname(void);
-
-#endif /* PLATFORM_H_ */
+#endif /* COMMON_H_ */

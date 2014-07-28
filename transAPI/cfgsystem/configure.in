@@ -9,7 +9,7 @@ AC_SUBST(PROJECTNAME)
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
 	CFLAGS="$CFLAGS -g -DDEBUG",
-	CFLAGS="$CFLAGS -O3"
+	CFLAGS="$CFLAGS -O3 -DNDEBUG"
 )
 
 # --with-libxml2=path-to-libxml2-git-repository

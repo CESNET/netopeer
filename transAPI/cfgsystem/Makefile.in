@@ -29,6 +29,7 @@ MODEL = model/ietf-system.yin \
 	model/ietf-system-schematron.xsl
 
 SRCS = @PROJECTNAME@.c \
+	base/common.c \
 	base/date_time.c \
 	base/platform.c \
 	base/dns_resolver.c \

@@ -2199,7 +2199,7 @@ PROJECTNAME=cfgsystem
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; CFLAGS="$CFLAGS -g -DDEBUG"
 else
-  CFLAGS="$CFLAGS -O3"
+  CFLAGS="$CFLAGS -O3 -DNDEBUG"
 
 fi
 
@@ -10824,8 +10824,7 @@ if ac_fn_c_try_compile "$LINENO"; then :
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	#CPPFLAGS="-DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
-	CFLAGS="$SAVE_CFLAGS"
+	CPPFLAGS="-DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
 
 else
 

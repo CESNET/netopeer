@@ -43,6 +43,7 @@
 #define _GNU_SOURCE
 #define _BSD_SOURCE
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,8 +58,10 @@
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <augeas.h>
+#include <libnetconf.h>
+#include <stdbool.h>
 
-#include "date_time.h"
+#include "common.h"
 #include "platform.h"
 
 #define ZONEINFO_FOLDER_PATH	"/usr/share/zoneinfo/"
@@ -69,9 +72,17 @@
 #define REDHAT_NTP_SERVICE "ntpd"
 #define SUSE_NTP_SERVICE "ntp"
 #define DEBIAN_NTP_SERVICE "ntp"
-#define NTP_CONF_FILE_PATH	"/etc/ntp.conf"
 
-struct tmz timezones[] = {
+/* from common.c */
+extern augeas *sysaugeas;
+
+/* from platform.c */
+extern DISTRO distribution_id;
+
+struct tmz {
+	int minute_offset;
+	char* timezone_file;
+} timezones[] = {
     {-720, "Etc/GMT-12"},
     {-660, "Etc/GMT-11"},
     {-600, "Etc/GMT-10"},
@@ -115,41 +126,39 @@ struct tmz timezones[] = {
     {0, NULL}
 };
 
-int set_timezone(const char *name)
+int tz_set(const char *name, char** errmsg)
 {
-	if (name == NULL) {
-		return 1;
-	}
-
 	struct stat statbuf;
-	char *path = ZONEINFO_FOLDER_PATH; /*"/usr/share/zoneinfo/"*/
 	char *tmp = NULL;
-	int file_ok = 0;
+	int ret = EXIT_SUCCESS;
 
-	asprintf(&tmp, "%s%s", path, name);
-
-	file_ok = access(tmp, F_OK);
-
-	if (file_ok) {
-		stat(tmp, &statbuf);
+	if (name == NULL) {
+		*errmsg = strdup("set_timezone: invalid parameter.");
+		return EXIT_FAILURE;
 	}
 
-	if (file_ok != 0 || S_ISDIR(statbuf.st_mode)) {
+	asprintf(&tmp, "%s%s", ZONEINFO_FOLDER_PATH, name);
+	if (stat(tmp, &statbuf) == -1) {
+		asprintf(errmsg, "Setting timezone failed - unable to get info about \"%s\" file (%s).", tmp, strerror(errno));
 		free(tmp);
-		return 1;
+		return EXIT_FAILURE;
+	}
+	if (S_ISDIR(statbuf.st_mode)) {
+		asprintf(errmsg, "Setting timezone failed - \"%s\" is a directory.", tmp);
+		free(tmp);
+		return EXIT_FAILURE;
 	}
 
-	if (unlink(LOCALTIME_FILE_PATH)) {
-		return 2; /*"/etc/localtime"*/
-	} if (symlink(tmp, LOCALTIME_FILE_PATH)) {
-		return 2; /*"/etc/localtime"*/
+	if (unlink(LOCALTIME_FILE_PATH) == -1 || symlink(tmp, LOCALTIME_FILE_PATH) == -1) {
+		asprintf(errmsg, "Setting timezone failed - unable to create localtime symlink to \"%s\" (%s).", tmp, strerror(errno));
+		ret = EXIT_FAILURE;
 	}
 	free(tmp);
 
-	return 0;
+	return ret;
 }
 
-int set_gmt_offset(int offset)
+int set_gmt_offset(int offset, char** errmsg)
 {
 	int i;
 
@@ -159,10 +168,15 @@ int set_gmt_offset(int offset)
 		}
 	}
 
-	return set_timezone(timezones[i].timezone_file);
+	if (timezones[i].timezone_file == NULL) {
+		*errmsg = strdup("Invalid timezone UTC offset.");
+		return EXIT_FAILURE;
+	}
+
+	return tz_set(timezones[i].timezone_file, errmsg);
 }
 
-time_t get_boottime(void)
+time_t boottime_get(void)
 {
 	struct sysinfo s_info;
 	time_t cur_time = time(NULL);
@@ -174,438 +188,339 @@ time_t get_boottime(void)
 	return (cur_time - s_info.uptime);
 }
 
-int ntp_start(void)
+static int ntp_cmd(const char* cmd)
 {
-	int output = 1;
+	int output;
+	char *cmdline = NULL;
+	const char* service[] = {
+		NULL, /* UNKNOWN */
+		REDHAT_NTP_SERVICE, /* REDHAT */
+		SUSE_NTP_SERVICE, /* SUSE */
+		DEBIAN_NTP_SERVICE /* DEBIAN */
+	};
 
 	if (distribution_id == 0) {
 		identity_detect();
 	}
 
-	switch (distribution_id) {
-	case REDHAT:
-		output = system("service" REDHAT_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
-		break;
-	case SUSE:
-		output = system("service" SUSE_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
-		break;
-	case DEBIAN:
-		output = system("service" DEBIAN_NTP_SERVICE " start 1> /dev/null  2>/dev/null");
-		break;
-	default:
-		return 2; /*unknown distribution*/
+	if (service[distribution_id] == NULL) {
+		nc_verb_error("Unable to start NTP service (unknown Linux distro).");
+		return EXIT_FAILURE;
 	}
 
-	if (output) {
-		return 1;
+	asprintf(&cmdline, "/sbin/service %s %s 1> /dev/null  2>/dev/null", service[distribution_id], cmd);
+	output = system(cmdline);
+
+	if (WEXITSTATUS(output) != 0) {
+		if (strcmp(cmd, "status")) {
+			nc_verb_error("Unable to %s NTP service (command \"%s\" returned %d).", cmd, cmdline, WEXITSTATUS(output));
+		}
+		free(cmdline);
+		return EXIT_FAILURE;
 	} else {
-		return 0;
+		free(cmdline);
+		return EXIT_SUCCESS;
 	}
+}
+
+int ntp_start(void)
+{
+	return ntp_cmd("start");
 }
 
 int ntp_stop(void)
 {
-	int output = 1;
-
-	if (distribution_id == 0) {
-		identity_detect();
-	}
-
-	switch (distribution_id) {
-	case REDHAT:
-		output = system("service" REDHAT_NTP_SERVICE " stop 1> /dev/null  2>/dev/null");
-		break;
-	case SUSE:
-		output = system("service" SUSE_NTP_SERVICE " stop 1> /dev/null  2>/dev/null");
-		break;
-	case DEBIAN:
-		output = system("service" DEBIAN_NTP_SERVICE" stop 1> /dev/null  2>/dev/null");
-		break;
-	default:
-		return 2; /*unknown distribution*/
-	}
-
-	if (output) { /*imposible using of ntp/ntpd in /etc/init.d */
-		return 1;
-	} else {
-		return 0;
-	}
+	return ntp_cmd("stop");
 }
 
 int ntp_restart(void)
 {
-	int output = 1;
-
-	if (distribution_id == 0) {
-		identity_detect();
-	}
-
-	output = ntp_stop();
-	if (output != 0) {
-		return output;
-	}
-	output = ntp_start();
-	return output;
+	return ntp_cmd("restart");
 }
 
 int ntp_status(void)
 {
-	int output;
-
-	if (distribution_id == 0) {
-		identity_detect();
-	}
-
-	switch (distribution_id) {
-	case REDHAT:
-		output = system("service" REDHAT_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
-		break;
-	case SUSE:
-		output = system("service" SUSE_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
-		break;
-	case DEBIAN:
-		output = system("service" DEBIAN_NTP_SERVICE " status 1> /dev/null  2>/dev/null");
-		break;
-	default:
-		return -1; /*unknown distribution*/
-	}
-
-	if (WEXITSTATUS(output) == 0) {
+	if (ntp_cmd("status") == EXIT_SUCCESS) {
+		/* NTP is running */
 		return 1;
 	} else {
+		/* NTP is stopped */
 		return 0;
 	}
 }
 
-int ntp_rewrite_conf(char* new_conf)
+xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns)
 {
-	FILE *f = fopen(NTP_CONF_FILE_PATH, "wt"); /*"/etc/ntp.conf"*/
-
-	if (distribution_id == 0) {
-		identity_detect();
-	}
-
-	if (f == NULL) {
-		return 1;
-	}
-
-	fprintf(f, "%s", new_conf);
-	fclose(f);
-
-	ntp_restart();
-	return 0;
-}
-
-int ntp_augeas_init(augeas** a, char** msg)
-{
-	int ret;
-
-	*a = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
-	if (aug_error(*a) != AUG_NOERROR) {
-		asprintf(msg, "Augeas NTP initialization failed: %s", aug_error_message(*a));
-		return EXIT_FAILURE;
-	}
-	aug_set(*a, "/augeas/load/Ntp/lens", "Ntp.lns");
-	aug_set(*a, "/augeas/load/Ntp/incl", NTP_CONF_FILE_PATH);
-
-	aug_load(*a);
-	ret = aug_match(*a, "/augeas//error", NULL);
-	/* Error (or more of them) occured */
-	if (ret == 1) {
-		aug_get(*a, "/augeas//error/message", (const char**) msg);
-		asprintf(msg, "Accessing \"%s\": %s.\n", NTP_CONF_FILE_PATH, *msg);
-		aug_close(*a);
-		return EXIT_FAILURE;
-	} else if (ret > 1) {
-		asprintf(msg, "Accessing \"%s\" failed.\n", NTP_CONF_FILE_PATH);
-		aug_close(*a);
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
-int ntp_augeas_add(augeas* a, char* udp_address, char* association_type,
-bool iburst, bool prefer, char** msg)
-{
-	int ret;
+	int i, j;
+	const char* type[2] = {"server", "peer"};
+	const char* value;
 	char* path;
+	xmlNodePtr ntp_node, server, aux_node;
 
-	if (a == NULL || udp_address == NULL || association_type == NULL) {
-		asprintf(msg, "NULL arguments.");
-		return EXIT_FAILURE;
+	assert(sysaugeas);
+
+	/* ntp */
+	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
+
+	/* ntp/enabled */
+	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (ntp_status() == 1) ? BAD_CAST "true" : BAD_CAST "false");
+
+	/* ntp/server[] */
+	j = 0;
+loop:
+	for (i = 1; j < 2; i++) {
+		path = NULL;
+		asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]", type[j], i);
+		switch(aug_match(sysaugeas, path, NULL)) {
+		case -1:
+			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+			free(path);
+			xmlFreeNode(ntp_node);
+			return (NULL);
+		case 0:
+			/* index out of bounds, continue with next server type */
+			free(path);
+			j++;
+			goto loop;
+		default: /* 1 */
+			/* ntp/server/ */
+			server = xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "server", NULL);
+
+			/* ntp/server/udp/address */
+			aug_get(sysaugeas, path, &value);
+			aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp", NULL);
+			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST value);
+			/* port specification is not supported by Linux ntp implementation */
+			free(path);
+
+			/* ntp/server/name */
+			path = NULL;
+			asprintf(&path, "%s-%d", type[j], i);
+			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST path);
+			free(path);
+
+			/* ntp/server/association-type */
+			xmlNewChild(server, server->ns, BAD_CAST "association-type", BAD_CAST type[j]);
+
+			/* ntp/server/iburst */
+			path = NULL;
+			asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]/iburst", type[j], i);
+			switch(aug_match(sysaugeas, path, NULL)) {
+			case -1:
+				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+				free(path);
+				xmlFreeNode(ntp_node);
+				return (NULL);
+			case 0:
+				/* iburst not set */
+				xmlNewChild(server, server->ns, BAD_CAST "iburst", BAD_CAST "false");
+				break;
+			default: /* 1 */
+				/* iburst set */
+				xmlNewChild(server, server->ns, BAD_CAST "iburst", BAD_CAST "true");
+				break;
+			}
+			free(path);
+
+			/* ntp/server/prefer */
+			path = NULL;
+			asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]/prefer", type[j], i);
+			switch(aug_match(sysaugeas, path, NULL)) {
+			case -1:
+				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+				free(path);
+				xmlFreeNode(ntp_node);
+				return (NULL);
+			case 0:
+				/* prefer not set */
+				xmlNewChild(server, server->ns, BAD_CAST "prefer", BAD_CAST "false");
+				break;
+			default: /* 1 */
+				/* prefer set */
+				xmlNewChild(server, server->ns, BAD_CAST "prefer", BAD_CAST "true");
+				break;
+			}
+			free(path);
+		}
 	}
 
-	asprintf(&path, "/files/%s/%s", NTP_CONF_FILE_PATH, association_type);
-	ret = aug_match(a, path, NULL);
+	return (ntp_node);
+}
+
+int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
+{
+	int ret;
+	char* path = NULL;
+
+	assert(udp_address);
+	assert(association_type);
+
+	asprintf(&path, "/files/%s/%s", AUGEAS_NTP_CONF, association_type);
+	ret = aug_match(sysaugeas, path, NULL);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
 		return EXIT_FAILURE;
 	}
-	++ret;
 	free(path);
 
-	asprintf(&path, "/files/%s/%s[%d]", NTP_CONF_FILE_PATH, association_type, ret);
-	aug_set(a, path, udp_address);
-	free(udp_address);
-	free(path);
+	/* add new item after the last one */
+	ret++;
+	path = NULL;
+	asprintf(&path, "/files/%s/%s[%d]", AUGEAS_NTP_CONF, association_type, ret);
+	aug_set(sysaugeas, path, udp_address);
+	free(path); path = NULL;
 
 	if (iburst) {
-		asprintf(&path, "/files/%s/%s[%d]/iburst", NTP_CONF_FILE_PATH, association_type, ret);
-		aug_set(a, path, NULL);
+		path = NULL;
+		asprintf(&path, "/files/%s/%s[%d]/iburst", AUGEAS_NTP_CONF, association_type, ret);
+		aug_set(sysaugeas, path, NULL);
 		free(path);
 	}
 
 	if (prefer) {
-		asprintf(&path, "/files/%s/%s[%d]/prefer", NTP_CONF_FILE_PATH, association_type, ret);
-		aug_set(a, path, NULL);
+		path = NULL;
+		asprintf(&path, "/files/%s/%s[%d]/prefer", AUGEAS_NTP_CONF, association_type, ret);
+		aug_set(sysaugeas, path, NULL);
 		free(path);
 	}
 
 	return EXIT_SUCCESS;
 }
 
-char* ntp_augeas_find(augeas* a, char* udp_address, char* association_type,
-bool iburst, bool prefer, char** msg)
+int ntp_rm_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
 {
-	int ret, ret2, i, j;
-	char* path, *match;
+	int ret, i, j;
+	char* path;
 	const char* value;
-	char** matches, **item_match;
+	char** matches = NULL;
 
-	if (a == NULL || udp_address == NULL || association_type == NULL) {
-		asprintf(msg, "NULL arguments.");
-		return NULL;
-	}
+	assert(udp_address);
+	assert(association_type);
 
-	asprintf(&path, "/files/%s/%s", NTP_CONF_FILE_PATH, association_type);
-	ret = aug_match(a, path, &matches);
+	path = NULL;
+	asprintf(&path, "/files/%s/%s", AUGEAS_NTP_CONF, association_type);
+	ret = aug_match(sysaugeas, path, &matches);
 	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
+		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 		free(path);
-		return NULL;
+		return EXIT_FAILURE;
 	}
 	free(path);
 
 	for (i = 0; i < ret; ++i) {
-		aug_get(a, matches[i], &value);
+		aug_get(sysaugeas, matches[i], &value);
 		if (value == NULL || strcmp(value, udp_address) != 0) {
 			continue;
 		}
 
-		asprintf(&path, "/files/%s/%s[%d]/*", NTP_CONF_FILE_PATH, association_type, i + 1);
-		ret2 = aug_match(a, path, &item_match);
+		path = NULL;
+		asprintf(&path, "/files/%s/%s[%d]/iburst", AUGEAS_NTP_CONF, association_type, i + 1);
+		j = aug_match(sysaugeas, path, NULL);
 		free(path);
-		if (ret2 > 2) {
+		if ((iburst && j != 1) || (!iburst && j != 0)) {
 			continue;
 		}
 
-		if (ret2 == 0) {
-			if (!iburst && !prefer) {
-				/* Match */
-				break;
-			} else {
-				goto next_iter;
-			}
+		path = NULL;
+		asprintf(&path, "/files/%s/%s[%d]/prefer", AUGEAS_NTP_CONF, association_type, i + 1);
+		j = aug_match(sysaugeas, path, NULL);
+		free(path);
+		if ((prefer && j != 1) || (!prefer && j != 0)) {
+			continue;
 		}
 
-		if (ret2 == 1) {
-			if (iburst && strcmp(item_match[0] + strlen(item_match[0]) - 6, "iburst") == 0) {
-				/* Match */
-				break;
-			}
-			if (prefer && strcmp(item_match[0] + strlen(item_match[0]) - 6, "prefer") == 0) {
-				/* Match */
-				break;
-			}
-			goto next_iter;
-		}
+		/* remove item and finish */
+		aug_rm(sysaugeas, matches[i]);
 
-		if (ret2 == 2) {
-			if (!iburst || !prefer) {
-				goto next_iter;
-			}
-			if (strcmp(item_match[0] + strlen(item_match[0]) - 6, "iburst") == 0 && strcmp(item_match[1] + strlen(item_match[1]) - 6, "prefer") == 0) {
-				/* Match */
-				break;
-			}
-			if (strcmp(item_match[0] + strlen(item_match[0]) - 6, "prefer") == 0 && strcmp(item_match[1] + strlen(item_match[1]) - 6, "iburst") == 0) {
-				/* Match */
-				break;
-			}
-			goto next_iter;
-		}
-
-		next_iter: for (j = 0; j < ret2; ++j) {
-			free(item_match[i]);
-		}
-		free(item_match);
+		break;
 	}
 
-	if (i == ret) {
-		return NULL;
-	}
-
-	/* Remove the node and it's children */
-	match = strdup(matches[i]);
-
+	/* cleanup */
 	for (i = 0; i < ret; ++i) {
 		free(matches[i]);
 	}
 	free(matches);
-	return match;
+
+	return EXIT_SUCCESS;
 }
 
-int ntp_augeas_next_server(augeas* a, char* association_type, int index, char** udp_address, bool* iburst, bool* prefer, char** msg)
-{
-	const char* value;
-	char* path;
-	int ret;
-
-	if (a == NULL || association_type == NULL || index < 1 || udp_address == NULL || iburst == NULL || prefer == NULL) {
-		asprintf(msg, "NULL argument.");
-		return -1;
-	}
-
-	asprintf(&path, "/files/%s/%s[%d]", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		return -1;
-	}
-	if (ret == 0) {
-		/* Index out-of-bounds */
-		free(path);
-		return 0;
-	}
-
-	aug_get(a, path, &value);
-	*udp_address = strdup(value);
-
-	free(path);
-	asprintf(&path, "/files/%s/%s[%d]/iburst", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		free(*udp_address);
-		return -1;
-	}
-	if (ret == 0) {
-		*iburst = false;
-	} else {
-		*iburst = true;
-	}
-
-	free(path);
-	asprintf(&path, "/files/%s/%s[%d]/prefer", NTP_CONF_FILE_PATH, association_type, index);
-	ret = aug_match(a, path, NULL);
-	if (ret == -1) {
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(a));
-		free(path);
-		free(*udp_address);
-		return -1;
-	}
-	if (ret == 0) {
-		*prefer = false;
-	} else {
-		*prefer = true;
-	}
-
-	free(path);
-	return 1;
-}
-
-char** ntp_resolve_server(char* server_name, char** msg)
+char** ntp_resolve_server(const char* server_name, char** msg)
 {
 	struct sockaddr_in* addr4;
 	struct sockaddr_in6* addr6;
 	char buffer[INET6_ADDRSTRLEN + 1];
 	struct addrinfo* current;
-	struct addrinfo* addinfo;
+	struct addrinfo* addrs;
 	struct addrinfo hints;
 	char** ret = NULL;
-	int ret_count = 0;
-	int ret2;
+	int r, i, count;
 
+	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = 0;
-	hints.ai_flags = 0;
-	hints.ai_addrlen = 0;
-	hints.ai_addr = NULL;
-	hints.ai_canonname = NULL;
-	hints.ai_next = NULL;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 
-	if ((ret2 = getaddrinfo(server_name, NULL, &hints, &addinfo)) != 0) {
-		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(ret2));
+	if ((r = getaddrinfo(server_name, NULL, &hints, &addrs)) != 0) {
+		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(r));
 		return NULL;
 	}
 
-	current = addinfo;
-	do {
-		if (ret == NULL) {
-			ret = malloc(sizeof(char*));
-			ret_count = 1;
-		} else {
-			++ret_count;
-			ret = realloc(ret, ret_count * sizeof(char*));
-		}
+	/* count returned addresses */
+	for (current = addrs, count = 0; current != NULL; current = current->ai_next, count++);
+	if (count == 0) {
+		*msg = strdup("\"%s\" cannot be resolved.");
+		return NULL;
+	}
 
+	/* get array for returning */
+	ret = malloc(count * sizeof(char*));
+	for (i = 0, current = addrs; i < count; i++, current = current->ai_next) {
 		switch (current->ai_addr->sa_family) {
 		case AF_INET:
 			addr4 = (struct sockaddr_in*) current->ai_addr;
-			ret[ret_count - 1] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
+			ret[i] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
 			break;
 
 		case AF_INET6:
 			addr6 = (struct sockaddr_in6*) current->ai_addr;
-			ret[ret_count - 1] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
+			ret[i] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
 			break;
 		}
+	}
+	ret[i] = NULL; /* terminating NULL byte */
+	freeaddrinfo(addrs);
 
-		current = current->ai_next;
-	} while (current != NULL);
-
-	freeaddrinfo(addinfo);
-	++ret_count;
-	ret = realloc(ret, ret_count * sizeof(char*));
-	ret[ret_count - 1] = NULL;
 	return ret;
 }
 
-char* get_timezone(char** msg)
+long tz_get_offset(void)
 {
-	char* buf, *tz;
-	size_t buf_len;
+	tzset();
+
+	/* timezone is in seconds, ietf-system shows it in minutes */
+	return (timezone / 60);
+}
+
+const char* tz_get(void)
+{
+	static char buf[128];
+	char* tz;
 	int ret;
 
-	buf_len = 128;
-	buf = malloc(buf_len * sizeof(char));
-
-	ret = readlink(LOCALTIME_FILE_PATH, buf, buf_len);
-
-	if (ret == -1) {
-		if (msg) {
-			asprintf(msg, "Getting the current timezone failed: %s", strerror(errno));
-		}
-		free(buf);
-		return NULL;
+	/* try to get nice name from localtime link */
+	if((ret = readlink(LOCALTIME_FILE_PATH, buf, 127)) == -1) {
+		goto backup;
 	}
-
-	if (ret == buf_len) {
-		if (msg) {
-			asprintf(msg, "Buffer too small for the timezone path.");
-		}
-		free(buf);
-		return NULL;
-	}
-
 	buf[ret] = '\0';
-	tz = strdup(strrchr(buf, '/') + 1);
-	free(buf);
-	return tz;
+
+	if ((tz = strstr(buf, ZONEINFO_FOLDER_PATH)) != NULL) {
+		return (tz + strlen(ZONEINFO_FOLDER_PATH));
+	} else {
+		return (strrchr(buf, '/') + 1);
+	}
+
+backup:
+	tzset();
+	return tzname[0];
 }
