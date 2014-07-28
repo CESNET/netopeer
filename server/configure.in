@@ -247,10 +247,11 @@ esac
 
 #check for c_rehash
 if test "$tls" = "yes"; then
-	AC_CHECK_PROG([C_REHASH], [c_rehash], [yes], [no])
+	AC_PATH_PROG([C_REHASH], [c_rehash], [no])
 	if test "$C_REHASH" = "no"; then
 		AC_MSG_ERROR(["c_rehash not found!"])
 	fi
+	AC_SUBST(C_REHASH)
 fi
 
 # Check python for manager and configurator

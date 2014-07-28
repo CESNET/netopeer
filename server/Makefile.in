@@ -53,6 +53,7 @@ dbusservices = @DBUSSERVICES@
 modulesdir = @MODULESDIR@
 
 TOPDIR = @CONFIGURE_PWD@
+#if you edit this path, edit also configurator/config.py.in path
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
 CC = @CC@
 RPMBUILD = @RPMBUILD@
