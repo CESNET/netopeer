@@ -691,7 +691,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, addr;
 	char* msg = NULL;
 	int i;
 
@@ -702,7 +702,24 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 
 		/* and add them again in current order */
 		for (i = 1, cur = node->parent->children; cur != NULL; i++, cur = cur->next) {
-			if (dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+			if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "server")) {
+				continue;
+			}
+			/* get node with added/changed address */
+			for (addr = cur->children; addr != NULL; addr = addr->next) {
+				if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "udp-and-tcp")) {
+					continue;
+				}
+				for (addr = addr->children; addr != NULL; addr = addr->next) {
+					if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "address")) {
+						continue;
+					}
+					break;
+				}
+				break;
+			}
+
+			if (addr == NULL || dns_add_nameserver(get_node_content(addr), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
@@ -743,11 +760,11 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 			xmlUnlinkNode(node);
 			xmlFreeNode(node);
 		} else if (op & XMLDIFF_ADD) {
-			if (dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+			if (cur == NULL || dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		} else if (op & XMLDIFF_MOD) {
-			if (dns_mod_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+			if (cur == NULL || dns_mod_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
