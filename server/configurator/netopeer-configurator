@@ -234,18 +234,18 @@ def cli(stdscr, config):
 		# Tools widow
 		try:
 			w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - next | ', curses.color_pair(0))
+			w_tools.window.addstr(' | ', curses.color_pair(0))
 			w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - previous | ', curses.color_pair(0))
+			w_tools.window.addstr(' | ', curses.color_pair(0))
 			if windows[window] == 'Menu':
 				w_tools.window.addstr("RIGHT", curses.color_pair(0) | curses.A_UNDERLINE)
 			else:
 				w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - switch window | ', curses.color_pair(0))
+			w_tools.window.addstr(' | ', curses.color_pair(0))
 			w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - save | ', curses.color_pair(0))
+			w_tools.window.addstr('-save | ', curses.color_pair(0))
 			w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
-			w_tools.window.addstr(' - exit', curses.color_pair(0))
+			w_tools.window.addstr('-exit', curses.color_pair(0))
 		except curses.error:
 			pass
 				
@@ -255,7 +255,7 @@ def cli(stdscr, config):
 				try:
 					w_tools.window.addstr('| ', curses.color_pair(0))
 					w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
-					w_tools.window.addstr(' - {s} '.format(s=desc), curses.color_pair(0))
+					w_tools.window.addstr('-{s} '.format(s=desc), curses.color_pair(0))
 				except curses.error:
 					pass
 
