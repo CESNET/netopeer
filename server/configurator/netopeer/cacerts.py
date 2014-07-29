@@ -43,7 +43,7 @@ class cacerts(nc_module.nc_module):
 				messages.append('stunnel certificate directory does not exist, creating it', 'warning')
 				if not os.mkdir(self.certspath, 0700):
 					messages.append('stunnel certificate directory could not be created', 'error')
-					certspath = None
+					self.certspath = None
 		else:
 			messages.append('netopeer configuration directory not found', 'error')
 		return(True)
