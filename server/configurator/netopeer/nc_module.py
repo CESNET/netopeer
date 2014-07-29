@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 
 import curses
+import os
 
 # netopeer configurator modules exception 
 class NCModuleError(Exception):
@@ -58,8 +59,9 @@ class nc_module:
  	# refresh content window after save
 	def refresh(self, window, focus, height, width):
 		return(True)
-	
-	def get_editable(self, y, x, stdscr, window, variable, color = None):
+
+	def get_editable(self, y, x, stdscr, window, variable, color = None, tabcompletepath = False):
+		os.environ['ESCDELAY'] = '25'
 		index = 0
 	
 		if color is None:
@@ -103,6 +105,27 @@ class nc_module:
 				index = 0
 			elif c == curses.KEY_END:
 				index = len(variable)
+			elif c == ord('\t') and tabcompletepath:
+				(dir, hint) = os.path.split(variable)
+				toadd = ''
+				if os.path.isdir(dir):
+					files = os.listdir(dir)
+					matches = []
+					for item in files:
+						if item[:len(hint)] == hint:
+							isdir = os.path.isdir(os.path.join(dir, item))
+							matches.append((item, isdir))
+
+					if len(matches) == 1:
+						toadd = matches[0][0][len(hint):]
+						if matches[0][1]:
+							toadd += '/'
+					elif len(matches) > 1:
+						paths = [i[0] for i in matches]
+						toadd = os.path.commonprefix(paths)[len(hint):]
+
+				variable += toadd
+				index = len(variable)
 			elif c > 31 and c < 256: # skip wierd characters in ASCII
 				if index == 0:
 					variable = chr(c)+variable
@@ -113,6 +136,5 @@ class nc_module:
 			# erase
 			for xx in range(x, blocklen+x):
 				window.delch(y,xx)
-	
-		return(variable)
 
+		return(variable)
