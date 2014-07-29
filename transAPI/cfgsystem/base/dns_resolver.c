@@ -373,7 +373,6 @@ int dns_set_opt_timeout(const char* number, char** msg)
 	/* Create or set existing one */
 	if (aug_set(sysaugeas, path, number) == -1) {
 		asprintf(msg, "Setting DNS timeout option failed (%s)", aug_error_message(sysaugeas));
-		free(path);
 		return (EXIT_FAILURE);
 	}
 
@@ -397,7 +396,6 @@ int dns_set_opt_attempts(const char* number, char** msg)
 	/* Create or set existing one */
 	if (aug_set(sysaugeas, path, number) == -1) {
 		asprintf(msg, "Setting DNS attempts option failed (%s)", aug_error_message(sysaugeas));
-		free(path);
 		return (EXIT_FAILURE);
 	}
 
