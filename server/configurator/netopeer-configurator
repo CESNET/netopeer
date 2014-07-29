@@ -56,6 +56,15 @@ class netopeer_configuration:
 			except NCModuleError as e:
 				messages.append(str(e), 'error')
 
+		if config.options['tls']:
+			try:
+				import netopeer.cacerts
+				self.nc_modules.append(netopeer.cacerts.cacerts(self.nc_modules))
+			except ImportError as e:
+				messages.append(str(e), 'error')
+			except NCModuleError as e:
+				messages.append(str(e), 'error')
+
 	def save_all(self):
 		for nc_module in self.nc_modules:
 			nc_module.update()
