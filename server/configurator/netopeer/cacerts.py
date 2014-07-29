@@ -159,6 +159,8 @@ class cacerts(nc_module.nc_module):
 				while i < len(self.certs):
 					window.addstr(self.certs[i][0] + '\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == i else 0)
 					i += 1
+				if len(self.certs) == 0:
+					window.addstr('None')
 			except curses.error:
 				pass
 		else:
@@ -328,7 +330,7 @@ class cacerts(nc_module.nc_module):
 			self.selected = self.selected-1
 		elif key == curses.KEY_DOWN and self.selected < len(self.certs)-1:
 			self.selected = self.selected+1
-		elif key == ord('\n'):
+		elif key == ord('\n') and len(self.certs) > 0:
 			self.show_cert = not self.show_cert
 		elif key == curses.KEY_DC:
 			self.certs_toremove.append(os.path.join(self.certspath, self.certs[self.selected][0]) + '.pem')
