@@ -147,8 +147,8 @@ def create_windows(stdscr):
 	if maxx < 50:
 		menu_x = 15
 	else:
-		menu_x = 20
-		
+		menu_x = 21
+
 	content_x = maxx-menu_x
 	content_y = maxy-w_messages_y-tools_y
 	
