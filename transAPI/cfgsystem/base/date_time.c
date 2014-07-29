@@ -350,7 +350,7 @@ loop:
 int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg)
 {
 	int ret;
-	char* path = NULL;
+	char* path = NULL, *srv_path = NULL;
 
 	assert(udp_address);
 	assert(association_type);
@@ -366,25 +366,40 @@ int ntp_add_server(const char* udp_address, const char* association_type, bool i
 
 	/* add new item after the last one */
 	ret++;
-	path = NULL;
-	asprintf(&path, "/files/%s/%s[%d]", AUGEAS_NTP_CONF, association_type, ret);
-	aug_set(sysaugeas, path, udp_address);
-	free(path); path = NULL;
+	asprintf(&srv_path, "/files/%s/%s[%d]", AUGEAS_NTP_CONF, association_type, ret);
+	if (aug_set(sysaugeas, srv_path, udp_address) == -1) {
+		asprintf(msg, "Setting NTP %s \"%s\" failed: %s", association_type, udp_address, aug_error_message(sysaugeas));
+		free(srv_path);
+		return EXIT_FAILURE;
+	}
 
 	if (iburst) {
 		path = NULL;
 		asprintf(&path, "/files/%s/%s[%d]/iburst", AUGEAS_NTP_CONF, association_type, ret);
-		aug_set(sysaugeas, path, NULL);
+		if (aug_set(sysaugeas, path, NULL) == -1) {
+			asprintf(msg, "Setting iburst option for %s \"%s\" failed: %s", association_type, udp_address, aug_error_message(sysaugeas));
+			free(path);
+			aug_rm(sysaugeas, srv_path);
+			free(srv_path);
+			return EXIT_FAILURE;
+		}
 		free(path);
 	}
 
 	if (prefer) {
 		path = NULL;
 		asprintf(&path, "/files/%s/%s[%d]/prefer", AUGEAS_NTP_CONF, association_type, ret);
-		aug_set(sysaugeas, path, NULL);
+		if (aug_set(sysaugeas, path, NULL) == -1) {
+			asprintf(msg, "Setting prefer option for %s \"%s\" failed: %s", association_type, udp_address, aug_error_message(sysaugeas));
+			free(path);
+			aug_rm(sysaugeas, srv_path);
+			free(srv_path);
+			return EXIT_FAILURE;
+		}
 		free(path);
 	}
 
+	free(srv_path);
 	return EXIT_SUCCESS;
 }
 
