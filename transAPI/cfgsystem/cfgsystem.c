@@ -447,7 +447,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 {
 	xmlNodePtr cur, child;
 	int i;
-	char* msg = NULL, *item = NULL, **resolved = NULL;
+	char* msg = NULL, **resolved = NULL;
 	const char* udp_address = NULL;
 	const char* association_type = NULL;
 	bool iburst = NTP_SERVER_IBURST_DEFAULT;
@@ -563,7 +563,6 @@ error:
 		}
 		free(resolved);
 	}
-	free(item);
 
 	return fail(error, msg, EXIT_FAILURE);
 }
