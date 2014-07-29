@@ -192,17 +192,29 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
 
 		/* insert new (empty) node */
 		if (index == 1) {
-			aug_insert(sysaugeas, "/files/"AUGEAS_DNS_CONF"/search/domain[1]", "domain", 1);
+			if (aug_insert(sysaugeas, "/files/"AUGEAS_DNS_CONF"/search/domain[1]", "domain", 1) == -1) {
+				asprintf(msg, "Inserting DNS search domain configuration before \"%s\" failed (%s)", "/files/"AUGEAS_DNS_CONF"/search/domain[1]", aug_error_message(sysaugeas));
+				return (EXIT_FAILURE);
+			}
 		} else {
 			asprintf(&path, "/files/%s/search/domain[%d]", AUGEAS_DNS_CONF, index - 1);
-			aug_insert(sysaugeas, path, "domain", 0);
+			if (aug_insert(sysaugeas, path, "domain", 0) == -1) {
+				asprintf(msg, "Inserting DNS search domain configuration after \"%s\" failed (%s)", path, aug_error_message(sysaugeas));
+				free(path);
+				return (EXIT_FAILURE);
+			}
 			free(path); path = NULL;
 		}
 	}
 
 	/* Set the value of the newly inserted node (or possibly create it, too) */
 	asprintf(&path, "/files/%s/search/domain[%d]", AUGEAS_DNS_CONF, index);
-	aug_set(sysaugeas, path, domain);
+	if (aug_set(sysaugeas, path, domain) == -1) {
+		aug_rm(sysaugeas, path); /* previously inserted, do rollback */
+		asprintf(msg, "Unable to set DNS search domain \"%s\" (%s).", domain, aug_error_message(sysaugeas));
+		free(path);
+		return EXIT_FAILURE;
+	}
 	free(path);
 
 	return EXIT_SUCCESS;
@@ -296,17 +308,25 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 
 		/* insert new (empty) node */
 		if (index == 1) {
-			aug_insert(sysaugeas, "/files/"AUGEAS_DNS_CONF"/nameserver[1]", "nameserver", 1);
+			if (aug_insert(sysaugeas, "/files/"AUGEAS_DNS_CONF"/nameserver[1]", "nameserver", 1) == -1) {
+				asprintf(msg, "Inserting DNS server configuration before \"%s\" failed (%s)", "/files/"AUGEAS_DNS_CONF"/nameserver[1]", aug_error_message(sysaugeas));
+				return (EXIT_FAILURE);
+			}
 		} else {
 			asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, index - 1);
-			aug_insert(sysaugeas, path, "nameserver", 0);
+			if (aug_insert(sysaugeas, path, "nameserver", 0) == -1) {
+				asprintf(msg, "Inserting DNS server configuration after \"%s\" failed (%s)", path, aug_error_message(sysaugeas));
+				free(path);
+				return (EXIT_FAILURE);
+			}
 			free(path); path = NULL;
 		}
 	}
 
 	/* Set the value of the newly inserted node (or possibly create it, too) */
 	asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, index);
-	if (aug_set(sysaugeas, path, address) != 0) {
+	if (aug_set(sysaugeas, path, address) == -1) {
+		aug_rm(sysaugeas, path); /* previously inserted, do rollback */
 		asprintf(msg, "Setting new DNS server failed (%s)", aug_error_message(sysaugeas));
 		free(path);
 		return (EXIT_FAILURE);
@@ -351,7 +371,11 @@ int dns_set_opt_timeout(const char* number, char** msg)
 	assert(number);
 
 	/* Create or set existing one */
-	aug_set(sysaugeas, path, number);
+	if (aug_set(sysaugeas, path, number) == -1) {
+		asprintf(msg, "Setting DNS timeout option failed (%s)", aug_error_message(sysaugeas));
+		free(path);
+		return (EXIT_FAILURE);
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -371,7 +395,11 @@ int dns_set_opt_attempts(const char* number, char** msg)
 	assert(number);
 
 	/* Create or set existing one */
-	aug_set(sysaugeas, path, number);
+	if (aug_set(sysaugeas, path, number) == -1) {
+		asprintf(msg, "Setting DNS attempts option failed (%s)", aug_error_message(sysaugeas));
+		free(path);
+		return (EXIT_FAILURE);
+	}
 
 	return EXIT_SUCCESS;
 }
