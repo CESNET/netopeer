@@ -633,7 +633,23 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		return EXIT_SUCCESS;
 	}
 
-	if (op & XMLDIFF_ADD) {
+	if (op & XMLDIFF_SIBLING) {
+		/* remove them all */
+		dns_rm_search_domain_all();
+
+		/* and then add them all in current order */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+					return fail(error, msg, EXIT_FAILURE);
+				}
+				i++;
+			}
+		}
+
+		/* Remember that REORDER was processed for every sibling */
+		dns_search_reorder_done = true;
+	} else if (op & XMLDIFF_ADD) {
 		/* Get the index of this node */
 		/* search<-dns-resolver->first children */
 		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
@@ -652,23 +668,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		if (dns_rm_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	}
-	if (op & XMLDIFF_SIBLING) {
-		/* remove them all */
-		dns_rm_search_domain_all();
-
-		/* and then add them all in current order */
-		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
-			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
-				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
-					return fail(error, msg, EXIT_FAILURE);
-				}
-				i++;
-			}
-		}
-
-		/* Remember that REORDER was processed for every sibling */
-		dns_search_reorder_done = true;
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-search callback.", op);
 		return fail(error, msg,  EXIT_FAILURE);
