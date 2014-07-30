@@ -226,7 +226,7 @@ class crls(nc_module.nc_module):
 			if os.path.exists(os.path.join(self.crlpath, os.path.basename(path))):
 				messages.append('CRL \"' + os.path.basename(path)[:-4] + '\" already in the CRL directory', 'error')
 				return(True)
-			crl = self.parse_crl(os.path.join(self.crlpath, path))
+			crl = self.parse_crl(path)
 
 			if crl:
 				self.crls.append(crl)
