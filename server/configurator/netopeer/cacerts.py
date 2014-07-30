@@ -337,7 +337,7 @@ class cacerts(nc_module.nc_module):
 			if os.path.exists(os.path.join(self.certspath, os.path.basename(path))):
 				messages.append('Certificate \"' + os.path.basename(path)[:-4] + '\" already in the CA directory', 'error')
 				return(True)
-			cert = self.parse_cert(os.path.join(self.certspath, path))
+			cert = self.parse_cert(path)
 
 			if cert:
 				self.certs.append(cert)
