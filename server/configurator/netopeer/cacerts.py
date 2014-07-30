@@ -3,7 +3,7 @@
 
 import curses
 import os
-import OpenSSL
+import M2Crypto
 import nc_module
 import messages
 import subprocess
@@ -49,17 +49,9 @@ class cacerts(nc_module.nc_module):
 		return(True)
 
 	def parse_cert(self, path):
-		fil = open(path, 'r')
-		if not fil:
-			messages.append('Could not open \"' + path + '\"', 'warning')
-			return None
-		strbuf = fil.read()
-		if not strbuf:
-			messages.append('Could not read from \"' + path + '\"', 'warning')
-			return None
 		try:
-			cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, strbuf)
-		except OpenSSL.crypto.Error:
+			cert = M2Crypto.X509.load_cert(path)
+		except (IOError, M2Crypto.X509.X509Error):
 			cert = None
 		if not cert:
 			messages.append('Could not parse certificate \"' + path + '\"', 'warning')
@@ -100,7 +92,6 @@ class cacerts(nc_module.nc_module):
 		if issuer.emailAddress and len(issuer.emailAddress) > iss_line_len:
 			iss_line_len = len(issuer.emailAddress)
 
-		fil.close()
 		return((os.path.basename(path)[:-4], cert, subj_line_len, iss_line_len))
 
 	def get(self):
@@ -168,7 +159,7 @@ class cacerts(nc_module.nc_module):
 			cert = self.certs[self.selected][1]
 			subject = cert.get_subject()
 			issuer = cert.get_issuer()
-			valid = cert.get_notAfter()
+			valid = cert.get_not_after()
 
 			if height > 22:
 				try:
@@ -233,7 +224,7 @@ class cacerts(nc_module.nc_module):
 					else:
 						window.addstr('EA: None\n')
 
-					window.addstr('\nValid: ' + valid[8:10] + ':' + valid[10:12] + ' ' + valid[6:8] + '.' + valid[4:6] + '.' + valid[0:4] + '\n');
+					window.addstr('\nValid: ' + str(cert.get_not_after()) + '\n')
 				except curses.error:
 					pass
 			else:
