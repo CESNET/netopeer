@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
 
-# standard modules 
+# standard modules
 import curses
 import os
 
@@ -60,6 +60,8 @@ class netopeer_configuration:
 			try:
 				import netopeer.cacerts
 				self.nc_modules.append(netopeer.cacerts.cacerts(self.nc_modules))
+				import netopeer.crls
+				self.nc_modules.append(netopeer.crls.crls(self.nc_modules))
 			except ImportError as e:
 				messages.append(str(e), 'error')
 			except NCModuleError as e:
@@ -148,10 +150,10 @@ def create_windows(stdscr):
 		w_messages_y = 4
 	else:
 		w_messages_y = 13
-	
+
 	tools_x = maxx
 	tools_y = 3
-	
+
 	menu_y = maxy-w_messages_y-tools_y
 	if maxx < 50:
 		menu_x = 15
@@ -160,19 +162,19 @@ def create_windows(stdscr):
 
 	content_x = maxx-menu_x
 	content_y = maxy-w_messages_y-tools_y
-	
+
 	# left subwindow with menu items
 	menu = configurator_window(stdscr, menu_y,menu_x, 0,0)
 
 	# right window with content depending on selected menu item
 	content = configurator_window(stdscr, content_y,content_x, 0,menu_x)
-	
+
 	# bottom window with error and other messages
 	messages = configurator_window(stdscr, w_messages_y,w_messages_x, maxy-tools_y-w_messages_y,0)
-	
+
 	# bottom line with avaliable tools/commands
 	tools = configurator_window(stdscr, tools_y,tools_x, maxy-tools_y,0)
-		
+
 	return(menu, content,  messages, tools)
 
 def cli(stdscr, config):
@@ -221,7 +223,7 @@ def cli(stdscr, config):
 						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
 					else:
 						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_UNDERLINE)
-				else:	
+				else:
 					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
 			except curses.error:
 				pass
@@ -257,7 +259,7 @@ def cli(stdscr, config):
 			w_tools.window.addstr('-exit', curses.color_pair(0))
 		except curses.error:
 			pass
-				
+
 		if windows[window] == 'Content':
 			# Print module tools
 			for (key,desc) in module_tools:
