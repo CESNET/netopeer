@@ -224,7 +224,7 @@ class cacerts(nc_module.nc_module):
 					else:
 						window.addstr('EA: None\n')
 
-					window.addstr('\nValid: ' + str(cert.get_not_after()) + '\n')
+					window.addstr('\nValid: ' + str(valid) + '\n')
 				except curses.error:
 					pass
 			else:
@@ -310,7 +310,7 @@ class cacerts(nc_module.nc_module):
 							msg2 = 'EA: None'
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						window.addstr('\nValid: ' + valid[8:10] + ':' + valid[10:12] + ' ' + valid[6:8] + '.' + valid[4:6] + '.' + valid[0:4] + '\n');
+						window.addstr('\nValid: ' + str(valid) + '\n');
 					except curses.error:
 						pass
 
