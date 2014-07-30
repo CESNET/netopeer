@@ -176,6 +176,20 @@ value of the --with-group option. When the Netopeer server is compiled without
 this option, access to the Netopeer server is not limited. However, there is
 NACM which can be used to fine-grained access control.
 
+CA Certificates
+~~~~~~~~~~~~~~~
+
+If compiled with TLS support, this module displays CA certificates used by
+stunnel(1) when authenticating clients. It is also possible to add and remove
+certificates from here.
+
+CRLs
+~~~~
+
+If compiled with TLS support, this module displays CRLs used by stunnel(1)
+to check for revocated certificates during verification. CRLs can also be
+added and deleted here.
+
 Starting the server
 -------------------
 
