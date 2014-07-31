@@ -45,11 +45,24 @@ and
 .BR netopeer-agent s.
 In case of DBus communication, it also allows to change the groups of users
 allowed to connect to the NETCONF server.
-.IP "CA Certificates"
+.IP "Server Certificate (only with TLS support)"
+Provides management of the server certificate utilized by
+.B stunnel
+, which is executed by
+.B netopeer-server .
+This certificate is sent to a client for TLS authentication.
+.IP "CA Certificates (only with TLS support)"
 Provides management of trusted Certificate Authority certificates utilized by
 .B stunnel
 , which is executed by
 .B netopeer-server .
+.IP "CRLs (only with TLS support)"
+Provides management of Certificate Revocation Lists utilized by
+.B stunnel
+, which is executed by
+.B netopeer-server .
+These CRLs are checked, when determining if a client certificate was not revocated
+by its issuer.
 .SH "SEE ALSO"
 .BR netopeer-agent(1) ,
 .BR netopeer-cli(1) ,

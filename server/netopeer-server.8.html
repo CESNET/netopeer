@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Thu Jun 12 18:55:39 2014 -->
+<!-- CreationDate: Thu Jul 31 09:37:46 2014 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -151,6 +151,42 @@ following <i>ietf-netconf-server</i> data model.</p>
 
 <p style="margin-left:22%; margin-top: 1em">This file is
 installed only if the <b>netopeer-server</b> is compiled
+with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/server.[crt|key|pem]</i></p>
+
+<p style="margin-left:22%;">Server certificate for the
+netopeer <b>stunnel(8)</b> instance. This certificate is
+sent to a client during the TLS handshake.</p>
+
+<p style="margin-left:22%; margin-top: 1em">These files are
+installed only if the <b>netopeer-server</b> is compiled
+with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/certs</i></p>
+
+<p style="margin-left:22%;">Directory with the trusted
+Certificate Authority certificates for the netopeer
+<b>stunnel(8)</b> instance. These certificates are used for
+client certificate TLS verification.</p>
+
+<p style="margin-left:22%; margin-top: 1em">This directory
+is installed only if the <b>netopeer-server</b> is compiled
+with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/crl</i></p>
+
+<p style="margin-left:22%;">Directory with Certificate
+Revocation Lists for the netopeer <b>stunnel(8)</b>
+instance. These CRLs are used during client certificate TLS
+verification when checking if the certificate was not
+revocated by its issuer.</p>
+
+<p style="margin-left:22%; margin-top: 1em">This directory
+is installed only if the <b>netopeer-server</b> is compiled
 with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
 
 
