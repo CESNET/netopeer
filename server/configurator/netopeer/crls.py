@@ -3,7 +3,6 @@
 
 import curses
 import os
-#import OpenSSL
 import M2Crypto
 import nc_module
 import messages
