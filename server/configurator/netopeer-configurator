@@ -58,6 +58,8 @@ class netopeer_configuration:
 
 		if config.options['tls']:
 			try:
+				import netopeer.servcert
+				self.nc_modules.append(netopeer.servcert.servcert(self.nc_modules))
 				import netopeer.cacerts
 				self.nc_modules.append(netopeer.cacerts.cacerts(self.nc_modules))
 				import netopeer.crls
