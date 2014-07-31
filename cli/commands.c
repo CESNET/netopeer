@@ -2073,6 +2073,7 @@ void parse_cert(const char* name, const char* path) {
 				}
 			}
 		}
+		sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
 	}
 	if (has_san) {
 		BIO_printf(bio_out, "\n");
