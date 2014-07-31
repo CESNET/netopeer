@@ -40,16 +40,16 @@
  *
  */
 
+#define _XOPEN_SOURCE
 #define _GNU_SOURCE
-#define _OW_SOURCE
 
+#include <stdlib.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <libxml/tree.h>
 #include <stdio.h>
-#include <crypt.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -58,13 +58,18 @@
 #include <libnetconf.h>
 
 #include "local_users.h"
+#include "encrypt.h"
 
 #define USERADD_PATH "/usr/sbin/useradd"
-#define USERMOD_PATH "/usr/sbin/usermod"
+#define NEWUSERS_PATH "/usr/sbin/newusers"
 #define USERDEL_PATH "/usr/sbin/userdel"
+#define SHADOW_ORIG "/etc/shadow"
+#define SHADOW_COPY "/etc/shadow.cfgsystem"
 
 /* Preceded by the user home directory */
 #define SSH_USER_CONFIG_PATH "/.ssh"
+
+#define SHA_ROUNDS 5000
 
 #define PAM_DIR_PATH "/etc/pam.d"
 
@@ -73,162 +78,320 @@ struct supported_auth {
 	char* module;
 };
 
-static struct supported_auth supported_auth[] = {
-    {"local-users", "pam_unix.so"},
-    {NULL, NULL}
-};
-
+/* from common.c */
 extern augeas *sysaugeas;
 
-const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg)
+/* for salt.c */
+long sha_crypt_min_rounds = -1;
+long sha_crypt_max_rounds = -1;
+char *encrypt_method = NULL;
+char md5_crypt_enab = 0;
+
+static void get_login_defs(void)
 {
-	xmlNodePtr cur;
-	char* pass, *salt;
-	const char* password;
-	struct crypt_data data;
+	const char *value;
+	char *endptr;
+	static char method[10] = {'\0','\0','\0','\0','\0','\0','\0','\0','\0','\0'};
 
-	cur = parent->children;
-	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, BAD_CAST "password") == 0) {
-			break;
+	if (aug_get(sysaugeas, "/files/etc/login.defs/SHA_CRYPT_MIN_ROUNDS", &value) == 1) {
+		sha_crypt_min_rounds = strtol(value, &endptr, 10);
+		if (*endptr != '\0') {
+			/* some characters after number */
+			nc_verb_warning("SHA_CRYPT_MIN_ROUNDS in /etc/login.defs contains invalid value (%s).", value);
+			sha_crypt_min_rounds = -1;
 		}
-		cur = cur->next;
-	}
-
-	if (cur == NULL) {
-		/* No password specified (empty) */
-		password = NULL;
 	} else {
-		password = (const char*) (cur->children->content);
+		/* default value */
+		sha_crypt_min_rounds = -1;
 	}
 
-	/* Check format and hash the password if needed */
-	if (password != NULL) {
-		if ((password[0] != '$') ||
-				(password[1] != '0' && password[1] != '1' && password[1] != '5' && password[1] != '6') ||
-				(password[2] != '$') ||
-				(strrchr(password, '$') - password < 5)) {
-			asprintf(msg, "Wrong password format (%s).", password);
-			return NULL;
+	if (aug_get(sysaugeas, "/files/etc/login.defs/SHA_CRYPT_MAX_ROUNDS", &value) == 1) {
+		sha_crypt_max_rounds = strtol(value, &endptr, 10);
+		if (*endptr != '\0') {
+			/* some characters after number */
+			nc_verb_warning("SHA_CRYPT_MAX_ROUNDS in /etc/login.defs contains invalid value (%s).", value);
+			sha_crypt_max_rounds = -1;
 		}
+	} else {
+		/* default value */
+		sha_crypt_max_rounds = -1;
+	}
 
-		if (password[1] == '0') {
-			salt = crypt_gensalt_ra("$6$", 1, NULL, 0);
+	if (aug_get(sysaugeas, "/files/etc/login.defs/ENCRYPT_METHOD", &value) == 1) {
+		strncpy(method, value, 9);
+		encrypt_method = method;
+	} else {
+		encrypt_method = NULL;
+	}
 
-			data.initialized = 0;
-			pass = crypt_r(password + 3, salt, &data);
+	if (aug_get(sysaugeas, "/files/etc/login.defs/MD5_CRYPT_ENAB", &value) == 1) {
+		md5_crypt_enab = (strcasecmp(value, "yes") == 0) ? 1 : 0;
+	} else {
+		/* default value */
+		md5_crypt_enab = 0;
+	}
+}
 
-			cur = xmlNewChild(parent, NULL, BAD_CAST "password", BAD_CAST pass);
-			*config_modified = 1;
-			free(pass);
-			free(salt);
+static const char* set_passwd(const char *name, const char *passwd, char **msg)
+{
+	FILE *f = NULL;
+	struct spwd *spwd, new_spwd;
+	const char *en_passwd; /* encrypted password */
+	int sha_rounds = SHA_ROUNDS;
 
-			password = (const char*) (cur->children->content);
-			return password;
+	assert(name);
+	assert(passwd);
+
+	/* check password format */
+	if ((passwd[0] != '$') ||
+			(passwd[1] != '0' && passwd[1] != '1' && passwd[1] != '5' && passwd[1] != '6') ||
+			(passwd[2] != '$')) {
+		asprintf(msg, "Wrong password format (user %s).", name);
+		return (NULL);
+	}
+
+	if (passwd[1] == '0') {
+		/* encrypt the password */
+		get_login_defs();
+		en_passwd = pw_encrypt(&(passwd[3]), crypt_make_salt(NULL, NULL));
+	} else {
+		en_passwd = passwd;
+	}
+
+	/*
+	 * store encrypted password into shadow
+	 */
+
+	/* lock shadow file */
+	if (lckpwdf() != 0) {
+		*msg = strdup("Failed to acquire shadow file lock.");
+		return (NULL);
+	}
+	/* init position in shadow */
+	setspent();
+
+	/* open new shadow */
+	f = fopen(SHADOW_COPY, "w");
+	if (f == NULL) {
+		asprintf(msg, "Unable to prepare shadow copy (%s).", strerror(errno));
+		endspent();
+		ulckpwdf();
+		return (NULL);
+	}
+
+	while ((spwd = getspent()) != NULL) {
+		if (strcmp(spwd->sp_namp, name) == 0) {
+			/*
+			 * we have the entry to change,
+			 * make the copy, modifying the original
+			 * structure doesn't seem as a good idea
+			 */
+			memcpy(&new_spwd, spwd, sizeof(struct spwd));
+			new_spwd.sp_pwdp = (char*) en_passwd;
+			spwd = &new_spwd;
 		}
+		/* store the record into the shadow copy */
+		putspent(spwd, f);
+	}
+	endspent();
+	fclose(f);
+
+	if (rename(SHADOW_COPY, SHADOW_ORIG) == -1) {
+		asprintf(msg, "Unable to rewrite shadow database (%s).", strerror(errno));
+		unlink(SHADOW_COPY);
+		ulckpwdf();
+		return (NULL);
+	}
+	unlink(SHADOW_COPY);
+	ulckpwdf();
+
+	return (en_passwd);
+}
+
+int users_rm(const char *name, char **msg)
+{
+	int ret;
+	char *cmdline = NULL;
+	const char *errmsg[] = {
+		/* 0 success */ "",
+		/* 1 */ "can't update password file",
+		/* 2 */ "invalid command syntax",
+		/* 3,4,5 */ "", "", "",
+		/* 6 */ "specified user doesn't exist",
+		/* 7 */ "",
+		/* 8 */ "user currently logged in",
+		/* 9 */ "",
+		/* 10 */ "can't update group file",
+		/* 11 */ "",
+		/* 12 */ "can't remove home directory",
+	};
+
+	/* remove user */
+	asprintf(&cmdline, "%s -r %s", USERDEL_PATH, name);
+	ret = WEXITSTATUS(system(cmdline));
+	free(cmdline);
+
+	if (ret != 0) {
+		*msg = strdup(errmsg[ret]);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+const char* users_add(const char *name, const char *passwd, char **msg)
+{
+	int ret;
+	const char *retstr;
+	char *aux = NULL;
+	char *cmdline = NULL;
+	const char *errmsg[] = {
+		/* 0 success */ "",
+		/* 1 */ "can't update password file",
+		/* 2 */ "invalid command syntax",
+		/* 3 */ "invalid argument to option",
+		/* 4 */ "UID already in use (and no -o)",
+		/* 5 */ "",
+		/* 6 */ "specified group doesn't exist",
+		/* 7,8 */ "", "",
+		/* 9 */ "username already in use",
+		/* 10 */ "can't update group file",
+		/* 11 */ "",
+		/* 12 */ "can't create home directory",
+		/* 13 */ "",
+		/* 14 */ "can't update SELinux user mapping"
+	};
+
+	assert(name);
+	assert(passwd);
+
+	/* create user */
+	asprintf(&cmdline, "%s -m %s", USERADD_PATH, name);
+	ret = WEXITSTATUS(system(cmdline));
+	free(cmdline);
+
+	if (ret != 0) {
+		*msg = strdup(errmsg[ret]);
+		return (NULL);
+	}
+
+	/* set password */
+	if (strlen(passwd) != 0) {
+		retstr = set_passwd(name, passwd, msg);
+		if (retstr == NULL) {
+			/* revert changes */
+			users_rm(name, &aux);
+			free(aux);
+		}
+		return (retstr);
+	}
+
+	return (passwd);
+}
+
+const char* users_mod(const char *name, const char *passwd, char **msg)
+{
+	assert(name);
+	assert(passwd);
+
+	/* set password */
+	if (strlen(passwd) != 0) {
+		return (set_passwd(name, passwd, msg));
 	}
 
 	return (NULL);
 }
 
-int users_add_user(const char* name, const char* passwd, char** msg)
+
+xmlNodePtr users_getxml(char** msg, xmlNsPtr ns)
 {
-	int ret;
-	char* tmp;
+	int i;
+	xmlNodePtr auth_node, user, aux_node;
+	struct passwd *pwd;
+	struct spwd *spwd;
+	struct ssh_key** key = NULL;
 
-	asprintf(&tmp, USERADD_PATH " -p %s %s >& /dev/null", passwd, name);
-	ret = WEXITSTATUS(system(tmp));
-	free(tmp);
-
-	switch (ret) {
-	case 0:
-		break;
-	case 1:
-		asprintf(msg, "Could not update the password file.");
-		return EXIT_FAILURE;
-	case 2:
-		asprintf(msg, "Invalid \"useradd\" syntax.");
-		return EXIT_FAILURE;
-	case 3:
-		asprintf(msg, "Invalid \"useradd\" argument to an option.");
-		return EXIT_FAILURE;
-	case 9:
-		asprintf(msg, "Username \"%s\" already used.", name);
-		return EXIT_FAILURE;
-	case 10:
-		asprintf(msg, "Could not update the group file.");
-		return EXIT_FAILURE;
-	default:
-		asprintf(msg, "\"useradd\" failed.");
-		return EXIT_FAILURE;
+	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
+		return (NULL);
 	}
 
-	return EXIT_SUCCESS;
-}
+	/* authentication */
+	auth_node = xmlNewNode(ns, BAD_CAST "authentication");
 
-int users_mod_user(const char* name, const char* passwd, char** msg)
-{
-	int ret;
-	char* tmp;
+	/* authentication/user-authentication-order */
+	/* we do not support RADIUS, so local-user is the only possibility */
+	xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user-authentication-order", BAD_CAST "local-users");
 
-	asprintf(&tmp, USERMOD_PATH " -p %s %s >& /dev/null", passwd, name);
-	ret = WEXITSTATUS(system(tmp));
-	free(tmp);
-
-	switch (ret) {
-	case 0:
-		break;
-	case 1:
-		asprintf(msg, "Could not update the password file.");
-		return EXIT_FAILURE;
-	case 2:
-		asprintf(msg, "Invalid \"usermod\" syntax.");
-		return EXIT_FAILURE;
-	case 3:
-		asprintf(msg, "Invalid \"usermod\" argument to an option.");
-		return EXIT_FAILURE;
-	case 6:
-		asprintf(msg, "Username \"%s\" does not exist.", name);
-		return EXIT_FAILURE;
-	default:
-		asprintf(msg, "\"usermod\" failed.");
-		return EXIT_FAILURE;
+	/* authentication/user[] */
+	if (lckpwdf() != 0) {
+		*msg = strdup("Failed to acquire shadow file lock.");
+		xmlFreeNode(auth_node);
+		return (NULL);
 	}
 
-	return EXIT_SUCCESS;
-}
+	setpwent();
 
-int users_rm_user(const char* name, char** msg)
-{
-	int ret;
-	char* tmp;
+	while ((pwd = getpwent()) != NULL) {
+		/* authentication/user */
+		user = xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user", NULL);
 
-	asprintf(&tmp, USERDEL_PATH " %s >& /dev/null", name);
-	ret = WEXITSTATUS(system(tmp));
-	free(tmp);
+		/* authentication/user/name */
+		xmlNewChild(user, user->ns, BAD_CAST "name", BAD_CAST pwd->pw_name);
 
-	switch (ret) {
-	case 0:
-		break;
-	case 1:
-		asprintf(msg, "Could not update the password file.");
-		return EXIT_FAILURE;
-	case 2:
-		asprintf(msg, "Invalid \"userdel\" syntax.");
-		return EXIT_FAILURE;
-	case 6:
-		asprintf(msg, "Username \"%s\" does not exist.", name);
-		return EXIT_FAILURE;
-	case 8:
-		asprintf(msg, "User is currently logged.");
-		break;
-	default:
-		asprintf(msg, "\"userdel\" failed.");
-		return EXIT_FAILURE;
+		/* authentication/user/passwd */
+		if (pwd->pw_passwd[0] == 'x') {
+			/* get data from /etc/shadow */
+			setspent();
+			spwd = getspnam(pwd->pw_name);
+			if (spwd->sp_pwdp[0] != '!' &&     /* account not initiated or locked */
+					spwd->sp_pwdp[0] != '*') { /* login disabled */
+				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
+			}
+		} else if (pwd->pw_passwd[0] != '*') {
+			/* password is stored in /etc/passwd or refers to something else (e.g., NIS server) */
+			xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
+		} /* else password is disabled */
+
+		/* authentication/user/authorized-key[] */
+/*		if (users_get_ssh_keys(pwd->pw_dir, &key, msg) != EXIT_SUCCESS) {
+			xmlFreeNode(auth_node);
+			return NULL;
+		}
+*/		if (key == NULL) {
+			continue;
+		} else {
+			for (i = 0; key[i] != NULL; i++) {
+				/* authentication/user/authorized-key */
+				aux_node = xmlNewChild(user, user->ns, BAD_CAST "authorized-key", NULL);
+
+				/* authentication/user/authorized-key/name */
+				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "name", BAD_CAST key[i]->name);
+				free(key[i]->name);
+
+				/* authentication/user/authorized-key/algorithm */
+				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "algorithm", BAD_CAST key[i]->alg);
+				free(key[i]->alg);
+
+				/* authentication/user/authorized-key/key-data */
+				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "key-data", BAD_CAST key[i]->data);
+				free(key[i]->data);
+
+				free(key[i]);
+			}
+			free(key);
+		}
 	}
 
-	return EXIT_SUCCESS;
+	endspent();
+	endpwent();
+	ulckpwdf();
+
+	return (auth_node);
 }
+
+
+
+#if 0
 
 char* users_get_home_dir(const char* user_name, char** msg)
 {
@@ -419,91 +582,6 @@ int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg)
 	return EXIT_SUCCESS;
 }
 
-xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns)
-{
-	int i;
-	xmlNodePtr auth_node, user, aux_node;
-	struct passwd *pwd;
-	struct spwd *spwd;
-	struct ssh_key** key;
-
-	assert(sysaugeas);
-
-	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
-		return (NULL);
-	}
-
-	/* authentication */
-	auth_node = xmlNewNode(ns, BAD_CAST "authentication");
-
-	/* authentication/user-authentication-order */
-	/* we do not support RADIUS, so local-user is the only possibility */
-	xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user-authentication-order", BAD_CAST "local-users");
-
-	/* authentication/user[] */
-	setpwent();
-	if (lckpwdf() != 0) {
-		*msg = strdup("Failed to acquire shadow file lock.");
-		xmlFreeNode(auth_node);
-		return (NULL);
-	}
-	while ((pwd = getpwent()) != NULL) {
-		/* authentication/user */
-		user = xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user", NULL);
-
-		/* authentication/user/name */
-		xmlNewChild(user, user->ns, BAD_CAST "name", BAD_CAST pwd->pw_name);
-
-		/* authentication/user/passwd */
-		if (pwd->pw_passwd[0] == 'x') {
-			/* get data from /etc/shadow */
-			setspent();
-			spwd = getspnam(pwd->pw_name);
-			if (spwd->sp_pwdp[0] != '!' &&     /* account not initiated or locked */
-					spwd->sp_pwdp[0] != '*') { /* login disabled */
-				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
-			}
-		} else if (pwd->pw_passwd[0] != '*') {
-			/* password is stored in /etc/passwd or refers to something else (e.g., NIS server) */
-			xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
-		} /* else password is disabled */
-
-		/* authentication/user/authorized-key[] */
-		if (users_get_ssh_keys(pwd->pw_dir, &key, msg) != EXIT_SUCCESS) {
-			xmlFreeNode(auth_node);
-			return NULL;
-		}
-		if (key == NULL) {
-			continue;
-		} else {
-			for (i = 0; key[i] != NULL; i++) {
-				/* authentication/user/authorized-key */
-				aux_node = xmlNewChild(user, user->ns, BAD_CAST "authorized-key", NULL);
-
-				/* authentication/user/authorized-key/name */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "name", BAD_CAST key[i]->name);
-				free(key[i]->name);
-
-				/* authentication/user/authorized-key/algorithm */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "algorithm", BAD_CAST key[i]->alg);
-				free(key[i]->alg);
-
-				/* authentication/user/authorized-key/key-data */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "key-data", BAD_CAST key[i]->data);
-				free(key[i]->data);
-
-				free(key[i]);
-			}
-			free(key);
-		}
-	}
-
-	endspent();
-	ulckpwdf();
-	endpwent();
-
-	return (auth_node);
-}
 
 int users_augeas_rem_all_sshd_auth_order(char** msg)
 {
@@ -716,3 +794,6 @@ int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg)
 
 	return EXIT_SUCCESS;
 }
+
+#endif
+

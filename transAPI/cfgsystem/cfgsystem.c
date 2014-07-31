@@ -216,7 +216,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 
 	/* authentication */
 	if (ncds_feature_isenabled("ietf-system", "authentication")) {
-		if ((cur =  users_augeas_getxml(&msg, root->ns)) != NULL) {
+		if ((cur =  users_getxml(&msg, root->ns)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
 			augeas_close();
@@ -884,86 +884,75 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_O
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
+	xmlNodePtr node_aux;
+	const char *name = NULL, *passwd = NULL, *new_passwd;
+	char *msg;
+
+
+	/* get name */
+	for(node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
+		if (node_aux->type != XML_ELEMENT_NODE || xmlStrcmp(node_aux->name, BAD_CAST "name") != 0) {
+			continue;
+		}
+		name = get_node_content(node_aux);
+		break;
+	}
+
+	if (name == NULL) {
+		return fail(error, strdup("Missing name element for the user."), EXIT_FAILURE);
+	}
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		/* create new user */
+
+		/* get password if any */
+		for(node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
+			if (node_aux->type != XML_ELEMENT_NODE || xmlStrcmp(node_aux->name, BAD_CAST "password") != 0) {
+				continue;
+			}
+			passwd = get_node_content(node_aux);
+			break;
+		}
+		if (passwd == NULL) {
+			passwd = "";
+		}
+
+		if (op & XMLDIFF_ADD) {
+			if ((new_passwd = users_add(name, passwd, &msg)) == NULL) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else { /* (op & XMLDIFF_MOD) */
+			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		}
+		if (new_passwd != passwd && node_aux != NULL) {
+			/* update password in configuration data */
+			/* securely rewrite/erase the plain text password from memory */
+			memset((char*)(node_aux->children->content), '\0', strlen((char*)(node_aux->children->content)));
+
+			/* and now replace content of the xml node */
+			xmlNodeSetContent(node_aux, BAD_CAST new_passwd);
+			config_modified = 1;
+		}
+
+		/* process authorized keys */
+		/* \todo */
+	} else if (op & XMLDIFF_REM) {
+		/* remove existing user */
+		if (users_rm(name, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
+#if 0
+
 	xmlNodePtr cur;
 	const char* pass = NULL, *name;
 	char* msg = NULL, *msg2, *home_dir;
 	struct user_ctx* ctx;
 	int i;
 
-	/* Check name node */
-	cur = node->children;
-	while (cur != NULL) {
-		if (xmlStrcmp(cur->name, BAD_CAST "name") == 0) {
-			break;
-		}
-		cur = cur->next;
-	}
-
-	if (cur == NULL) {
-		/* No name node */
-		asprintf(&msg, "No name node in a new user.");
-		if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-			asprintf(&msg2, "Inconsistent SSH key configuration (if any) of a user, %s", msg);
-		} else {
-			msg2 = msg;
-		}
-		user_ctx_cleanup((struct user_ctx**) data);
-		return fail(error, msg2, EXIT_FAILURE);
-	} else {
-		name = get_node_content(cur);
-	}
-
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD) || (op & XMLDIFF_REM)) {
-		if (!(op & XMLDIFF_REM)) {
-			pass = users_process_pass(node, &config_modified, &msg);
-			if (msg != NULL) {
-				if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-					asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-					free(msg);
-				} else {
-					msg2 = msg;
-				}
-				user_ctx_cleanup((struct user_ctx**) data);
-				return fail(error, msg2, EXIT_FAILURE);
-			}
-		}
-
-		/* Adding a user */
-		if ((op & XMLDIFF_ADD) && (users_add_user(name, pass, &msg) != EXIT_SUCCESS)) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		/* Modifying a user */
-		if ((op & XMLDIFF_MOD) && (users_mod_user(name, pass, &msg) != EXIT_SUCCESS)) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		/* Removing a user */
-		if ((op & XMLDIFF_REM) && (users_rm_user(name, &msg) != EXIT_SUCCESS)) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-	}
 
 	/* Process the SSH key changes */
 	if (*data != NULL) {
@@ -1006,6 +995,9 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
 	}
 
 	user_ctx_cleanup((struct user_ctx**) data);
+
+#endif
+
 	return EXIT_SUCCESS;
 }
 
@@ -1028,7 +1020,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 	const char* content;
 	char* msg = NULL, *msg2;
 	int i;
-
+#if 0
 	/* Assign a new ssh_key_ctx */
 	if (*data == NULL) {
 		/* First key */
@@ -1103,7 +1095,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 	} else if (op & XMLDIFF_REM) {
 		key->change = 2;
 	} /* if XMLDIFF_ADD, change is already 0 */
-
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -1122,7 +1114,7 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
 {
 	xmlNodePtr cur;
 	char* msg;
-
+#if 0
 	/* user-authentication-order */
 	if (op & (XMLDIFF_MOD | XMLDIFF_REORDER)) {
 		if (users_augeas_rem_all_sshd_auth_order(&msg) != EXIT_SUCCESS) {
@@ -1144,7 +1136,7 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	}
-
+#endif
 	return EXIT_SUCCESS;
 }
 

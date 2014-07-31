@@ -61,45 +61,6 @@ struct ssh_key {
 };
 
 /**
- * @brief get and possibly hash the password in parent's child
- * @param parent parent node of the password node
- * @param config_modified indicate config modification
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg);
-
-/**
- * @brief add a new user
- * @param name user name
- * @param passwd password
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_add_user(const char* name, const char* passwd, char** msg);
-
-/**
- * @brief modify a user
- * @param name user name
- * @param passwd password
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_mod_user(const char* name, const char* passwd, char** msg);
-
-/**
- * @brief remove a user
- * @param name user name
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_rm_user(const char* name, char** msg);
-
-/**
  * @brief get the home directory of a user
  * @param user_name user name
  * @param msg message containing an error if one occured
@@ -128,7 +89,13 @@ int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
  */
 int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg);
 
-xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns);
+xmlNodePtr users_getxml(char** msg, xmlNsPtr ns);
+
+const char* users_add(const char *name, const char *passwd, char **msg);
+
+int users_rm(const char *name, char **msg);
+
+const char* users_mod(const char *name, const char *passwd, char **msg);
 
 /**
  * @brief remove all known SSHD PAM authentication types

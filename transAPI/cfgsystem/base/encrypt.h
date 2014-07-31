@@ -1,6 +1,6 @@
 /**
- * \file common.c
- * \brief Internal functions for cfgsystem module
+ * \file encrypt.h
+ * \brief Internal header file for encryption functions from salt.c and encrypt.c
  * \author Radek Krejci <rkrejci@cesnet.cz>
  * \date 2014
  *
@@ -39,70 +39,12 @@
  * if advised of the possibility of such damage.
  *
  */
-#define _GNU_SOURCE
 
-#include <assert.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#ifndef ENCRYPT_H
+#define ENCRYPT_H_
 
-#include <augeas.h>
+const char *crypt_make_salt (const char *meth, void *arg);
 
-#include "common.h"
+char *pw_encrypt(const char *clear, const char *salt);
 
-augeas *sysaugeas = NULL;
-
-int augeas_init(char** msg)
-{
-	assert(msg);
-
-	if (sysaugeas != NULL) {
-		/* already initiated */
-		return EXIT_SUCCESS;
-	}
-
-	sysaugeas = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
-	if (aug_error(sysaugeas) != AUG_NOERROR) {
-		asprintf(msg, "Augeas NTP initialization failed (%s)", aug_error_message(sysaugeas));
-		return EXIT_FAILURE;
-	}
-	/* NTP */
-	aug_set(sysaugeas, "/augeas/load/Ntp/lens", "Ntp.lns");
-	aug_set(sysaugeas, "/augeas/load/Ntp/incl", AUGEAS_NTP_CONF);
-	/* DNS resolver */
-	aug_set(sysaugeas, "/augeas/load/Resolv/lens", "Resolv.lns");
-	aug_set(sysaugeas, "/augeas/load/Resolv/incl", AUGEAS_DNS_CONF);
-	/* authentication */
-	aug_set(sysaugeas, "/augeas/load/Pam/lens", "Pam.lns");
-	aug_set(sysaugeas, "/augeas/load/Pam/incl", AUGEAS_PAM_DIR"/*");
-	/* /etc/login.defs */
-	aug_set(sysaugeas, "/augeas/load/Login_defs/lens", "Login_defs.lns");
-	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", "/etc/login.defs");
-
-	aug_load(sysaugeas);
-
-	if (aug_match(sysaugeas, "/augeas//error", NULL) != 0) {
-		aug_get(sysaugeas, "/augeas//error[1]/message", (const char**) msg);
-		asprintf(msg, "Initiating augeas failed (%s)", *msg);
-		augeas_close();
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
-int augeas_save(char** msg)
-{
-	if (aug_save(sysaugeas) != 0) {
-		asprintf(msg, "Saving configuration failed (%s)", aug_error_message(sysaugeas));
-		return (EXIT_FAILURE);
-	}
-
-	return (EXIT_SUCCESS);
-}
-
-void augeas_close(void)
-{
-	aug_close(sysaugeas);
-	sysaugeas = NULL;
-}
+#endif /* ENCRYPT_H */

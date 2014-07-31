@@ -71,7 +71,7 @@ PKG_CHECK_MODULES(AUGEAS, augeas >= 1.0.0)
 CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
 LIBS="$LIBS $AUGEAS_LIBS"
 
-AC_SEARCH_LIBS([crypt_gensalt_ra], [crypt], ,AC_MSG_ERROR([crypt not found!]))
+AC_SEARCH_LIBS([crypt], [crypt], ,AC_MSG_ERROR([crypt() not found!]))
 
 # Check for libxml2.
 if test -z "$WITH_LIBXML2" ; then
@@ -89,7 +89,7 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 #AC_TYPE_UINT32_T
 
 # Checks for library functions.
-#AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

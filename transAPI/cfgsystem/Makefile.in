@@ -36,6 +36,8 @@ SRCS = $(TARGET).c \
 	base/platform.c \
 	base/dns_resolver.c \
 	base/shutdown.c \
+	base/encrypt.c \
+	base/salt.c \
 	base/local_users.c
 OBJDIR = .obj
 LOBJS = $(SRCS:%.c=$(OBJDIR)/%.lo)
