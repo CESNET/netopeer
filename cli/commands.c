@@ -1991,12 +1991,13 @@ int cp(const char *to, const char *from) {
 }
 
 void parse_cert(const char* name, const char* path) {
-	int i;
+	int i, has_san, first_san;
 	ASN1_INTEGER *bs;
 	BIO *bio_out;
 	FILE *fp;
 	X509 *cert;
-	/*X509_CINF *ci;*/
+	STACK_OF(GENERAL_NAME) *san_names = NULL;
+	GENERAL_NAME *san_name;
 
 	fp = fopen(path, "r");
 	if (fp == NULL) {
@@ -2031,8 +2032,39 @@ void parse_cert(const char* name, const char* path) {
 	ASN1_TIME_print(bio_out, X509_get_notAfter(cert));
 	BIO_printf(bio_out, "\n");
 
-	/*ci = cert->cert_info;
-	X509V3_extensions_print(bio_out, "X509v3 extensions", ci->extensions, X509_FLAG_COMPAT, 0);*/
+	has_san = 0;
+	first_san = 1;
+	san_names = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+	if (san_names != NULL) {
+		for (i = 0; i < sk_GENERAL_NAME_num(san_names); ++i) {
+			san_name = sk_GENERAL_NAME_value(san_names, i);
+			if (san_name->type == GEN_EMAIL || san_name->type == GEN_DNS || san_name->type == GEN_IPADD) {
+				if (!has_san) {
+					BIO_printf(bio_out, "X509v3 Subject Alternative Name:\n\t");
+					has_san = 1;
+				}
+				if (!first_san) {
+					BIO_printf(bio_out, ", ");
+				}
+				if (first_san) {
+					first_san = 0;
+				}
+				if (san_name->type == GEN_EMAIL) {
+					BIO_printf(bio_out, "RFC822:%s", (char*) ASN1_STRING_data(san_name->d.rfc822Name));
+				}
+				if (san_name->type == GEN_DNS) {
+					BIO_printf(bio_out, "DNS:%s", (char*) ASN1_STRING_data(san_name->d.dNSName));
+				}
+				if (san_name->type == GEN_IPADD) {
+					BIO_printf(bio_out, "IP:%s", (char*) ASN1_STRING_data(san_name->d.iPAddress));
+				}
+			}
+		}
+	}
+	if (has_san) {
+		BIO_printf(bio_out, "\n");
+	}
+	BIO_printf(bio_out, "\n");
 
 	X509_free(cert);
 	BIO_vfree(bio_out);
