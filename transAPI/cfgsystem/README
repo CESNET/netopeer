@@ -1,0 +1,23 @@
+This part of the Netopeer project is not finished and it is not intended for
+public usage, YET.
+
+Use on your own risk, it can harm your system configuration files.
+
+
+cfgsystem-init
+--------------
+
+This small utility is able to load all the configurations managed by the 
+ietf-system model and store them as the startup configuration data for use
+in the netopeer-server.
+
+The tool is automatically used with 'make install', so after that you don't
+need to run it manually.
+
+Remember, that having empty startup datastore on netopeer-server startup with
+the cfgsystem module enabled causes removing all current configuration settings
+(NTP and DNS servers, users,...)!
+ 
+Usage:
+	./cfgsystem-init <cfgsystem's datastore path>
+

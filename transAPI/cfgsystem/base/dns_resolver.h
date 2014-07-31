@@ -85,6 +85,7 @@ void dns_rm_search_domain_all(void);
  */
 int dns_add_nameserver(const char* address, int index, char** msg);
 
+int dns_mod_nameserver(const char* address, int index, char** msg);
 /**
  * @brief remove a nameserver from the resolv configuration file
  * @param a augeas structure to use
@@ -93,7 +94,7 @@ int dns_add_nameserver(const char* address, int index, char** msg);
  * @return EXIT_FAILURE error occured
  * @return EXIT_SUCCESS otherwise
  */
-int dns_rm_nameserver(const char* address, char** msg);
+int dns_rm_nameserver(int index, char** msg);
 
 /**
  * @brief remove all nameservers from the resolv configuration file

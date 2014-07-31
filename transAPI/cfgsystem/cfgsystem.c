@@ -447,7 +447,7 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 {
 	xmlNodePtr cur, child;
 	int i;
-	char* msg = NULL, *item = NULL, **resolved = NULL;
+	char* msg = NULL, **resolved = NULL;
 	const char* udp_address = NULL;
 	const char* association_type = NULL;
 	bool iburst = NTP_SERVER_IBURST_DEFAULT;
@@ -563,7 +563,6 @@ error:
 		}
 		free(resolved);
 	}
-	free(item);
 
 	return fail(error, msg, EXIT_FAILURE);
 }
@@ -634,7 +633,23 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		return EXIT_SUCCESS;
 	}
 
-	if (op & XMLDIFF_ADD) {
+	if (op & XMLDIFF_SIBLING) {
+		/* remove them all */
+		dns_rm_search_domain_all();
+
+		/* and then add them all in current order */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+					return fail(error, msg, EXIT_FAILURE);
+				}
+				i++;
+			}
+		}
+
+		/* Remember that REORDER was processed for every sibling */
+		dns_search_reorder_done = true;
+	} else if (op & XMLDIFF_ADD) {
 		/* Get the index of this node */
 		/* search<-dns-resolver->first children */
 		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
@@ -653,75 +668,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		if (dns_rm_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
-	}
-	if (op & XMLDIFF_SIBLING) {
-		/* remove them all */
-		dns_rm_search_domain_all();
-
-		/* and then add them all in current order */
-		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
-			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
-				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
-					return fail(error, msg, EXIT_FAILURE);
-				}
-				i++;
-			}
-		}
-
-		/* Remember that REORDER was processed for every sibling */
-		dns_search_reorder_done = true;
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-search callback.", op);
 		return fail(error, msg,  EXIT_FAILURE);
-	}
-
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:address changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	xmlNodePtr cur;
-	int i;
-	char* msg = NULL;
-
-	if (op & XMLDIFF_MOD) {
-		/* translate it to the following two operations */
-		op = XMLDIFF_REM | XMLDIFF_ADD;
-	}
-
-	if (op & XMLDIFF_REM) {
-		if (dns_rm_nameserver(get_node_content(node), &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	}
-
-	if (op & XMLDIFF_ADD) {
-		/* Get the index of this nameserver */
-		/* address<-udp-and-tcp<-server<-dns-resolver->(first node) */
-		for (i = 1, cur = node->parent->parent->parent->children; cur != NULL; cur = cur->next) {
-			if (cur->type != XML_ELEMENT_NODE) {
-				continue;
-			} else if (cur == node->parent->parent) {
-				break;
-			} else if (xmlStrcmp(cur->name, node->parent->parent->name) == 0) {
-				i++;
-			}
-		}
-
-		if (dns_add_nameserver(get_node_content(node), i, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
 	}
 
 	return EXIT_SUCCESS;
@@ -740,16 +689,10 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server_system
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, addr;
 	char* msg = NULL;
 	int i;
 
-	/*
-	 * XMLDIFF_ADD is covered by udp-and-tcp address callback
-	 * XMLDIFF_REM is covered by udp-and-tcp address callback,
-	 * XMLDIFF_MOD is covered by udp-and-tcp address callback,
-	 * so cover only reordering
-	 */
 	if ((op & XMLDIFF_SIBLING) && !dns_server_reorder_done) {
 
 		/* remove all */
@@ -757,12 +700,73 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 
 		/* and add them again in current order */
 		for (i = 1, cur = node->parent->children; cur != NULL; i++, cur = cur->next) {
-			if (dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+			if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "server")) {
+				continue;
+			}
+			/* get node with added/changed address */
+			for (addr = cur->children; addr != NULL; addr = addr->next) {
+				if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "udp-and-tcp")) {
+					continue;
+				}
+				for (addr = addr->children; addr != NULL; addr = addr->next) {
+					if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "address")) {
+						continue;
+					}
+					break;
+				}
+				break;
+			}
+
+			if (addr == NULL || dns_add_nameserver(get_node_content(addr), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
 
 		dns_server_reorder_done = true;
+	} else {
+		/* Get the index of this nameserver */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
+			} else if (cur == node) {
+				if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+					/* get node with added/changed address */
+					for (cur = node->children; cur != NULL; cur = cur->next) {
+						if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "udp-and-tcp")) {
+							continue;
+						}
+						for (cur = cur->children; cur != NULL; cur = cur->next) {
+							if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "address")) {
+								continue;
+							}
+							break;
+						}
+						break;
+					}
+				}
+				break;
+			} else if (xmlStrcmp(cur->name, node->name) == 0) {
+				i++;
+			}
+		}
+
+		if (op & XMLDIFF_REM) {
+			if (dns_rm_nameserver(i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+			/* remove it due to getting index in other siblings */
+			xmlUnlinkNode(node);
+			xmlFreeNode(node);
+		} else if (op & XMLDIFF_ADD) {
+			if (cur == NULL || dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else if (op & XMLDIFF_MOD) {
+			if (cur == NULL || dns_mod_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		}
+
 	}
 
 	return EXIT_SUCCESS;
@@ -1150,7 +1154,7 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-	.callbacks_count = 15,
+	.callbacks_count = 14,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1167,8 +1171,6 @@ PUBLIC struct transapi_data_callbacks clbks = {
 			.func = callback_systemns_system_systemns_ntp},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:search",
 			.func = callback_systemns_system_systemns_dns_resolver_systemns_search},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:server/systemns:udp-and-tcp/systemns:address",
-			.func = callback_systemns_system_systemns_dns_resolver_systemns_server_systemns_udp_and_tcp_systemns_address},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:server",
 			.func = callback_systemns_system_systemns_dns_resolver_systemns_server},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout",
