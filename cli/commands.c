@@ -1991,7 +1991,8 @@ int cp(const char *to, const char *from) {
 }
 
 void parse_cert(const char* name, const char* path) {
-	int i, has_san, first_san;
+	int i, j, has_san, first_san;
+	ASN1_OCTET_STRING *ip;
 	ASN1_INTEGER *bs;
 	BIO *bio_out;
 	FILE *fp;
@@ -2056,7 +2057,19 @@ void parse_cert(const char* name, const char* path) {
 					BIO_printf(bio_out, "DNS:%s", (char*) ASN1_STRING_data(san_name->d.dNSName));
 				}
 				if (san_name->type == GEN_IPADD) {
-					BIO_printf(bio_out, "IP:%s", (char*) ASN1_STRING_data(san_name->d.iPAddress));
+					BIO_printf(bio_out, "IP:");
+					ip = san_name->d.iPAddress;
+					if (ip->length == 4) {
+						BIO_printf(bio_out, "%d.%d.%d.%d", ip->data[0], ip->data[1], ip->data[2], ip->data[3]);
+					} else if (ip->length == 16) {
+						for (j = 0; j < ip->length; ++j) {
+							if (j > 0 && j < 15 && j%2 == 1) {
+								BIO_printf(bio_out, "%02x:", ip->data[j]);
+							} else {
+								BIO_printf(bio_out, "%02x", ip->data[j]);
+							}
+						}
+					}
 				}
 			}
 		}
