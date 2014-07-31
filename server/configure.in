@@ -263,6 +263,10 @@ AX_PYTHON_MODULE(re, fatal)
 AX_PYTHON_MODULE(string, fatal)
 AX_PYTHON_MODULE(argparse, fatal)
 AX_PYTHON_MODULE(xml, fatal)
+if test "$tls" = "yes"; then
+	AX_PYTHON_MODULE(M2Crypto, fatal)
+	AX_PYTHON_MODULE(shutil, fatal)
+fi
 
 # Check for rpmbuil
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
