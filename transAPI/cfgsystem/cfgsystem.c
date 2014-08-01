@@ -978,6 +978,41 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 }
 
 /**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user-authentication-order changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+{
+	const char* value;
+	char *msg = NULL;
+
+	value = (const char*)(get_node_content(node));
+	if (strcmp(value, "local-users") != 0) {
+		asprintf(&msg, "Invalid value (%s) of the \"user-authentication-order\" element.", value);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	if (op & XMLDIFF_ADD) {
+		if (auth_enable(&msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		if (auth_disable(&msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+/**
  * @brief This callback will be run when node in path /systemns:system/systemns:authentication changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -990,31 +1025,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	xmlNodePtr cur;
-	char* msg;
-#if 0
-	/* user-authentication-order */
-	if (op & (XMLDIFF_MOD | XMLDIFF_REORDER)) {
-		if (users_augeas_rem_all_sshd_auth_order(&msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
+	char* msg = NULL;
 
-		cur = node->last;
-		while (cur != NULL) {
-			if (xmlStrcmp(cur->name, BAD_CAST "user-authentication-order") == 0) {
-				if (users_augeas_add_first_sshd_auth_order(get_node_content(cur), &msg) != EXIT_SUCCESS) {
-					return fail(error, msg, EXIT_FAILURE);
-				}
-			}
-			cur = cur->prev;
-		}
-
-		/* Save the changes */
-		if (augeas_save(&msg) != 0) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
+	/* Save the changes made by children callbacks via augeas */
+	if (augeas_save(&msg) != 0) {
+		return fail(error, msg, EXIT_FAILURE);
 	}
-#endif
+
 	return EXIT_SUCCESS;
 }
 
@@ -1024,7 +1041,7 @@ PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-	.callbacks_count = 14,
+	.callbacks_count = 15,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1035,7 +1052,7 @@ PUBLIC struct transapi_data_callbacks clbks = {
 			.func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset},
 		{.path = "/systemns:system/systemns:ntp/systemns:server",
 			.func = callback_systemns_system_systemns_ntp_systemns_server},
-		{ .path = "/systemns:system/systemns:ntp/systemns:enabled",
+		{.path = "/systemns:system/systemns:ntp/systemns:enabled",
 			.func = callback_systemns_system_systemns_ntp_systemns_enabled},
 		{.path = "/systemns:system/systemns:ntp",
 			.func = callback_systemns_system_systemns_ntp},
@@ -1053,6 +1070,8 @@ PUBLIC struct transapi_data_callbacks clbks = {
 			.func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
 		{.path = "/systemns:system/systemns:authentication/systemns:user",
 			.func = callback_systemns_system_systemns_authentication_systemns_user},
+		{.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order",
+			.func = callback_systemns_system_systemns_authentication_systemns_auth_order },
 		{.path = "/systemns:system/systemns:authentication",
 			.func = callback_systemns_system_systemns_authentication }
 	}

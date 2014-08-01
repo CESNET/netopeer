@@ -44,7 +44,6 @@
 #define LOCAL_USERS_H_
 
 #include <libxml/tree.h>
-#include <augeas.h>
 
 xmlNodePtr users_getxml(char** msg, xmlNsPtr ns);
 
@@ -57,5 +56,9 @@ const char* users_mod(const char *name, const char *passwd, char **msg);
 int authkey_add(const char *username, const char *id, const char *pem, char **msg);
 
 int authkey_rm(const char *username, const char*id, char **msg);
+
+int auth_enable(char **msg);
+
+int auth_disable(char **msg);
 
 #endif /* LOCAL_USERS_H_ */
