@@ -69,8 +69,6 @@
 /* Preceded by the user home directory */
 #define SSH_USER_CONFIG_PATH "/.ssh"
 
-#define SHA_ROUNDS 5000
-
 #define PAM_DIR_PATH "/etc/pam.d"
 
 struct supported_auth {
@@ -137,7 +135,6 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	FILE *f = NULL;
 	struct spwd *spwd, new_spwd;
 	const char *en_passwd; /* encrypted password */
-	int sha_rounds = SHA_ROUNDS;
 
 	assert(name);
 	assert(passwd);
