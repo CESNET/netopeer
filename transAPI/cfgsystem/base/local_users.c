@@ -53,6 +53,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
 
 #include <libxml/tree.h>
 #include <augeas.h>
@@ -554,9 +556,44 @@ int authkey_rm(const char *username, const char*id, char **msg)
 
 static int switch_auth(const char *value, char **msg)
 {
-	if (aug_set(sysaugeas, "/files/"NETOPEER_DIR"sshd_config/PasswordAuthentication", value) == -1) {
+	const char* sshdpid_env;
+	augeas *augeas_running;
+
+	if (aug_set(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/PasswordAuthentication", value) == -1) {
 		asprintf(msg, "Unable to set PasswordAuthentication to \"%s\" (%s).", value, aug_error_message(sysaugeas));
 		return (EXIT_FAILURE);
+	}
+
+	/* Save the changes made by children callbacks via augeas */
+	if (augeas_save(msg) != 0) {
+		return (EXIT_FAILURE);
+	}
+
+	if ((sshdpid_env = getenv("SSHD_PID")) != NULL && access(NETOPEER_DIR"/sshd_config.running", F_OK) == 0) {
+		/* we have info about listening SSH server, update its config and make
+		 * it reload the configuration. If something get wrong, still return
+		 * success, new settings just will be applied after the SSH server
+		 * reboot (if the settings will be stored also into startup datastore).
+		 */
+		augeas_running = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
+		if (aug_error(augeas_running) != AUG_NOERROR) {
+			return EXIT_SUCCESS;
+		}
+		aug_set(augeas_running, "/augeas/load/Sshd/lens", "Sshd.lns");
+		aug_set(augeas_running, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config.running");
+		aug_load(augeas_running);
+
+		if (aug_match(augeas_running, "/augeas//error", NULL) != 0) {
+			aug_close(augeas_running);
+			return EXIT_SUCCESS;
+		}
+
+		if (aug_set(augeas_running, "/files/"NETOPEER_DIR"/sshd_config.running/PasswordAuthentication", value) == 0 &&
+				aug_save(augeas_running) == 0) {
+			/* make the server to reload configuration */
+			kill(atoi(sshdpid_env), SIGHUP);
+		}
+		aug_close(augeas_running);
 	}
 
 	return (EXIT_SUCCESS);

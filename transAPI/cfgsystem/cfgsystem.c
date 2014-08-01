@@ -1012,36 +1012,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
 	return (EXIT_SUCCESS);
 }
 
-/**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	char* msg = NULL;
-
-	/* Save the changes made by children callbacks via augeas */
-	if (augeas_save(&msg) != 0) {
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	return EXIT_SUCCESS;
-}
-
 /*
  * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
  * It is used by libnetconf library to decide which callbacks will be run.
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-	.callbacks_count = 15,
+	.callbacks_count = 14,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1071,9 +1048,7 @@ PUBLIC struct transapi_data_callbacks clbks = {
 		{.path = "/systemns:system/systemns:authentication/systemns:user",
 			.func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order",
-			.func = callback_systemns_system_systemns_authentication_systemns_auth_order },
-		{.path = "/systemns:system/systemns:authentication",
-			.func = callback_systemns_system_systemns_authentication }
+			.func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}
 };
 
