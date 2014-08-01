@@ -73,6 +73,8 @@ export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
 PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+AC_SUBST(LIBNETCONF_DATADIR)
 
 PKG_CHECK_MODULES(AUGEAS, augeas >= 1.0.0)
 CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
@@ -98,5 +100,5 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 # Checks for library functions.
 AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile model/ietf-system-data.rng])
 AC_OUTPUT

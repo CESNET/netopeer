@@ -636,6 +636,7 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 AUGEAS_LIBS
 AUGEAS_CFLAGS
+LIBNETCONF_DATADIR
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -11110,6 +11111,8 @@ $as_echo "yes" >&6; }
 fi
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+
 
 
 pkg_failed=no
@@ -11370,7 +11373,7 @@ if test "x$ac_cv_func_l64a" = xyes; then :
 fi
 
 
-ac_config_files="$ac_config_files Makefile"
+ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12366,6 +12369,7 @@ do
   case $ac_config_target in
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "model/ietf-system-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-system-data.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
