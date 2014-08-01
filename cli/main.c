@@ -109,8 +109,10 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	nc_callback_print(clb_print);
 	nc_callback_error_reply(clb_error_print);
 
-	/* disable publickey authentication */
-	nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, -1);
+	/* set authentication preferences */
+	nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, 3);
+	nc_ssh_pref(NC_SSH_AUTH_PASSWORD, 2);
+	nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, 1);
 
 	load_config (&client_supported_cpblts);
 
