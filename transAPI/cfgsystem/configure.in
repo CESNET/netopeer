@@ -12,18 +12,25 @@ AC_ARG_ENABLE([debug],
 	CFLAGS="$CFLAGS -O3 -DNDEBUG"
 )
 
+AC_ARG_WITH([netopeer-confdir],
+	[AC_HELP_STRING([--with-netopeer-confdir=DIR], [Netopeer server configuration directory (by default ${sysconfdir}/netopeer/)])],
+	[NETOPEER_DIR="$withval"],
+	[NETOPEER_DIR="${sysconfdir}/netopeer/"]
+)
+AC_SUBST(NETOPEER_DIR)
+
 # --with-libxml2=path-to-libxml2-git-repository
 AC_ARG_WITH([libxml2],
-[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
-[
-	AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
-	if test "$XML2_CONFIG" = "no"; then
-		AC_MSG_ERROR([Missing development package of libxml2.])
-	fi
-	CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
-	LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
-	WITH_LIBXML2="$withval"
-]
+	[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
+	[
+		AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
+		if test "$XML2_CONFIG" = "no"; then
+			AC_MSG_ERROR([Missing development package of libxml2.])
+		fi
+		CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
+		LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
+		WITH_LIBXML2="$withval"
+	]
 )
 
 # Checks for programs.

@@ -46,7 +46,6 @@
 #define AUGEAS_NTP_CONF "/etc/ntp.conf"
 #define AUGEAS_DNS_CONF "/etc/resolv.conf"
 #define AUGEAS_PAM_DIR "/etc/pam.d"
-#define NETOPEER_DIR "/etc/netopeer/"
 
 int augeas_init(char** msg);
 
