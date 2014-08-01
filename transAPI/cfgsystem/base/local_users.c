@@ -210,6 +210,50 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	return (en_passwd);
 }
 
+static FILE* open_authfile(const char *username, const char *opentype, char **path, char **msg)
+{
+	struct passwd *pwd;
+	char *filepath = NULL;
+	FILE *file;
+	mode_t mask;
+	int flag;
+
+	/* get user home */
+	pwd = getpwnam(username);
+	if (pwd == NULL) {
+		asprintf(msg, "Unable to get user record (%s)", strerror(errno));
+		return (NULL);
+	}
+	if (pwd->pw_dir == NULL) {
+		asprintf(msg, "Home directory of user \"%s\" not set, unable to set authorized keys.", username);
+		return(NULL);
+	}
+	asprintf(&filepath, "%s/.ssh/authorized_keys", pwd->pw_dir);
+
+	/* open authorized_keys file in the user's ssh home directory */
+	flag = access(filepath, F_OK);
+	mask = umask(0600);
+	if ((file = fopen(filepath, opentype)) == NULL) {
+		umask(mask);
+		asprintf(msg, "Opening authorized keys file \"%s\" failed (%s).", filepath, strerror(errno));
+		free(filepath);
+		return (NULL);
+	}
+	umask(mask);
+	if (flag != 0) {
+		/* change owner of the created file */
+		chown(filepath, pwd->pw_uid, pwd->pw_gid);
+	}
+
+	if (path != NULL) {
+		*path = filepath;
+	} else {
+		free(filepath);
+	}
+
+	return (file);
+}
+
 int users_rm(const char *name, char **msg)
 {
 	int ret;
@@ -304,14 +348,62 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	return (NULL);
 }
 
+static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
+{
+	FILE *authfile;
+	char *line = NULL, *id, *delim;
+	xmlNodePtr firstnode = NULL, newnode;
+	ssize_t len = 0;
+	size_t n = 0;
+
+	/* get authorized_keys file */
+	if ((authfile = open_authfile(username, "r", NULL, msg)) == NULL) {
+		return (NULL);
+	}
+
+	while((len = getline(&line, &n, authfile)) != -1) {
+		/* get the second space to locate comment/id */
+		id = strchr((delim = strchr(line, ' ')) + 1, ' ');
+
+		if (id == NULL) {
+			free(line);
+			xmlFreeNodeList(firstnode);
+			*msg = strdup("Invalid authorized key format.");
+			return (NULL);
+		}
+
+		/* divide comment/id from data */
+		id[0] = '\0';
+		id++;
+		/* remove the newline if any */
+		if (line[len - 1] == '\n') {
+			line[len - 1] = '\0';
+		}
+
+		/* create xml data */
+		newnode = xmlNewNode(ns, BAD_CAST "authorized-key");
+		xmlNewChild(newnode, ns, BAD_CAST "name", BAD_CAST id);
+		xmlNewChild(newnode, ns, BAD_CAST "key-data", BAD_CAST line);
+		delim[0] = '\0';
+		xmlNewChild(newnode, ns, BAD_CAST "algorithm", BAD_CAST line);
+
+		/* prepare returning node list */
+		if (firstnode == NULL) {
+			firstnode = newnode;
+		} else {
+			xmlAddSibling(firstnode, newnode);
+		}
+	}
+	free(line);
+
+	return(firstnode);
+}
 
 xmlNodePtr users_getxml(char** msg, xmlNsPtr ns)
 {
-	int i;
 	xmlNodePtr auth_node, user, aux_node;
 	struct passwd *pwd;
 	struct spwd *spwd;
-	struct ssh_key** key = NULL;
 
 	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
 		return (NULL);
@@ -355,32 +447,12 @@ xmlNodePtr users_getxml(char** msg, xmlNsPtr ns)
 		} /* else password is disabled */
 
 		/* authentication/user/authorized-key[] */
-/*		if (users_get_ssh_keys(pwd->pw_dir, &key, msg) != EXIT_SUCCESS) {
-			xmlFreeNode(auth_node);
-			return NULL;
-		}
-*/		if (key == NULL) {
-			continue;
+		if ((aux_node = authkey_getxml(pwd->pw_name, user->ns, msg)) != NULL) {
+			xmlAddChildList(user, aux_node);
 		} else {
-			for (i = 0; key[i] != NULL; i++) {
-				/* authentication/user/authorized-key */
-				aux_node = xmlNewChild(user, user->ns, BAD_CAST "authorized-key", NULL);
-
-				/* authentication/user/authorized-key/name */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "name", BAD_CAST key[i]->name);
-				free(key[i]->name);
-
-				/* authentication/user/authorized-key/algorithm */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "algorithm", BAD_CAST key[i]->alg);
-				free(key[i]->alg);
-
-				/* authentication/user/authorized-key/key-data */
-				xmlNewChild(aux_node, aux_node->ns, BAD_CAST "key-data", BAD_CAST key[i]->data);
-				free(key[i]->data);
-
-				free(key[i]);
-			}
-			free(key);
+			/* ignore failures in this case */
+			free(*msg);
+			*msg = NULL;
 		}
 	}
 
@@ -391,199 +463,95 @@ xmlNodePtr users_getxml(char** msg, xmlNsPtr ns)
 	return (auth_node);
 }
 
-
-
-#if 0
-
-char* users_get_home_dir(const char* user_name, char** msg)
+int authkey_add(const char *username, const char *id, const char *pem, char **msg)
 {
-	size_t buf_len;
-	char* buf, *home_dir;
-	struct passwd pwd, *result;
-	int ret;
+	FILE *authkeys_file;
 
-	buf_len = sysconf(_SC_GETPW_R_SIZE_MAX);
-	buf = malloc(buf_len);
+	assert(username);
+	assert(id);
+	assert(pem);
 
-	ret = getpwnam_r(user_name, &pwd, buf, buf_len, &result);
-	if (ret != 0) {
-		asprintf(msg, "getpwnam_r failed: %s", strerror(ret));
-		free(buf);
-		return NULL;
-	} else if (result == NULL) {
-		asprintf(msg, "User \"%s\" not found.", user_name);
-		free(buf);
-		return NULL;
-	}
-
-	home_dir = strdup(pwd.pw_dir);
-	free(buf);
-	return home_dir;
-}
-
-int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg)
-{
-	char* key_file_path;
-	FILE* key_file;
-	int ret;
-
-	if (key == NULL || home_dir == NULL) {
-		return EXIT_FAILURE;
-	}
-
-	asprintf(&key_file_path, "%s%s%s%s", home_dir, SSH_USER_CONFIG_PATH, key->name, ".pub");
-
-	switch (key->change) {
-	case 0: /* ADD */
-		ret = access(key_file_path, F_OK);
-		if (ret == 0) {
-			asprintf(msg, "SSH key \"%s\" cannot be added, already exists.", key_file_path);
-			free(key_file_path);
-			return EXIT_FAILURE;
-		} else if (ret != ENOENT) {
-			asprintf(msg, "access on \"%s\" failed: %s", key_file_path, strerror(ret));
-			free(key_file_path);
-			return EXIT_FAILURE;
-		}
-
-		key_file = fopen(key_file_path, "w");
-		if (key_file == NULL) {
-			asprintf(msg, "Could not create \"%s\": %s", key_file_path, strerror(errno));
-			free(key_file_path);
-			return EXIT_FAILURE;
-		}
-
-		fprintf(key_file, "%s %s\n", key->alg, key->data);
-		fclose(key_file);
-
-		break;
-	case 1: /* MOD */
-		ret = eaccess(key_file_path, W_OK);
-		if (ret != 0) {
-			asprintf(msg, "SSH key \"%s\" cannot be modified: %s", key_file_path, strerror(errno));
-			free(key_file_path);
-			return EXIT_FAILURE;
-		}
-
-		key_file = fopen(key_file_path, "w");
-		if (key_file == NULL) {
-			asprintf(msg, "Could not open \"%s\": %s", key_file_path, strerror(errno));
-			free(key_file_path);
-			return EXIT_FAILURE;
-		}
-
-		fprintf(key_file, "%s %s\n", key->alg, key->data);
-		fclose(key_file);
-
-		break;
-	case 2: /* REM */
-		ret = remove(key_file_path);
-		if (ret != 0) {
-			asprintf(msg, "Could not remove \"%s\": %s", key_file_path, strerror(errno));
-			free(key_file_path);
-			return EXIT_FAILURE;
-		}
-		break;
-	default:
-		*msg = strdup("Internal error (invalid \"change\" attribute of the key."); /* allow free */
-		free(key_file_path);
+	/* get authorized_keys file */
+	if ((authkeys_file = open_authfile(username, "a", NULL, msg)) == NULL) {
 		return (EXIT_FAILURE);
 	}
 
-	free(key_file_path);
-	return EXIT_SUCCESS;
+	/* add the key to the file */
+	fprintf(authkeys_file, "%s %s\n", pem, id);
+	fclose(authkeys_file);
+
+	return (EXIT_SUCCESS);
 }
 
-int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg)
+int authkey_rm(const char *username, const char*id, char **msg)
 {
-	char* path, *tmp, c;
-	DIR* dir;
-	FILE* file;
-	struct dirent* ent;
-	int i, alloc, used, key_count;
-	struct ssh_key* cur_key;
+	FILE *file, *copy;
+	char *copy_path = NULL, *file_path;
+	char *line = NULL, *aux_id;
+	size_t n = 0;
+	ssize_t len;
+	struct stat st;
 
-	if (home_dir == 0 || key == NULL) {
-		return EXIT_FAILURE;
+	assert(username);
+	assert(id);
+
+	/* get authorized_keys file */
+	if ((file = open_authfile(username, "r", &file_path, msg)) == NULL) {
+		return (EXIT_FAILURE);
 	}
-	*key = NULL;
+	/* get file stat of the original file to make a nice copy of it */
+	fstat(fileno(file), &st);
 
-	asprintf(&path, "%s%s", home_dir, SSH_USER_CONFIG_PATH);
-	dir = opendir(path);
-	if (dir == NULL) {
-		if (errno == ENOENT) {
-			free(path);
-			return EXIT_SUCCESS;
-		} else {
-			free(path);
-			asprintf(msg, "Could not open \"%s\" in the home dir \"%s\": %s", SSH_USER_CONFIG_PATH, home_dir, strerror(errno));
-			return EXIT_FAILURE;
+	/* prepare copy of the file */
+	asprintf(&copy_path, "%s.cfgsystem", file_path);
+	if ((copy = fopen(copy_path, "w")) == NULL) {
+		asprintf(msg, "Unable to prepare working authorized keys file \"%s\" (%s).", copy_path, strerror(errno));
+		free(copy_path);
+		free(file_path);
+		fclose(file);
+		return (EXIT_FAILURE);
+	}
+	fchmod(fileno(copy), st.st_mode);
+	fchown(fileno(copy), st.st_uid, st.st_gid);
+
+	while((len = getline(&line, &n, file)) != -1) {
+		/* get the second space to locate comment/id */
+		aux_id = strchr(strchr(line, ' ') + 1, ' ') + 1;
+		if (aux_id == NULL) {
+			/* invalid format of the key */
+			continue;
+		}
+
+		/* remove the newline if any */
+		if (line[len - 1] == '\n') {
+			line[len - 1] = '\0';
+		}
+
+		/* check if it is matching */
+		if (aux_id == NULL || strcmp(id, aux_id) != 0) {
+			/* they do not match so write the key into the new authorized_keys file */
+			fprintf(copy, "%s\n", line);
 		}
 	}
+	free(line);
+	fclose(file);
+	fclose(copy);
 
-	key_count = 0;
-	while ((ent = readdir(dir)) != NULL) {
-		if (strlen(ent->d_name) >= 5 && strcmp(ent->d_name + strlen(ent->d_name) - 4, ".pub") == 0) {
-			/* Public ssh key */
-			if (key_count == 0) {
-				*key = malloc(sizeof(struct ssh_key*));
-			} else {
-				*key = realloc(*key, (key_count + 1) * sizeof(struct ssh_key*));
-			}
-			(*key)[key_count] = malloc(sizeof(struct ssh_key));
-			cur_key = (*key)[key_count];
-
-			cur_key->name = strdup(ent->d_name);
-			asprintf(&tmp, "%s/%s", path, ent->d_name);
-			file = fopen(tmp, "r");
-
-			/* alg */
-			cur_key->alg = malloc(51 * sizeof(char));
-			for (i = 0; i < 50; ++i) {
-				c = fgetc(file);
-				if (c == ' ') {
-					break;
-				}
-				cur_key->alg[i] = c;
-			}
-			if (i == 50) {
-				asprintf(msg, "Likely a corrupted public ssh key \"%s\".", tmp);
-				closedir(dir);
-				fclose(file);
-				return EXIT_FAILURE;
-			}
-			cur_key->alg[i] = '\0';
-
-			/* data */
-			alloc = 101;
-			used = 0;
-			cur_key->data = malloc(alloc * sizeof(char));
-			while ((c = fgetc(file)) != EOF && c != ' ') {
-				if (used + 1 == alloc) {
-					alloc += 100;
-					cur_key->data = realloc(cur_key->data, alloc * sizeof(char));
-				}
-				cur_key->data[used] = c;
-				++used;
-			}
-			cur_key->data[used] = '\0';
-
-			free(tmp);
-			fclose(file);
-			++key_count;
-		}
+	if (rename(copy_path, file_path) == -1) {
+		asprintf(msg, "Unable to rewrite authorized_keys file \"%s\" (%s).", file_path, strerror(errno));
+		unlink(copy_path);
+		free(copy_path);
+		free(file_path);
+		return (EXIT_FAILURE);
 	}
 
-	if (key_count != 0) {
-		*key = realloc(*key, (key_count + 1) * sizeof(struct ssh_key*));
-		(*key)[key_count] = NULL;
-	}
+	free(copy_path);
+	free(file_path);
 
-	closedir(dir);
-	free(path);
-	return EXIT_SUCCESS;
+	return (EXIT_SUCCESS);
 }
 
+#if 0
 
 int users_augeas_rem_all_sshd_auth_order(char** msg)
 {

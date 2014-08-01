@@ -46,49 +46,6 @@
 #include <libxml/tree.h>
 #include <augeas.h>
 
-/* Context created for SSH keys processed in the user callback */
-struct user_ctx {
-	int count;
-	struct ssh_key* first;
-};
-
-/* SSH key context */
-struct ssh_key {
-	char* name;
-	char* alg;
-	char* data;
-	int change;		// 0 - add, 1 - mod, 2 - rem
-};
-
-/**
- * @brief get the home directory of a user
- * @param user_name user name
- * @param msg message containing an error if one occured
- * @return home dir success
- * @return NULL error occured
- */
-char* users_get_home_dir(const char* user_name, char** msg);
-
-/**
- * @brief apply the saved changes of an ssh key of a user
- * @param home_dir user home directory
- * @param key key to apply
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg);
-
-/**
- * @brief get and process all public ssh keys in a home dir of a user
- * @param home_dir user home directory
- * @param key structure to hold all the keys (must be freed)
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success or the home directory does not exist
- * @return EXIT_FAILURE error occured
- */
-int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg);
-
 xmlNodePtr users_getxml(char** msg, xmlNsPtr ns);
 
 const char* users_add(const char *name, const char *passwd, char **msg);
@@ -97,23 +54,8 @@ int users_rm(const char *name, char **msg);
 
 const char* users_mod(const char *name, const char *passwd, char **msg);
 
-/**
- * @brief remove all known SSHD PAM authentication types
- * @param a augeas structure to use
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_rem_all_sshd_auth_order(char** msg);
+int authkey_add(const char *username, const char *id, const char *pem, char **msg);
 
-/**
- * @brief add an SSHD PAM authentication type with the highest priority
- * @param a augeas structure to use
- * @param auth_type known authentication type
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg);
+int authkey_rm(const char *username, const char*id, char **msg);
 
 #endif /* LOCAL_USERS_H_ */

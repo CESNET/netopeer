@@ -75,51 +75,6 @@ static bool dns_search_reorder_done = false;
 /* reorder done flag for DNS server */
 static bool dns_server_reorder_done = false;
 
-/* IANA SSH Public Key Algorithm Names */
-struct pub_key_alg {
-	int len; /* Length to compare */
-	const char* alg; /* Name of an algorithm */
-};
-static struct pub_key_alg pub_key_algs[] = {
-		{8, "ssh-dss"},
-        {8, "ssh-rsa"},
-        {14, "spki-sign-rsa"},
-        {14, "spki-sign-dss"},
-        {13, "pgp-sign-rsa"},
-        {13, "pgp-sign-dss"},
-        {5, "null"},
-        {11, "ecdsa-sha2-"},
-        {15, "x509v3-ssh-dss"},
-        {15, "x509v3-ssh-rsa"},
-        {22, "x509v3-rsa2048-sha256"},
-        {18, "x509v3-ecdsa-sha2-"},
-        {0, NULL}
-};
-
-static void user_ctx_cleanup(struct user_ctx** ctx)
-{
-	int i;
-
-	if (ctx != NULL && *ctx != NULL) {
-		for (i = 0; i < (*ctx)->count; ++i) {
-			if ((*ctx)->first + i != NULL) {
-				if ((*ctx)->first[i].name != NULL) {
-					free((*ctx)->first[i].name);
-				}
-				if ((*ctx)->first[i].alg != NULL) {
-					free((*ctx)->first[i].alg);
-				}
-				if ((*ctx)->first[i].data != NULL) {
-					free((*ctx)->first[i].data);
-				}
-			}
-		}
-		free((*ctx)->first);
-		free(*ctx);
-		*ctx = NULL;
-	}
-}
-
 static int fail(struct nc_err** error, char* msg, int ret)
 {
 	if (error != NULL) {
@@ -937,66 +892,12 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
 		}
 
 		/* process authorized keys */
-		/* \todo */
 	} else if (op & XMLDIFF_REM) {
 		/* remove existing user */
 		if (users_rm(name, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	}
-
-#if 0
-
-	xmlNodePtr cur;
-	const char* pass = NULL, *name;
-	char* msg = NULL, *msg2, *home_dir;
-	struct user_ctx* ctx;
-	int i;
-
-
-	/* Process the SSH key changes */
-	if (*data != NULL) {
-		ctx = *data;
-
-		if ((home_dir = users_get_home_dir(name, &msg)) == NULL) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-
-		for (i = 0; i < ctx->count; ++i) {
-			if (users_process_ssh_key(home_dir, ctx->first + i, &msg) != EXIT_SUCCESS) {
-				break;
-			}
-		}
-		free(home_dir);
-
-		if (i != ctx->count) {
-			if (erropt == NC_EDIT_ERROPT_ROLLBACK) {
-				asprintf(&msg2, "Inconsistent SSH key configuration (if any) of the user \"%s\", %s", name, msg);
-				free(msg);
-			} else {
-				msg2 = msg;
-			}
-			user_ctx_cleanup((struct user_ctx**) data);
-			return fail(error, msg2, EXIT_FAILURE);
-		}
-	}
-
-	if (!(op & XMLDIFF_ADD) && !(op & XMLDIFF_MOD) && !(op & XMLDIFF_REM) && !(op & XMLDIFF_CHAIN)) {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the authentication-user callback.", op);
-		user_ctx_cleanup((struct user_ctx**) data);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	user_ctx_cleanup((struct user_ctx**) data);
-
-#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1014,88 +915,65 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	xmlNodePtr cur;
-	struct ssh_key* key;
-	struct user_ctx* user;
-	const char* content;
-	char* msg = NULL, *msg2;
-	int i;
-#if 0
-	/* Assign a new ssh_key_ctx */
-	if (*data == NULL) {
-		/* First key */
-		user = malloc(sizeof(struct user_ctx));
-		*data = user;
-		user->count = 1;
-		user->first = malloc(sizeof(struct ssh_key));
-	} else {
-		user = *data;
-		user->count += 1;
-		user->first = realloc(user->first, user->count * sizeof(struct ssh_key));
+	char *msg;
+	xmlNodePtr aux_node;
+	const char* username = NULL, *id = NULL, *pem = NULL;
+
+	/* get username for this key */
+	for (aux_node = node->parent->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "name") != 0) {
+			continue;
+		}
+		username = get_node_content(aux_node);
+		break;
 	}
-	key = user->first + (user->count - 1);
-	memset(key, 0, sizeof(struct ssh_key));
+	if (username == NULL) {
+		return fail(error, strdup("Missing name element for the user."), EXIT_FAILURE);
+	}
 
-	cur = node->children;
-	while (cur != NULL) {
-		/* name */
-		if (xmlStrcmp(cur->name, BAD_CAST "name") == 0) {
-			key->name = strdup(get_node_content(cur));
+	/* get id of this key */
+	for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "name") != 0) {
+			continue;
 		}
-
-		/* algorithm */
-		if (xmlStrcmp(cur->name, BAD_CAST "algorithm") == 0) {
-			content = get_node_content(cur);
-
-			i = 0;
-			while (pub_key_algs[i].len != 0) {
-				if (strncmp(content, pub_key_algs[i].alg, pub_key_algs[i].len) == 0) {
-					break;
-				}
-				++i;
-			}
-
-			if (pub_key_algs[i].len == 0) {
-				asprintf(&msg, "Unknown SSH key algorithm \"%s\", check ietf-system model for the list of the supported algorithms.", content);
-				msg2 = msg;
-				/* Some SSH keys might have been successfully parsed,
-				 * we have to commit those changes or throw this partial change away */
-				if (user->count != 1) {
-					free(key->name);
-					free(key->alg);
-					free(key->data);
-					user->count -= 1;
-
-					if (erropt != NC_EDIT_ERROPT_CONT) {
-						/* If this fails, so much for consistency */
-						if (callback_systemns_system_systemns_authentication_systemns_user(data, XMLDIFF_CHAIN, node->parent, NULL) != EXIT_SUCCESS) {
-							asprintf(&msg2, "Inconsistent SSH key configuration of a user, %s", msg);
-							free(msg);
-						}
-					}
-				} else {
-					user_ctx_cleanup((struct user_ctx**) data);
-				}
-				return fail(error, msg2, EXIT_FAILURE);
-			}
-
-			key->alg = strdup(content);
-		}
-
-		/* key-data */
-		if (xmlStrcmp(cur->name, BAD_CAST "key-data") == 0) {
-			key->data = strdup(get_node_content(cur));
-		}
-
-		cur = cur->next;
+		id = get_node_content(aux_node);
+		break;
+	}
+	if (id == NULL) {
+		return fail(error, strdup("Missing name element for the authorized-key."), EXIT_FAILURE);
 	}
 
 	if (op & XMLDIFF_MOD) {
-		key->change = 1;
-	} else if (op & XMLDIFF_REM) {
-		key->change = 2;
-	} /* if XMLDIFF_ADD, change is already 0 */
-#endif
+		/* implement as removing the key and then adding it as a new one */
+		op = XMLDIFF_REM | XMLDIFF_ADD;
+	}
+
+	if (op & XMLDIFF_REM) {
+		/* remove the existing key */
+		if (authkey_rm(username, id, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
+	if (op & XMLDIFF_ADD) {
+		/* get pem data of this key */
+		for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+			if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "key-data") != 0) {
+				continue;
+			}
+			pem = get_node_content(aux_node);
+			break;
+		}
+		if (pem == NULL) {
+			return fail(error, strdup("Missing key-data element for the authorized-key."), EXIT_FAILURE);
+		}
+
+		/* add new key */
+		if (authkey_add(username, id, pem, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
 	return EXIT_SUCCESS;
 }
 
