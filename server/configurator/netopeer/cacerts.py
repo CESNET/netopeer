@@ -119,7 +119,7 @@ class cacerts(nc_module.nc_module):
 		try:
 			while len(self.certs_toadd) > 0:
 				path = self.certs_toadd.pop()
-				shutil.copyfile(path, os.path.join(self.certspath, os.path.basename(path)))
+				shutil.copyfile(path, os.path.join(self.certspath, os.path.basename(path)[:-4] + '.pem'))
 				changes = True
 		except IOError as e:
 			messages.append('Could not add \"' + path + '\": ' + e.strerror + '\n', 'error')
