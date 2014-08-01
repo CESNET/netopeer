@@ -6,6 +6,7 @@ import os
 import M2Crypto
 import nc_module
 import messages
+import signal
 import shutil
 import config
 
@@ -247,13 +248,27 @@ class servcert(nc_module.nc_module):
 				messages.append('Could not copy \"' + self.key_toreplace + '\": ' + e.strerror + '\n', 'error')
 				return(False)
 
+		changes = False
 		if self.pem_toreplace:
 			self.set_stunnel_config(pempath, None)
 			self.pem_toreplace = None
+			changes = True
 		elif self.crt_toreplace and self.key_toreplace:
 			self.set_stunnel_config(crtpath, keypath)
 			self.crt_toreplace = None
 			self.key_toreplace = None
+			changes = True
+
+		if changes:
+			stunnel_pidpath = config.paths['cfgdir'] + '/stunnel/stunnel.pid'
+			if os.path.exists(stunnel_pidpath):
+				try:
+					pidfile = open(stunnel_pidpath, 'r')
+					stunnelpid = int(pidfile.read())
+					os.kill(stunnelpid, signal.SIGHUP)
+				except (ValueError, IOError, OSError):
+					messages.append('netopeer stunnel pid file found, but could not force config reload, changes may not take effect before stunnel restart', 'error')
+
 		return self.get()
 
 	def refresh(self, window, focus, height, width):

@@ -7,6 +7,7 @@ import M2Crypto
 import nc_module
 import messages
 import subprocess
+import signal
 import shutil
 import config
 
@@ -135,6 +136,15 @@ class cacerts(nc_module.nc_module):
 			except subprocess.CalledProcessError:
 				messages.append('c_rehash failed, the CA directory left inconsistent', 'error')
 				return(False)
+			stunnel_pidpath = config.paths['cfgdir'] + '/stunnel/stunnel.pid'
+			if os.path.exists(stunnel_pidpath):
+				try:
+					pidfile = open(stunnel_pidpath, 'r')
+					stunnelpid = int(pidfile.read())
+					os.kill(stunnelpid, signal.SIGHUP)
+				except (ValueError, IOError, OSError):
+					messages.append('netopeer stunnel pid file found, but could not force config reload, changes may not take effect before stunnel restart', 'error')
+
 
 		return(True)
 

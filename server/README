@@ -50,7 +50,7 @@ item. All requirements are checked by the configure script.
    netopeer-agent(1)s.
 - python 2.6 or higher with the following modules:
  - os, string, re, argparse, subprocess, curses, xml, libxml2
- - if using --enable-tls option also - M2Crypto, shutil
+ - if using --enable-tls option also - M2Crypto, shutil, signal
 - sshd
  - openSSH's SSH server, make sure that the correct path to this binary is part
    of your PATH environment variable or use --with-sshd=/path/to/sshd configure's

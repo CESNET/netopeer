@@ -266,6 +266,7 @@ AX_PYTHON_MODULE(xml, fatal)
 if test "$tls" = "yes"; then
 	AX_PYTHON_MODULE(M2Crypto, fatal)
 	AX_PYTHON_MODULE(shutil, fatal)
+	AX_PYTHON_MODULE(signal, fatal)
 fi
 
 # Check for rpmbuil
