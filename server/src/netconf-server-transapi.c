@@ -798,9 +798,10 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
 {
-	int cfgfile, running_cfgfile, pidfd;
+	int cfgfile, running_cfgfile, pidfd, cmdfd;
 	int pid, r;
-	char pidbuf[16];
+	char pidbuf[16], str[64];
+	ssize_t str_len = 64;
 	struct stat stbuf;
 
 	if (op == XMLDIFF_REM) {
@@ -849,8 +850,23 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* give him some time to restart */
 		usleep(500000);
 	} else {
-		/* remove possible leftover pid file */
-		remove(CFG_DIR"/stunnel/stunnel.pid");
+		/* remove possible leftover pid file and kill it, if it really is stunnel process */
+		if (access(CFG_DIR"/stunnel/stunnel.pid", F_OK) == 0) {
+			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1 && (r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
+				close(pidfd);
+				pidbuf[r] = '\0';
+				sprintf(str, "/proc/%s/cmdline", pidbuf);
+				if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1 && (str_len = read(cmdfd, &str, str_len-1)) != -1) {
+					close(cmdfd);
+					str[str_len] = '\0';
+					if (strstr(str, "stunnel") != NULL) {
+						kill(tlsd_pid, SIGTERM);
+					}
+				}
+				tlsd_pid = 0;
+			}
+			remove(CFG_DIR"/stunnel/stunnel.pid");
+		}
 
 		/* start stunnel */
 		pid = fork();
