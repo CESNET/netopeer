@@ -45,15 +45,16 @@
 
 #include <stdlib.h>
 #include <assert.h>
-#include <sys/types.h>
 #include <pwd.h>
 #include <shadow.h>
-#include <libxml/tree.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <libxml/tree.h>
 #include <augeas.h>
 #include <libnetconf.h>
 
@@ -135,6 +136,7 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	FILE *f = NULL;
 	struct spwd *spwd, new_spwd;
 	const char *en_passwd; /* encrypted password */
+	struct stat st;
 
 	assert(name);
 	assert(passwd);
@@ -175,6 +177,10 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 		ulckpwdf();
 		return (NULL);
 	}
+	/* get file stat of the original file to make a nice copy of it */
+	stat(SHADOW_ORIG, &st);
+	fchmod(fileno(f), st.st_mode);
+	fchown(fileno(f), st.st_uid, st.st_gid);
 
 	while ((spwd = getspent()) != NULL) {
 		if (strcmp(spwd->sp_namp, name) == 0) {
@@ -199,7 +205,6 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 		ulckpwdf();
 		return (NULL);
 	}
-	unlink(SHADOW_COPY);
 	ulckpwdf();
 
 	return (en_passwd);
