@@ -435,7 +435,7 @@ poll_restart:
 					process_operation(agents[i].fd);
 					break;
 				default:
-					nc_verb_warning("Unsupported DBus message type received.");
+					nc_verb_warning("Unsupported UNIX socket message type received.");
 					result = COMM_SOCKET_RESULT_ERROR;
 					send(agents[i].fd, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 				}
