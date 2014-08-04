@@ -855,6 +855,9 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1 && (r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
 				close(pidfd);
 				pidbuf[r] = '\0';
+				if (pidbuf[strlen(pidbuf)-1] == '\n') {
+					pidbuf[strlen(pidbuf)-1] = '\0';
+				}
 				sprintf(str, "/proc/%s/cmdline", pidbuf);
 				if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1 && (str_len = read(cmdfd, &str, str_len-1)) != -1) {
 					close(cmdfd);
