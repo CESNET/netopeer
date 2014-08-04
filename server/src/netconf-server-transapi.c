@@ -74,6 +74,8 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
+#define SSHDPID_ENV "SSHD_PID"
+
 struct ch_app {
 	char* name;
 	NC_TRANSPORT transport;
@@ -126,6 +128,7 @@ static void kill_sshd(void)
 	if (sshd_pid != 0) {
 		kill(sshd_pid, SIGTERM);
 		sshd_pid = 0;
+		unsetenv(SSHDPID_ENV);
 	}
 }
 
@@ -264,6 +267,7 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 {
 	int cfgfile, running_cfgfile;
 	int pid;
+	char pidbuf[10];
 	struct stat stbuf;
 
 	if (op == XMLDIFF_REM) {
@@ -328,6 +332,10 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			nc_verb_verbose("%s: started sshd (PID %d)", __func__, pid);
 			/* store sshd's PID */
 			sshd_pid = pid;
+
+			/* store it for other modules into environ */
+			snprintf(pidbuf, 10, "%u", sshd_pid);
+			setenv(SSHDPID_ENV, pidbuf, 1);
 		}
 	}
 

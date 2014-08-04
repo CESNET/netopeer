@@ -1,6 +1,6 @@
 /**
- * \file common.h
- * \brief Internal header file for cfgsystem module
+ * \file encrypt.h
+ * \brief Internal header file for encryption functions from salt.c and encrypt.c
  * \author Radek Krejci <rkrejci@cesnet.cz>
  * \date 2014
  *
@@ -40,30 +40,23 @@
  *
  */
 
-#ifndef COMMON_H_
-#define COMMON_H_
-
-#define AUGEAS_NTP_CONF "/etc/ntp.conf"
-#define AUGEAS_DNS_CONF "/etc/resolv.conf"
-#define AUGEAS_PAM_DIR "/etc/pam.d"
+#ifndef ENCRYPT_H
+#define ENCRYPT_H_
 
 /**
- * @brief init augeas structures needed for cfgsystem module
- * @param msg[out] error message in case of error.
- * @return EXIT_SUCCESS or EXIT_FAILURE
+ * @brief prepare salt for the crypt() function
+ * @param meth[in] Encryption method (MD5, DES, SHA256, SHA512)
+ * @param arg[in] number of rounds in case of SHA encryption
+ * @return created salt
  */
-int augeas_init(char** msg);
+const char *crypt_make_salt(const char *meth, void *arg);
 
 /**
- * @brief save all changes in configuration files covered by cfgsystem's auageas
- * @param msg[out] error message in case of error.
- * @return EXIT_SUCCESS or EXIT_FAILURE
+ * @brief wrapper for crypt() with error handling
+ * @param clear[in] plain text password
+ * @param salt[in] salt for hashing the password
+ * @return encrypted password including algorithm id, its parameters and salt
  */
-int augeas_save(char** msg);
+char *pw_encrypt(const char *clear, const char *salt);
 
-/**
- * @brief close augeas structures used by cfgsystem module
- */
-void augeas_close(void);
-
-#endif /* COMMON_H_ */
+#endif /* ENCRYPT_H */

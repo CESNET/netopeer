@@ -42,15 +42,15 @@
 
 #define _GNU_SOURCE
 
-#include "shutdown.h"
-
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
+
 #include <libnetconf.h>
+
+#include "shutdown.h"
 
 #define SHUTDOWN_PATH "/sbin/shutdown"
 

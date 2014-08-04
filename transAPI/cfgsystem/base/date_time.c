@@ -41,28 +41,25 @@
  */
 
 #define _GNU_SOURCE
-#define _BSD_SOURCE
-
+#include <arpa/inet.h>
 #include <assert.h>
-#include <stdio.h>
+#include <augeas.h>
+#include <errno.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <sys/utsname.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#include <sys/stat.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/sysinfo.h>
-#include <augeas.h>
+
 #include <libnetconf.h>
-#include <stdbool.h>
 
 #include "common.h"
 #include "platform.h"
+#include "date_time.h"
 
 #define ZONEINFO_FOLDER_PATH	"/usr/share/zoneinfo/"
 #define LOCALTIME_FILE_PATH	"/etc/localtime"
@@ -249,7 +246,7 @@ int ntp_status(void)
 	}
 }
 
-xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns)
+xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 {
 	int i, j;
 	const char* type[2] = {"server", "peer"};
@@ -273,7 +270,7 @@ loop:
 		asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]", type[j], i);
 		switch(aug_match(sysaugeas, path, NULL)) {
 		case -1:
-			asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+			asprintf(errmsg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 			free(path);
 			xmlFreeNode(ntp_node);
 			return (NULL);
@@ -307,7 +304,7 @@ loop:
 			asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]/iburst", type[j], i);
 			switch(aug_match(sysaugeas, path, NULL)) {
 			case -1:
-				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+				asprintf(errmsg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 				free(path);
 				xmlFreeNode(ntp_node);
 				return (NULL);
@@ -327,7 +324,7 @@ loop:
 			asprintf(&path, "/files/"AUGEAS_NTP_CONF"/%s[%d]/prefer", type[j], i);
 			switch(aug_match(sysaugeas, path, NULL)) {
 			case -1:
-				asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+				asprintf(errmsg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
 				free(path);
 				xmlFreeNode(ntp_node);
 				return (NULL);

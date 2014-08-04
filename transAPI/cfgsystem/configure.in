@@ -12,18 +12,25 @@ AC_ARG_ENABLE([debug],
 	CFLAGS="$CFLAGS -O3 -DNDEBUG"
 )
 
+AC_ARG_WITH([netopeer-confdir],
+	[AC_HELP_STRING([--with-netopeer-confdir=DIR], [Netopeer server configuration directory (by default ${sysconfdir}/netopeer/)])],
+	[NETOPEER_DIR="$withval"],
+	[NETOPEER_DIR="${sysconfdir}/netopeer/"]
+)
+AC_SUBST(NETOPEER_DIR)
+
 # --with-libxml2=path-to-libxml2-git-repository
 AC_ARG_WITH([libxml2],
-[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
-[
-	AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
-	if test "$XML2_CONFIG" = "no"; then
-		AC_MSG_ERROR([Missing development package of libxml2.])
-	fi
-	CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
-	LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
-	WITH_LIBXML2="$withval"
-]
+	[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
+	[
+		AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
+		if test "$XML2_CONFIG" = "no"; then
+			AC_MSG_ERROR([Missing development package of libxml2.])
+		fi
+		CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
+		LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
+		WITH_LIBXML2="$withval"
+	]
 )
 
 # Checks for programs.
@@ -66,12 +73,14 @@ export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
 PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+AC_SUBST(LIBNETCONF_DATADIR)
 
 PKG_CHECK_MODULES(AUGEAS, augeas >= 1.0.0)
 CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
 LIBS="$LIBS $AUGEAS_LIBS"
 
-AC_SEARCH_LIBS([crypt_gensalt_ra], [crypt], ,AC_MSG_ERROR([crypt not found!]))
+AC_SEARCH_LIBS([crypt], [crypt], ,AC_MSG_ERROR([crypt() not found!]))
 
 # Check for libxml2.
 if test -z "$WITH_LIBXML2" ; then
@@ -89,7 +98,7 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 #AC_TYPE_UINT32_T
 
 # Checks for library functions.
-#AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile model/ietf-system-data.rng])
 AC_OUTPUT

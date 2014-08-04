@@ -45,100 +45,97 @@
 
 #include <stdbool.h>
 
-xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns);
+/**
+ * @brief Get current (real) configuration of the DNS part in XML format.
+ * @param ns[in] XML namespace for the XML subtree being created.
+ * @param msg[out] error message in case of error.
+ * @return Created XML subtree or NULL on failure.
+ */
+xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg);
 
 /**
- * @brief add a new search domain to the resolv configuration file
- * @param a augeas structure to use
- * @param domain domain name to be added
- * @param index index of the newly added domain <1; oo)
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief add a new search domain to the /etc/resolv.conf configuration file
+ * @param domain[in] domain name to be added
+ * @param index[in] index of the newly added domain (index >= 1)
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_add_search_domain(const char* domain, int index, char** msg);
 
 /**
- * @brief remove a search domain from the resolv configuration file
- * @param a augeas structure to use
- * @param domain domain name to be removed
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief remove a search domain from the /etc/resolv.conf configuration file
+ * @param domain[in] domain name to be removed
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_rm_search_domain(const char* domain, char** msg);
 
 /**
- * @brief remove all search domains from the resolv configuration file
- * @param a augeas structure to use
+ * @brief remove all search domains from the /etc/resolv.conf configuration file
  */
 void dns_rm_search_domain_all(void);
 
 /**
- * @brief add a new nameserver to the resolv configuration file
- * @param a augeas structure to use
- * @param address nameserver address
- * @param index index of the newly added nameserver <1; oo)
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief add a new nameserver to the /etc/resolv.conf configuration file
+ * @param address[in] nameserver address
+ * @param index[in] index of the newly added nameserver <1; oo)
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_add_nameserver(const char* address, int index, char** msg);
 
-int dns_mod_nameserver(const char* address, int index, char** msg);
 /**
- * @brief remove a nameserver from the resolv configuration file
- * @param a augeas structure to use
- * @param address nameserver address
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief change the domain name of the nameserver at position index in the
+ * /etc/resolv.conf configuration file
+ * @param address[in] nameserver address
+ * @param index[in] index of the nameserver beeing changed
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int dns_mod_nameserver(const char* address, int index, char** msg);
+
+/**
+ * @brief remove a nameserver from the /etc/resolv.conf configuration file
+ * @param address[in] nameserver address
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_rm_nameserver(int index, char** msg);
 
 /**
- * @brief remove all nameservers from the resolv configuration file
- * @param a augeas structure to use
+ * @brief remove all nameservers from the /etc/resolv.conf configuration file
  */
 void dns_rm_nameserver_all(void);
 
 /**
- * @brief add the timeout option to the resolv configuration file
- * @param a augeas structure to use
- * @param number timeout value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief set the timeout option to the /etc/resolv.conf configuration file
+ * @param number[in] timeout value in seconds.
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_set_opt_timeout(const char* number, char** msg);
 
 /**
- * @brief remove the timeout option from the resolv configuration file
- * @param a augeas structure to use
- * @param number timeout value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief remove the timeout option from the /etc/resolv.conf configuration file
+ * @param number[in] original timeout value in seconds
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_rm_opt_timeout(void);
 
 /**
- * @brief add the attempts option to the resolv configuration file
- * @param a augeas structure to use
- * @param number attempts value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief set the attempts option to the /etc/resolv.conf configuration file
+ * @param number[in] attempts value
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_set_opt_attempts(const char* number, char** msg);
 
 /**
- * @brief remove the attempts option from the resolv configuration file
- * @param a augeas structure to use
- * @param number attempts value
- * @param msg error message if an error occured
- * @return EXIT_FAILURE error occured
- * @return EXIT_SUCCESS otherwise
+ * @brief remove the attempts option from the /etc/resolv.conf configuration file
+ * @param number[in] attempts value
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_rm_opt_attempts(void);
 

@@ -636,6 +636,7 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 AUGEAS_LIBS
 AUGEAS_CFLAGS
+LIBNETCONF_DATADIR
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -686,6 +687,7 @@ LDFLAGS
 CFLAGS
 CC
 XML2_CONFIG
+NETOPEER_DIR
 PROJECTNAME
 target_alias
 host_alias
@@ -729,6 +731,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_debug
+with_netopeer_confdir
 with_libxml2
 enable_shared
 enable_static
@@ -1377,6 +1380,9 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-netopeer-confdir=DIR
+                          Netopeer server configuration directory (by default
+                          ${sysconfdir}/netopeer/)
   --with-libxml2          specific libxml2 location
   --with-pic[=PKGS]       try to use only PIC/non-PIC objects [default=use
                           both]
@@ -2204,12 +2210,23 @@ else
 fi
 
 
+
+# Check whether --with-netopeer-confdir was given.
+if test "${with_netopeer_confdir+set}" = set; then :
+  withval=$with_netopeer_confdir; NETOPEER_DIR="$withval"
+else
+  NETOPEER_DIR="${sysconfdir}/netopeer/"
+
+fi
+
+
+
 # --with-libxml2=path-to-libxml2-git-repository
 
 # Check whether --with-libxml2 was given.
 if test "${with_libxml2+set}" = set; then :
   withval=$with_libxml2;
-	# Extract the first word of "xml2-config", so it can be a program name with args.
+		# Extract the first word of "xml2-config", so it can be a program name with args.
 set dummy xml2-config; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -2247,12 +2264,12 @@ $as_echo "no" >&6; }
 fi
 
 
-	if test "$XML2_CONFIG" = "no"; then
-		as_fn_error $? "Missing development package of libxml2." "$LINENO" 5
-	fi
-	CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
-	LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
-	WITH_LIBXML2="$withval"
+		if test "$XML2_CONFIG" = "no"; then
+			as_fn_error $? "Missing development package of libxml2." "$LINENO" 5
+		fi
+		CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
+		LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
+		WITH_LIBXML2="$withval"
 
 
 fi
@@ -11094,6 +11111,8 @@ $as_echo "yes" >&6; }
 fi
 CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
 LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+
 
 
 pkg_failed=no
@@ -11189,9 +11208,9 @@ fi
 CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
 LIBS="$LIBS $AUGEAS_LIBS"
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing crypt_gensalt_ra" >&5
-$as_echo_n "checking for library containing crypt_gensalt_ra... " >&6; }
-if ${ac_cv_search_crypt_gensalt_ra+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing crypt" >&5
+$as_echo_n "checking for library containing crypt... " >&6; }
+if ${ac_cv_search_crypt+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_func_search_save_LIBS=$LIBS
@@ -11204,11 +11223,11 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char crypt_gensalt_ra ();
+char crypt ();
 int
 main ()
 {
-return crypt_gensalt_ra ();
+return crypt ();
   ;
   return 0;
 }
@@ -11221,30 +11240,30 @@ for ac_lib in '' crypt; do
     LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
   fi
   if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_crypt_gensalt_ra=$ac_res
+  ac_cv_search_crypt=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext
-  if ${ac_cv_search_crypt_gensalt_ra+:} false; then :
+  if ${ac_cv_search_crypt+:} false; then :
   break
 fi
 done
-if ${ac_cv_search_crypt_gensalt_ra+:} false; then :
+if ${ac_cv_search_crypt+:} false; then :
 
 else
-  ac_cv_search_crypt_gensalt_ra=no
+  ac_cv_search_crypt=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_crypt_gensalt_ra" >&5
-$as_echo "$ac_cv_search_crypt_gensalt_ra" >&6; }
-ac_res=$ac_cv_search_crypt_gensalt_ra
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_crypt" >&5
+$as_echo "$ac_cv_search_crypt" >&6; }
+ac_res=$ac_cv_search_crypt
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "crypt not found!" "$LINENO" 5
+  as_fn_error $? "crypt() not found!" "$LINENO" 5
 fi
 
 
@@ -11348,9 +11367,13 @@ done
 #AC_TYPE_UINT32_T
 
 # Checks for library functions.
-#AC_CHECK_FUNCS([strdup])
+ac_fn_c_check_func "$LINENO" "l64a" "ac_cv_func_l64a"
+if test "x$ac_cv_func_l64a" = xyes; then :
+  CPPFLAGS="$CPPFLAGS -DHAVE_L64A"
+fi
 
-ac_config_files="$ac_config_files Makefile"
+
+ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12346,6 +12369,7 @@ do
   case $ac_config_target in
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "model/ietf-system-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-system-data.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

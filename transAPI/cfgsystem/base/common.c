@@ -61,7 +61,7 @@ int augeas_init(char** msg)
 		return EXIT_SUCCESS;
 	}
 
-	sysaugeas = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE | AUG_SAVE_NEWFILE);
+	sysaugeas = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
 	if (aug_error(sysaugeas) != AUG_NOERROR) {
 		asprintf(msg, "Augeas NTP initialization failed (%s)", aug_error_message(sysaugeas));
 		return EXIT_FAILURE;
@@ -73,8 +73,11 @@ int augeas_init(char** msg)
 	aug_set(sysaugeas, "/augeas/load/Resolv/lens", "Resolv.lns");
 	aug_set(sysaugeas, "/augeas/load/Resolv/incl", AUGEAS_DNS_CONF);
 	/* authentication */
-	aug_set(sysaugeas, "/augeas/load/Pam/lens", "Pam.lns");
-	aug_set(sysaugeas, "/augeas/load/Pam/incl", AUGEAS_PAM_DIR"/*");
+	aug_set(sysaugeas, "/augeas/load/Sshd/lens", "Sshd.lns");
+	aug_set(sysaugeas, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config");
+	/* /etc/login.defs */
+	aug_set(sysaugeas, "/augeas/load/Login_defs/lens", "Login_defs.lns");
+	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", "/etc/login.defs");
 
 	aug_load(sysaugeas);
 
@@ -84,6 +87,26 @@ int augeas_init(char** msg)
 		augeas_close();
 		return EXIT_FAILURE;
 	}
+
+	/* Switch off the PAM authentication in the sshd configuration.
+	 * The better way should be probably support PAM, but since we support only
+	 * local users, we don't need it. The only configuration we have to work
+	 * with is sshd_config. There, if the UsePAM is set to 'no', we have a full
+	 * control of the authentication via PasswordAuthentication value which
+	 * allows us to turn on/off 'local-users' user-authentication-order.
+	 *
+	 * If the PasswordAuthentication is 'no', pubkey authentication can still
+	 * works (but it is out of the ietf-netmod-system-mgmt). In this case the
+	 * user-authentication-order leaf-list with 'local-users' value is not
+	 * present.
+	 *
+	 * If the PasswordAuthentication is 'yes', the user-authentication-order
+	 * leaf-list with 'local-users' value is present. And since we don't support
+	 * radius authentication, it is the only user-authentication-order element.
+	 */
+	aug_set(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/UsePAM", "no");
+	augeas_save(msg);
+	free(*msg); *msg = NULL;
 
 	return EXIT_SUCCESS;
 }

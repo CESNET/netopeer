@@ -44,109 +44,83 @@
 #define LOCAL_USERS_H_
 
 #include <libxml/tree.h>
-#include <augeas.h>
-
-/* Context created for SSH keys processed in the user callback */
-struct user_ctx {
-	int count;
-	struct ssh_key* first;
-};
-
-/* SSH key context */
-struct ssh_key {
-	char* name;
-	char* alg;
-	char* data;
-	int change;		// 0 - add, 1 - mod, 2 - rem
-};
 
 /**
- * @brief get and possibly hash the password in parent's child
- * @param parent parent node of the password node
- * @param config_modified indicate config modification
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief Get current (real) configuration of the authentication part in XML format.
+ * @param ns[in] XML namespace for the XML subtree being created.
+ * @param errmsg[out] error message in case of error.
+ * @return Created XML subtree or NULL on failure.
  */
-const char* users_process_pass(xmlNodePtr parent, int* config_modified, char** msg);
+xmlNodePtr users_getxml(xmlNsPtr ns, char** msg);
 
 /**
- * @brief add a new user
- * @param name user name
- * @param passwd password
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief Add new user.
+ * @param name[in] username
+ * @param passwd[in] password for the user, can be NULL (not set), $0$plaintext
+ * (it will be encrypted), $X$hash (already encrypted using algorithm X).
+ * @param msg[out] error message in case of error.
+ * @return stored (encrypted) password
  */
-int users_add_user(const char* name, const char* passwd, char** msg);
+const char* users_add(const char *name, const char *passwd, char **msg);
 
 /**
- * @brief modify a user
- * @param name user name
- * @param passwd password
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief remove the specified user
+ * @param name[in] username of user to remove
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int users_mod_user(const char* name, const char* passwd, char** msg);
+int users_rm(const char *name, char **msg);
 
 /**
- * @brief remove a user
- * @param name user name
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief change password of the user
+ * @param name[in] username
+ * @param passwd[in] password for the user, can be NULL (not set), $0$plaintext
+ * (it will be encrypted), $X$hash (already encrypted using algorithm X).
+ * @param msg[out] error message in case of error.
+ * @return stored (encrypted) password
  */
-int users_rm_user(const char* name, char** msg);
+const char* users_mod(const char *name, const char *passwd, char **msg);
 
 /**
- * @brief get the home directory of a user
- * @param user_name user name
- * @param msg message containing an error if one occured
- * @return home dir success
- * @return NULL error occured
+ * @brief Add authorized key for the specified user
+ * @param username[in] name of the user where add the authorized key
+ * @param id[in] id of the key, it is stored as a comment for the key
+ * @param pem[in] authorized key data, in format stored by openSSH (algoithm data)
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-char* users_get_home_dir(const char* user_name, char** msg);
+int authkey_add(const char *username, const char *id, const char *pem, char **msg);
 
 /**
- * @brief apply the saved changes of an ssh key of a user
- * @param home_dir user home directory
- * @param key key to apply
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief Remove authorized key
+ * @param username[in] name of the user where manipulate with authorized keys
+ * @param id[in] id of the key to remove, it is stored as the key's comment
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int users_process_ssh_key(const char* home_dir, struct ssh_key* key, char** msg);
+int authkey_rm(const char *username, const char*id, char **msg);
 
 /**
- * @brief get and process all public ssh keys in a home dir of a user
- * @param home_dir user home directory
- * @param key structure to hold all the keys (must be freed)
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success or the home directory does not exist
- * @return EXIT_FAILURE error occured
+ * @brief enable local-users authentication.
+ *
+ * It sets 'yes' to PasswordAuthentication option in sshd_config of the SSH
+ * daemon listening for incoming NETCONF connections.
+ *
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int users_get_ssh_keys(const char* home_dir, struct ssh_key*** key, char** msg);
-
-xmlNodePtr users_augeas_getxml(char** msg, xmlNsPtr ns);
-
-/**
- * @brief remove all known SSHD PAM authentication types
- * @param a augeas structure to use
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
- */
-int users_augeas_rem_all_sshd_auth_order(char** msg);
+int auth_enable(char **msg);
 
 /**
- * @brief add an SSHD PAM authentication type with the highest priority
- * @param a augeas structure to use
- * @param auth_type known authentication type
- * @param msg message containing an error if one occured
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief disable local-users authentication.
+ *
+ * It sets 'no' to PasswordAuthentication option in sshd_config of the SSH
+ * daemon listening for incoming NETCONF connections. Users can be still
+ * authenticated via SSH keys.
+ *
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int users_augeas_add_first_sshd_auth_order(const char* auth_type, char** msg);
+int auth_disable(char **msg);
 
 #endif /* LOCAL_USERS_H_ */

@@ -13,6 +13,7 @@ libdir =  @libdir@
 mandir = @mandir@
 libtool = @libtool@
 sysconfdir = @sysconfdir@
+NETOPEER_DIR = @NETOPEER_DIR@
 
 CC = @CC@
 INSTALL = @INSTALL@
@@ -20,7 +21,7 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 LIBS = @LIBS@
 CFLAGS = -Wall @CFLAGS@
-CPPFLAGS = @CPPFLAGS@
+CPPFLAGS = @CPPFLAGS@ -DNETOPEER_DIR=\"$(NETOPEER_DIR)\"
 LIBTOOL = $(libtool) --tag=CC --quiet
 NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
@@ -36,6 +37,8 @@ SRCS = $(TARGET).c \
 	base/platform.c \
 	base/dns_resolver.c \
 	base/shutdown.c \
+	base/encrypt.c \
+	base/salt.c \
 	base/local_users.c
 OBJDIR = .obj
 LOBJS = $(SRCS:%.c=$(OBJDIR)/%.lo)
@@ -60,21 +63,21 @@ $(OBJDIR)/%.lo: %.c
 install: $(MODULE) $(TARGET)-init
 	$(INSTALL) -m 775 -d $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=install cp $(MODULE) $(DESTDIR)/$(libdir)/;
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/
+	$(INSTALL) -d $(NETOPEER_DIR)/ietf-system/
 	@for i in $(MODEL); do \
-		$(INSTALL_DATA) -m 600 $$i $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/; \
+		$(INSTALL_DATA) -m 600 $$i $(NETOPEER_DIR)/ietf-system/; \
 	done
 	@if test -n "$(NETOPEER_MANAGER)"; then \
 		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
 			$(NETOPEER_MANAGER) rm --name ietf-system; \
 		fi; \
 		$(NETOPEER_MANAGER) add --name ietf-system \
-			--model $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/ietf-system.yin \
+			--model $(NETOPEER_DIR)/ietf-system/ietf-system.yin \
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
-			--features authentication local-users ntp ntp-udp-port timezone-name dns-udp-tcp-port \
-			--datastore $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/datastore.xml; \
+			--features authentication local-users ntp timezone-name \
+			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
-	./$(TARGET)-init $(DESTDIR)/$(sysconfdir)/netopeer/ietf-system/datastore.xml
+	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
 
 .PHONY: clean
 clean:
