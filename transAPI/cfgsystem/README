@@ -1,7 +1,49 @@
-This part of the Netopeer project is not finished and it is not intended for
-public usage, YET.
-
 Use on your own risk, it can harm your system configuration files.
+
+cfgsystem.so
+------------
+
+TransAPI module primarily intended for the Netopeer server, but in general
+for libnetconf based NETCONF servers. The module should correctly work on
+RHEL, SUSE and Debian based distros.
+
+Install
+~~~~~~~
+
+$ ./configure
+$ make
+# make install
+
+configure options:
+
+--with-netopeer-confdir=DIR
+
+  If you changed the sysconfdir of the Netopeer server, please reflect
+  this change in this option. By default, the Netopeer server stores its
+  configuration files in ${sysconfdir}/netopeer/ directory. Instead of the
+  complete path, you can alternatively specify the sysconfdir value
+  (--sysconfdir=DIR) in the same way as in case of the Netopeer server.
+
+Functionality
+~~~~~~~~~~~~~
+
+This module implements ietf-system data model as defined in
+ietf-netmod-system-mgmt-16 draft from May 14, 2014. It implements only the
+folowing features of the data model:
+
+- authentication - configuration of the user authentication by manipulating
+  with the sshd_config of SSH daemon listening for the NETCONF connections.
+- local-users - configuration of local user authentication by manipulating
+  with the /etc/passwd, /etc/shadow and ~/.ssh/authorized_keys files.
+- ntp - configuration of usage NTP server(s) by manipulating with
+  /etc/ntp.conf file and the ntp (or ntpd on RHEL based distros) service.
+- timezone-name - allows timezone configuration using TZ database.
+
+The module also allows configuration of
+- DNS resolver by manipulating with the /etc/resolv.conf.
+
+For the detailed description of content for the specific configuration
+element, please read the ietf-netmod-system-mgmt-16 draft.
 
 
 cfgsystem-init
@@ -11,8 +53,9 @@ This small utility is able to load all the configurations managed by the
 ietf-system model and store them as the startup configuration data for use
 in the netopeer-server.
 
-The tool is automatically used with 'make install', so after that you don't
-need to run it manually.
+The tool is automatically used with 'make install' when the Netopeer server
+(netopeer-manager(1) is already installed, so after that you don't need to run
+it manually.
 
 Remember, that having empty startup datastore on netopeer-server startup with
 the cfgsystem module enabled causes removing all current configuration settings
