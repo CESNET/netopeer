@@ -779,7 +779,7 @@ int cmd_validate (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "c:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "c::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'c':
 			if (optarg == NULL) {
@@ -1085,7 +1085,7 @@ int cmd_get (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -1463,7 +1463,7 @@ int cmd_getconfig (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -2140,7 +2140,7 @@ int cmd_subscribe(char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "bef:ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "bef::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'b':
 		case 'e':
