@@ -2833,17 +2833,6 @@ $as_echo "$STUNNEL_EXEC" >&6; }
 		as_fn_error $? "Missing stunnel required for NETCONF over TLS transport." "$LINENO" 5
 	elif test ! -x "$STUNNEL_EXEC"; then
 		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" is not executable file." "$LINENO" 5
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for NETCONF support in stunnel" >&5
-$as_echo_n "checking for NETCONF support in stunnel... " >&6; }
-		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-			CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
-		else
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-		fi
 	fi
 fi
 

@@ -1,0 +1,32 @@
+--- ./verify(orig).c	2014-04-12 10:28:44.000000000 +0200
++++ ./verify.c	2014-08-01 10:30:03.633181215 +0200
+@@ -250,11 +250,13 @@
+         SSL_get_ex_data_X509_STORE_CTX_idx());
+     CLI *c=SSL_get_ex_data(ssl, cli_index);
+     int depth=X509_STORE_CTX_get_error_depth(callback_ctx);
++	static int ca_verify_ok = 1;
+ 
+     if(!preverify_ok) {
+         /* remote site specified a certificate, but it's not correct */
+         if(c->opt->verify_level>=4 && depth>0) {
+             s_log(LOG_INFO, "CERT: Invalid CA certificate ignored");
++			ca_verify_ok = 0;
+             return 1; /* success */
+         } else {
+             s_log(LOG_WARNING, "CERT: Verification error: %s",
+@@ -263,9 +265,13 @@
+             return 0; /* fail */
+         }
+     }
+-    if(c->opt->verify_level>=3 && depth==0)
+-        if(!cert_check_local(callback_ctx))
++	if((!ca_verify_ok && c->opt->verify_level>=5 && depth==0) || (c->opt->verify_level>=3 && c->opt->verify_level<=4 && depth==0)) {
++        if(!cert_check_local(callback_ctx)) {
++			ca_verify_ok = 1;
+             return 0; /* fail */
++		} else
++			ca_verify_ok = 1;
++	}
+     return 1; /* success */
+ }
+ 

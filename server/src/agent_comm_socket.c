@@ -290,3 +290,48 @@ nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 	return (reply);
 }
 
+#ifdef ENABLE_TLS
+char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
+{
+	msgtype_t result = 0, op = COMM_SOCKET_OP_CERT_TO_NAME;
+	unsigned int len;
+	int i;
+	char* username;
+
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		return NULL;
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* number of string arguments */
+	send(*conn, &argv_len, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* send each string */
+	for (i = 0; i < argv_len; ++i) {
+		len = strlen(argv[i]) + 1;
+		send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		send(*conn, argv[i], len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
+	}
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		return NULL;
+	}
+
+	// TODO ctn
+	/* get the username */
+	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	if (len == 0) {
+		return NULL;
+	}
+	username = malloc(len*sizeof(char));
+	recv(*conn, username, len, COMM_SOCKET_SEND_FLAGS);
+
+	return username;
+}
+#endif /* ENABLE_TLS */

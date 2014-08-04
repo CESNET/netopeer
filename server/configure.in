@@ -195,14 +195,6 @@ if test "$tls" = "yes"; then
 		AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
 	elif test ! -x "$STUNNEL_EXEC"; then
 		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" is not executable file.])
-	else
-		AC_MSG_CHECKING([for NETCONF support in stunnel])
-		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
-			AC_MSG_RESULT([yes])
-			CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
-		else
-			AC_MSG_RESULT([no])
-		fi
 	fi
 fi
 

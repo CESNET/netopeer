@@ -308,6 +308,49 @@ send_reply:
 	free(session_id);
 }
 
+#ifdef ENABLE_TLS
+static void cert_to_name (int socket)
+{
+	char *username = NULL;
+	int i, count;
+	unsigned int len;
+	char* arg;
+	msgtype_t result;
+
+	/* number of strings */
+	recv(socket, &count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* receive each string */
+	for (i = 0; i < count; ++i) {
+		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		arg = malloc(len*sizeof(char));
+		recv(socket, arg, len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
+		free(arg);
+	}
+
+	/* cert-to-name */
+	// TODO ctn
+	username = strdup("root");
+
+	/* send reply */
+	result = COMM_SOCKET_OP_CERT_TO_NAME;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	/* send username */
+	if (username == NULL) {
+		len = 0;
+		send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		return;
+	}
+	len = strlen(username) + 1;
+	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(socket, username, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* cleanup */
+	free(username);
+}
+#endif
+
 static void process_operation (int socket)
 {
 	struct session_info *session;
@@ -431,6 +474,11 @@ poll_restart:
 				case COMM_SOCKET_OP_KILL_SESSION:
 					kill_session(agents[i].fd);
 					break;
+#ifdef ENABLE_TLS
+				case COMM_SOCKET_OP_CERT_TO_NAME:
+					cert_to_name(agents[i].fd);
+					break;
+#endif
 				case COMM_SOCKET_OP_GENERIC:
 					process_operation(agents[i].fd);
 					break;

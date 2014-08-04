@@ -510,6 +510,61 @@ send_reply:
 	dbus_message_unref(dbus_reply);
 }
 
+#ifdef ENABLE_TLS
+/**
+ * @brief Translate a certificate from a client connected to Netopeer agent to
+ * a username. The function sends reply to the Netopeer agent.
+ *
+ * @param conn DBus connection to the Netopeer agent
+ * @param msg CertToName DBus message from the Netopeer agent
+ */
+static void cert_to_name (DBusConnection *conn, DBusMessage *msg)
+{
+	DBusMessageIter args;
+	char *aux_string = NULL;
+	DBusMessage * dbus_reply;
+	//struct nc_err * err;
+	dbus_bool_t boolean;
+	//nc_reply * reply;
+
+	if (!dbus_message_iter_init (msg, &args)) {
+		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_CERT_TO_NAME);
+		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
+		return;
+	} else {
+		/*err = nc_err_new (NC_ERR_OP_FAILED);
+		nc_err_set (err, NC_ERR_PARAM_MSG, "cert-to-name failed");
+		reply = nc_reply_error (err);
+		aux_string = nc_reply_dump (reply);
+		nc_reply_free (reply);*/
+		aux_string = strdup("root");
+
+		/* send D-Bus reply */
+		dbus_reply = dbus_message_new_method_return(msg);
+		if (dbus_reply == NULL) {
+			nc_verb_error("cert_to_name(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
+			/*err = nc_err_new (NC_ERR_OP_FAILED);
+			nc_err_set (err, NC_ERR_PARAM_MSG, "cert_to_name(): Failed to create dbus reply message.");*/
+			return;
+		}
+
+		boolean = 1;
+		dbus_message_iter_init_append (dbus_reply, &args);
+		dbus_message_iter_append_basic (&args, DBUS_TYPE_BOOLEAN, &boolean);
+		dbus_message_iter_append_basic (&args, DBUS_TYPE_STRING, &aux_string);
+		free (aux_string);
+
+		dbus_connection_send (conn, dbus_reply, NULL);
+		dbus_connection_flush (conn);
+		dbus_message_unref(dbus_reply);
+		/* parse message */
+		/* session ID */
+		//TODO ctn: parsing and cert-to-name fun
+		//dbus_message_iter_get_basic (&args, &session_id);
+	}
+}
+#endif /* ENABLE_TLS */
+
 /**
  * @brief Take care of all others NETCONF operation. Based on namespace
  * associated to operation decide to which device module pass the message.
@@ -623,6 +678,11 @@ int comm_loop(conn_t* conn, int timeout)
 			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
 				/* KillSession request */
 				kill_session(conn, msg);
+#ifdef ENABLE_TLS
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CERT_TO_NAME) == TRUE) {
+				/* CertToName request */
+				cert_to_name(conn, msg);
+#endif
 			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_PROCESS_OP) == TRUE) {
 				/* All other requests */
 				process_operation(conn, msg);

@@ -17,8 +17,8 @@ output = {CFGDIR}/stunnel.log
 cert = {CFGDIR}/server.pem
 ;key = {CFGDIR}/server.key
 
-; Verify peer with trusted CA chain.
-verify = 2
+; Verify peer first with trusted CA chain, on fail try to find exact local match.
+verify = 5
 
 ; CA certificates directory, with verify level 3, it also includes allowed
 ; client certificates.

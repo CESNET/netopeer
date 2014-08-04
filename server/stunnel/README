@@ -5,19 +5,21 @@ client.*     - client certificate signed by rootCA
 server.*     - server certificate signed by rootCA
 rootCA.*     - self-signed CA certificate
 stunnel.conf - example configuration for stunnel
-stunnel_netconf.patch
-             - patch for stunnel (v5.00) making stunnel to dump
-               received client certificate for use by
-               netopeer-agent and libnetconf.
+*.c.patch    - patches for stunnel (v5.02) making stunnel
+               export cert hashes and subjectAltName
+			   values and enabling new verify = 5 mode
 
 
 Patching stunnel:
 ~~~~~~~~~~~~~~~~
 
-wget https://www.stunnel.org/downloads/stunnel-5.00.tar.gz
-tar -xzf stunnel-5.00.tar.gz
-cd stunnel-5.00
-patch -p0 -i ../stunnel_netconf.patch
+wget https://www.stunnel.org/downloads/stunnel-5.02.tar.gz
+tar -xzf stunnel-5.02.tar.gz
+cd stunnel-5.02/src
+patch -p0 -i ../../client.c.patch
+patch -p0 -i ../../options.c.patch
+patch -p0 -i ../../verify.c.patch
+cd ..
 ./configure
 make
 sudo make install
@@ -30,7 +32,6 @@ Note: All certificates in this directory are only examples!
 
 Create self-signed CA certificate:
 openssl genrsa -out rootCA.key 2048
-openssl genrsa -out rootCA.key 2048 -des3
 openssl req -x509 -new -nodes -key rootCA.key -days 1024 -out rootCA.pem
 
 Create a peer certificate signed by own CA:
