@@ -74,7 +74,7 @@ install: $(MODULE) $(TARGET)-init
 		$(NETOPEER_MANAGER) add --name ietf-system \
 			--model $(NETOPEER_DIR)/ietf-system/ietf-system.yin \
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
-			--features authentication local-users ntp ntp-udp-port timezone-name dns-udp-tcp-port \
+			--features authentication local-users ntp timezone-name \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
