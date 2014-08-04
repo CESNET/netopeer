@@ -399,7 +399,7 @@ static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
 	return(firstnode);
 }
 
-xmlNodePtr users_getxml(char** msg, xmlNsPtr ns)
+xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 {
 	xmlNodePtr auth_node, user, aux_node;
 	struct passwd *pwd;

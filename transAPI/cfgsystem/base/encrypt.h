@@ -43,8 +43,20 @@
 #ifndef ENCRYPT_H
 #define ENCRYPT_H_
 
-const char *crypt_make_salt (const char *meth, void *arg);
+/**
+ * @brief prepare salt for the crypt() function
+ * @param meth[in] Encryption method (MD5, DES, SHA256, SHA512)
+ * @param arg[in] number of rounds in case of SHA encryption
+ * @return created salt
+ */
+const char *crypt_make_salt(const char *meth, void *arg);
 
+/**
+ * @brief wrapper for crypt() with error handling
+ * @param clear[in] plain text password
+ * @param salt[in] salt for hashing the password
+ * @return encrypted password including algorithm id, its parameters and salt
+ */
 char *pw_encrypt(const char *clear, const char *salt);
 
 #endif /* ENCRYPT_H */

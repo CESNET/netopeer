@@ -4,21 +4,14 @@
  * Do NOT alter function signatures or any structures unless you know exactly what you are doing.
  */
 
-#define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <errno.h>
 #include <string.h>
+#include <unistd.h>
+
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
-#include <augeas.h>
-#include <stdbool.h>
-#include <pwd.h>
-#include <sys/types.h>
-#include <shadow.h>
-#include <errno.h>
 
 #include "base/common.h"
 #include "base/date_time.h"
@@ -34,12 +27,6 @@
 #define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 #define NTP_SERVER_IBURST_DEFAULT false
 #define NTP_SERVER_PREFER_DEFAULT false
-
-/* Max numbers from manpage resolv.conf(5) */
-#define DNS_SEARCH_DOMAIN_MAX 6
-#define DNS_SEARCH_DOMAINLIST_LEN_MAX 256
-#define DNS_TIMEOUT_MAX 30
-#define DNS_ATTEMPTS_MAX 5
 
 /* transAPI version which must be compatible with libnetconf */
 PUBLIC int transapi_version = 4;
@@ -151,7 +138,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 
 	/* ntp */
 	if (ncds_feature_isenabled("ietf-system", "ntp")) {
-		if ((cur =  ntp_getconfig(&msg, root->ns)) != NULL) {
+		if ((cur =  ntp_getconfig(root->ns, &msg)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
 			augeas_close();
@@ -161,7 +148,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 	}
 
 	/* dns-resolver */
-	if ((cur =  dns_getconfig(&msg, root->ns)) != NULL) {
+	if ((cur =  dns_getconfig(root->ns, &msg)) != NULL) {
 		xmlAddChild(root, cur);
 	} else if (msg != NULL) {
 		augeas_close();
@@ -171,7 +158,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 
 	/* authentication */
 	if (ncds_feature_isenabled("ietf-system", "authentication")) {
-		if ((cur =  users_getxml(&msg, root->ns)) != NULL) {
+		if ((cur =  users_getxml(root->ns, &msg)) != NULL) {
 			xmlAddChild(root, cur);
 		} else if (msg != NULL) {
 			augeas_close();

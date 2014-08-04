@@ -52,21 +52,18 @@
 
 /**
  * @brief set the /etc/localtime file to right timezone
- * @param name[in] char * name of new timezone (e.g. "Europe/Prague")
+ * @param name[in] name of new timezone (e.g. "Europe/Prague")
  * file with this name has to be in /usr/share/zomeinfo/ folder
- * @return 0 successful rewrite of /etc/localtime
- * @return 1 file not found
- * @return 2 permission denied
+ * @param errmsg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int tz_set(const char *name, char** errmsg);
 
 /**
  * @brief set the /etc/localtime file to right timezone
- * @param offset[in] int GMT/UTC offset (e.g. 5)
- * file with this zone has to be in /usr/share/zoneinfo/Etc/ folder
- * @return 0 successful rewrite of /etc/localtime
- * @return 1 timezone not found
- * @return 2 permission denied
+ * @param offset[in] GMT/UTC offset in minutes (e.g. -120)
+ * @param errmsg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int set_gmt_offset(int offset, char** errmsg);
 
@@ -77,69 +74,66 @@ int set_gmt_offset(int offset, char** errmsg);
 time_t boottime_get(void);
 
 /**
- * @brief start ntp program on your system
- * @return 0 success
- * @return 1 problem with using ntp program
- * @return 2 UNKNOWN distribution
+ * @brief start ntp service on your system
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int ntp_start(void);
 
 /**
- * @brief stop ntp program on your system
- * @return 0 success
- * @return 1 problem with using ntp program
- * @return 2 UNKNOWN distribution
+ * @brief stop ntp service on your system
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int ntp_stop(void);
 
 /**
- * @brief restart ntp program on your system
- * @return 0 success 
+ * @brief restart ntp service on your system
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int ntp_restart(void);
 
 /**
- * @brief check the status of ntp on your system
+ * @brief check the status of ntp service on your system
  * @return 1 ntp running
- * @return 0 ntp not running
- * @return -1 failed to check ntp status
+ * @return 0 ntp not running or checking failed
  */
 int ntp_status(void);
 
-xmlNodePtr ntp_getconfig(char** msg, xmlNsPtr ns);
+/**
+ * @brief Get current (real) configuration of the ntp part in XML format.
+ * @param ns[in] XML namespace for the XML subtree being created.
+ * @param errmsg[out] error message in case of error.
+ * @return Created XML subtree or NULL on failure.
+ */
+xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg);
 
 /**
- * @brief add new server into augeas NTP config
- * @param a initialized augeas
- * @param udp_address NTP server address
- * @param association_type association type
- * @param iburst whether to set iburst
- * @param prefer whether to set prefer
- * @param msg error message in case of an error
- * @return EXIT_SUCCESS success
- * @return EXIT_FAILURE error occured
+ * @brief add new NTP server config to be used
+ * @param udp_address[in] NTP server address
+ * @param association_type[in] association type ('server', 'peer', 'pool').
+ * @param iburst[in] whether to set iburst option
+ * @param prefer[in] whether to set prefer option
+ * @param msg[out] error message in case of an error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int ntp_add_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
- * @brief find a server in augeas NTP config
- * @param a initialized augeas
- * @param udp_address NTP server address
- * @param association_type association type
- * @param iburst whether it had iburst set
- * @param prefer whether it had prefer set
+ * @brief remove the NTP server
+ * @param udp_address[in] address of the NTP server to be removed
+ * @param association_type[in[ association type ('server', 'peer', 'pool') of
+ * the NTP server to be removed
+ * @param iburst[in] whether it had iburst option set
+ * @param prefer[in] whether it had prefer option set
  * @param msg error message in case of an error
- * @return augeas item unique name
- * @return NULL if error occured
+ * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int ntp_rm_server(const char* udp_address, const char* association_type, bool iburst, bool prefer, char** msg);
 
 /**
  * @brief resolve an URL in both IPv4 and IPv6
- * @param server_name server URL
- * @param msg error message in case of an error
- * @return list of IP addresses ended with NULL
- * @return NULL if error occured
+ * @param server_name[in] URL of a server
+ * @param msg[out] error message in case of an error
+ * @return NULL terminated list of IP addresses or NULL in case of error.
  */
 char** ntp_resolve_server(const char* server_name, char** msg);
 

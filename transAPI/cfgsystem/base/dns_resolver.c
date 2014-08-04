@@ -55,7 +55,7 @@
 /* from common.c */
 extern augeas *sysaugeas;
 
-xmlNodePtr dns_getconfig(char** msg, xmlNsPtr ns)
+xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 {
 	int i, done;
 	char* path;

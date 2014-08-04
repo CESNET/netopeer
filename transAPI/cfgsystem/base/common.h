@@ -47,10 +47,23 @@
 #define AUGEAS_DNS_CONF "/etc/resolv.conf"
 #define AUGEAS_PAM_DIR "/etc/pam.d"
 
+/**
+ * @brief init augeas structures needed for cfgsystem module
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int augeas_init(char** msg);
 
+/**
+ * @brief save all changes in configuration files covered by cfgsystem's auageas
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int augeas_save(char** msg);
 
+/**
+ * @brief close augeas structures used by cfgsystem module
+ */
 void augeas_close(void);
 
 #endif /* COMMON_H_ */

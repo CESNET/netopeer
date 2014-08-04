@@ -59,47 +59,37 @@ typedef enum {
 } DISTRO;
 
 /**
- * @brief int which indicate kernel version (2., 3., ...)
- */
-extern int version_id;
-
-/**
  * @brief set global variables distribution_id and version_id
  */
 void identity_detect(void);
 
 /**
  * @brief return same information as uname -n
- * @return NULL allocation fail
- * @return char * node network name
+ * @return node network name or NULL on failure
  */
 const char* get_nodename(void);
 
 /**
  * @brief return same information as uname -r
- * @return NULL allocation fail
- * @return char * kernel release
+ * @return kernel release or NULL on failure
  */
 const char* get_os_release(void);
 
 /**
  * @brief return same information as uname -v
- * @return NULL allocation fail
- * @return char * kernel version
+ * @return kernel version or NULL on failure
  */
 const char* get_os_version(void);
 
 /**
  * @brief return same information as uname -m
- * @return NULL allocation fail
- * @return char * machine hardware name
+ * @return machine hardware name or NULL on failure
  */
 const char* get_os_machine(void);
 
 /**
  * @brief return same information uname -s
- * @return NULL allocation fail
- * @return char * NIS or YP domain name
+ * @return NIS or YP domain name or NULL on failure
  */
 const char* get_sysname(void);
 

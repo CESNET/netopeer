@@ -45,20 +45,82 @@
 
 #include <libxml/tree.h>
 
-xmlNodePtr users_getxml(char** msg, xmlNsPtr ns);
+/**
+ * @brief Get current (real) configuration of the authentication part in XML format.
+ * @param ns[in] XML namespace for the XML subtree being created.
+ * @param errmsg[out] error message in case of error.
+ * @return Created XML subtree or NULL on failure.
+ */
+xmlNodePtr users_getxml(xmlNsPtr ns, char** msg);
 
+/**
+ * @brief Add new user.
+ * @param name[in] username
+ * @param passwd[in] password for the user, can be NULL (not set), $0$plaintext
+ * (it will be encrypted), $X$hash (already encrypted using algorithm X).
+ * @param msg[out] error message in case of error.
+ * @return stored (encrypted) password
+ */
 const char* users_add(const char *name, const char *passwd, char **msg);
 
+/**
+ * @brief remove the specified user
+ * @param name[in] username of user to remove
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int users_rm(const char *name, char **msg);
 
+/**
+ * @brief change password of the user
+ * @param name[in] username
+ * @param passwd[in] password for the user, can be NULL (not set), $0$plaintext
+ * (it will be encrypted), $X$hash (already encrypted using algorithm X).
+ * @param msg[out] error message in case of error.
+ * @return stored (encrypted) password
+ */
 const char* users_mod(const char *name, const char *passwd, char **msg);
 
+/**
+ * @brief Add authorized key for the specified user
+ * @param username[in] name of the user where add the authorized key
+ * @param id[in] id of the key, it is stored as a comment for the key
+ * @param pem[in] authorized key data, in format stored by openSSH (algoithm data)
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int authkey_add(const char *username, const char *id, const char *pem, char **msg);
 
+/**
+ * @brief Remove authorized key
+ * @param username[in] name of the user where manipulate with authorized keys
+ * @param id[in] id of the key to remove, it is stored as the key's comment
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int authkey_rm(const char *username, const char*id, char **msg);
 
+/**
+ * @brief enable local-users authentication.
+ *
+ * It sets 'yes' to PasswordAuthentication option in sshd_config of the SSH
+ * daemon listening for incoming NETCONF connections.
+ *
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int auth_enable(char **msg);
 
+/**
+ * @brief disable local-users authentication.
+ *
+ * It sets 'no' to PasswordAuthentication option in sshd_config of the SSH
+ * daemon listening for incoming NETCONF connections. Users can be still
+ * authenticated via SSH keys.
+ *
+ * @param msg[out] error message in case of error.
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
 int auth_disable(char **msg);
 
 #endif /* LOCAL_USERS_H_ */
