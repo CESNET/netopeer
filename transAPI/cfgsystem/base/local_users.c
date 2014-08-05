@@ -438,7 +438,8 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 			/* get data from /etc/shadow */
 			setspent();
 			spwd = getspnam(pwd->pw_name);
-			if (spwd->sp_pwdp[0] != '!' &&     /* account not initiated or locked */
+			if (spwd != NULL && /* no record, wtf?!? */
+					spwd->sp_pwdp[0] != '!' && /* account not initiated or locked */
 					spwd->sp_pwdp[0] != '*') { /* login disabled */
 				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
 			}
