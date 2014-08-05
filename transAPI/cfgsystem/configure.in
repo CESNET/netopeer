@@ -37,6 +37,24 @@ AC_ARG_WITH([libxml2],
 AC_PROG_CC
 AC_PROG_INSTALL
 
+AC_PATH_PROG(USERADD, [useradd], [], [$PATH:/usr/sbin:/sbin])
+AC_PATH_PROG(USERDEL, [userdel], [], [$PATH:/usr/sbin:/sbin])
+AC_PATH_PROG(NTP, [ntpd], [], [$PATH:/usr/sbin:/sbin])
+AC_PATH_PROG(SHUTDOWN, [shutdown], [], [$PATH:/usr/sbin:/sbin])
+AC_SUBST(USERADD)
+AC_SUBST(USERDEL)
+AC_SUBST(SHUTDOWN)
+
+if test -d "/usr/share/zoneinfo/"; then
+	FEATURES="timezone-name"
+fi
+if test -n "$USERADD" -a -n "$USERDEL"; then
+	FEATURES="$FEATURES authentication local-users"
+fi
+if test -n "$NTP"; then
+	FEATURES="$FEATURES ntp"
+fi
+
 # Use libtool
 AC_PROG_LIBTOOL
 # Always use ./libtool unless overridden from command-line
@@ -100,5 +118,7 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 # Checks for library functions.
 AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
 
-AC_CONFIG_FILES([Makefile model/ietf-system-data.rng])
+AC_SUBST(FEATURES)
+
+AC_CONFIG_FILES([Makefile model/ietf-system-data.rng base/common.h])
 AC_OUTPUT

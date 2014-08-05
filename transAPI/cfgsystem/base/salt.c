@@ -18,10 +18,6 @@
 #include <unistd.h>
 #include <string.h>
 
-//#include "prototypes.h"
-//#include "defines.h"
-//#include "getdef.h"
-
 /* local function prototypes */
 static void seedRNG (void);
 static /*@observer@*/const char *gensalt (size_t salt_size);

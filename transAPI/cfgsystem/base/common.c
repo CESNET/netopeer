@@ -77,7 +77,7 @@ int augeas_init(char** msg)
 	aug_set(sysaugeas, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config");
 	/* /etc/login.defs */
 	aug_set(sysaugeas, "/augeas/load/Login_defs/lens", "Login_defs.lns");
-	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", "/etc/login.defs");
+	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", AUGEAS_LOGIN_CONF);
 
 	aug_load(sysaugeas);
 

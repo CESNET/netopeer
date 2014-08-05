@@ -48,7 +48,7 @@ all: $(MODULE) $(TARGET)-init
 $(TARGET)-init: $(SRCS) $(TARGET)-init.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ $(LIBS)
 
-*.la: $(LOBJS)
+$(MODULE): $(LOBJS)
 	$(LIBTOOL) --mode=link $(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS) -avoid-version -module -shared -export-dynamic --mode=link -o $@ $^ -rpath $(libdir)
 
 $(OBJDIR)/cfgsystem_build_config.o: cfgsystem_build_config/cfgsystem_build_config.c
@@ -67,17 +67,27 @@ install: $(MODULE) $(TARGET)-init
 	@for i in $(MODEL); do \
 		$(INSTALL_DATA) -m 600 $$i $(NETOPEER_DIR)/ietf-system/; \
 	done
-	@if test -n "$(NETOPEER_MANAGER)"; then \
+	if test -n "$(NETOPEER_MANAGER)"; then \
 		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
 			$(NETOPEER_MANAGER) rm --name ietf-system; \
 		fi; \
 		$(NETOPEER_MANAGER) add --name ietf-system \
 			--model $(NETOPEER_DIR)/ietf-system/ietf-system.yin \
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
-			--features authentication local-users ntp timezone-name \
+			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
+
+.PHONY: uninstall
+uninstall:
+	$(LIBTOOL) --mode=uninstall rm -rf q$(DESTDIR)/$(libdir)/$(MODULE);
+	rm -rf $(NETOPEER_DIR)/ietf-system/
+	if test -n "$(NETOPEER_MANAGER)"; then \
+		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
+			$(NETOPEER_MANAGER) rm --name ietf-system; \
+		fi; \
+	fi
 
 .PHONY: clean
 clean:

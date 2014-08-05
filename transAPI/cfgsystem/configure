@@ -634,6 +634,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+FEATURES
 AUGEAS_LIBS
 AUGEAS_CFLAGS
 LIBNETCONF_DATADIR
@@ -676,6 +677,10 @@ build_vendor
 build_cpu
 build
 LIBTOOL
+SHUTDOWN
+NTP
+USERDEL
+USERADD
 INSTALL_DATA
 INSTALL_SCRIPT
 INSTALL_PROGRAM
@@ -3187,6 +3192,184 @@ test -z "$INSTALL_SCRIPT" && INSTALL_SCRIPT='${INSTALL}'
 
 test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 
+
+# Extract the first word of "useradd", so it can be a program name with args.
+set dummy useradd; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_USERADD+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $USERADD in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_USERADD="$USERADD" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$PATH:/usr/sbin:/sbin"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_USERADD="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+USERADD=$ac_cv_path_USERADD
+if test -n "$USERADD"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $USERADD" >&5
+$as_echo "$USERADD" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+# Extract the first word of "userdel", so it can be a program name with args.
+set dummy userdel; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_USERDEL+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $USERDEL in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_USERDEL="$USERDEL" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$PATH:/usr/sbin:/sbin"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_USERDEL="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+USERDEL=$ac_cv_path_USERDEL
+if test -n "$USERDEL"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $USERDEL" >&5
+$as_echo "$USERDEL" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+# Extract the first word of "ntpd", so it can be a program name with args.
+set dummy ntpd; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_NTP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $NTP in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_NTP="$NTP" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$PATH:/usr/sbin:/sbin"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_NTP="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+NTP=$ac_cv_path_NTP
+if test -n "$NTP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $NTP" >&5
+$as_echo "$NTP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+# Extract the first word of "shutdown", so it can be a program name with args.
+set dummy shutdown; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_SHUTDOWN+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $SHUTDOWN in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_SHUTDOWN="$SHUTDOWN" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$PATH:/usr/sbin:/sbin"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_SHUTDOWN="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+SHUTDOWN=$ac_cv_path_SHUTDOWN
+if test -n "$SHUTDOWN"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SHUTDOWN" >&5
+$as_echo "$SHUTDOWN" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+
+
+
+
+if test -d "/usr/share/zoneinfo/"; then
+	FEATURES="timezone-name"
+fi
+if test -n "$USERADD" -a -n "$USERDEL"; then
+	FEATURES="$FEATURES authentication local-users"
+fi
+if test -n "$NTP"; then
+	FEATURES="$FEATURES ntp"
+fi
 
 # Use libtool
 case `pwd` in
@@ -11373,7 +11556,9 @@ if test "x$ac_cv_func_l64a" = xyes; then :
 fi
 
 
-ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng"
+
+
+ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng base/common.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12370,6 +12555,7 @@ do
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "model/ietf-system-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-system-data.rng" ;;
+    "base/common.h") CONFIG_FILES="$CONFIG_FILES base/common.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
