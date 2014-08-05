@@ -64,8 +64,6 @@
 #include "encrypt.h"
 #include "common.h"
 
-#define USERADD_PATH "/usr/sbin/useradd"
-#define USERDEL_PATH "/usr/sbin/userdel"
 #define SHADOW_ORIG "/etc/shadow"
 #define SHADOW_COPY "/etc/shadow.cfgsystem"
 

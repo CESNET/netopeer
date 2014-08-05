@@ -51,8 +51,7 @@
 #include <libnetconf.h>
 
 #include "shutdown.h"
-
-#define SHUTDOWN_PATH "/sbin/shutdown"
+#include "common.h"
 
 /**
  * @brief test shutdown usability

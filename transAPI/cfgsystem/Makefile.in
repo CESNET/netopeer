@@ -67,14 +67,14 @@ install: $(MODULE) $(TARGET)-init
 	@for i in $(MODEL); do \
 		$(INSTALL_DATA) -m 600 $$i $(NETOPEER_DIR)/ietf-system/; \
 	done
-	@if test -n "$(NETOPEER_MANAGER)"; then \
+	if test -n "$(NETOPEER_MANAGER)"; then \
 		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
 			$(NETOPEER_MANAGER) rm --name ietf-system; \
 		fi; \
 		$(NETOPEER_MANAGER) add --name ietf-system \
 			--model $(NETOPEER_DIR)/ietf-system/ietf-system.yin \
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
-			--features authentication local-users ntp timezone-name \
+			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
