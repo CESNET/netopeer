@@ -84,11 +84,11 @@ static void get_login_defs(void)
 	char *endptr;
 	static char method[10] = {'\0','\0','\0','\0','\0','\0','\0','\0','\0','\0'};
 
-	if (aug_get(sysaugeas, "/files/etc/login.defs/SHA_CRYPT_MIN_ROUNDS", &value) == 1) {
+	if (aug_get(sysaugeas, "/files/"AUGEAS_LOGIN_CONF"/SHA_CRYPT_MIN_ROUNDS", &value) == 1) {
 		sha_crypt_min_rounds = strtol(value, &endptr, 10);
 		if (*endptr != '\0') {
 			/* some characters after number */
-			nc_verb_warning("SHA_CRYPT_MIN_ROUNDS in /etc/login.defs contains invalid value (%s).", value);
+			nc_verb_warning("SHA_CRYPT_MIN_ROUNDS in %s contains invalid value (%s).", AUGEAS_LOGIN_CONF, value);
 			sha_crypt_min_rounds = -1;
 		}
 	} else {
@@ -96,11 +96,11 @@ static void get_login_defs(void)
 		sha_crypt_min_rounds = -1;
 	}
 
-	if (aug_get(sysaugeas, "/files/etc/login.defs/SHA_CRYPT_MAX_ROUNDS", &value) == 1) {
+	if (aug_get(sysaugeas, "/files/etc/"AUGEAS_LOGIN_CONF"/SHA_CRYPT_MAX_ROUNDS", &value) == 1) {
 		sha_crypt_max_rounds = strtol(value, &endptr, 10);
 		if (*endptr != '\0') {
 			/* some characters after number */
-			nc_verb_warning("SHA_CRYPT_MAX_ROUNDS in /etc/login.defs contains invalid value (%s).", value);
+			nc_verb_warning("SHA_CRYPT_MAX_ROUNDS in %s contains invalid value (%s).", AUGEAS_LOGIN_CONF, value);
 			sha_crypt_max_rounds = -1;
 		}
 	} else {
@@ -108,14 +108,14 @@ static void get_login_defs(void)
 		sha_crypt_max_rounds = -1;
 	}
 
-	if (aug_get(sysaugeas, "/files/etc/login.defs/ENCRYPT_METHOD", &value) == 1) {
+	if (aug_get(sysaugeas, "/files/etc/"AUGEAS_LOGIN_CONF"/ENCRYPT_METHOD", &value) == 1) {
 		strncpy(method, value, 9);
 		encrypt_method = method;
 	} else {
 		encrypt_method = NULL;
 	}
 
-	if (aug_get(sysaugeas, "/files/etc/login.defs/MD5_CRYPT_ENAB", &value) == 1) {
+	if (aug_get(sysaugeas, "/files/etc/"AUGEAS_LOGIN_CONF"/MD5_CRYPT_ENAB", &value) == 1) {
 		md5_crypt_enab = (strcasecmp(value, "yes") == 0) ? 1 : 0;
 	} else {
 		/* default value */

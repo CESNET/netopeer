@@ -45,8 +45,7 @@
 
 #define AUGEAS_NTP_CONF "/etc/ntp.conf"
 #define AUGEAS_DNS_CONF "/etc/resolv.conf"
-#define AUGEAS_PAM_DIR "/etc/pam.d"
-
+#define AUGEAS_LOGIN_CONF "/etc/login.defs"
 /**
  * @brief init augeas structures needed for cfgsystem module
  * @param msg[out] error message in case of error.
