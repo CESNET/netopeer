@@ -69,6 +69,7 @@
 
 /* from common.c */
 extern augeas *sysaugeas;
+extern char NETOPEER_SSHD_CONF[];
 
 /* for salt.c */
 long sha_crypt_min_rounds = -1;
@@ -210,7 +211,10 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 	const char *akf = NULL;
 
 	/* get AuthorizedKeysFile value from sshd_config */
-	aug_get(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/AuthorizedKeysFile", &akf);
+
+	asprintf(&filepath, "/files/%s/AuthorizedKeysFile", NETOPEER_SSHD_CONF);
+	aug_get(sysaugeas, filepath, &akf);
+	free(filepath); filepath = NULL;
 	if (akf == NULL) {
 		*msg = strdup("SSH server doesn't support Authorized Keys files.");
 		return(NULL);
@@ -403,6 +407,7 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 	struct passwd *pwd;
 	struct spwd *spwd;
 	const char* value;
+	char *path = NULL;
 
 	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
 		return (NULL);
@@ -412,7 +417,9 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 	auth_node = xmlNewNode(ns, BAD_CAST "authentication");
 
 	/* authentication/user-authentication-order */
-	aug_get(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/PasswordAuthentication", &value);
+	asprintf(&path, "/files/%s/PasswordAuthentication", NETOPEER_SSHD_CONF);
+	aug_get(sysaugeas, path, &value);
+	free(path);
 	if (value != NULL && strcmp(value, "yes") == 0) {
 		xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user-authentication-order", BAD_CAST "local-users");
 	}
@@ -557,18 +564,24 @@ static int switch_auth(const char *value, char **msg)
 {
 	const char* sshdpid_env;
 	augeas *augeas_running;
+	char *path = NULL;
 
-	if (aug_set(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/PasswordAuthentication", value) == -1) {
+	asprintf(&path, "/files/%s/PasswordAuthentication", NETOPEER_SSHD_CONF);
+	if (aug_set(sysaugeas, path, value) == -1) {
 		asprintf(msg, "Unable to set PasswordAuthentication to \"%s\" (%s).", value, aug_error_message(sysaugeas));
+		free(path);
 		return (EXIT_FAILURE);
 	}
+	free(path);
+	path = NULL;
 
 	/* Save the changes made by children callbacks via augeas */
 	if (augeas_save(msg) != 0) {
 		return (EXIT_FAILURE);
 	}
 
-	if ((sshdpid_env = getenv("SSHD_PID")) != NULL && access(NETOPEER_DIR"/sshd_config.running", F_OK) == 0) {
+	asprintf(&path, "/files/%s.running", NETOPEER_SSHD_CONF);
+	if ((sshdpid_env = getenv("SSHD_PID")) != NULL && access(path, F_OK) == 0) {
 		/* we have info about listening SSH server, update its config and make
 		 * it reload the configuration. If something get wrong, still return
 		 * success, new settings just will be applied after the SSH server
@@ -576,10 +589,12 @@ static int switch_auth(const char *value, char **msg)
 		 */
 		augeas_running = aug_init(NULL, NULL, AUG_NO_MODL_AUTOLOAD | AUG_NO_ERR_CLOSE);
 		if (aug_error(augeas_running) != AUG_NOERROR) {
+			free(path);
 			return EXIT_SUCCESS;
 		}
 		aug_set(augeas_running, "/augeas/load/Sshd/lens", "Sshd.lns");
-		aug_set(augeas_running, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config.running");
+		aug_set(augeas_running, "/augeas/load/Sshd/incl", path);
+		free(path); path = NULL;
 		aug_load(augeas_running);
 
 		if (aug_match(augeas_running, "/augeas//error", NULL) != 0) {
@@ -587,11 +602,13 @@ static int switch_auth(const char *value, char **msg)
 			return EXIT_SUCCESS;
 		}
 
-		if (aug_set(augeas_running, "/files/"NETOPEER_DIR"/sshd_config.running/PasswordAuthentication", value) == 0 &&
+		asprintf(&path, "/files/%s.running/PasswordAuthentication", NETOPEER_SSHD_CONF);
+		if (aug_set(augeas_running, path, value) == 0 &&
 				aug_save(augeas_running) == 0) {
 			/* make the server to reload configuration */
 			kill(atoi(sshdpid_env), SIGHUP);
 		}
+		free(path);
 		aug_close(augeas_running);
 	}
 

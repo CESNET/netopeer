@@ -45,6 +45,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <augeas.h>
 
@@ -52,9 +53,49 @@
 
 augeas *sysaugeas = NULL;
 
+char NETOPEER_SSHD_CONF[sizeof(NETOPEER_DIR) + 12];
+
+static void clip_occurences_with(char *str, char sought, char replacement)
+{
+	int adjacent = 0;
+	int clipped = 0;
+
+	assert(str);
+
+	while (*str != '\0') {
+		if (*str != sought) {
+			if (clipped != 0) {
+				/* Hurl together. */
+				*(str - clipped) = *str;
+			}
+			adjacent = 0;
+		} else if (adjacent == 0) {
+			/*
+			 * Found first character from a possible sequence of
+			 * characters. The whole sequence is going to be
+			 * replaced by only one replacement character.
+			 */
+			*(str - clipped) = replacement;
+			/* Next occurrence will be adjacent. */
+			adjacent = 1;
+		} else {
+			++clipped;
+		}
+
+		/* Next character. */
+		++str;
+	}
+
+	if (clipped != 0) {
+		/* New string end. */
+		*(str - clipped) = '\0';
+	}
+}
+
 int augeas_init(char** msg)
 {
 	char** matches;
+	char* path = NULL;
 	int c, i;
 
 	assert(msg);
@@ -89,8 +130,10 @@ int augeas_init(char** msg)
 	aug_set(sysaugeas, "/augeas/load/Resolv/lens", "Resolv.lns");
 	aug_set(sysaugeas, "/augeas/load/Resolv/incl", AUGEAS_DNS_CONF);
 	/* authentication */
+	strcpy(NETOPEER_SSHD_CONF, NETOPEER_DIR"/sshd_config");
+	clip_occurences_with(NETOPEER_SSHD_CONF, '/', '/');
 	aug_set(sysaugeas, "/augeas/load/Sshd/lens", "Sshd.lns");
-	aug_set(sysaugeas, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config");
+	aug_set(sysaugeas, "/augeas/load/Sshd/incl", NETOPEER_SSHD_CONF);
 	aug_load(sysaugeas);
 
 	if ((c = aug_match(sysaugeas, "/augeas//error", &matches)) != 0) {
@@ -120,7 +163,9 @@ int augeas_init(char** msg)
 	 * leaf-list with 'local-users' value is present. And since we don't support
 	 * radius authentication, it is the only user-authentication-order element.
 	 */
-	aug_set(sysaugeas, "/files/"NETOPEER_DIR"/sshd_config/UsePAM", "no");
+	asprintf(&path, "/files/%s/UsePAM", NETOPEER_SSHD_CONF);
+	aug_set(sysaugeas, path, "no");
+	free(path);
 	augeas_save(msg);
 	free(*msg); *msg = NULL;
 
