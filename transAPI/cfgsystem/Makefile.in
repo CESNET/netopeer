@@ -48,7 +48,7 @@ all: $(MODULE) $(TARGET)-init
 $(TARGET)-init: $(SRCS) $(TARGET)-init.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ $(LIBS)
 
-*.la: $(LOBJS)
+$(MODULE): $(LOBJS)
 	$(LIBTOOL) --mode=link $(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS) -avoid-version -module -shared -export-dynamic --mode=link -o $@ $^ -rpath $(libdir)
 
 $(OBJDIR)/cfgsystem_build_config.o: cfgsystem_build_config/cfgsystem_build_config.c
