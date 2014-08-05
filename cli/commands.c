@@ -1801,7 +1801,7 @@ int cmd_listen (char* arg)
 	}
 #ifdef ENABLE_TLS
 	if (cert) {
-		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL, NULL, NULL) != EXIT_SUCCESS) {
 			ERROR("listen", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
@@ -1920,7 +1920,7 @@ int cmd_connect (char* arg)
 	}
 #ifdef ENABLE_TLS
 	if (cert) {
-		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
+		if (nc_tls_init(cert, key, NULL, NULL, NULL, NULL) != EXIT_SUCCESS) {
 			ERROR("connect", "Initiating TLS failed.");
 			return (EXIT_FAILURE);
 		}
