@@ -79,6 +79,16 @@ install: $(MODULE) $(TARGET)-init
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
 
+.PHONY: uninstall
+uninstall:
+	$(LIBTOOL) --mode=uninstall rm -rf q$(DESTDIR)/$(libdir)/$(MODULE);
+	rm -rf $(NETOPEER_DIR)/ietf-system/
+	if test -n "$(NETOPEER_MANAGER)"; then \
+		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
+			$(NETOPEER_MANAGER) rm --name ietf-system; \
+		fi; \
+	fi
+
 .PHONY: clean
 clean:
 	$(LIBTOOL) --mode clean rm -f $(LOBJS)
