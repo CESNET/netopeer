@@ -37,12 +37,23 @@ AC_ARG_WITH([libxml2],
 AC_PROG_CC
 AC_PROG_INSTALL
 
-AC_PATH_PROG(USERADD, [useradd], [], [$PATH:/usr/sbin:/sbin])
-AC_PATH_PROG(USERDEL, [userdel], [], [$PATH:/usr/sbin:/sbin])
-AC_PATH_PROG(NTP, [ntpd], [], [$PATH:/usr/sbin:/sbin])
-AC_PATH_PROG(SHUTDOWN, [shutdown], [], [$PATH:/usr/sbin:/sbin])
+AC_ARG_WITH([useradd],
+	[AC_HELP_STRING([--with-useradd=PATH], [Path to useradd(1) utility])],
+	[USERADD=$withval],
+	[AC_PATH_PROG(USERADD, [useradd], [], [$PATH:/usr/sbin:/sbin])]
+)
 AC_SUBST(USERADD)
+AC_ARG_WITH([userdel],
+	[AC_HELP_STRING([--with-userdel=PATH], [Path to userdel(1) utility])],
+	[USERDEL=$withval],
+	[AC_PATH_PROG(USERDEL, [userdel], [], [$PATH:/usr/sbin:/sbin])]
+)
 AC_SUBST(USERDEL)
+AC_ARG_WITH([shutdown],
+	[AC_HELP_STRING([--with-shutdown=PATH], [Path to shutdown(1) utility])],
+	[SHUTDOWN=$withval],
+	[AC_PATH_PROG(SHUTDOWN, [shutdown], [], [$PATH:/usr/sbin:/sbin])]
+)
 AC_SUBST(SHUTDOWN)
 
 if test -d "/usr/share/zoneinfo/"; then
@@ -51,7 +62,7 @@ fi
 if test -n "$USERADD" -a -n "$USERDEL"; then
 	FEATURES="$FEATURES authentication local-users"
 fi
-if test -n "$NTP"; then
+if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
 	FEATURES="$FEATURES ntp"
 fi
 
