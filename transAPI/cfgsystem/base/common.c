@@ -54,6 +54,9 @@ augeas *sysaugeas = NULL;
 
 int augeas_init(char** msg)
 {
+	char** matches;
+	int c, i;
+
 	assert(msg);
 
 	if (sysaugeas != NULL) {
@@ -66,6 +69,19 @@ int augeas_init(char** msg)
 		asprintf(msg, "Augeas NTP initialization failed (%s)", aug_error_message(sysaugeas));
 		return EXIT_FAILURE;
 	}
+
+	/*
+	 * check if we are able to load Login_defs lens, on augeas <1.1 it can fail,
+	 * but we can continue even without login.defs (default values will be used)
+	 */
+	aug_set(sysaugeas, "/augeas/load/Login_defs/lens", "Login_defs.lns");
+	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", AUGEAS_LOGIN_CONF);
+	aug_load(sysaugeas);
+	if (aug_match(sysaugeas, "/augeas//error", NULL) != 0) {
+		/* continue without login.defs */
+		aug_rm(sysaugeas, "/augeas/load/Login_defs/");
+	}
+
 	/* NTP */
 	aug_set(sysaugeas, "/augeas/load/Ntp/lens", "Ntp.lns");
 	aug_set(sysaugeas, "/augeas/load/Ntp/incl", AUGEAS_NTP_CONF);
@@ -75,16 +91,16 @@ int augeas_init(char** msg)
 	/* authentication */
 	aug_set(sysaugeas, "/augeas/load/Sshd/lens", "Sshd.lns");
 	aug_set(sysaugeas, "/augeas/load/Sshd/incl", NETOPEER_DIR"/sshd_config");
-	/* /etc/login.defs */
-	aug_set(sysaugeas, "/augeas/load/Login_defs/lens", "Login_defs.lns");
-	aug_set(sysaugeas, "/augeas/load/Login_defs/incl", AUGEAS_LOGIN_CONF);
-
 	aug_load(sysaugeas);
 
-	if (aug_match(sysaugeas, "/augeas//error", NULL) != 0) {
-		aug_get(sysaugeas, "/augeas//error[1]/message", (const char**) msg);
-		asprintf(msg, "Initiating augeas failed (%s)", *msg);
+	if ((c = aug_match(sysaugeas, "/augeas//error", &matches)) != 0) {
+		aug_get(sysaugeas, matches[0], (const char**) msg);
+		asprintf(msg, "Initiating augeas failed (%s: %s)", matches[0], *msg);
 		augeas_close();
+		for (i = 0; i < c; ++i) {
+			free(matches[i]);
+		}
+		free(matches);
 		return EXIT_FAILURE;
 	}
 
