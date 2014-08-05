@@ -24,6 +24,14 @@ configure options:
   complete path, you can alternatively specify the sysconfdir value
   (--sysconfdir=DIR) in the same way as in case of the Netopeer server.
 
+--with-[useradd|userdel|shutdown]=PATH
+
+  On some distros (RHEL based) when a normal user builds (run configure)
+  it is unable to detect, that these tools are available when you are
+  root. Therefore, if configure cannot detect those tools, you can specify
+  them manually. Otherwise, configure switches off the functionality of the
+  cfgsystem that depends on that tools.
+
 Functionality
 ~~~~~~~~~~~~~
 

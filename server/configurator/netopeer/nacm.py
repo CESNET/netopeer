@@ -84,7 +84,8 @@ class nacm(nc_module.nc_module):
 	def find(self):
 		"""Try to find NACM datastore."""
 		try:
-			ncworkingdir = subprocess.check_output('pkg-config libnetconf --variable=ncworkingdir', shell=True).split(os.linesep)[0]
+			p = subprocess.Popen(['pkg-config', 'libnetconf', '--variable=ncworkingdir'], stdout=subprocess.PIPE)
+			ncworkingdir = p.communicate()[0].split(os.linesep)[0]
 		except:
 			return(False)
 
