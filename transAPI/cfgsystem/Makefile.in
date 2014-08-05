@@ -68,7 +68,7 @@ install: $(MODULE) $(TARGET)-init
 		$(INSTALL_DATA) -m 600 $$i $(NETOPEER_DIR)/ietf-system/; \
 	done
 	if test -n "$(NETOPEER_MANAGER)"; then \
-		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
+		if test -n "`$(NETOPEER_MANAGER) list | grep "^ietf-system ("`"; then \
 			$(NETOPEER_MANAGER) rm --name ietf-system; \
 		fi; \
 		$(NETOPEER_MANAGER) add --name ietf-system \
@@ -84,7 +84,7 @@ uninstall:
 	$(LIBTOOL) --mode=uninstall rm -rf q$(DESTDIR)/$(libdir)/$(MODULE);
 	rm -rf $(NETOPEER_DIR)/ietf-system/
 	if test -n "$(NETOPEER_MANAGER)"; then \
-		if test "`$(NETOPEER_MANAGER) list | grep ietf-system`" = "ietf-system"; then \
+		if test -n "`$(NETOPEER_MANAGER) list | grep "^ietf-system ("`"; then \
 			$(NETOPEER_MANAGER) rm --name ietf-system; \
 		fi; \
 	fi
