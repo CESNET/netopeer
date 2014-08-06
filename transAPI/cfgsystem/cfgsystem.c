@@ -881,8 +881,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
 		/* process authorized keys */
 	} else if (op & XMLDIFF_REM) {
 		/* remove existing user */
+		msg = NULL;
 		if (users_rm(name, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
+		}
+		if (msg != NULL) {
+			nc_verb_warning(msg);
+			free(msg);
 		}
 	}
 

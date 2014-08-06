@@ -281,7 +281,9 @@ int users_rm(const char *name, char **msg)
 
 	if (ret != 0) {
 		*msg = strdup(errmsg[ret]);
-		return (EXIT_FAILURE);
+		if (ret != 12) {
+			return (EXIT_FAILURE);
+		}
 	}
 
 	return (EXIT_SUCCESS);
