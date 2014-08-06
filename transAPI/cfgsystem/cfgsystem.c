@@ -904,7 +904,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 {
 	char *msg;
 	xmlNodePtr aux_node;
-	const char* username = NULL, *id = NULL, *pem = NULL;
+	const char* username = NULL, *id = NULL, *alg = NULL, *pem = NULL;
 
 	/* get username for this key */
 	for (aux_node = node->parent->children; aux_node != NULL; aux_node = aux_node->next) {
@@ -945,18 +945,26 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
 	if (op & XMLDIFF_ADD) {
 		/* get pem data of this key */
 		for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
-			if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "key-data") != 0) {
+			if (aux_node->type != XML_ELEMENT_NODE) {
 				continue;
 			}
-			pem = get_node_content(aux_node);
-			break;
+			if  (xmlStrcmp(aux_node->name, BAD_CAST "key-data") != 0) {
+				pem = get_node_content(aux_node);
+			} else if  (xmlStrcmp(aux_node->name, BAD_CAST "algorithm") != 0) {
+				alg = get_node_content(aux_node);
+			}
+
+			if (pem && alg) {
+				break;
+			}
 		}
-		if (pem == NULL) {
-			return fail(error, strdup("Missing key-data element for the authorized-key."), EXIT_FAILURE);
+		if (pem == NULL || alg == NULL) {
+			asprintf(&msg, "Missing %s element for the authorized-key.", (pem == NULL) ? "key-data" : "algorithm");
+			return fail(error, msg, EXIT_FAILURE);
 		}
 
 		/* add new key */
-		if (authkey_add(username, id, pem, &msg) != EXIT_SUCCESS) {
+		if (authkey_add(username, id, alg, pem, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	}

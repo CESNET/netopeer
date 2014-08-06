@@ -353,7 +353,7 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
 {
 	FILE *authfile;
-	char *line = NULL, *id, *delim;
+	char *line = NULL, *id, *data;
 	xmlNodePtr firstnode = NULL, newnode;
 	ssize_t len = 0;
 	size_t n = 0;
@@ -365,7 +365,7 @@ static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
 
 	while((len = getline(&line, &n, authfile)) != -1) {
 		/* get the second space to locate comment/id */
-		id = strchr((delim = strchr(line, ' ')) + 1, ' ');
+		id = strchr((data = strchr(line, ' ')) + 1, ' ');
 
 		if (id == NULL) {
 			free(line);
@@ -374,10 +374,13 @@ static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
 			return (NULL);
 		}
 
-		/* divide comment/id from data */
+		/* divide comment/id from data... */
 		id[0] = '\0';
 		id++;
-		/* remove the newline if any */
+		/* ... and data from algorithm */
+		data[0] = '\0';
+		data++;
+		/* remove the newline in the end if any */
 		if (line[len - 1] == '\n') {
 			line[len - 1] = '\0';
 		}
@@ -385,8 +388,7 @@ static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
 		/* create xml data */
 		newnode = xmlNewNode(ns, BAD_CAST "authorized-key");
 		xmlNewChild(newnode, ns, BAD_CAST "name", BAD_CAST id);
-		xmlNewChild(newnode, ns, BAD_CAST "key-data", BAD_CAST line);
-		delim[0] = '\0';
+		xmlNewChild(newnode, ns, BAD_CAST "key-data", BAD_CAST data);
 		xmlNewChild(newnode, ns, BAD_CAST "algorithm", BAD_CAST line);
 
 		/* prepare returning node list */
@@ -472,13 +474,14 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 	return (auth_node);
 }
 
-int authkey_add(const char *username, const char *id, const char *pem, char **msg)
+int authkey_add(const char *username, const char *id, const char *algorithm, const char *pem, char **msg)
 {
 	FILE *authkeys_file;
 
 	assert(username);
 	assert(id);
 	assert(pem);
+	assert(algorithm);
 
 	/* get authorized_keys file */
 	if ((authkeys_file = open_authfile(username, "a", NULL, msg)) == NULL) {
@@ -486,7 +489,7 @@ int authkey_add(const char *username, const char *id, const char *pem, char **ms
 	}
 
 	/* add the key to the file */
-	fprintf(authkeys_file, "%s %s\n", pem, id);
+	fprintf(authkeys_file, "%s %s %s\n", algorithm, pem, id);
 	fclose(authkeys_file);
 
 	return (EXIT_SUCCESS);
