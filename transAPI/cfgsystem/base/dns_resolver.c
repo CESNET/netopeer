@@ -58,7 +58,7 @@ extern augeas *sysaugeas;
 xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 {
 	int i, done;
-	char* path;
+	char* path, *content = NULL;
 	const char* value;
 	xmlNodePtr dns_node, server, aux_node;
 
@@ -111,18 +111,19 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 			/* dns-resolver/server */
 			server = xmlNewChild(dns_node, dns_node->ns, BAD_CAST "server", NULL);
 
+			/* dns-resolver/server/name */
+			asprintf(&content, "nameserver-%d", i);
+			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST content);
+			free(content);
+
 			/* dns-resolver/server/udp-and-tcp/address */
 			aug_get(sysaugeas, path, &value);
 			aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp-and-tcp", NULL);
 			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST value);
+			free(path);
+
 			/* port specification is not supported by Linux dns resolver implementation */
 
-			/* dns-resolver/server/name */
-			free(path); path = NULL;
-			asprintf(&path, "nameserver-%d", i);
-			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST path);
-
-			free(path); path = NULL;
 			break;
 		}
 	}
