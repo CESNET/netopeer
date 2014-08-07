@@ -77,24 +77,24 @@ char* get_netconf_dir(void)
 	}
 	user_home = pw->pw_dir;
 
-	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+	if (asprintf(&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
 		ERROR("get_netconf_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		return NULL;
 	}
 
-	ret = access (netconf_dir, R_OK|X_OK);
+	ret = access(netconf_dir, R_OK | X_OK);
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist */
-			ERROR ("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
-			if (mkdir (netconf_dir, 0700) != 0) {
-				ERROR ("get_netconf_dir", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
-				free (netconf_dir);
+			ERROR("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
+			if (mkdir(netconf_dir, 0700) != 0) {
+				ERROR("get_netconf_dir", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
+				free(netconf_dir);
 				return NULL;
 			}
 		} else {
-			ERROR ("get_netconf_dir", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
-			free (netconf_dir);
+			ERROR("get_netconf_dir", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
+			free(netconf_dir);
 			return NULL;
 		}
 	}
@@ -102,7 +102,8 @@ char* get_netconf_dir(void)
 	return netconf_dir;
 }
 
-void get_default_client_cert(char** cert, char** key) {
+void get_default_client_cert(char** cert, char** key)
+{
 	char* netconf_dir;
 	int ret;
 
@@ -148,7 +149,8 @@ void get_default_client_cert(char** cert, char** key) {
 	return;
 }
 
-char* get_default_trustedCA_dir(void) {
+char* get_default_trustedCA_dir(void)
+{
 	char* netconf_dir, *cert_dir;
 	DIR* dir;
 
@@ -174,7 +176,8 @@ char* get_default_trustedCA_dir(void) {
 	return cert_dir;
 }
 
-char* get_default_CRL_dir(void) {
+char* get_default_CRL_dir(void)
+{
 	char* netconf_dir, *crl_dir;
 	DIR* dir;
 
@@ -200,9 +203,9 @@ char* get_default_CRL_dir(void) {
 	return crl_dir;
 }
 
-void load_config (struct nc_cpblts **cpblts)
+void load_config(struct nc_cpblts **cpblts)
 {
-	char * netconf_dir, * history_file, *config_file;
+	char * netconf_dir, *history_file, *config_file;
 #ifdef ENABLE_TLS
 	struct stat st;
 	char* trusted_dir, *crl_dir;
@@ -213,7 +216,7 @@ void load_config (struct nc_cpblts **cpblts)
 	xmlNodePtr config_cap, tmp_node;
 
 #ifndef DISABLE_LIBSSH
-	char * key_priv, * key_pub, *prio;
+	char * key_priv, *key_pub, *prio;
 	xmlNodePtr tmp_auth, tmp_pref, tmp_key;
 #endif
 
@@ -269,7 +272,7 @@ void load_config (struct nc_cpblts **cpblts)
 	free(crl_dir);
 #endif /* ENABLE_TLS */
 
-	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
+	if (asprintf(&history_file, "%s/history", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to load commands history due to the previous error.");
 		history_file = NULL;
@@ -294,7 +297,7 @@ void load_config (struct nc_cpblts **cpblts)
 		}
 	}
 
-	if (asprintf (&config_file, "%s/config.xml", netconf_dir) == -1) {
+	if (asprintf(&config_file, "%s/config.xml", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to load configuration due to the previous error.");
 		config_file = NULL;
@@ -382,18 +385,18 @@ void load_config (struct nc_cpblts **cpblts)
 		}
 	}
 
-	free (config_file);
-	free (history_file);
-	free (netconf_dir);
+	free(config_file);
+	free(history_file);
+	free(netconf_dir);
 }
 
 /**
  * \brief Store configuration and history
  */
-void store_config (struct nc_cpblts * cpblts)
+void store_config(struct nc_cpblts * cpblts)
 {
 	struct passwd * pw;
-	char * user_home, *netconf_dir, * history_file, *config_file;
+	char * user_home, *netconf_dir, *history_file, *config_file;
 	const char * cap;
 	int history_fd, ret;
 	xmlDocPtr config_doc;
@@ -406,30 +409,30 @@ void store_config (struct nc_cpblts * cpblts)
 	}
 	user_home = pw->pw_dir;
 
-	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+	if (asprintf(&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		return;
 	}
 
-	ret = access (netconf_dir, R_OK|W_OK|X_OK);
+	ret = access(netconf_dir, R_OK | W_OK | X_OK);
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist, create it */
-			if (mkdir (netconf_dir, 0700)) {
+			if (mkdir(netconf_dir, 0700)) {
 				/* directory can not be created */
-				free (netconf_dir);
+				free(netconf_dir);
 				ERROR("store_config", "Storing history failed (mkdir(): %s)", strerror(errno));
 				return;
 			}
 		} else {
 			/* directory exist but cannot be accessed */
-			free (netconf_dir);
+			free(netconf_dir);
 			ERROR("store_config", "Accessing the directory for storing the history failed (%s)", strerror(errno));
 			return;
 		}
 	}
 
-	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
+	if (asprintf(&history_file, "%s/history", netconf_dir) == -1) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("store_config", "Unable to store commands history due to the previous error.");
 		history_file = NULL;
@@ -453,7 +456,7 @@ void store_config (struct nc_cpblts * cpblts)
 		free(history_file);
 	}
 
-	if (asprintf (&config_file, "%s/config.xml", netconf_dir) == -1) {
+	if (asprintf(&config_file, "%s/config.xml", netconf_dir) == -1) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("store_config", "Unable to store configuration due to the previous error.");
 		config_file = NULL;
@@ -489,6 +492,6 @@ void store_config (struct nc_cpblts * cpblts)
 		}
 	}
 
-	free (netconf_dir);
-	free (config_file);
+	free(netconf_dir);
+	free(config_file);
 }
