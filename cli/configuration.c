@@ -395,41 +395,15 @@ void load_config(struct nc_cpblts **cpblts)
  */
 void store_config(struct nc_cpblts * cpblts)
 {
-	struct passwd * pw;
-	char * user_home, *netconf_dir, *history_file, *config_file;
+	char *netconf_dir, *history_file, *config_file;
 	const char * cap;
 	int history_fd, ret;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_caps;
 	FILE * config_f;
 
-	if ((pw = getpwuid(getuid())) == NULL) {
-		ERROR("store_config", "Determining home directory failed (%s).", strerror(errno));
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
-	}
-	user_home = pw->pw_dir;
-
-	if (asprintf(&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
-		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
-		return;
-	}
-
-	ret = access(netconf_dir, R_OK | W_OK | X_OK);
-	if (ret == -1) {
-		if (errno == ENOENT) {
-			/* directory does not exist, create it */
-			if (mkdir(netconf_dir, 0700)) {
-				/* directory can not be created */
-				free(netconf_dir);
-				ERROR("store_config", "Storing history failed (mkdir(): %s)", strerror(errno));
-				return;
-			}
-		} else {
-			/* directory exist but cannot be accessed */
-			free(netconf_dir);
-			ERROR("store_config", "Accessing the directory for storing the history failed (%s)", strerror(errno));
-			return;
-		}
 	}
 
 	if (asprintf(&history_file, "%s/history", netconf_dir) == -1) {
