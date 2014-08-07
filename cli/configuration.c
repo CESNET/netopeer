@@ -39,6 +39,7 @@
  */
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <readline/readline.h>
@@ -106,6 +107,9 @@ void get_default_client_cert(char** cert, char** key)
 {
 	char* netconf_dir;
 	int ret;
+
+	assert(cert && !*cert);
+	assert(key &&!*key);
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
@@ -219,6 +223,8 @@ void load_config(struct nc_cpblts **cpblts)
 	char * key_priv, *key_pub, *prio;
 	xmlNodePtr tmp_auth, tmp_pref, tmp_key;
 #endif
+
+	assert(cpblts);
 
 	(*cpblts) = nc_session_get_cpblts_default();
 
@@ -393,14 +399,14 @@ void load_config(struct nc_cpblts **cpblts)
 /**
  * \brief Store configuration and history
  */
-void store_config(struct nc_cpblts * cpblts)
+void store_config(struct nc_cpblts *cpblts)
 {
 	char *netconf_dir, *history_file, *config_file;
 	const char * cap;
 	int history_fd, ret;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_caps;
-	FILE * config_f;
+	FILE *config_f;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;

@@ -107,7 +107,7 @@ fi
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
 	CFLAGS="$CFLAGS -g -O0 -DDEBUG",
-	CFLAGS="$CFLAGS -O3"
+	CFLAGS="$CFLAGS -O3 -DNDEBUG"
 	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 )
 
