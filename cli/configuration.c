@@ -86,7 +86,7 @@ char* get_netconf_dir(void)
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist */
-			ERROR("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
+			VERB("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
 			if (mkdir(netconf_dir, 0700) != 0) {
 				ERROR("get_netconf_dir", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
 				free(netconf_dir);
