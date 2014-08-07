@@ -63,6 +63,9 @@
 
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
+/* from server.c */
+extern int server_start;
+
 /* transAPI version which must be compatible with libnetconf */
 /* int transapi_version = 3; */
 
@@ -315,6 +318,10 @@ int module_enable(struct module * module, int add)
 		return (EXIT_FAILURE);
 	}
 
+	/* remove datastore locks if any kept */
+	if (server_start) {
+		ncds_break_locks(NULL);
+	}
 	ncds_device_init(&(module->id), NULL, 1);
 
 	if (add) {
