@@ -68,7 +68,7 @@ $(OBJDIR)/%.lo: %.c
 	$(LIBTOOL) --mode=compile $(CC) $(CFLAGS) $(CPPFLAGS) -fPIC -shared -c $< -o $@
 
 .PHONY: install
-install: $(MODULE) $(TARGET)-init $(PYMODULE)
+install: $(MODULE) $(TARGET)-init
 	$(INSTALL) -m 775 -d $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=install cp $(MODULE) $(DESTDIR)/$(libdir)/;
 	$(INSTALL) -d $(NETOPEER_DIR)/ietf-system/
