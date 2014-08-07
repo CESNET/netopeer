@@ -50,6 +50,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sendfile.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <time.h>
@@ -1932,54 +1933,34 @@ error_cleanup:
 }
 
 #ifdef ENABLE_TLS
-int cp(const char *to, const char *from) {
+int cp(const char* to, const char* from) {
 	int fd_to, fd_from;
-	char buf[4096];
-	ssize_t nread;
+	struct stat st;
+	ssize_t from_len;
 	int saved_errno;
 
 	fd_from = open(from, O_RDONLY);
-	if (fd_from < 0)
+	if (fd_from < 0) {
 		return -1;
+	}
 
 	fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-	if (fd_to < 0)
+	if (fd_to < 0) {
 		goto out_error;
-
-	while (nread = read(fd_from, buf, sizeof buf), nread > 0)
-	{
-		char *out_ptr = buf;
-		ssize_t nwritten;
-
-		do {
-			nwritten = write(fd_to, out_ptr, nread);
-
-			if (nwritten >= 0)
-			{
-				nread -= nwritten;
-				out_ptr += nwritten;
-			}
-			else if (errno != EINTR)
-			{
-				goto out_error;
-			}
-		} while (nread > 0);
 	}
 
-	if (nread == 0)
-	{
-		if (close(fd_to) < 0)
-		{
-			fd_to = -1;
-			goto out_error;
-		}
-		close(fd_from);
-
-		/* Success! */
-		return 0;
+	if (fstat(fd_from, &st) < 0) {
+		goto out_error;
 	}
 
-	out_error:
+	from_len = st.st_size;
+
+	if (sendfile(fd_to, fd_from, NULL, from_len) < from_len) {
+		goto out_error;
+	}
+	return 0;
+
+out_error:
 	saved_errno = errno;
 
 	close(fd_from);
