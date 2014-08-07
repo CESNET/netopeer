@@ -79,6 +79,7 @@ char* recv_msg(int socket, size_t len, struct nc_err** err)
 				*err = nc_err_new(NC_ERR_OP_FAILED);
 				nc_err_set(*err, NC_ERR_PARAM_MSG, "agent-server communication failed.");
 			}
+			free(msg_dump);
 			return (NULL);
 		}
 		recv_len += ret;
