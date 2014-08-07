@@ -4,7 +4,7 @@
 import curses
 import os
 import libxml2
-import nc_module
+import ncmodule
 import messages
 import config
 
@@ -22,12 +22,12 @@ class netopeer_module:
 	def disable(self):
 		self.enabled = False
 
-class netopeer(nc_module.nc_module):
+class nc_netopeer(ncmodule.ncmodule):
 	name = 'Netopeer'
 
 	modules = []
 	modules_maxlen = 0
-	
+
 	server_path = None
 	agent_path = None
 	modules_path = None
@@ -58,10 +58,10 @@ class netopeer(nc_module.nc_module):
 				if os.path.isfile(os.path.join(self.modules_path, module_conf)):
 					module_valid = True
 					# get module name, everything before last dot
-					module_name = module_conf.rsplit('.', 1)[0]					
+					module_name = module_conf.rsplit('.', 1)[0]
 					module_doc = libxml2.parseFile(os.path.join(self.modules_path, module_conf))
 					module_ctxt = module_doc.xpathNewContext()
-					
+
 					xpath_mainyin = module_ctxt.xpathEval('/device/data-models/model-main/path')
 					if not xpath_mainyin:
 						messages.append('Module {s} is not valid, main model path is missing'.format(s=module_name), 'warning')
@@ -72,7 +72,7 @@ class netopeer(nc_module.nc_module):
 					elif not os.path.exists(xpath_mainyin[0].get_content()):
 						messages.append('Module {s} is not valid, main model file does not exist'.format(s=module_name), 'warning')
 						continue
-					
+
 					xpath_maintransapi = module_ctxt.xpathEval('/device/data-models/model-main/transapi')
 					if xpath_maintransapi and len(xpath_maintransapi) != 1:
 						messages.append('Module {s} is not valid, there are multiple main transapi modules'.format(s=module_name), 'warning')
@@ -80,8 +80,8 @@ class netopeer(nc_module.nc_module):
 					elif xpath_maintransapi and not os.path.exists(xpath_maintransapi[0].get_content()):
 						messages.append('Module {s} is not valid, main model transapi file does not exist'.format(s=module_name), 'warning')
 						continue
-								
-					xpath_repo_type = module_ctxt.xpathEval('/device/repo/type')					
+
+					xpath_repo_type = module_ctxt.xpathEval('/device/repo/type')
 					if not xpath_repo_type:
 						messages.append('Module {s} is not valid, repo type is not specified'.format(s=module_name), 'warning')
 						continue
@@ -106,7 +106,7 @@ class netopeer(nc_module.nc_module):
 							messages.append('Module {s} is not valid, main model transapi file does not exist'.format(s=module_name), 'warning')
 							module_valid = False
 							break
-					
+
 					# do not allow manipulation with an internal or invalid modules
 					if module_valid and not (module_name == 'Netopeer' or module_name == 'NETCONF-server'):
 						self.modules.append(netopeer_module(module_name))
@@ -124,7 +124,7 @@ class netopeer(nc_module.nc_module):
 				self.netopeer_ctxt = self.netopeer_doc.xpathNewContext()
 				self.netopeer_ctxt.xpathRegisterNs('d', 'urn:cesnet:tmc:datastores:file')
 				self.netopeer_ctxt.xpathRegisterNs('n', 'urn:cesnet:tmc:netopeer:1.0')
-				
+
 				netopeer_allowed_modules = self.netopeer_ctxt.xpathEval("/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:enabled=\'true\']/n:name")
 				netopeer_forbidden_modules = self.netopeer_ctxt.xpathEval("/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:enabled=\'false\']/n:name")
 
@@ -151,13 +151,13 @@ class netopeer(nc_module.nc_module):
 				messages.append('Netopeer module not found, unable to manage modules', 'error')
 				self.selected = -1
 				self.modules = []
-				
+
 		return(True)
 
 	def update(self):
 		if not self.modules:
 			return(True)
-		
+
 		# check netopeer config content
 		modules_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules')
 		if not modules_node:
@@ -174,7 +174,7 @@ class netopeer(nc_module.nc_module):
 			modules_node = netopeer_node.newChild(netopeer_node.ns(), 'modules', None)
 		else:
 			modules_node = modules_node[0]
-		
+
 		for module in self.modules:
 			xml_module = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:name=\'{s}\']/n:enabled'.format(s=module.name))
 			if not xml_module:
@@ -185,7 +185,7 @@ class netopeer(nc_module.nc_module):
 			else:
 				# set it according to the current value
 				xml_module[0].setContent('true' if module.enabled else 'false')
-				
+
 		self.netopeer_doc.saveFormatFile(self.netopeer_path, 1)
 		return(True)
 
@@ -216,13 +216,13 @@ class netopeer(nc_module.nc_module):
 			for module in self.modules:
 				msg = '{s}'.format(s=module.name)
 				window.addstr(msg+' '*(linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and module is self.modules[self.selected] else 0)
-		
+
 			window.addstr('\nTo (un)install Netopeer modules, use ')
 			window.addstr('netopeer-manager(1)', curses.color_pair(0) | curses.A_UNDERLINE)
 			window.addstr('.\n')
 		except curses.error:
 			pass
-		
+
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):

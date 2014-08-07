@@ -1,0 +1,10 @@
+Dynamic netopeer-configurator modules
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+netopeer-configurator(1) dynamically loads any modules
+it can find. The search begins by learning the directory
+which 'config.py' module is in. This directory is then
+searched for 'nc_*.py' files. These must include classes
+with the same name as their file name without the
+extension and conform to 'ncmodule.py'. All such modules
+are imported.
