@@ -31,6 +31,8 @@ MODEL = model/ietf-system.yin \
 	model/ietf-system-gdefs.rng \
 	model/ietf-system-schematron.xsl
 
+PYMODULES = nc_cfgsystem
+
 SRCS = $(TARGET).c \
 	base/common.c \
 	base/date_time.c \
@@ -42,6 +44,12 @@ SRCS = $(TARGET).c \
 	base/local_users.c
 OBJDIR = .obj
 LOBJS = $(SRCS:%.c=$(OBJDIR)/%.lo)
+
+define PYINSTALL
+cd $(1); \
+python setup.py install &>/dev/null; \
+cd -;
+endef
 
 all: $(MODULE) $(TARGET)-init
 
@@ -60,7 +68,7 @@ $(OBJDIR)/%.lo: %.c
 	$(LIBTOOL) --mode=compile $(CC) $(CFLAGS) $(CPPFLAGS) -fPIC -shared -c $< -o $@
 
 .PHONY: install
-install: $(MODULE) $(TARGET)-init
+install: $(MODULE) $(TARGET)-init $(PYMODULE)
 	$(INSTALL) -m 775 -d $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=install cp $(MODULE) $(DESTDIR)/$(libdir)/;
 	$(INSTALL) -d $(NETOPEER_DIR)/ietf-system/
@@ -78,6 +86,7 @@ install: $(MODULE) $(TARGET)-init
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
+	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
 .PHONY: uninstall
 uninstall:
