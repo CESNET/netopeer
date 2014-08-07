@@ -65,7 +65,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 /* NetConf Client home (appended to ~/) */
 #define NCC_DIR ".netopeer-cli"
 
-char* get_netconf_dir()
+char* get_netconf_dir(void)
 {
 	int ret;
 	struct passwd * pw;
@@ -148,7 +148,7 @@ void get_default_client_cert(char** cert, char** key) {
 	return;
 }
 
-char* get_default_trustedCA_dir() {
+char* get_default_trustedCA_dir(void) {
 	char* netconf_dir, *cert_dir;
 	DIR* dir;
 
@@ -174,7 +174,7 @@ char* get_default_trustedCA_dir() {
 	return cert_dir;
 }
 
-char* get_default_CRL_dir() {
+char* get_default_CRL_dir(void) {
 	char* netconf_dir, *crl_dir;
 	DIR* dir;
 
