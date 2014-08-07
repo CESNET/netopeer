@@ -860,21 +860,26 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	} else {
 		/* remove possible leftover pid file and kill it, if it really is stunnel process */
 		if (access(CFG_DIR"/stunnel/stunnel.pid", F_OK) == 0) {
-			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1 && (r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
-				close(pidfd);
-				pidbuf[r] = '\0';
-				if (pidbuf[strlen(pidbuf)-1] == '\n') {
-					pidbuf[strlen(pidbuf)-1] = '\0';
-				}
-				sprintf(str, "/proc/%s/cmdline", pidbuf);
-				if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1 && (str_len = read(cmdfd, &str, str_len-1)) != -1) {
-					close(cmdfd);
-					str[str_len] = '\0';
-					if (strstr(str, "stunnel") != NULL) {
-						kill(tlsd_pid, SIGTERM);
+			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1) {
+				if ((r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
+					pidbuf[r] = '\0';
+					if (pidbuf[strlen(pidbuf)-1] == '\n') {
+						pidbuf[strlen(pidbuf)-1] = '\0';
 					}
+
+					sprintf(str, "/proc/%s/cmdline", pidbuf);
+					if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1) {
+						if ((str_len = read(cmdfd, &str, str_len-1)) != -1) {
+							str[str_len] = '\0';
+							if (strstr(str, "stunnel") != NULL) {
+								kill(tlsd_pid, SIGTERM);
+							}
+						}
+						close(cmdfd);
+					}
+					tlsd_pid = 0;
 				}
-				tlsd_pid = 0;
+				close(pidfd);
 			}
 			remove(CFG_DIR"/stunnel/stunnel.pid");
 		}
