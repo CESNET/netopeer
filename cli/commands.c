@@ -2256,15 +2256,25 @@ int cmd_cert (const char* arg)
 
 	} else if (strcmp(cmd, "replaceown") == 0) {
 		path = strtok_r(NULL, " ", &ptr);
-		if (path == NULL || strlen(path) < 5 || access(path, R_OK) != 0) {
-			ERROR("cert replaceown", "Missing or cannot access the certificate \"%s\"", path);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("cert replaceown", "Missing the certificate or invalid path.");
+			return (EXIT_FAILURE);
+		}
+		if (access(path, R_OK) != 0) {
+			ERROR("cert replaceown", "Cannot access the certificate \"%s\": %s", path, strerror(errno));
 			return (EXIT_FAILURE);
 		}
 
 		path2 = strtok_r(NULL, " ", &ptr);
-		if (path2 != NULL && (strlen(path2) < 5 || access(path2, R_OK) != 0)) {
-			ERROR("cert replaceown", "Cannot access the private key \"%s\"", path2);
-			return (EXIT_FAILURE);
+		if (path2 != NULL) {
+			if (strlen(path2) < 5) {
+				ERROR("cert replaceown", "Invalid private key path.");
+				return (EXIT_FAILURE);
+			}
+			if (access(path2, R_OK) != 0) {
+				ERROR("cert replaceown", "Cannot access the private key \"%s\": %s", path2, strerror(errno));
+				return (EXIT_FAILURE);
+			}
 		}
 
 		netconf_dir = get_netconf_dir();
@@ -2288,13 +2298,13 @@ int cmd_cert (const char* arg)
 
 			strcpy(dest+strlen(dest)-4, ".crt");
 			if (cp(dest, path) != 0) {
-				ERROR("cert replaceown", "Could not copy the certificate: %s", strerror(errno));
+				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
 				free(dest);
 				return (EXIT_FAILURE);
 			}
 			strcpy(dest+strlen(dest)-4, ".key");
 			if (cp(dest, path2) != 0) {
-				ERROR("cert replaceown", "Could not copy the private key: %s", strerror(errno));
+				ERROR("cert replaceown", "Could not copy the private key \"%s\": %s", path, strerror(errno));
 				free(dest);
 				return (EXIT_FAILURE);
 			}
@@ -2311,7 +2321,7 @@ int cmd_cert (const char* arg)
 
 			strcpy(dest+strlen(dest)-4, ".pem");
 			if (cp(dest, path) != 0) {
-				ERROR("cert replaceown", "Could not copy the certificate: %s", strerror(errno));
+				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
 				free(dest);
 				return (EXIT_FAILURE);
 			}
@@ -2337,7 +2347,7 @@ void parse_crl(const char* name, const char* path) {
 
 	fp = fopen(path, "r");
 	if (fp == NULL) {
-		ERROR("parse_crl", "Unable to open: %s", path);
+		ERROR("parse_crl", "Unable to open \"%s\": %s", path, strerror(errno));
 		return;
 	}
 	crl = PEM_read_X509_CRL(fp, NULL, NULL, NULL);
@@ -2462,7 +2472,7 @@ int cmd_crl (const char* arg) {
 		}
 
 		if (cp(dest, path) != 0) {
-			ERROR("crl add", "Could not copy the CRL: %s", strerror(errno));
+			ERROR("crl add", "Could not copy the CRL \"%s\": %s", path, strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
 			return (EXIT_FAILURE);

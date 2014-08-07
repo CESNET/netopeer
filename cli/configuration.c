@@ -73,7 +73,7 @@ char* get_netconf_dir(void)
 	char* user_home, *netconf_dir;
 
 	if ((pw = getpwuid(getuid())) == NULL) {
-		ERROR("get_netconf_dir", "Determining home directory failed (%s).", strerror(errno));
+		ERROR("get_netconf_dir", "Determining home directory failed: getpwuid: %s.", strerror(errno));
 		return NULL;
 	}
 	user_home = pw->pw_dir;
@@ -87,14 +87,14 @@ char* get_netconf_dir(void)
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist */
-			ERROR("get_netconf_dir", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
+			ERROR("get_netconf_dir", "Configuration directory \"%s\" does not exist, creating it.", netconf_dir);
 			if (mkdir(netconf_dir, 0700) != 0) {
-				ERROR("get_netconf_dir", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
+				ERROR("get_netconf_dir", "Configuration directory \"%s\" cannot be created: %s", netconf_dir, strerror(errno));
 				free(netconf_dir);
 				return NULL;
 			}
 		} else {
-			ERROR("get_netconf_dir", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
+			ERROR("get_netconf_dir", "Configuration directory \"%s\" exists but something else failed: %s", netconf_dir, strerror(errno));
 			free(netconf_dir);
 			return NULL;
 		}
@@ -124,6 +124,16 @@ void get_default_client_cert(char** cert, char** key)
 	}
 
 	if (access(*cert, R_OK) == -1 || access(*key, R_OK) == -1) {
+		if (errno != ENOENT) {
+			ERROR("get_default_client_cert", "Unable to access \"%s\" and \"%s\": %s", *cert, *key, strerror(errno));
+			free(*key);
+			*key = NULL;
+			free(*cert);
+			*cert = NULL;
+			free(netconf_dir);
+			return;
+		}
+
 		// *.crt & *.key failed, trying to use *.pem format
 		free(*key);
 		*key = NULL;
@@ -137,8 +147,12 @@ void get_default_client_cert(char** cert, char** key)
 
 		ret = access(*cert, R_OK);
 		if (ret == -1) {
-			// *.pem failed as well
-			ERROR("get_default_client_cert", "Unable to find the default client certificate.");
+			if (errno != ENOENT) {
+				ERROR("get_default_client_cert", "Unable to access \"%s\": %s", *cert, strerror(errno));
+			} else {
+				// *.pem failed as well
+				ERROR("get_default_client_cert", "Unable to find the default client certificate.");
+			}
 			free(*cert);
 			*cert = NULL;
 			free(netconf_dir);
@@ -149,7 +163,6 @@ void get_default_client_cert(char** cert, char** key)
 	}
 
 	free(netconf_dir);
-
 	return;
 }
 
@@ -171,7 +184,7 @@ char* get_default_trustedCA_dir(void)
 	free(netconf_dir);
 
 	if ((dir = opendir(cert_dir)) == NULL) {
-		ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory.");
+		ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory: %s", strerror(errno));
 		free(cert_dir);
 		return NULL;
 	}
@@ -198,7 +211,7 @@ char* get_default_CRL_dir(void)
 	free(netconf_dir);
 
 	if ((dir = opendir(crl_dir)) == NULL) {
-		ERROR("get_default_CRL_dir", "Unable to open the default CRL directory.");
+		ERROR("get_default_CRL_dir", "Unable to open the default CRL directory: %s", strerror(errno));
 		free(crl_dir);
 		return NULL;
 	}
