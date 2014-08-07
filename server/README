@@ -1,10 +1,10 @@
 Introduction
 ============
 
-The Netopeer multi-level NETCONF server follows architecture described at 
+The Netopeer multi-level NETCONF server follows architecture described at
 [http://libnetconf.googlecode.com/git/doc/doxygen/html/da/db3/server.html].
 The source codes of this application can be found in the project Git repository
-inside the `/server/` directory. From here, this server is referred as the 
+inside the `/server/` directory. From here, this server is referred as the
 _Netopeer server_.
 
 The Netopeer server is the main part of the Netopeer project. It uses
@@ -48,8 +48,8 @@ item. All requirements are checked by the configure script.
  - can be omitted by --disable-dbus configure's option. In that case standard
    UNIX sockets are used for communication between netopeer-server(8) and
    netopeer-agent(1)s.
-- python 2.6 or higher with the following modules:
- - os, string, re, argparse, subprocess, curses, xml, libxml2
+- python 2.7 or higher with the following modules:
+ - os, string, re, argparse, subprocess, inspect, importlib, curses, xml, libxml2
 - sshd
  - openSSH's SSH server, make sure that the correct path to this binary is part
    of your PATH environment variable or use --with-sshd=/path/to/sshd configure's
@@ -75,7 +75,7 @@ Notorious sequence
 will configure, build project and install the following binaries:
  netopeer-server(8)       - the Netopeer server
  netopeer-agent(1)        - NETCONF agent running as an SSH subsystem and
-                            comunicating with the Netopeer server over D-Bus or 
+                            comunicating with the Netopeer server over D-Bus or
                             UNIX socket.
  netopeer-manager(1)      - tool used to manage the Netopeer modules
  netopeer-configurator(1) - tool used for the Netopeer server first run
@@ -83,7 +83,7 @@ will configure, build project and install the following binaries:
 
 *Note*
 Do not change SSH daemon settings. The Netopeer server uses its own instance of
-the SSH daemon which is configured via NETCONF according to the 
+the SSH daemon which is configured via NETCONF according to the
 ietf-netconf-server data model. By default, the server will listen on port 830,
 so it is good to make sure that no other application (including the default SSH
 daemon) does not use this port.
@@ -105,7 +105,7 @@ D-Bus
 D-Bus is a default intercommunication channel. In this case, access control is
 specified in the D-Bus configuration file for Netopeer
 service org.liberouter.netopeer.conf (usually
-/etc/dbus-1/system.d/org.liberouter.netopeer.conf). Netopeer allows user to 
+/etc/dbus-1/system.d/org.liberouter.netopeer.conf). Netopeer allows user to
 a) allow access to anybody or b) specify a single group with granted access.
 The group can be specified via configure's --with-group option or via
 Intercommunication section in netopeer-configurator(1). However, D-Bus
