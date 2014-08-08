@@ -177,34 +177,13 @@ class nc_crls(ncmodule.ncmodule):
 			try:
 				window.addstr(self.crls[self.selected][0] + '\n\n')
 				window.addstr('Issuer\n')
-				if crl[1]:
-					window.addstr('C:  ' + crl[1] + '\n')
-				else:
-					window.addstr('C:  None\n')
-				if crl[2]:
-					window.addstr('ST: ' + crl[2] + '\n')
-				else:
-					window.addstr('ST: None\n')
-				if crl[3]:
-					window.addstr('L:  ' + crl[3] + '\n')
-				else:
-					window.addstr('L:  None\n')
-				if crl[4]:
-					window.addstr('O:  ' + crl[4] + '\n')
-				else:
-					window.addstr('O:  None\n')
-				if crl[5]:
-					window.addstr('OU: ' + crl[5] + '\n')
-				else:
-					window.addstr('OU: None\n')
-				if crl[6]:
-					window.addstr('CN: ' + crl[6] + '\n')
-				else:
-					window.addstr('CN: None\n')
-				if crl[7]:
-					window.addstr('EA: ' + crl[7] + '\n')
-				else:
-					window.addstr('EA: None\n')
+				window.addstr('C:  ' + str(crl[1]) + '\n')
+				window.addstr('ST: ' + str(crl[2]) + '\n')
+				window.addstr('L:  ' + str(crl[3]) + '\n')
+				window.addstr('O:  ' + str(crl[4]) + '\n')
+				window.addstr('OU: ' + str(crl[5]) + '\n')
+				window.addstr('CN: ' + str(crl[6]) + '\n')
+				window.addstr('EA: ' + str(crl[7]) + '\n')
 
 				window.addstr('\nValid from: ' + str(VF) + '\n');
 				window.addstr('        to: ' + str(VT) + '\n');

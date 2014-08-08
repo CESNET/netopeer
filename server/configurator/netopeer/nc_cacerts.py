@@ -175,64 +175,22 @@ class nc_cacerts(ncmodule.ncmodule):
 				try:
 					window.addstr(self.certs[self.selected][0] + '\n\n')
 					window.addstr('Subject\n')
-					if subject.C:
-						window.addstr('C:  ' + subject.C + '\n')
-					else:
-						window.addstr('C:  None\n')
-					if subject.ST:
-						window.addstr('ST: ' + subject.ST + '\n')
-					else:
-						window.addstr('ST: None\n')
-					if subject.L:
-						window.addstr('L:  ' + subject.L + '\n')
-					else:
-						window.addstr('L:  None\n')
-					if subject.O:
-						window.addstr('O:  ' + subject.O + '\n')
-					else:
-						window.addstr('O:  None\n')
-					if subject.OU:
-						window.addstr('OU: ' + subject.OU + '\n')
-					else:
-						window.addstr('OU: None\n')
-					if subject.CN:
-						window.addstr('CN: ' + subject.CN + '\n')
-					else:
-						window.addstr('CN: None\n')
-					if subject.emailAddress:
-						window.addstr('EA: ' + subject.emailAddress + '\n')
-					else:
-						window.addstr('EA: None\n')
+					window.addstr('C:  ' + str(subject.C) + '\n')
+					window.addstr('ST: ' + str(subject.ST) + '\n')
+					window.addstr('L:  ' + str(subject.L) + '\n')
+					window.addstr('O:  ' + str(subject.O) + '\n')
+					window.addstr('OU: ' + str(subject.OU) + '\n')
+					window.addstr('CN: ' + str(subject.CN) + '\n')
+					window.addstr('EA: ' + str(subject.emailAddress) + '\n')
 
 					window.addstr('\nIssuer\n')
-					if issuer.C:
-						window.addstr('C:  ' + issuer.C + '\n')
-					else:
-						window.addstr('C:  None\n')
-					if issuer.ST:
-						window.addstr('ST: ' + issuer.ST + '\n')
-					else:
-						window.addstr('ST: None\n')
-					if issuer.L:
-						window.addstr('L:  ' + issuer.L + '\n')
-					else:
-						window.addstr('L:  None\n')
-					if issuer.O:
-						window.addstr('O:  ' + issuer.O + '\n')
-					else:
-						window.addstr('O:  None\n')
-					if issuer.OU:
-						window.addstr('OU: ' + issuer.OU + '\n')
-					else:
-						window.addstr('OU: None\n')
-					if issuer.CN:
-						window.addstr('CN: ' + issuer.CN + '\n')
-					else:
-						window.addstr('CN: None\n')
-					if issuer.emailAddress:
-						window.addstr('EA: ' + issuer.emailAddress + '\n')
-					else:
-						window.addstr('EA: None\n')
+					window.addstr('C:  ' + str(issuer.C) + '\n')
+					window.addstr('ST: ' + str(issuer.ST) + '\n')
+					window.addstr('L:  ' + str(issuer.L) + '\n')
+					window.addstr('O:  ' + str(issuer.O) + '\n')
+					window.addstr('OU: ' + str(issuer.OU) + '\n')
+					window.addstr('CN: ' + str(issuer.CN) + '\n')
+					window.addstr('EA: ' + str(issuer.emailAddress) + '\n')
 
 					window.addstr('\nValid: ' + str(valid) + '\n')
 				except curses.error:
@@ -250,74 +208,32 @@ class nc_cacerts(ncmodule.ncmodule):
 						msg = 'Subject'
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + 'Issuer\n')
 
-						if subject.C:
-							msg = 'C:  ' + subject.C
-						else:
-							msg = 'C:  None'
-						if issuer.C:
-							msg2 = 'C:  ' + issuer.C
-						else:
-							msg2 = 'C:  None'
+						msg = 'C:  ' + str(subject.C)
+						msg2 = 'C:  ' + str(issuer.C)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.ST:
-							msg = 'ST: ' + subject.ST
-						else:
-							msg = 'ST:  None'
-						if issuer.ST:
-							msg2 = 'ST: ' + issuer.ST
-						else:
-							msg2 = 'ST:  None'
+						msg = 'ST: ' + str(subject.ST)
+						msg2 = 'ST: ' + str(issuer.ST)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.L:
-							msg = 'L:  ' + subject.L
-						else:
-							msg = 'L:  None'
-						if issuer.L:
-							msg2 = 'L:  ' + issuer.L
-						else:
-							msg2 = 'L:  None'
+						msg = 'L:  ' + str(subject.L)
+						msg2 = 'L:  ' + str(issuer.L)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.O:
-							msg = 'O:  ' + subject.O
-						else:
-							msg = 'O:  None'
-						if issuer.O:
-							msg2 = 'O:  ' + issuer.O
-						else:
-							msg2 = 'O:  None'
+						msg = 'O:  ' + str(subject.O)
+						msg2 = 'O:  ' + str(issuer.O)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.OU:
-							msg = 'OU: ' + subject.OU
-						else:
-							msg = 'OU: None'
-						if issuer.OU:
-							msg2 = 'OU: ' + issuer.OU
-						else:
-							msg2 = 'OU: None'
+						msg = 'OU: ' + str(subject.OU)
+						msg2 = 'OU: ' + str(issuer.OU)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.CN:
-							msg = 'CN: ' + subject.CN
-						else:
-							msg = 'CN: None'
-						if issuer.CN:
-							msg2 = 'CN: ' + issuer.CN
-						else:
-							msg2 = 'CN: None'
+						msg = 'CN: ' + str(subject.CN)
+						msg2 = 'CN: ' + str(issuer.CN)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
-						if subject.emailAddress:
-							msg = 'EA: ' + subject.emailAddress
-						else:
-							msg = 'EA: None'
-						if issuer.emailAddress:
-							msg2 = 'EA: ' + issuer.emailAddress
-						else:
-							msg2 = 'EA: None'
+						msg = 'EA: ' + str(subject.emailAddress)
+						msg2 = 'EA: ' + str(issuer.emailAddress)
 						window.addstr(msg + ' '*(5 + self.certs[self.selected][2]-len(msg)) + msg2 + '\n')
 
 						window.addstr('\nValid: ' + str(valid) + '\n');
