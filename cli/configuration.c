@@ -166,10 +166,9 @@ void get_default_client_cert(char** cert, char** key)
 	return;
 }
 
-char* get_default_trustedCA_dir(void)
+char* get_default_trustedCA_dir(DIR** ret_dir)
 {
 	char* netconf_dir, *cert_dir;
-	DIR* dir;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return NULL;
@@ -183,20 +182,26 @@ char* get_default_trustedCA_dir(void)
 	}
 	free(netconf_dir);
 
-	if ((dir = opendir(cert_dir)) == NULL) {
-		ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory: %s", strerror(errno));
+	if (ret_dir != NULL) {
+		if ((*ret_dir = opendir(cert_dir)) == NULL) {
+			ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory: %s", strerror(errno));
+			free(cert_dir);
+			return NULL;
+		}
+		return NULL;
+	}
+
+	if (eaccess(cert_dir, R_OK | W_OK | X_OK) < 0) {
+		ERROR("get_default_trustedCA_dir", "Unable to fully access the default trusted CA directory: %s", strerror(errno));
 		free(cert_dir);
 		return NULL;
 	}
-	closedir(dir);
-
 	return cert_dir;
 }
 
-char* get_default_CRL_dir(void)
+char* get_default_CRL_dir(DIR** ret_dir)
 {
 	char* netconf_dir, *crl_dir;
-	DIR* dir;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return NULL;
@@ -210,13 +215,20 @@ char* get_default_CRL_dir(void)
 	}
 	free(netconf_dir);
 
-	if ((dir = opendir(crl_dir)) == NULL) {
-		ERROR("get_default_CRL_dir", "Unable to open the default CRL directory: %s", strerror(errno));
+	if (ret_dir != NULL) {
+		if ((*ret_dir = opendir(crl_dir)) == NULL) {
+			ERROR("get_default_CRL_dir", "Unable to open the default CRL directory: %s", strerror(errno));
+			free(crl_dir);
+			return NULL;
+		}
+		return NULL;
+	}
+
+	if (eaccess(crl_dir, R_OK | W_OK | X_OK) < .0) {
+		ERROR("get_default_CRL_dir", "Unable to fully access the default CRL directory: %s", strerror(errno));
 		free(crl_dir);
 		return NULL;
 	}
-	closedir(dir);
-
 	return crl_dir;
 }
 

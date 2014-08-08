@@ -37,6 +37,7 @@
  */
 
 #include <libnetconf.h>
+#include <dirent.h>
 
 /**
  * @brief Finds the current user's netconf dir
@@ -57,16 +58,19 @@ void get_default_client_cert(char** cert, char** key);
 
 /**
  * @brief Finds the default trusted CA certificate directory
- * @return NULL on failure, dynamically allocated trusted CA dir path
- * otherwise
+ * @return ret_dir == NULL: NULL on failure, dynamically allocated trusted CA dir path
+ * otherwise, ret_dir != NULL: always NULL, on success *ret_dir is opened trusted CA
+ * dir, not modified on error
  */
-char* get_default_trustedCA_dir(void);
+char* get_default_trustedCA_dir(DIR** ret_dir);
 
 /**
  * @brief Finds the default CRL directory
- * @return NULL on failure, dynamically allocated CRL dir path otherwise
+ * @return ret_dir == NILL: NULL on failure, dynamically allocated CRL dir path otherwise,
+ * ret_dir != NULL: always NULL, on success *ret_dir is opened CRL dir, not modified
+ * on error
  */
-char* get_default_CRL_dir(void);
+char* get_default_CRL_dir(DIR** ret_dir);
 
 /**
  * @brief Checks all the relevant files and directories creating any

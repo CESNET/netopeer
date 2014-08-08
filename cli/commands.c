@@ -1734,7 +1734,7 @@ int cmd_listen (const char* arg)
 	static unsigned short listening = 0;
 	char *user = NULL;
 #ifdef ENABLE_TLS
-	DIR* dir;
+	DIR* dir = NULL;
 	struct dirent* d;
 	int usetls = 0, n;
 	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
@@ -1836,13 +1836,13 @@ int cmd_listen (const char* arg)
 			}
 		}
 		if (trusted_store == NULL) {
-			if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+			get_default_trustedCA_dir(&dir);
+			if (dir == NULL) {
 				ERROR("listen", "Could not use the trusted CA directory.");
 				goto error_cleanup;
 			}
 
 			/* check whether we have any trusted CA, verification should fail otherwise */
-			dir = opendir(trusted_dir);
 			n = 0;
 			while ((d = readdir(dir)) != NULL) {
 				if (++n > 2) {
@@ -1863,7 +1863,7 @@ int cmd_listen (const char* arg)
 				goto error_cleanup;
 			}
 		}
-		if ((crl_dir = get_default_CRL_dir()) == NULL) {
+		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
 			ERROR("listen", "Could not use the CRL directory.");
 			goto error_cleanup;
 		}
@@ -2077,7 +2077,7 @@ int cmd_cert (const char* arg)
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *path2, *dest;
 	char* trusted_dir, *netconf_dir, *c_rehash_cmd;
-	DIR* dir;
+	DIR* dir = NULL;
 	struct dirent *d;
 
 	cmd = strtok_r(args, " ", &ptr);
@@ -2088,8 +2088,8 @@ int cmd_cert (const char* arg)
 	} else if (strcmp(cmd, "display") == 0) {
 		int none = 1;
 		char* name;
-		trusted_dir = get_default_trustedCA_dir();
-		if (trusted_dir == NULL) {
+
+		if ((trusted_dir = get_default_trustedCA_dir(NULL)) == NULL) {
 			ERROR("cert display", "Could not get the default trusted CA directory");
 			return (EXIT_FAILURE);
 		}
@@ -2123,7 +2123,7 @@ int cmd_cert (const char* arg)
 			return (EXIT_FAILURE);
 		}
 
-		trusted_dir = get_default_trustedCA_dir();
+		trusted_dir = get_default_trustedCA_dir(NULL);
 		if (trusted_dir == NULL) {
 			ERROR("cert add", "Could not get the default trusted CA directory");
 			return (EXIT_FAILURE);
@@ -2169,7 +2169,7 @@ int cmd_cert (const char* arg)
 			path[strlen(path)-4] = '\0';
 		}
 
-		trusted_dir = get_default_trustedCA_dir();
+		trusted_dir = get_default_trustedCA_dir(NULL);
 		if (trusted_dir == NULL) {
 			ERROR("cert remove", "Could not get the default trusted CA directory");
 			return (EXIT_FAILURE);
@@ -2407,7 +2407,7 @@ int cmd_crl (const char* arg) {
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *dest;
 	char* crl_dir, *c_rehash_cmd;
-	DIR* dir;
+	DIR* dir = NULL;
 	struct dirent *d;
 
 	cmd = strtok_r(args, " ", &ptr);
@@ -2418,8 +2418,8 @@ int cmd_crl (const char* arg) {
 	} else if (strcmp(cmd, "display") == 0) {
 		int none = 1;
 		char* name;
-		crl_dir = get_default_CRL_dir();
-		if (crl_dir == NULL) {
+
+		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
 			ERROR("crl display", "Could not get the default CRL directory");
 			return (EXIT_FAILURE);
 		}
@@ -2453,7 +2453,7 @@ int cmd_crl (const char* arg) {
 			return (EXIT_FAILURE);
 		}
 
-		crl_dir = get_default_CRL_dir();
+		crl_dir = get_default_CRL_dir(NULL);
 		if (crl_dir == NULL) {
 			ERROR("crl add", "Could not get the default CRL directory");
 			return (EXIT_FAILURE);
@@ -2499,7 +2499,7 @@ int cmd_crl (const char* arg) {
 			path[strlen(path)-4] = '\0';
 		}
 
-		crl_dir = get_default_CRL_dir();
+		crl_dir = get_default_CRL_dir(NULL);
 		if (crl_dir == NULL) {
 			ERROR("crl remove", "Could not get the default CRL directory");
 			return (EXIT_FAILURE);
@@ -2552,7 +2552,7 @@ int cmd_connect (const char* arg)
 {
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
-	DIR* dir;
+	DIR* dir = NULL;
 	struct dirent* d;
 	int usetls = 0, n;
 	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
@@ -2650,13 +2650,13 @@ int cmd_connect (const char* arg)
 			}
 		}
 		if (trusted_store == NULL) {
-			if ((trusted_dir = get_default_trustedCA_dir()) == NULL) {
+			get_default_trustedCA_dir(&dir);
+			if (dir == NULL) {
 				ERROR("connect", "Could not use the trusted CA directory.");
 				goto error_cleanup;
 			}
 
 			/* check whether we have any trusted CA, verification should fail otherwise */
-			dir = opendir(trusted_dir);
 			n = 0;
 			while ((d = readdir(dir)) != NULL) {
 				if (++n > 2) {
@@ -2677,7 +2677,7 @@ int cmd_connect (const char* arg)
 				goto error_cleanup;
 			}
 		}
-		if ((crl_dir = get_default_CRL_dir()) == NULL) {
+		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
 			ERROR("connect", "Could not use the CRL directory.");
 			goto error_cleanup;
 		}
