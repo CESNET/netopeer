@@ -4,7 +4,7 @@
 import curses
 import os
 import M2Crypto
-import nc_module
+import ncmodule
 import messages
 import signal
 import subprocess
@@ -25,7 +25,7 @@ class netopeer_module:
 	def disable(self):
 		self.enabled = False
 
-class crls(nc_module.nc_module):
+class nc_crls(ncmodule.ncmodule):
 	name = 'CRLs'
 
 	crlpath = None

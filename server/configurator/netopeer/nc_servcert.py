@@ -4,7 +4,7 @@
 import curses
 import os
 import M2Crypto
-import nc_module
+import ncmodule
 import messages
 import signal
 import shutil
@@ -24,7 +24,7 @@ class netopeer_module:
 	def disable(self):
 		self.enabled = False
 
-class servcert(nc_module.nc_module):
+class nc_servcert(ncmodule.ncmodule):
 	name = 'Server Certificate'
 
 	certpath = None

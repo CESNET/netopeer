@@ -38,6 +38,8 @@ class netopeer_configuration:
 					continue
 				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
 					continue
+				if not config.options['tls'] and (fil[:-3] == 'nc_servcert' or fil[:-3] == 'nc_cacerts' or fil[:-3] == 'nc_crls'):
+					continue
 				try:
 					module = importlib.import_module('netopeer.' + fil[:-3])
 					self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
@@ -49,19 +51,6 @@ class netopeer_configuration:
 		if len(self.ncmodules) == 0:
 			print('Failed to load any module.')
 			exit(1)
-
-		if config.options['tls']:
-			try:
-				import netopeer.servcert
-				self.nc_modules.append(netopeer.servcert.servcert(self.nc_modules))
-				import netopeer.cacerts
-				self.nc_modules.append(netopeer.cacerts.cacerts(self.nc_modules))
-				import netopeer.crls
-				self.nc_modules.append(netopeer.crls.crls(self.nc_modules))
-			except ImportError as e:
-				messages.append(str(e), 'error')
-			except NCModuleError as e:
-				messages.append(str(e), 'error')
 
 	def save_all(self):
 		for ncmodule in self.ncmodules:
