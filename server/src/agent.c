@@ -170,6 +170,7 @@ int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
 				xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
 			clb_print(NC_VERB_ERROR, "Corrupted RPC message.");
 			reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
+			xmlFreeNodeList(op);
 			goto send_reply;
 		}
 		if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
@@ -177,10 +178,12 @@ int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
 			err = nc_err_new(NC_ERR_MISSING_ELEM);
 			nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
 			reply = nc_reply_error(err);
+			xmlFreeNodeList(op);
 			goto send_reply;
 		}
 		sid = (char *)xmlNodeGetContent(op->children);
 		reply = comm_kill_session(conn, sid);
+		xmlFreeNodeList(op);
 		free(sid);
 		break;
 	case NC_OP_CREATESUBSCRIPTION:

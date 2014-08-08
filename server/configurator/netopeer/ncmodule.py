@@ -4,7 +4,7 @@
 import curses
 import os
 
-# netopeer configurator modules exception 
+# netopeer configurator modules exception
 class NCModuleError(Exception):
 	def __init__(self, name = '', errmsg = ''):
 		if name:
@@ -25,15 +25,15 @@ class NCModuleOff(Exception):
 			self.name = name
 		else:
 			self.name = '<unspecified>'
-		
+
 		self.errmsg = 'Module '+self.name+' is turned off'
 
 	def __str__(self):
 		return(self.errmsg)
-	
+
 
 # base class for netopeer configurator modules
-class nc_module:
+class ncmodule:
 	# every module should define its name
 	name = None
 	all_modules = []
@@ -43,7 +43,7 @@ class nc_module:
 		self.all_modules = modules
 		if not self.find() or not self.get():
 			raise(NCModuleError(self.name, 'Module init failed.'))
-	
+
 	# find configuration/binary files
 	def find(self):
 		return(True)
@@ -55,7 +55,7 @@ class nc_module:
 	# write current configuration to files
 	def update(self):
 		return(True)
-	
+
  	# refresh content window after save
 	def refresh(self, window, focus, height, width):
 		return(True)
@@ -63,10 +63,10 @@ class nc_module:
 	def get_editable(self, y, x, stdscr, window, variable, color = None, tabcompletepath = False):
 		os.environ['ESCDELAY'] = '25'
 		index = 0
-	
+
 		if color is None:
 			color = curses.color_pair(0)
-	
+
 		while True:
 			# how much to erase
 			blocklen = len(variable)
@@ -78,7 +78,7 @@ class nc_module:
 				window.refresh()
 			except curses.error:
 				pass
-		
+
 			# get next key
 			c = stdscr.getch()
 			if c == ord('\n'):
@@ -132,7 +132,7 @@ class nc_module:
 				else:
 					variable = variable[:index]+chr(c)+variable[index:]
 				index = index+1
-	
+
 			# erase
 			for xx in range(x, blocklen+x):
 				window.delch(y,xx)

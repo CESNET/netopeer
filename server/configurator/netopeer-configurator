@@ -4,10 +4,12 @@
 # standard modules
 import curses
 import os
+import inspect
+import importlib
 
 # netopeer configurator module base
-from netopeer.nc_module import NCModuleError
-from netopeer.nc_module import NCModuleOff
+from netopeer.ncmodule import NCModuleError
+from netopeer.ncmodule import NCModuleOff
 
 # error messages
 import netopeer.messages as messages
@@ -17,44 +19,36 @@ class netopeer_configuration:
 	"""Top level class of netopeer-configuration script."""
 
 	# configuration modules
-	nc_modules = []
+	ncmodules = []
 
 	def __init__(self):
 		if not self.run_as_root():
-			print('Script must be run with as a root.')
+			print('Script must be run as root.')
 			exit(1)
-		try:
-			import netopeer.netopeer
-			self.nc_modules.append(netopeer.netopeer.netopeer(self.nc_modules))
-		except ImportError as e:
-			messages.append(str(e), 'error')
-		except NCModuleError as e:
-			messages.append(str(e), 'error')
 
-		try:
-			import netopeer.nacm
-			self.nc_modules.append(netopeer.nacm.nacm(self.nc_modules))
-		except ImportError as e:
-			messages.append(str(e), 'error')
-		except NCModuleError as e:
-			messages.append(str(e), 'error')
+		nc_dir = os.path.dirname(inspect.getfile(config))
+		if not os.path.isdir(nc_dir):
+			print('Could not find nc module directory in the standard setup path nor locally.')
+			exit(1)
+		files = os.listdir(nc_dir)
 
-		if config.options['dbus']:
-			try:
-				import netopeer.dbus
-				self.nc_modules.append(netopeer.dbus.dbus(self.nc_modules))
-			except ImportError as e:
-				messages.append(str(e), 'error')
-			except NCModuleError as e:
-				messages.append(str(e), 'error')
-		else:
-			try:
-				import netopeer.sock
-				self.nc_modules.append(netopeer.sock.sock(self.nc_modules))
-			except ImportError as e:
-				messages.append(str(e), 'error')
-			except NCModuleError as e:
-				messages.append(str(e), 'error')
+		for fil in files:
+			if fil[:3] == 'nc_' and fil[-3:] == '.py':
+				if config.options['dbus'] and fil[:-3] == 'nc_sock':
+					continue
+				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
+					continue
+				try:
+					module = importlib.import_module('netopeer.' + fil[:-3])
+					self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
+				except ImportError as e:
+					messages.append(str(e), 'error')
+				except NCModuleError as e:
+					messages.append(str(e), 'error')
+
+		if len(self.ncmodules) == 0:
+			print('Failed to load any module.')
+			exit(1)
 
 		if config.options['tls']:
 			try:
@@ -70,8 +64,8 @@ class netopeer_configuration:
 				messages.append(str(e), 'error')
 
 	def save_all(self):
-		for nc_module in self.nc_modules:
-			nc_module.update()
+		for ncmodule in self.ncmodules:
+			ncmodule.update()
 
 	def run_as_root(self):
 		"""Script must be run as root user."""
@@ -218,9 +212,9 @@ def cli(stdscr, config):
 		w_tools.wrapper.box()
 
 		# Menu window
-		for module in config.nc_modules:
+		for module in config.ncmodules:
 			try:
-				if module is config.nc_modules[module_selected]:
+				if module is config.ncmodules[module_selected]:
 					if windows[window] == 'Menu':
 						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
 					else:
@@ -232,7 +226,7 @@ def cli(stdscr, config):
 
 		# Content window
 		focus = windows[window] == 'Content'
-		module_tools = config.nc_modules[module_selected].paint(w_content.window, focus, w_content.size['y'], w_content.size['x'])
+		module_tools = config.ncmodules[module_selected].paint(w_content.window, focus, w_content.size['y'], w_content.size['x'])
 
 		# Messages window
 		last_messages = messages.last(w_messages.size['y']-2)
@@ -292,18 +286,18 @@ def cli(stdscr, config):
 		elif c == curses.KEY_F10:
 			config.save_all()
 			messages.append('Configuration saved', 'note')
-			config.nc_modules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
+			config.ncmodules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
 		elif windows[window] == 'Menu':
 			if c == curses.KEY_UP and module_selected > 0:
 				module_selected = module_selected-1
-			elif c == curses.KEY_DOWN and module_selected < (len(config.nc_modules)-1):
+			elif c == curses.KEY_DOWN and module_selected < (len(config.ncmodules)-1):
 				module_selected = module_selected+1
 			elif c == ord('\n'):
 				window = windows.index('Content')
 			else:
 				curses.flash()
 		elif windows[window] == 'Content':
-			config.nc_modules[module_selected].handle(stdscr, w_content.window, w_content.size['y'], w_content.size['x'], c)
+			config.ncmodules[module_selected].handle(stdscr, w_content.window, w_content.size['y'], w_content.size['x'], c)
 
 
 if __name__ == '__main__':

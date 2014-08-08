@@ -247,17 +247,17 @@ static void close_session(int socket)
 	nc_verb_verbose("Agent %s removed.", id);
 }
 
-static void kill_session (int socket)
+static void kill_session(int socket)
 {
 	struct session_info *session, *sender_session;
 	struct nc_err* err = NULL;
 	char *session_id = NULL, *aux_string = NULL;
-	size_t len;
+	size_t len = 0;
 	char id[6];
 	nc_reply *reply;
 	msgtype_t result;
 
-	/* session ID*/
+	/* session ID */
 	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
 	session_id = recv_msg(socket, len, &err);
 	if (err != NULL) {
@@ -265,30 +265,22 @@ static void kill_session (int socket)
 		goto send_reply;
 	}
 
-	if ((session = (struct session_info *)server_sessions_get_by_agentid(session_id)) == NULL) {
-		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
-		err = nc_err_new (NC_ERR_OP_FAILED);
-		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
-			nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
-			free(aux_string);
+	if ((session = (struct session_info *)server_sessions_get_by_ncid(session_id)) == NULL) {
+		/* break locks using dummy session */
+		ncds_break_locks(NULL);
+	} else {
+		/* check if the request does not relate to the current session */
+		snprintf(id, sizeof(id), "%d", socket);
+		if ((sender_session = (struct session_info *)srv_get_session(id)) != NULL) {
+			if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
+				nc_verb_verbose("Requesting to kill own session.");
+				err = nc_err_new (NC_ERR_INVALID_VALUE);
+				reply = nc_reply_error (err);
+				goto send_reply;
+			}
 		}
-		reply = nc_reply_error(err);
-		goto send_reply;
+		server_sessions_kill(session);
 	}
-
-	/* check if the request does not relate to the current session */
-	snprintf(id, sizeof(id), "%d", socket);
-	sender_session = (struct session_info *)srv_get_session(id);
-	if (sender_session != NULL) {
-		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
-			nc_verb_verbose("Request to kill own session.");
-			err = nc_err_new (NC_ERR_INVALID_VALUE);
-			reply = nc_reply_error (err);
-			goto send_reply;
-		}
-	}
-
-	server_sessions_kill(session);
 	reply = nc_reply_ok();
 
 send_reply:
@@ -296,7 +288,7 @@ send_reply:
 	nc_reply_free (reply);
 
 	/* send reply */
-	result = COMM_SOCKET_OP_CLOSE_SESSION;
+	result = COMM_SOCKET_OP_KILL_SESSION;
 	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 
 	len = strlen(aux_string) + 1;

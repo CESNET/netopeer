@@ -248,7 +248,7 @@ xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 	int i, j;
 	const char* type[2] = {"server", "peer"};
 	const char* value;
-	char* path;
+	char* path, *content = NULL;
 	xmlNodePtr ntp_node, server, aux_node;
 
 	assert(sysaugeas);
@@ -280,17 +280,16 @@ loop:
 			/* ntp/server/ */
 			server = xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "server", NULL);
 
+			/* ntp/server/name */
+			asprintf(&content, "%s-%d", type[j], i);
+			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST content);
+			free(content);
+
 			/* ntp/server/udp/address */
 			aug_get(sysaugeas, path, &value);
 			aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp", NULL);
 			xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST value);
 			/* port specification is not supported by Linux ntp implementation */
-			free(path);
-
-			/* ntp/server/name */
-			path = NULL;
-			asprintf(&path, "%s-%d", type[j], i);
-			xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST path);
 			free(path);
 
 			/* ntp/server/association-type */

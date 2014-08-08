@@ -240,8 +240,8 @@ int comm_close(conn_t* conn)
 
 nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 {
-	struct nc_err* err;
-	msgtype_t result = 0, op = COMM_SOCKET_OP_CLOSE_SESSION;
+	struct nc_err* err = NULL;
+	msgtype_t result = 0, op = COMM_SOCKET_OP_KILL_SESSION;
 	unsigned int len;
 	char* reply_dump;
 	nc_reply *reply;
@@ -271,8 +271,7 @@ nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 
 	/* get the reply message */
 	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	reply_dump = recv_msg(*conn, len, &err);
-	if (err != NULL) {
+	if ((reply_dump = recv_msg(*conn, len, &err)) == NULL) {
 		return (nc_reply_error(err));
 	}
 	reply = nc_reply_build(reply_dump);

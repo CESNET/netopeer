@@ -58,6 +58,8 @@
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
+int server_start = 0;
+
 /**
  * \brief Print program version
  *
@@ -222,6 +224,8 @@ int main (int argc, char** argv)
 		return (EXIT_FAILURE);
 	}
 
+	server_start = 1;
+
 restart:
 	/* start NETCONF server module */
 	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
@@ -252,6 +256,7 @@ restart:
 		return EXIT_FAILURE;
 	}
 
+	server_start = 0;
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {

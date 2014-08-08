@@ -85,11 +85,12 @@ const char* users_mod(const char *name, const char *passwd, char **msg);
  * @brief Add authorized key for the specified user
  * @param username[in] name of the user where add the authorized key
  * @param id[in] id of the key, it is stored as a comment for the key
+ * @param algorithm[in] used algorithm for the key data
  * @param pem[in] authorized key data, in format stored by openSSH (algoithm data)
  * @param msg[out] error message in case of error.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int authkey_add(const char *username, const char *id, const char *pem, char **msg);
+int authkey_add(const char *username, const char *id, const char *algorithm, const char *pem, char **msg);
 
 /**
  * @brief Remove authorized key
