@@ -65,6 +65,12 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 /* NetConf Client home (appended to ~/) */
 #define NCC_DIR ".netopeer-cli"
+/* all these appended to NCC_DIR */
+#define CA_DIR "certs"
+#define CRL_DIR "crl"
+#define CERT_CRT "client.crt"
+#define CERT_PEM "client.pem"
+#define CERT_KEY "client.key"
 
 char* get_netconf_dir(void)
 {
@@ -116,7 +122,7 @@ void get_default_client_cert(char** cert, char** key)
 	}
 
 	// trying to use *.crt and *.key format
-	if (asprintf(cert, "%s/%s", netconf_dir, "client.crt") == -1 || asprintf(key, "%s/%s", netconf_dir, "client.key") == -1) {
+	if (asprintf(cert, "%s/%s", netconf_dir, CERT_CRT) == -1 || asprintf(key, "%s/%s", netconf_dir, CERT_KEY) == -1) {
 		ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
 		free(netconf_dir);
@@ -138,7 +144,7 @@ void get_default_client_cert(char** cert, char** key)
 		free(*key);
 		*key = NULL;
 		free(*cert);
-		if (asprintf(cert, "%s/%s", netconf_dir, "client.pem") == -1) {
+		if (asprintf(cert, "%s/%s", netconf_dir, CERT_PEM) == -1) {
 			ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 			ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
 			free(netconf_dir);
@@ -159,7 +165,7 @@ void get_default_client_cert(char** cert, char** key)
 			return;
 		}
 
-		ERROR("get_default_client_cert", "Using \"client.pem\" but this may be a security risk and separate certificate and key files should be used.");
+		ERROR("get_default_client_cert", "Using \"" CERT_PEM "\" but this may be a security risk and separate certificate and key files should be used.");
 	}
 
 	free(netconf_dir);
@@ -174,7 +180,7 @@ char* get_default_trustedCA_dir(DIR** ret_dir)
 		return NULL;
 	}
 
-	if (asprintf(&cert_dir, "%s/%s", netconf_dir, "certs") == -1) {
+	if (asprintf(&cert_dir, "%s/%s", netconf_dir, CA_DIR) == -1) {
 		ERROR("get_default_trustedCA_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("get_default_trustedCA_dir", "Unable to use the trusted CA directory due to the previous error.");
 		free(netconf_dir);
@@ -207,7 +213,7 @@ char* get_default_CRL_dir(DIR** ret_dir)
 		return NULL;
 	}
 
-	if (asprintf(&crl_dir, "%s/%s", netconf_dir, "crl") == -1) {
+	if (asprintf(&crl_dir, "%s/%s", netconf_dir, CRL_DIR) == -1) {
 		ERROR("get_default_CRL_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("get_default_CRL_dir", "Unable to use the trusted CA directory due to the previous error.");
 		free(netconf_dir);
@@ -258,7 +264,7 @@ void load_config(struct nc_cpblts **cpblts)
 	}
 
 #ifdef ENABLE_TLS
-	if (asprintf (&trusted_dir, "%s/certs", netconf_dir) == -1) {
+	if (asprintf (&trusted_dir, "%s/%s", netconf_dir, CA_DIR) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to check trusted CA directory due to the previous error.");
 		trusted_dir = NULL;
@@ -280,7 +286,7 @@ void load_config(struct nc_cpblts **cpblts)
 	}
 	free(trusted_dir);
 
-	if (asprintf (&crl_dir, "%s/crl", netconf_dir) == -1) {
+	if (asprintf (&crl_dir, "%s/%s", netconf_dir, CRL_DIR) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to check CRL directory due to the previous error.");
 		crl_dir = NULL;
