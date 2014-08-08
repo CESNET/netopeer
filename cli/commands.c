@@ -1854,7 +1854,7 @@ int cmd_listen (const char* arg)
 				ERROR("listen", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
 			}
 		} else {
-			if (access(trusted_store, R_OK) != 0) {
+			if (eaccess(trusted_store, R_OK) != 0) {
 				ERROR("listen", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
 				goto error_cleanup;
 			}
@@ -2118,7 +2118,7 @@ int cmd_cert (const char* arg)
 			ERROR("cert add", "Missing or wrong path to the certificate");
 			return (EXIT_FAILURE);
 		}
-		if (access(path, R_OK) != 0) {
+		if (eaccess(path, R_OK) != 0) {
 			ERROR("cert add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
 			return (EXIT_FAILURE);
 		}
@@ -2213,17 +2213,17 @@ int cmd_cert (const char* arg)
 			return (EXIT_FAILURE);
 		}
 		free(netconf_dir);
-		if (access(dest, R_OK) == 0) {
+		if (eaccess(dest, R_OK) == 0) {
 			pem = 1;
 		}
 
 		strcpy(dest+strlen(dest)-4, ".key");
-		if (access(dest, R_OK) == 0) {
+		if (eaccess(dest, R_OK) == 0) {
 			key = 1;
 		}
 
 		strcpy(dest+strlen(dest)-4, ".crt");
-		if (access(dest, R_OK) == 0) {
+		if (eaccess(dest, R_OK) == 0) {
 			crt = 1;
 		}
 
@@ -2260,7 +2260,7 @@ int cmd_cert (const char* arg)
 			ERROR("cert replaceown", "Missing the certificate or invalid path.");
 			return (EXIT_FAILURE);
 		}
-		if (access(path, R_OK) != 0) {
+		if (eaccess(path, R_OK) != 0) {
 			ERROR("cert replaceown", "Cannot access the certificate \"%s\": %s", path, strerror(errno));
 			return (EXIT_FAILURE);
 		}
@@ -2271,7 +2271,7 @@ int cmd_cert (const char* arg)
 				ERROR("cert replaceown", "Invalid private key path.");
 				return (EXIT_FAILURE);
 			}
-			if (access(path2, R_OK) != 0) {
+			if (eaccess(path2, R_OK) != 0) {
 				ERROR("cert replaceown", "Cannot access the private key \"%s\": %s", path2, strerror(errno));
 				return (EXIT_FAILURE);
 			}
@@ -2448,7 +2448,7 @@ int cmd_crl (const char* arg) {
 			ERROR("crl add", "Missing or wrong path to the certificate");
 			return (EXIT_FAILURE);
 		}
-		if (access(path, R_OK) != 0) {
+		if (eaccess(path, R_OK) != 0) {
 			ERROR("crl add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
 			return (EXIT_FAILURE);
 		}
@@ -2668,7 +2668,7 @@ int cmd_connect (const char* arg)
 				ERROR("connect", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
 			}
 		} else {
-			if (access(trusted_store, R_OK) != 0) {
+			if (eaccess(trusted_store, R_OK) != 0) {
 				ERROR("connect", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
 				goto error_cleanup;
 			}

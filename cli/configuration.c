@@ -83,7 +83,7 @@ char* get_netconf_dir(void)
 		return NULL;
 	}
 
-	ret = access(netconf_dir, R_OK | X_OK);
+	ret = eaccess(netconf_dir, R_OK | X_OK);
 	if (ret == -1) {
 		if (errno == ENOENT) {
 			/* directory does not exist */
@@ -123,7 +123,7 @@ void get_default_client_cert(char** cert, char** key)
 		return;
 	}
 
-	if (access(*cert, R_OK) == -1 || access(*key, R_OK) == -1) {
+	if (eaccess(*cert, R_OK) == -1 || eaccess(*key, R_OK) == -1) {
 		if (errno != ENOENT) {
 			ERROR("get_default_client_cert", "Unable to access \"%s\" and \"%s\": %s", *cert, *key, strerror(errno));
 			free(*key);
@@ -145,7 +145,7 @@ void get_default_client_cert(char** cert, char** key)
 			return;
 		}
 
-		ret = access(*cert, R_OK);
+		ret = eaccess(*cert, R_OK);
 		if (ret == -1) {
 			if (errno != ENOENT) {
 				ERROR("get_default_client_cert", "Unable to access \"%s\": %s", *cert, strerror(errno));
@@ -308,7 +308,7 @@ void load_config(struct nc_cpblts **cpblts)
 		ERROR("load_config", "Unable to load commands history due to the previous error.");
 		history_file = NULL;
 	} else {
-		ret = access(history_file, R_OK);
+		ret = eaccess(history_file, R_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "History file (%s) does not exist, creating it", history_file);
@@ -333,7 +333,7 @@ void load_config(struct nc_cpblts **cpblts)
 		ERROR("load_config", "Unable to load configuration due to the previous error.");
 		config_file = NULL;
 	} else {
-		ret = access(config_file, R_OK);
+		ret = eaccess(config_file, R_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "Configuration file (%s) does not exits, creating it", config_file);
@@ -442,7 +442,7 @@ void store_config(struct nc_cpblts *cpblts)
 		ERROR("store_config", "Unable to store commands history due to the previous error.");
 		history_file = NULL;
 	} else {
-		ret = access(history_file, R_OK | W_OK);
+		ret = eaccess(history_file, R_OK | W_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				/* file does not exit, create it */
@@ -466,7 +466,7 @@ void store_config(struct nc_cpblts *cpblts)
 		ERROR("store_config", "Unable to store configuration due to the previous error.");
 		config_file = NULL;
 	} else {
-		if (access(config_file, R_OK | W_OK) == -1 || (config_doc = xmlReadFile(config_file, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR)) == NULL) {
+		if (eaccess(config_file, R_OK | W_OK) == -1 || (config_doc = xmlReadFile(config_file, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR)) == NULL) {
 			config_doc = xmlNewDoc(BAD_CAST "1.0");
 			config_doc->children = xmlNewDocNode(config_doc, NULL, BAD_CAST "netconf-client", NULL);
 		}
