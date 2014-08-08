@@ -48,8 +48,8 @@ item. All requirements are checked by the configure script.
  - can be omitted by --disable-dbus configure's option. In that case standard
    UNIX sockets are used for communication between netopeer-server(8) and
    netopeer-agent(1)s.
-- python 2.7 or higher with the following modules:
- - os, string, re, argparse, subprocess, inspect, importlib, curses, xml, libxml2
+- python 2.6 or higher with the following modules:
+ - os, string, re, argparse, subprocess, inspect, curses, xml, libxml2
  - if using --enable-tls option also - M2Crypto, shutil, signal
 - sshd
  - openSSH's SSH server, make sure that the correct path to this binary is part

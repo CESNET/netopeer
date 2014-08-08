@@ -5,7 +5,6 @@
 import curses
 import os
 import inspect
-import importlib
 
 # netopeer configurator module base
 from netopeer.ncmodule import NCModuleError
@@ -41,7 +40,7 @@ class netopeer_configuration:
 				if not config.options['tls'] and (fil[:-3] == 'nc_servcert' or fil[:-3] == 'nc_cacerts' or fil[:-3] == 'nc_crls'):
 					continue
 				try:
-					module = importlib.import_module('netopeer.' + fil[:-3])
+					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
 					self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
 				except ImportError as e:
 					messages.append(str(e), 'error')
