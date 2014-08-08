@@ -1733,221 +1733,6 @@ int cmd_unlock (const char *arg)
 	return cmd_un_lock (UNLOCK_OP, arg);
 }
 
-void cmd_listen_help ()
-{
-#ifdef ENABLE_TLS
-	fprintf (stdout, "listen [--help] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>] [--port <num>] [--login <username>]\n");
-#else
-	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
-#endif
-}
-
-#define DEFAULT_PORT_CH_SSH 6666
-#define DEFAULT_PORT_CH_TLS 6667
-#define ACCEPT_TIMEOUT 60000 /* 1 minute */
-int cmd_listen (const char* arg)
-{
-	static unsigned short listening = 0;
-	char *user = NULL;
-#ifdef ENABLE_TLS
-	DIR* dir = NULL;
-	struct dirent* d;
-	int usetls = 0, n;
-	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
-#endif
-	unsigned short port = 0;
-	int c;
-	int timeout = ACCEPT_TIMEOUT;
-	struct arglist cmd;
-	struct option long_options[] = {
-			{"help", 0, 0, 'h'},
-			{"port", 1, 0, 'p'},
-			{"login", 1, 0, 'l'},
-#ifdef ENABLE_TLS
-			{"tls", 0, 0, 't'},
-			{"cert", 1, 0, 'c'},
-			{"key", 1, 0, 'k'},
-			{"trusted", 1, 0, 's'},
-#endif
-			{0, 0, 0, 0}
-	};
-	int option_index = 0;
-
-	/* set back to start to be able to use getopt() repeatedly */
-	optind = 0;
-
-	if (session != NULL) {
-		ERROR("listen", "already connected to %s.", nc_session_get_host (session));
-		return (EXIT_FAILURE);
-	}
-
-	/* set default transport protocol */
-	nc_session_transport(NC_TRANSPORT_SSH);
-
-	/* process given arguments */
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
-
-#ifdef ENABLE_TLS
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
-#else
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
-#endif
-	{
-		switch (c) {
-		case 'h':
-			cmd_listen_help ();
-			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
-			break;
-		case 'p':
-			port = (unsigned short) atoi (optarg);
-			if (listening != 0 && listening != port) {
-				nc_callhome_listen_stop();
-				listening = 0;
-			}
-			break;
-		case 'l':
-			user = optarg;
-			break;
-#ifdef ENABLE_TLS
-		case 't':
-			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
-				if (port == 0) {
-					port = DEFAULT_PORT_CH_TLS;
-				}
-				usetls = 1;
-			}
-			break;
-		case 'c':
-			asprintf(&cert, "%s", optarg);
-			break;
-		case 'k':
-			asprintf(&key, "%s", optarg);
-			break;
-		case 's':
-			trusted_store = optarg;
-			break;
-#endif
-		default:
-			ERROR("listen", "unknown option -%c.", c);
-			cmd_listen_help ();
-			goto error_cleanup;
-		}
-	}
-	if (port == 0) {
-		port = DEFAULT_PORT_CH_SSH;
-	}
-#ifdef ENABLE_TLS
-	if (usetls) {
-		if (cert == NULL) {
-			if (key != NULL) {
-				ERROR("listen", "Key specified without a certificate.");
-				goto error_cleanup;
-			}
-			get_default_client_cert(&cert, &key);
-			if (cert == NULL) {
-				ERROR("listen", "Could not find the default client certificate.");
-				goto error_cleanup;
-			}
-		}
-		if (trusted_store == NULL) {
-			get_default_trustedCA_dir(&dir);
-			if (dir == NULL) {
-				ERROR("listen", "Could not use the trusted CA directory.");
-				goto error_cleanup;
-			}
-
-			/* check whether we have any trusted CA, verification should fail otherwise */
-			n = 0;
-			while ((d = readdir(dir)) != NULL) {
-				if (++n > 2) {
-					break;
-				}
-			}
-			closedir(dir);
-			if (n <= 2) {
-				ERROR("listen", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
-			}
-		} else {
-			if (eaccess(trusted_store, R_OK) != 0) {
-				ERROR("listen", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
-				goto error_cleanup;
-			}
-			if (strlen(trusted_store) < 5 || strcmp(trusted_store+strlen(trusted_store)-4, ".pem") != 0) {
-				ERROR("listen", "Trusted CA store in an unknown format.");
-				goto error_cleanup;
-			}
-		}
-		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
-			ERROR("listen", "Could not use the CRL directory.");
-			goto error_cleanup;
-		}
-
-		if (nc_tls_init(cert, key, trusted_store, trusted_dir, NULL, crl_dir) != EXIT_SUCCESS) {
-			ERROR("listen", "Initiating TLS failed.");
-			goto error_cleanup;
-		}
-	}
-#endif
-
-	/* create the session */
-	if (!listening) {
-		if (nc_callhome_listen(port) == EXIT_FAILURE) {
-			ERROR("listen", "unable to start listening for incoming Call Home");
-			goto error_cleanup;
-		}
-		listening = port;
-	}
-
-	if (verb_level == 0) {
-		fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
-	}
-	session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
-	if (session == NULL ) {
-		if (timeout == 0) {
-			ERROR("listen", "no call home")
-		} else {
-			ERROR("listen", "receiving call Home failed.");
-		}
-	}
-
-#ifdef ENABLE_TLS
-	if (trusted_dir != NULL) {
-		free(trusted_dir);
-	}
-	if (crl_dir != NULL) {
-		free(crl_dir);
-	}
-	if (cert != NULL) {
-		free(cert);
-	}
-	if (key != NULL) {
-		free(key);
-	}
-#endif
-	clear_arglist(&cmd);
-	return (EXIT_SUCCESS);
-
-error_cleanup:
-#ifdef ENABLE_TLS
-	if (trusted_dir != NULL) {
-		free(trusted_dir);
-	}
-	if (crl_dir != NULL) {
-		free(crl_dir);
-	}
-	if (cert != NULL) {
-		free(cert);
-	}
-	if (key != NULL) {
-		free(key);
-	}
-#endif
-	clear_arglist(&cmd);
-	return (EXIT_FAILURE);
-}
-
 #ifdef ENABLE_TLS
 int cp(const char* to, const char* from) {
 	int fd_to, fd_from;
@@ -2562,10 +2347,26 @@ void cmd_connect_help ()
 #endif
 }
 
+void cmd_listen_help ()
+{
+#ifdef ENABLE_TLS
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>]\n");
+#else
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+#endif
+}
+
 #define DEFAULT_PORT_SSH 830
 #define DEFAULT_PORT_TLS 6513
-int cmd_connect (const char* arg)
+
+#define DEFAULT_PORT_CH_SSH 6666
+#define DEFAULT_PORT_CH_TLS 6667
+#define ACCEPT_TIMEOUT 60000 /* 1 minute */
+
+static int cmd_connect_listen (const char* arg, int is_connect)
 {
+	char* func_name = (is_connect ? strdupa("connect") : strdupa("listen"));
+	static unsigned short listening = 0;
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
 	DIR* dir = NULL;
@@ -2576,6 +2377,7 @@ int cmd_connect (const char* arg)
 	int hostfree = 0;
 	unsigned short port = 0;
 	int c;
+	int timeout = ACCEPT_TIMEOUT;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
@@ -2595,7 +2397,7 @@ int cmd_connect (const char* arg)
 	optind = 0;
 
 	if (session != NULL) {
-		ERROR("connect", "already connected to %s.", nc_session_get_host (session));
+		ERROR(func_name, "already connected to %s.", nc_session_get_host (session));
 		return (EXIT_FAILURE);
 	}
 
@@ -2614,12 +2416,20 @@ int cmd_connect (const char* arg)
 	{
 		switch (c) {
 		case 'h':
-			cmd_connect_help ();
+			if (is_connect) {
+				cmd_connect_help();
+			} else {
+				cmd_listen_help();
+			}
 			clear_arglist(&cmd);
 			return (EXIT_SUCCESS);
 			break;
 		case 'p':
 			port = (unsigned short) atoi (optarg);
+			if (!is_connect && listening != 0 && listening != port) {
+				nc_callhome_listen_stop();
+				listening = 0;
+			}
 			break;
 		case 'l':
 			user = optarg;
@@ -2628,7 +2438,7 @@ int cmd_connect (const char* arg)
 		case 't':
 			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
 				if (port == 0) {
-					port = DEFAULT_PORT_TLS;
+					port = (is_connect ? DEFAULT_PORT_TLS : DEFAULT_PORT_CH_TLS);
 				}
 				usetls = 1;
 			}
@@ -2644,31 +2454,35 @@ int cmd_connect (const char* arg)
 			break;
 #endif
 		default:
-			ERROR("connect", "unknown option -%c.", c);
-			cmd_connect_help ();
+			ERROR(func_name, "unknown option -%c.", c);
+			if (is_connect) {
+				cmd_connect_help();
+			} else {
+				cmd_listen_help();
+			}
 			goto error_cleanup;
 		}
 	}
 	if (port == 0) {
-		port = DEFAULT_PORT_SSH;
+		port = (is_connect ? DEFAULT_PORT_SSH : DEFAULT_PORT_CH_SSH);
 	}
 #ifdef ENABLE_TLS
 	if (usetls) {
 		if (cert == NULL) {
 			if (key != NULL) {
-				ERROR("connect", "Key specified without a certificate.");
+				ERROR(func_name, "Key specified without a certificate.");
 				goto error_cleanup;
 			}
 			get_default_client_cert(&cert, &key);
 			if (cert == NULL) {
-				ERROR("connect", "Could not find the default client certificate, check with \"cert displayown\" command.");
+				ERROR(func_name, "Could not find the default client certificate, check with \"cert displayown\" command.");
 				goto error_cleanup;
 			}
 		}
 		if (trusted_store == NULL) {
 			get_default_trustedCA_dir(&dir);
 			if (dir == NULL) {
-				ERROR("connect", "Could not use the trusted CA directory.");
+				ERROR(func_name, "Could not use the trusted CA directory.");
 				goto error_cleanup;
 			}
 
@@ -2681,57 +2495,81 @@ int cmd_connect (const char* arg)
 			}
 			closedir(dir);
 			if (n <= 2) {
-				ERROR("connect", "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+				ERROR(func_name, "Trusted CA directory empty, use \"cert add\" command to add certificates.");
 			}
 		} else {
 			if (eaccess(trusted_store, R_OK) != 0) {
-				ERROR("connect", "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
+				ERROR(func_name, "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
 				goto error_cleanup;
 			}
 			if (strlen(trusted_store) < 5 || strcmp(trusted_store+strlen(trusted_store)-4, ".pem") != 0) {
-				ERROR("connect", "Trusted CA store in an unknown format.");
+				ERROR(func_name, "Trusted CA store in an unknown format.");
 				goto error_cleanup;
 			}
 		}
 		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
-			ERROR("connect", "Could not use the CRL directory.");
+			ERROR(func_name, "Could not use the CRL directory.");
 			goto error_cleanup;
 		}
 
 		if (nc_tls_init(cert, key, trusted_store, trusted_dir, NULL, crl_dir) != EXIT_SUCCESS) {
-			ERROR("connect", "Initiating TLS failed.");
+			ERROR(func_name, "Initiating TLS failed.");
 			goto error_cleanup;
 		}
 	}
 #endif
-	if (optind == cmd.count) {
-		/* get mandatory argument */
-		host = malloc (sizeof(char) * BUFFER_SIZE);
-		if (host == NULL) {
-			ERROR("connect", "memory allocation error (%s).", strerror (errno));
-			goto error_cleanup;
-		}
-		hostfree = 1;
-		INSTRUCTION("Hostname to connect to: ");
-		if (scanf ("%1023s", host) == EOF) {
-			ERROR("connect", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
-			goto error_cleanup;
-		}
-	} else if ((optind + 1) == cmd.count) {
-		host = cmd.list[optind];
-	}
 
-	/* create the session */
-	session = nc_session_connect (host, port, user, client_supported_cpblts);
-	if (session == NULL) {
-		ERROR("connect", "connecting to the %s failed.", host);
+	if (is_connect) {
+		if (optind == cmd.count) {
+			/* get mandatory argument */
+			host = malloc (sizeof(char) * BUFFER_SIZE);
+			if (host == NULL) {
+				ERROR(func_name, "memory allocation error (%s).", strerror (errno));
+				goto error_cleanup;
+			}
+			hostfree = 1;
+			INSTRUCTION("Hostname to connect to: ");
+			if (scanf ("%1023s", host) == EOF) {
+				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
+				goto error_cleanup;
+			}
+		} else if ((optind + 1) == cmd.count) {
+			host = cmd.list[optind];
+		}
+
+		/* create the session */
+		session = nc_session_connect (host, port, user, client_supported_cpblts);
+		if (session == NULL) {
+			ERROR(func_name, "connecting to the %s failed.", host);
+			if (hostfree) {
+				free (host);
+			}
+			goto error_cleanup;
+		}
 		if (hostfree) {
 			free (host);
 		}
-		goto error_cleanup;
-	}
-	if (hostfree) {
-		free (host);
+	} else {
+		/* create the session */
+		if (!listening) {
+			if (nc_callhome_listen(port) == EXIT_FAILURE) {
+				ERROR(func_name, "unable to start listening for incoming Call Home");
+				goto error_cleanup;
+			}
+			listening = port;
+		}
+
+		if (verb_level == 0) {
+			fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
+		}
+		session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
+		if (session == NULL ) {
+			if (timeout == 0) {
+				ERROR(func_name, "no call home")
+			} else {
+				ERROR(func_name, "receiving call Home failed.");
+			}
+		}
 	}
 
 #ifdef ENABLE_TLS
@@ -2769,6 +2607,16 @@ error_cleanup:
 #endif
 	clear_arglist(&cmd);
 	return (EXIT_FAILURE);
+}
+
+int cmd_connect (const char* arg)
+{
+	return cmd_connect_listen(arg, 1);
+}
+
+int cmd_listen (const char* arg)
+{
+	return cmd_connect_listen(arg, 0);
 }
 
 int cmd_disconnect (const char* UNUSED(arg))
