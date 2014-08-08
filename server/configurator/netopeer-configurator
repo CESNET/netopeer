@@ -5,7 +5,6 @@
 import curses
 import os
 import inspect
-import importlib
 
 # netopeer configurator module base
 from netopeer.ncmodule import NCModuleError
@@ -39,7 +38,7 @@ class netopeer_configuration:
 				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
 					continue
 				try:
-					module = importlib.import_module('netopeer.' + fil[:-3])
+					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
 					self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
 				except ImportError as e:
 					messages.append(str(e), 'error')
