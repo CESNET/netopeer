@@ -233,7 +233,7 @@ def cli(stdscr, config):
 			w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
 			w_tools.window.addstr(' | ', curses.color_pair(0))
 			if windows[window] == 'Menu':
-				w_tools.window.addstr("RIGHT", curses.color_pair(0) | curses.A_UNDERLINE)
+				w_tools.window.addstr('RIGHT', curses.color_pair(0) | curses.A_UNDERLINE)
 			else:
 				w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
 			w_tools.window.addstr(' | ', curses.color_pair(0))
@@ -248,9 +248,9 @@ def cli(stdscr, config):
 			# Print module tools
 			for (key,desc) in module_tools:
 				try:
-					w_tools.window.addstr('| ', curses.color_pair(0))
+					w_tools.window.addstr(' | ', curses.color_pair(0))
 					w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
-					w_tools.window.addstr('-{s} '.format(s=desc), curses.color_pair(0))
+					w_tools.window.addstr('-{s}'.format(s=desc), curses.color_pair(0))
 				except curses.error:
 					pass
 
