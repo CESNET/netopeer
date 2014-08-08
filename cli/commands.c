@@ -127,6 +127,22 @@ COMMAND commands[] = {
 		{NULL, NULL, NULL}
 };
 
+char* cert_commands[] = {
+		"display",
+		"add",
+		"remove",
+		"displayown",
+		"replaceown",
+		NULL
+};
+
+char* crl_commands[] = {
+		"display",
+		"add",
+		"remove",
+		NULL
+};
+
 typedef enum GENERIC_OPS {
 	GO_COMMIT,
 	GO_DISCARD_CHANGES

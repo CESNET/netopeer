@@ -47,6 +47,8 @@
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 extern COMMAND commands[];
+extern char* cert_commands[];
+extern char* crl_commands[];
 volatile int multiline = 0;
 
 /* Generator function for command completion.  STATE lets us know whether
@@ -78,6 +80,39 @@ char * cmd_generator(const char *text, int state)
 	return ((char *) NULL);
 }
 
+char* subcmd_generator(const char* text, int state)
+{
+	static int list_index, len;
+	static char** cmds = NULL;
+	char *name;
+
+	/* If this is a new word to complete, initialize now.  This includes
+	 saving the length of TEXT for efficiency, and initializing the index
+	 variable to 0. */
+	if (!state) {
+		list_index = 0;
+		len = strlen(text);
+		if (strncmp(rl_line_buffer, "cert", 4) == 0) {
+			cmds = cert_commands;
+		}
+		if (strncmp(rl_line_buffer, "crl", 3) == 0) {
+			cmds = crl_commands;
+		}
+	}
+
+	/* Return the next name which partially matches from the command list. */
+	while ((name = cmds[list_index]) != NULL) {
+		list_index++;
+
+		if (strncmp(name, text, len) == 0) {
+			return (strdup(name));
+		}
+	}
+
+	/* If no names matched, then return NULL. */
+	return ((char *) NULL);
+}
+
 /**
  * \brief Attempt to complete available program commands.
  *
@@ -88,7 +123,7 @@ char * cmd_generator(const char *text, int state)
  *
  * \return The array of matches, or NULL if there aren't any.
  */
-char ** cmd_completion(const char *text, int start, int UNUSED(end))
+char ** cmd_completion(const char *text, int start, int end)
 {
 	char **matches;
 
@@ -99,6 +134,9 @@ char ** cmd_completion(const char *text, int start, int UNUSED(end))
 	 directory. */
 	if (start == 0) {
 		matches = rl_completion_matches(text, cmd_generator);
+	} else if (strcmp(rl_line_buffer, "cert ") == 0 || strcmp(rl_line_buffer, "crl ") == 0 ||
+			(rl_line_buffer[end-1] != ' ' && (strncmp(rl_line_buffer, "cert ", 5) == 0 || strncmp(rl_line_buffer, "crl ", 4) == 0))) {
+		matches = rl_completion_matches(text, subcmd_generator);
 	}
 
 	return (matches);
