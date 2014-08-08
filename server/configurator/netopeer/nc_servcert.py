@@ -275,21 +275,21 @@ class nc_servcert(ncmodule.ncmodule):
 		return(True)
 
 	def paint(self, window, focus, height, width):
-		tools = [('INS', 'replace')]
+		tools = [('ENTER', 'replace')]
 		if not self.pem and not self.crt:
 			if not self.stunnel_certpath and not self.stunnel_keypath:
 				window.addstr('FAIL: Inaccessible or corrupted stunnel config file')
 			if self.stunnel_certpath and not self.stunnel_keypath:
 				window.addstr('FAIL: Inaccessible or corrupted certificate and key in:\n')
-				window.addstr(self.stunnel_certpath, curses.color_pair(0) | curses.A_UNDERLINE)
+				window.addstr(self.stunnel_certpath, curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus else 0))
 			if self.stunnel_certpath and self.stunnel_keypath:
 				window.addstr('FAIL: Inaccessible or corrupted certificate in:\n')
-				window.addstr(self.stunnel_certpath, curses.color_pair(0) | curses.A_UNDERLINE)
+				window.addstr(self.stunnel_certpath, curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus else 0))
 			return(tools)
 
 		if self.pem:
 			window.addstr('Using the certificate and key in:\n')
-			window.addstr(self.stunnel_certpath + '\n\n', curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr(self.stunnel_certpath + '\n\n', curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus else 0))
 			subject = self.pem[1].get_subject()
 			issuer = self.pem[1].get_issuer()
 			valid = self.pem[1].get_not_after()
@@ -298,9 +298,9 @@ class nc_servcert(ncmodule.ncmodule):
 
 		if self.crt:
 			window.addstr('Using the certificate in:\n')
-			window.addstr(self.stunnel_certpath + '\n', curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr(self.stunnel_certpath + '\n', curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus else 0))
 			window.addstr('With the private key in:\n')
-			window.addstr(self.stunnel_keypath + '\n\n', curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr(self.stunnel_keypath + '\n\n', curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus else 0))
 			subject = self.crt[1].get_subject()
 			issuer = self.crt[1].get_issuer()
 			valid = self.crt[1].get_not_after()
@@ -454,7 +454,7 @@ class nc_servcert(ncmodule.ncmodule):
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
-		if key == curses.KEY_IC:
+		if key == ord('\n'):
 			selected = 0
 			while True:
 				try:
