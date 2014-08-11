@@ -271,6 +271,12 @@ class nc_servcert(ncmodule.ncmodule):
 
 		return self.get()
 
+	def unsaved_changes(self):
+		if self.pem_toreplace != None or self.crt_toreplace != None or self.key_toreplace != None:
+			return(True)
+
+		return(False)
+
 	def refresh(self, window, focus, height, width):
 		return(True)
 

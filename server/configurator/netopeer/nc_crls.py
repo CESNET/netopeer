@@ -219,6 +219,12 @@ class nc_crls(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if self.crlpath_toedit or len(self.crls_toadd) > 0 or len(self.crls_toremove) > 0:
+			return(True)
+
+		return(False)
+
 	def refresh(self, window, focus, height, width):
 		return self.get()
 

@@ -216,6 +216,12 @@ class nc_cacerts(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if self.certspath_toedit or len(self.certs_toadd) > 0 or len(self.certs_toremove) > 0:
+			return(True)
+
+		return (False)
+
 	def refresh(self, window, focus, height, width):
 		return self.get()
 
