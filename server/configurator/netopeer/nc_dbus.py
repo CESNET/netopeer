@@ -104,6 +104,24 @@ class nc_dbus(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if not self.permission_path:
+			return(False)
+
+		xpath_user = self.dbus_ctxt.xpathEval('/busconfig/policy[@user and allow/@own = \'org.liberouter.netopeer.server\']/@user')
+		if xpath_user and xpath_user[0].getContent() != self.user:
+			return(True)
+
+		xpath_group = self.dbus_ctxt.xpathEval('/busconfig/policy[@group and allow/@send_destination = \'org.liberouter.netopeer.server\' and allow/@receive_sender = \'org.liberouter.netopeer.server\']/@group')
+		if xpath_group and xpath_group[0].getContent() != self.group:
+			return(True)
+
+		if self.service_path:
+			if self.service_content.find('User='+self.user) == -1:
+				return(True)
+
+		return(False)
+
 	def paint(self, window, focus, height, width):
 		tools = []
 		try:
