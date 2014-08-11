@@ -291,6 +291,11 @@ def cli(stdscr, config):
 						if selected == 0:
 							config.save_all()
 						break
+					elif c == ord('q'):
+						break
+					elif c == curses.KEY_F10:
+						config.save_all()
+						break
 					else:
 						curses.flash()
 			break
