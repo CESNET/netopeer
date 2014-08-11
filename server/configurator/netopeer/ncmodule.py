@@ -56,6 +56,10 @@ class ncmodule:
 	def update(self):
 		return(True)
 
+	# check for unsaved configuration changes
+	def unsaved_changes(self):
+		return(False)
+
  	# refresh content window after save
 	def refresh(self, window, focus, height, width):
 		return(True)

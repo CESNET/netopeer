@@ -55,6 +55,12 @@ class netopeer_configuration:
 		for ncmodule in self.ncmodules:
 			ncmodule.update()
 
+	def any_unsaved_changes(self):
+		for ncmodule in self.ncmodules:
+			if ncmodule.unsaved_changes():
+				return(True)
+		return(False)
+
 	def run_as_root(self):
 		"""Script must be run as root user."""
 		if os.geteuid() != 0:
@@ -159,7 +165,12 @@ def create_windows(stdscr):
 	# bottom line with avaliable tools/commands
 	tools = configurator_window(stdscr, tools_y,tools_x, maxy-tools_y,0)
 
-	return(menu, content,  messages, tools)
+	# centered hidden unsaved changes dialogue
+	changes_width = 33
+	changes_height = 5
+	changes = configurator_window(stdscr, changes_height, changes_width, maxy/2-changes_height/2, maxx/2-changes_width/2)
+
+	return(menu, content,  messages, tools, changes)
 
 def cli(stdscr, config):
 	# use default terminal colors
@@ -176,7 +187,7 @@ def cli(stdscr, config):
 	# cursor invsible
 	curses.curs_set(0)
 
-	(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
+	(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
 
 	# Defined windows
 	windows = ['Menu', 'Content']
@@ -256,6 +267,32 @@ def cli(stdscr, config):
 
 		c = stdscr.getch()
 		if c == ord('q'):
+			if config.any_unsaved_changes():
+				selected = 0
+
+				while True:
+					w_changes.erase()
+					w_changes.wrapper.box()
+					try:
+						w_changes.wrapper.addstr(0, 13, 'Warning', curses.color_pair(1) | curses.A_REVERSE)
+						w_changes.window.addstr('There are some unsaved changes.\n')
+						w_changes.window.addstr(2, 5, 'Save', curses.color_pair(0) | curses.A_REVERSE if selected == 0 else 0)
+						w_changes.window.addstr('  ')
+						w_changes.window.addstr(2, 19, 'Discard', curses.color_pair(0) | curses.A_REVERSE if selected == 1 else 0)
+					except:
+						pass
+					w_changes.wrapper.refresh()
+					c = stdscr.getch()
+					if c == curses.KEY_RIGHT and selected < 1:
+						selected += 1
+					elif c == curses.KEY_LEFT and selected > 0:
+						selected -= 1
+					elif c == ord('\n'):
+						if selected == 0:
+							config.save_all()
+						break
+					else:
+						curses.flash()
 			break
 		elif c == curses.KEY_RESIZE:
 			del(w_menu)
