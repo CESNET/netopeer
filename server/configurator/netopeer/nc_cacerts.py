@@ -28,25 +28,27 @@ class netopeer_module:
 class nc_cacerts(ncmodule.ncmodule):
 	name = 'CA Certificates'
 
+	stunnelpath = None
 	certspath = None
+	certspath_toedit = False
 	certs = []
+	line_len = len('Add a certificate')
 	show_cert = False
 	certs_toremove = []
 	certs_toadd = []
 
 	# curses
-	selected = 0
+	selected = -2
 
 	def find(self):
-		if os.path.exists(config.paths['cfgdir']):
-			self.certspath = config.paths['cfgdir'] + '/stunnel/certs'
-			if not os.access(self.certspath, os.F_OK):
-				messages.append('stunnel certificate directory does not exist, creating it', 'warning')
-				if not os.mkdir(self.certspath, 0700):
-					messages.append('stunnel certificate directory could not be created', 'error')
-					self.certspath = None
-		else:
-			messages.append('netopeer configuration directory not found', 'error')
+		self.stunnelpath = config.paths['cfgdir'] + '/stunnel_config'
+		if not os.path.isfile(self.stunnelpath):
+			messages.append('netopeer stunnel config file not found', 'error')
+			self.stunnelpath = None
+			return(False)
+		self.certspath = self.get_stunnel_config()
+		if self.certspath == None:
+			return(False)
 		return(True)
 
 	def parse_cert(self, path):
@@ -95,15 +97,75 @@ class nc_cacerts(ncmodule.ncmodule):
 
 		return((os.path.basename(path)[:-4], cert, subj_line_len, iss_line_len))
 
-	def get(self):
-		if self.certspath:
-			for path in os.listdir(self.certspath):
-				if len(path) < 5 or path[-4:] != '.pem' or os.path.isdir(os.path.join(self.certspath, path)):
-					continue
-				cert = self.parse_cert(os.path.join(self.certspath, path))
+	def set_stunnel_config(self, new_certspath):
+		if not self.stunnelpath:
+			return(False)
+		try:
+			file = open(self.stunnelpath, 'r')
+		except IOError:
+			return(False)
+		text = file.read()
+		file.close()
 
-				if cert:
-					self.certs.append(cert)
+		if text[:9] == 'CAPath = ':
+			starti = 9
+			endi = text.find('\n', starti)
+		else:
+			starti = text.find('\nCApath = ')
+			if starti > -1:
+				starti += 10
+				endi = text.find('\n', starti)
+
+		try:
+			file = open(self.stunnelpath, 'w')
+		except IOError:
+			return(False)
+		if starti > -1:
+			file.write(text[:starti])
+			file.write(new_certspath)
+			file.write(text[endi:])
+		else:
+			file.write('CApath = ' + new_certspath + '\n')
+			file.write(text)
+		file.close()
+
+		return(True)
+
+	def get_stunnel_config(self):
+		if not self.stunnelpath:
+			return(None)
+		try:
+			file = open(self.stunnelpath, 'r')
+		except IOError:
+			return(None)
+		text = file.read()
+		file.close()
+
+		i = text.find('\nCApath = ')
+		if i == -1:
+			messages.append('stunnel config file does not define any trusted CA directory', 'error')
+			return(None)
+		i += 10
+		certspath = text[i : text.find('\n', i)]
+
+		return(certspath)
+
+	def get(self):
+		self.certs = []
+		self.line_len = len('Add a certificate')
+		if self.certspath == None or not os.path.isdir(self.certspath):
+			return(False)
+		if len(self.certspath) > self.line_len:
+			self.line_len = len(self.certspath)
+		for path in os.listdir(self.certspath):
+			if len(path) < 5 or path[-4:] != '.pem' or os.path.isdir(os.path.join(self.certspath, path)):
+				continue
+			cert = self.parse_cert(os.path.join(self.certspath, path))
+
+			if cert:
+				if len(cert[0]) > self.line_len:
+					self.line_len = len(cert[0])
+				self.certs.append(cert)
 
 		self.certs.sort()
 		return(True)
@@ -126,6 +188,7 @@ class nc_cacerts(ncmodule.ncmodule):
 			messages.append('Could not add \"' + path + '\": ' + e.strerror + '\n', 'error')
 
 		if changes:
+			# rehash cert dir and tell stunnel to reload it
 			if not os.path.exists(config.paths['crehash']):
 				messages.append('Could not rehash the CA directory with \"' + config.paths['crehash'] + '\", left inconsistent', 'error')
 				return(False)
@@ -145,23 +208,52 @@ class nc_cacerts(ncmodule.ncmodule):
 				except (ValueError, IOError, OSError):
 					messages.append('netopeer stunnel pid file found, but could not force config reload, changes may not take effect before stunnel restart', 'error')
 
+		if self.certspath_toedit:
+			if not self.set_stunnel_config(self.certspath):
+				messages.append('Could not write the new stunnel trusted CA dir into config file', 'error')
+				return(False)
+			self.certspath_toedit = False
 
 		return(True)
 
 	def refresh(self, window, focus, height, width):
-		return(True)
+		return self.get()
+
+	def maddstrln(self, window, width, msg, attr = 0, force_len = 0):
+		if len(msg) > width-2:
+			window.addstr(msg[:width-6]+'...\n', attr)
+		elif force_len > len(msg):
+			window.addstr(msg, attr)
+			window.addstr((' '*((force_len if force_len < width-3 else width-3)-len(msg))) + '\n', (attr ^ curses.A_UNDERLINE if attr & curses.A_UNDERLINE else attr))
+		else:
+			window.addstr(msg + '\n', attr)
 
 	def paint(self, window, focus, height, width):
-		tools = [('DEL', 'remove'), ('INS', 'add')]
+		tools = [('PGUP, PGDOWN', 'scrolling'), ('DEL', 'remove')]
 		if not self.show_cert:
 			tools.append(('ENTER', 'show'))
-			i = (self.selected / (height-2)) * (height-2)
+			if self.selected < height-7:
+				cert_index = 0
+			else:
+				cert_index = ((self.selected+5) / (height-2)) * (height-2) - 5
+
+			if cert_index == 0:
+				cert_count = height-7;
+				self.maddstrln(window, width, 'Trusted CA certificates in:');
+				self.maddstrln(window, width, self.certspath, curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus and self.selected == -2 else 0), self.line_len)
+				self.maddstrln(window, width, '')
+				self.maddstrln(window, width, 'Add a certificate', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == -1 else 0, self.line_len)
+				self.maddstrln(window, width, '')
+			else:
+				cert_count = height-2;
+
 			try:
-				while i < len(self.certs):
-					window.addstr(self.certs[i][0] + '\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == i else 0)
+				i = 0
+				while cert_index+i < len(self.certs) and i < cert_count:
+					self.maddstrln(window, width, self.certs[cert_index+i][0], curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == cert_index+i else 0, self.line_len)
 					i += 1
 				if len(self.certs) == 0:
-					window.addstr('None')
+					self.maddstrln(window, width, 'None')
 			except curses.error:
 				pass
 		else:
@@ -196,7 +288,9 @@ class nc_cacerts(ncmodule.ncmodule):
 				except curses.error:
 					pass
 			else:
-				if width-2 < 24 or width-2 < 4 + self.certs[self.selected][2] + 1 + 4 + self.certs[self.selected][3] + 1:
+				# cert name width (or) valid width (or) subject longest line + issuer longest line
+				if width-2 < len(self.certs[self.selected][0])+1 or width-2 < 34 or\
+						width-2 < 4 + self.certs[self.selected][2] + 1 + 4 + self.certs[self.selected][3] + 1:
 					self.show_cert = False
 					tools.pop()
 					tools.append(('ENTER', 'show'))
@@ -243,32 +337,51 @@ class nc_cacerts(ncmodule.ncmodule):
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
-		if key == curses.KEY_UP and self.selected > 0:
+		if key == curses.KEY_UP and ((not self.show_cert and self.selected > -2) or (self.show_cert and self.selected > 0)):
 			self.selected = self.selected-1
 		elif key == curses.KEY_DOWN and self.selected < len(self.certs)-1:
 			self.selected = self.selected+1
-		elif key == ord('\n') and len(self.certs) > 0:
-			self.show_cert = not self.show_cert
-		elif key == curses.KEY_DC:
+		elif key == ord('\n'):
+			if self.selected == -2:
+				window.addstr(1, 0, ' '*(width-2))
+				path = self.get_editable(1, 0, stdscr, window, self.certspath, curses.color_pair(1), True)
+				if path == '' or path == self.certspath:
+					return(True)
+				self.certspath = path
+				self.certspath_toedit = True
+				self.get()
+			elif self.selected == -1:
+				window.erase()
+				window.addstr('Absolute path: ')
+				path = self.get_editable(0, 15, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE, True)
+				if path == '':
+					return(True)
+				if os.path.exists(os.path.join(self.certspath, os.path.basename(path))):
+					messages.append('Certificate \"' + os.path.basename(path)[:-4] + '\" already in the CA directory', 'error')
+					return(True)
+				cert = self.parse_cert(path)
+
+				if cert:
+					self.certs.append(cert)
+					self.certs.sort()
+					self.certs_toadd.append(path)
+			else:
+				self.show_cert = not self.show_cert
+		elif key == curses.KEY_DC and self.selected > -1:
 			self.certs_toremove.append(os.path.join(self.certspath, self.certs[self.selected][0]) + '.pem')
 			del self.certs[self.selected]
-			if self.selected > 0:
-				self.selected -= 1;
-		elif key == curses.KEY_IC:
-			window.erase()
-			window.addstr('Absolute path: ')
-			path = self.get_editable(0, 15, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE, True)
-			if path == '':
-				return(True)
-			if os.path.exists(os.path.join(self.certspath, os.path.basename(path))):
-				messages.append('Certificate \"' + os.path.basename(path)[:-4] + '\" already in the CA directory', 'error')
-				return(True)
-			cert = self.parse_cert(path)
-
-			if cert:
-				self.certs.append(cert)
-				self.certs.sort()
-				self.certs_toadd.append(path)
+			self.selected -= 1;
+		elif key == curses.KEY_NPAGE and self.selected != len(self.certs)-1:
+			if self.selected < 0:
+				self.selected += height-3
+			else:
+				self.selected += height-2
+			if self.selected > len(self.certs)-1:
+				self.selected = len(self.certs)-1
+		elif key == curses.KEY_PPAGE and self.selected != -2:
+			self.selected -= height-2
+			if self.selected < -2:
+				self.selected = -2
 		else:
 			curses.flash()
 		return(True)
