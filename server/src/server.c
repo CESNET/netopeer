@@ -204,6 +204,12 @@ int main (int argc, char** argv)
 		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
 
+	/* make sure we were executed by root */
+	if (geteuid() != 0) {
+		nc_verb_error("Failed to start, must have root privileges.");
+		return (EXIT_FAILURE);
+	}
+
 	/* Initiate communication subsystem for communicate with agents */
 	conn = comm_init();
 	if (conn == NULL) {
