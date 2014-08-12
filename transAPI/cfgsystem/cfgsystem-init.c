@@ -51,6 +51,12 @@
 /* from cfgsystem.c */
 int transapi_init(xmlDocPtr *running);
 
+const char* capabilities[] = {
+	"urn:ietf:params:netconf:base:1.0",
+	"urn:ietf:params:netconf:base:1.1",
+	"urn:ietf:params:netconf:capability:startup:1.0"
+};
+
 void my_print(NC_VERB_LEVEL level, const char* msg)
 {
 	switch (level) {
@@ -71,11 +77,12 @@ void my_print(NC_VERB_LEVEL level, const char* msg)
 
 void help(const char* progname)
 {
-	fprintf(stdout, "Usage: %s path\n\n", progname);
-	fprintf(stdout, "  path    Path to the cfgsystem's datastore file.\n\n");
+	fprintf(stdout, "Usage: %s path [features ...]\n\n", progname);
+	fprintf(stdout, "  path     Path to the cfgsystem's datastore file.\n");
+	fprintf(stdout, "  features Space-separated features to be enabled.\n\n");
 }
 
-void create_datastore(xmlDocPtr *datastore, xmlNodePtr *startup)
+void create_datastore(xmlDocPtr *datastore)
 {
 	xmlNodePtr root, node;
 	xmlNsPtr ns;
@@ -91,17 +98,24 @@ void create_datastore(xmlDocPtr *datastore, xmlNodePtr *startup)
 	node =xmlNewChild(root, root->ns, BAD_CAST "candidate", NULL);
 	xmlNewProp(node, BAD_CAST "lock", BAD_CAST "");
 	xmlNewProp(node, BAD_CAST "modified", BAD_CAST "false");
-	*startup = node = xmlNewChild(root, root->ns, BAD_CAST "startup", NULL);
+	node = xmlNewChild(root, root->ns, BAD_CAST "startup", NULL);
 	xmlNewProp(node, BAD_CAST "lock", BAD_CAST "");
 }
 
 int main(int argc, char** argv)
 {
+	struct nc_session* dummy_session;
+	struct nc_cpblts* capabs;
+	struct ncds_ds* ds;
+	nc_rpc* rpc;
+	nc_reply* reply;
+	char* new_startup_config;
+	ncds_id id;
 	xmlDocPtr startup_doc = NULL, datastore = NULL;
-	xmlNodePtr startup_node = NULL, node, rm;
-	int ret = 0;
+	xmlNodePtr startup_node = NULL, node;
+	int ret = 0, i;
 
-	if (argc != 2 || argv[1][0] == '-') {
+	if (argc < 2 || argv[1][0] == '-') {
 		help(argv[0]);
 		return 1;
 	}
@@ -114,6 +128,38 @@ int main(int argc, char** argv)
 
 	/* set message printing callback */
 	nc_callback_print(my_print);
+
+	/* register the datastore */
+	if ((ds = ncds_new(NCDS_TYPE_FILE, "./model/ietf-system.yin", NULL)) == NULL) {
+		nc_close(0);
+		return 1;
+	}
+
+	/* enable features */
+	for (i = 2; i < argc; ++i) {
+		if (ncds_feature_enable("ietf-system", argv[i]) != 0) {
+			nc_verb_error("Could not enable feature \"%s\".", argv[i]);
+			nc_close(0);
+			return 1;
+		}
+	}
+
+	/* set the path to the target file */
+	if (ncds_file_set_path(ds, argv[1]) != 0) {
+		nc_verb_error("Could not set \"%s\" to the datastore.", argv[1]);
+		nc_close(0);
+		return 1;
+	}
+	if ((id = ncds_init(ds)) < 0) {
+		nc_verb_error("Failed to nitialize datastore.");
+		nc_close(0);
+		return 1;
+	}
+	if (ncds_consolidate() != 0) {
+		nc_verb_error("Could not consolidate the datastore.");
+		nc_close(0);
+		return 1;
+	}
 
 	if (transapi_init(&startup_doc) != EXIT_SUCCESS) {
 		nc_close(0);
@@ -147,38 +193,36 @@ int main(int argc, char** argv)
 		if (startup_node == NULL) {
 			/* datastore is corrupted, create a new one */
 			xmlFreeDoc(datastore);
-			create_datastore(&datastore, &startup_node);
+			create_datastore(&datastore);
 		}
 	} else {
-		/* dotastore does not exists or it is corrupted, create a new one */
-		create_datastore(&datastore, &startup_node);
+		/* datastore does not exists or it is corrupted, create a new one */
+		create_datastore(&datastore);
 	}
 
-	if (startup_node == NULL) {
-		nc_verb_error("Unable to process datastore file content.");
+	/* create the dummy session */
+	capabs = nc_cpblts_new(capabilities);
+	if ((dummy_session = nc_session_dummy("session0", "root", NULL, capabs)) == NULL) {
+		nc_verb_error("Could not create a dummy session.");
 		nc_close(0);
 		return 1;
 	}
 
-	/* cleanup startup */
-	for (node = startup_node->children; node != NULL; ) {
-		rm = node;
-		node = node->next;
-		xmlUnlinkNode(rm);
-		xmlFreeNode(rm);
+	/* dump the new config */
+	xmlDocDumpMemory(startup_doc, (xmlChar**)&new_startup_config, NULL);
+
+	/* apply copy-config rpc on the datastore */
+	if ((rpc = nc_rpc_copyconfig(NC_DATASTORE_CONFIG, NC_DATASTORE_STARTUP, new_startup_config)) == NULL) {
+		nc_verb_error("Could not create copy-config RPC.");
+		nc_close(0);
+		return 1;
 	}
-
-	/* reconnect startup config from transapi_init into the datastore */
-	node = xmlCopyNodeList(startup_doc->children);
-	xmlAddChildList(startup_node, node);
-
-	xmlFreeDoc(startup_doc);
-
-	if (xmlSaveFormatFile(argv[1], datastore, 1) == -1) {
-		nc_verb_error("Unable to store dtastore to \"%s\" file.", argv[1]);
-		ret = 1;
+	reply = ncds_apply_rpc(id, dummy_session, rpc);
+	if (nc_reply_get_type(reply) != NC_REPLY_OK) {
+		nc_verb_error("Copy-config RPC failed.");
+		nc_close(0);
+		return 1;
 	}
-	xmlFreeDoc(datastore);
 
 	nc_close(0);
 	return ret;

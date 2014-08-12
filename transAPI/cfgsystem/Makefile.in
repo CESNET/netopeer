@@ -85,7 +85,7 @@ install: $(MODULE) $(TARGET)-init
 			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 	fi
-	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml
+	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
 .PHONY: uninstall
