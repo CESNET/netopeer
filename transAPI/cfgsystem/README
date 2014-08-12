@@ -57,7 +57,7 @@ element, please read the ietf-netmod-system-mgmt-16 draft.
 nc_cfgsystem.py
 ---------------
 
-This is a module for netopeer-configurator(1) to enable user-firendly
+This is a module for netopeer-configurator(1) to enable user-friendly
 manipulation of PasswordAuthentication parameter of netopeer sshd_config
 file. Installing cfgsystem plugin automatically disables PAM authentication
 and if PasswordAuthentication is disabled as well, the only means of
