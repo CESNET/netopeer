@@ -13635,3 +13635,7 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
+$as_echo "$as_me: " >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Detected cfgsystem features: $FEATURES" >&5
+$as_echo "$as_me: Detected cfgsystem features: $FEATURES" >&6;}

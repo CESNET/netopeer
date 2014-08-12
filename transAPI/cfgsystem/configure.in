@@ -133,3 +133,5 @@ AC_SUBST(FEATURES)
 
 AC_CONFIG_FILES([Makefile model/ietf-system-data.rng base/common.h])
 AC_OUTPUT
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([Detected cfgsystem features: $FEATURES])
