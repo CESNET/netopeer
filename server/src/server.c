@@ -227,6 +227,7 @@ int main (int argc, char** argv)
 	/* initialize library including internal datastores and maybee something more */
 	if (nc_init (NC_INIT_ALL) < 0) {
 		nc_verb_error("Library initialization failed.");
+		comm_destroy(conn);
 		return (EXIT_FAILURE);
 	}
 
@@ -236,6 +237,7 @@ restart:
 	/* start NETCONF server module */
 	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary NETCONF server plugin failed!");
+		comm_destroy(conn);
 		return(EXIT_FAILURE);
 	}
 	server_module->name = strdup(NCSERVER_MODULE_NAME);
@@ -243,6 +245,7 @@ restart:
 		nc_verb_error("Starting necessary NETCONF server plugin failed!");
 		free(server_module->name);
 		free(server_module);
+		comm_destroy(conn);
 		return EXIT_FAILURE;
 	}
 
@@ -251,6 +254,7 @@ restart:
 	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary Netopeer plugin failed!");
 		module_disable(server_module, 1);
+		comm_destroy(conn);
 		return(EXIT_FAILURE);
 	}
 	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
@@ -259,6 +263,7 @@ restart:
 		module_disable(server_module, 1);
 		free(netopeer_module->name);
 		free(netopeer_module);
+		comm_destroy(conn);
 		return EXIT_FAILURE;
 	}
 
