@@ -3351,12 +3351,18 @@ fi
 
 if test -d "/usr/share/zoneinfo/"; then
 	FEATURES="timezone-name"
+else
+	OFF_FEATURES="timezone-name"
 fi
 if test -n "$USERADD" -a -n "$USERDEL"; then
 	FEATURES="$FEATURES authentication local-users"
+else
+	OFF_FEATURES="$OFF_FEATURES authentication local-users"
 fi
 if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
 	FEATURES="$FEATURES ntp"
+else
+	OFF_FEATURES="$OFF_FEATURES ntp"
 fi
 
 # Use libtool
@@ -13637,5 +13643,11 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
 $as_echo "$as_me: " >&6;}
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Detected cfgsystem features: $FEATURES" >&5
-$as_echo "$as_me: Detected cfgsystem features: $FEATURES" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: ------cfgsystem feature summary------" >&5
+$as_echo "$as_me: ------cfgsystem feature summary------" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: On: $FEATURES" >&5
+$as_echo "$as_me: On: $FEATURES" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Off: $OFF_FEATURES" >&5
+$as_echo "$as_me: Off: $OFF_FEATURES" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Not supported: radius radius-authentication ntp-udp-port dns-udp-tcp-port" >&5
+$as_echo "$as_me: Not supported: radius radius-authentication ntp-udp-port dns-udp-tcp-port" >&6;}

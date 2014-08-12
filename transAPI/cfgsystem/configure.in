@@ -58,12 +58,18 @@ AC_SUBST(SHUTDOWN)
 
 if test -d "/usr/share/zoneinfo/"; then
 	FEATURES="timezone-name"
+else
+	OFF_FEATURES="timezone-name"
 fi
 if test -n "$USERADD" -a -n "$USERDEL"; then
 	FEATURES="$FEATURES authentication local-users"
+else
+	OFF_FEATURES="$OFF_FEATURES authentication local-users"
 fi
 if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
 	FEATURES="$FEATURES ntp"
+else
+	OFF_FEATURES="$OFF_FEATURES ntp"
 fi
 
 # Use libtool
@@ -134,4 +140,7 @@ AC_SUBST(FEATURES)
 AC_CONFIG_FILES([Makefile model/ietf-system-data.rng base/common.h])
 AC_OUTPUT
 AC_MSG_NOTICE([])
-AC_MSG_NOTICE([Detected cfgsystem features: $FEATURES])
+AC_MSG_NOTICE([------cfgsystem feature summary------])
+AC_MSG_NOTICE([On: $FEATURES])
+AC_MSG_NOTICE([Off: $OFF_FEATURES])
+AC_MSG_NOTICE([Not supported: radius radius-authentication ntp-udp-port dns-udp-tcp-port])
