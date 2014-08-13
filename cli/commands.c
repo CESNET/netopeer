@@ -2480,8 +2480,8 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 			}
 		}
 		if (trusted_store == NULL) {
-			get_default_trustedCA_dir(&dir);
-			if (dir == NULL) {
+			trusted_dir = get_default_trustedCA_dir(NULL);
+			if ((dir = opendir(trusted_dir)) == NULL) {
 				ERROR(func_name, "Could not use the trusted CA directory.");
 				goto error_cleanup;
 			}
