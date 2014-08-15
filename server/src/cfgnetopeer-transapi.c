@@ -106,12 +106,11 @@ void module_free(struct module * module)
 /*
  * if repo_type is -1, then we are working with augment models specifications
  */
-static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, NCDS_TYPE repo_type)
+static int parse_model_cfg(struct module *module, xmlNodePtr node, NCDS_TYPE repo_type)
 {
-	xmlNodePtr node;
-	char *transapi_path, *model_path, *feature, *name, *aux;
-	int i;
+	char *transapi_path = NULL, *model_path = NULL, *feature, *name, *aux;
 	struct transapi *st = NULL;
+	xmlNodePtr aux_node;
 
 	if (strcmp(module->name, NETOPEER_MODULE_NAME) == 0) {
 		st = &netopeer_transapi;
@@ -119,91 +118,87 @@ static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, N
 		st = &server_transapi;
 	}
 
-	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
-		model_path = NULL;
-		transapi_path = NULL;
-		for (node = xpath_obj->nodesetval->nodeTab[i]->children; node != NULL; node = node->next) {
-			if (xmlStrcmp(node->name, BAD_CAST "path") == 0) {
-				model_path = (char*)xmlNodeGetContent(node);
-			}
-			if (xmlStrcmp(node->name, BAD_CAST "transapi") == 0) {
-				transapi_path = (char*)xmlNodeGetContent(node);
-			}
-			if (model_path && transapi_path) {
-				break;
-			}
+	for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (xmlStrcmp(aux_node->name, BAD_CAST "path") == 0) {
+			model_path = (char*)xmlNodeGetContent(aux_node);
 		}
-		/* Netopeer module is something extra */
-		if (st != NULL && model_path) {
-			/* internal static server (Netopeer) module */
-			if (repo_type == -1 && transapi_path) {
-				/* augment transapi module */
-				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
-				ncds_add_augment_transapi(model_path, transapi_path);
-			} else if (repo_type == -1) {
-				/* augment model */
-				nc_verb_verbose("Adding augment model \"%s\"", model_path);
-				ncds_add_model(model_path);
-			} else {
-				nc_verb_verbose("Adding static transapi \"%s\"", model_path);
-				if ((module->ds = ncds_new_transapi_static(repo_type, model_path, st)) == NULL) {
-					free(model_path);
-					free(transapi_path);
-					return (EXIT_FAILURE);
-				}
-			}
-		} else if (model_path && transapi_path) {
-			if (repo_type == -1) {
-				/* augment transapi module */
-				nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
-				ncds_add_augment_transapi(model_path, transapi_path);
-			} else {
-				/* base transapi module for datastore */
-				nc_verb_verbose("Adding transapi \"%s\"", model_path);
-				if ((module->ds = ncds_new_transapi(repo_type, model_path, transapi_path)) == NULL) {
-					free(model_path);
-					free(transapi_path);
-					return (EXIT_FAILURE);
-				}
-			}
-		} else if (model_path) {
-			if (repo_type == -1) {
-				/* augment model */
-				nc_verb_verbose("Adding augment model \"%s\"", model_path);
-				ncds_add_model(model_path);
-			} else {
-				/* base model for datastore */
-				nc_verb_verbose("Adding base model \"%s\"", model_path);
-				if ((module->ds = ncds_new2(repo_type, model_path, NULL)) == NULL) {
-					free(model_path);
-					return (EXIT_FAILURE);
-				}
-			}
-		} else {
-			nc_verb_error("Configuration mismatch: missing model path in %s config.", module->name);
+		if (xmlStrcmp(aux_node->name, BAD_CAST "transapi") == 0) {
+			transapi_path = (char*)xmlNodeGetContent(aux_node);
 		}
-		name = strdup(basename(model_path));
-		/* cut off the .yin suffix */
-		aux = strrchr(name, '.');
-		if (aux) { *aux = '\0';}
-
-		free(model_path);
-		free(transapi_path);
-
-		/* set features */
-		for (node = xpath_obj->nodesetval->nodeTab[i]->children; node != NULL; node = node->next) {
-			if (xmlStrcmp(node->name, BAD_CAST "feature") == 0) {
-				feature = (char*)xmlNodeGetContent(node);
-				if (strcmp(feature, "*") == 0) {
-					ncds_features_enableall(name);
-				} else {
-					ncds_feature_enable(name, feature);
-				}
-				free(feature);
-			}
+		if (model_path && transapi_path) {
+			break;
 		}
-		free(name);
 	}
+	/* Netopeer module is something extra */
+	if (st != NULL && model_path) {
+		/* internal static server (Netopeer) module */
+		if (repo_type == -1 && transapi_path) {
+			/* augment transapi module */
+			nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
+			ncds_add_augment_transapi(model_path, transapi_path);
+		} else if (repo_type == -1) {
+			/* augment model */
+			nc_verb_verbose("Adding augment model \"%s\"", model_path);
+			ncds_add_model(model_path);
+		} else {
+			nc_verb_verbose("Adding static transapi \"%s\"", model_path);
+			if ((module->ds = ncds_new_transapi_static(repo_type, model_path, st)) == NULL) {
+				free(model_path);
+				free(transapi_path);
+				return (EXIT_FAILURE);
+			}
+		}
+	} else if (model_path && transapi_path) {
+		if (repo_type == -1) {
+			/* augment transapi module */
+			nc_verb_verbose("Adding augment transapi \"%s\"", model_path);
+			ncds_add_augment_transapi(model_path, transapi_path);
+		} else {
+			/* base transapi module for datastore */
+			nc_verb_verbose("Adding transapi \"%s\"", model_path);
+			if ((module->ds = ncds_new_transapi(repo_type, model_path, transapi_path)) == NULL) {
+				free(model_path);
+				free(transapi_path);
+				return (EXIT_FAILURE);
+			}
+		}
+	} else if (model_path) {
+		if (repo_type == -1) {
+			/* augment model */
+			nc_verb_verbose("Adding augment model \"%s\"", model_path);
+			ncds_add_model(model_path);
+		} else {
+			/* base model for datastore */
+			nc_verb_verbose("Adding base model \"%s\"", model_path);
+			if ((module->ds = ncds_new2(repo_type, model_path, NULL)) == NULL) {
+				free(model_path);
+				return (EXIT_FAILURE);
+			}
+		}
+	} else {
+		nc_verb_error("Configuration mismatch: missing model path in %s config.", module->name);
+	}
+	name = strdup(basename(model_path));
+	/* cut off the .yin suffix */
+	aux = strrchr(name, '.');
+	if (aux) { *aux = '\0';}
+
+	free(model_path);
+	free(transapi_path);
+
+	/* set features */
+	for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (xmlStrcmp(aux_node->name, BAD_CAST "feature") == 0) {
+			feature = (char*)xmlNodeGetContent(aux_node);
+			if (strcmp(feature, "*") == 0) {
+				ncds_features_enableall(name);
+			} else {
+				ncds_feature_enable(name, feature);
+			}
+			free(feature);
+		}
+	}
+	free(name);
 
 	return (EXIT_SUCCESS);
 }
@@ -211,7 +206,7 @@ static int parse_model_cfg(struct module *module, xmlXPathObjectPtr xpath_obj, N
 int module_enable(struct module * module, int add)
 {
 	char *config_path = NULL, *repo_path = NULL, *repo_type_str = NULL;
-	int repo_type = -1;
+	int repo_type = -1, i;
 	xmlDocPtr module_config;
 	xmlNodePtr node;
 	xmlXPathContextPtr xpath_ctxt;
@@ -282,7 +277,9 @@ int module_enable(struct module * module, int add)
 		xmlXPathFreeObject(xpath_obj);
 		goto err_cleanup;
 	}
-	parse_model_cfg(module, xpath_obj, -1);
+	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+		parse_model_cfg(module, xpath_obj->nodesetval->nodeTab[i], -1);
+	}
 	xmlXPathFreeObject(xpath_obj);
 
 	/* main datastore's model */
@@ -294,7 +291,9 @@ int module_enable(struct module * module, int add)
 		xmlXPathFreeObject(xpath_obj);
 		goto err_cleanup;
 	}
-	parse_model_cfg(module, xpath_obj, repo_type);
+	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+		parse_model_cfg(module, xpath_obj->nodesetval->nodeTab[i], repo_type);
+	}
 	xmlXPathFreeObject(xpath_obj);
 
 	if (repo_type == NCDS_TYPE_FILE) {
