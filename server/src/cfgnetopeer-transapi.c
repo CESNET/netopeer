@@ -206,7 +206,7 @@ static int parse_model_cfg(struct module *module, xmlNodePtr node, NCDS_TYPE rep
 int module_enable(struct module * module, int add)
 {
 	char *config_path = NULL, *repo_path = NULL, *repo_type_str = NULL;
-	int repo_type = -1, i;
+	int repo_type = -1, main_model_count;
 	xmlDocPtr module_config;
 	xmlNodePtr node;
 	xmlXPathContextPtr xpath_ctxt;
@@ -270,31 +270,38 @@ int module_enable(struct module * module, int add)
 	}
 	xmlXPathFreeObject(xpath_obj);
 
-	/* models augmenting the datastore */
-	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model", xpath_ctxt)) == NULL ||
-			xpath_obj->nodesetval == NULL) {
-		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
-		xmlXPathFreeObject(xpath_obj);
-		goto err_cleanup;
-	}
-	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
-		parse_model_cfg(module, xpath_obj->nodesetval->nodeTab[i], -1);
-	}
-	xmlXPathFreeObject(xpath_obj);
-
-	/* main datastore's model */
-	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models/model-main", xpath_ctxt)) == NULL) {
+	/* get data-models element */
+	if ((xpath_obj = xmlXPathEvalExpression(BAD_CAST "/device/data-models", xpath_ctxt)) == NULL) {
 		nc_verb_error("XPath evaluating error (%s:%d)", __FILE__, __LINE__);
 		goto err_cleanup;
 	} else if (xpath_obj->nodesetval == NULL || xpath_obj->nodesetval->nodeNr != 1) {
-		nc_verb_verbose("model-main is not unique in %s transAPI module configuration.", module->name);
+		nc_verb_verbose("data-models is not unique in %s transAPI module configuration.", module->name);
 		xmlXPathFreeObject(xpath_obj);
 		goto err_cleanup;
 	}
-	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
-		parse_model_cfg(module, xpath_obj->nodesetval->nodeTab[i], repo_type);
+
+	/* parse models in the config-defined order, both main and augments */
+	main_model_count = 0;
+	for (node = xpath_obj->nodesetval->nodeTab[0]->children; node != NULL; node = node->next) {
+		if (node->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+		if (xmlStrcmp(node->name, BAD_CAST "model") == 0) {
+			parse_model_cfg(module, node, -1);
+		}
+		if (xmlStrcmp(node->name, BAD_CAST "model-main") == 0) {
+			parse_model_cfg(module, node, repo_type);
+			main_model_count++;
+		}
 	}
 	xmlXPathFreeObject(xpath_obj);
+	if (main_model_count == 0) {
+		nc_verb_verbose("model-main is not present in %s transAPI module configuration.", module->name);
+		goto err_cleanup;
+	} else if (main_model_count > 1) {
+		nc_verb_verbose("model-main is not unique in %s transAPI module configuration.", module->name);
+		goto err_cleanup;
+	}
 
 	if (repo_type == NCDS_TYPE_FILE) {
 		if (ncds_file_set_path(module->ds, repo_path)) {
