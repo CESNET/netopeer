@@ -351,7 +351,7 @@ int module_disable(struct module * module, int destroy)
 {
 	ncds_free(module->ds);
 	module->ds = NULL;
-	
+
 	if (ncds_consolidate() != 0) {
 		nc_verb_warning("%s: consolidating libnetconf datastores failed for module %s.", __func__, module->name);
 	}
@@ -366,7 +366,7 @@ int module_disable(struct module * module, int destroy)
 		if (modules == module) {
 			modules = module->next;
 		}
-	
+
 		module_free(module);
 	}
 	return(EXIT_SUCCESS);
@@ -641,7 +641,7 @@ nc_reply * rpc_netopeer_reboot (xmlNodePtr input[])
 
 	free(type_str);
 
-	return(nc_reply_ok()); 
+	return(nc_reply_ok());
 }
 
 nc_reply * rpc_reload_module (xmlNodePtr input[])
@@ -672,7 +672,7 @@ nc_reply * rpc_reload_module (xmlNodePtr input[])
 		return(nc_reply_error(nc_err_new(NC_ERR_OP_FAILED)));
 	}
 
-	return(nc_reply_ok()); 
+	return(nc_reply_ok());
 }
 /*
 * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
