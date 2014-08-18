@@ -75,6 +75,8 @@
 #endif
 
 #define SSHDPID_ENV "SSHD_PID"
+#define STUNNELPID_ENV "STUNNEL_PID"
+#define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
 
 struct ch_app {
 	char* name;
@@ -142,6 +144,8 @@ static void kill_tlsd(void)
 	if (tlsd_pid != 0) {
 		kill(tlsd_pid, SIGTERM);
 		tlsd_pid = 0;
+		unsetenv(STUNNELPID_ENV);
+		unsetenv(STUNNELCAPATH_ENV);
 	}
 }
 
@@ -808,7 +812,7 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 {
 	int cfgfile, running_cfgfile, pidfd, cmdfd;
 	int pid, r;
-	char pidbuf[16], str[64];
+	char pidbuf[16], str[64], *buf, *ptr;
 	ssize_t str_len = 64;
 	struct stat stbuf;
 
@@ -829,7 +833,7 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		goto err_return;
 	}
 
-	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
+	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_RDWR | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
 		nc_verb_error("Unable to prepare TLS server configuration (%s)", strerror(errno));
 		goto err_return;
 	}
@@ -847,6 +851,35 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	dprintf(running_cfgfile, "%s", tlsd_listen);
 	free(tlsd_listen);
 	tlsd_listen = NULL;
+
+	/* having the configuration file open, export CApath for cfgsystem */
+	r = 0;
+	lseek(running_cfgfile, 0, SEEK_SET);
+	if ((buf = malloc(stbuf.st_size)) != NULL) {
+		if (read(running_cfgfile, buf, stbuf.st_size) == stbuf.st_size && (ptr = strstr(buf, "CApath")) != NULL) {
+			if (ptr - buf == 0 || *(ptr-1) == '\n') {
+				ptr += 6;
+				/* get to the actual path */
+				while (*ptr == ' ' || *ptr == '=') {
+					++ptr;
+				}
+
+				/* create fake separate path */
+				*strchr(ptr, '\n') = '\0';
+				setenv(STUNNELCAPATH_ENV, ptr, 1);
+			} else {
+				r = 1;
+			}
+		} else {
+			r = 1;
+		}
+		free(buf);
+	} else {
+		r = 1;
+	}
+	if (r) {
+		nc_verb_verbose("Failed to export stunnel CApath for cfgsystem module.");
+	}
 
 	/* close config files */
 	close(running_cfgfile);
@@ -917,6 +950,9 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			pidbuf[r] = 0;
 			tlsd_pid = atoi(pidbuf);
 			nc_verb_verbose("TLS server (%s) started (PID %d)", TLSD_EXEC, tlsd_pid);
+
+			/* export stunnel PID for cfgsystem module */
+			setenv(STUNNELPID_ENV, pidbuf, 1);
 		}
 	}
 	return EXIT_SUCCESS;
