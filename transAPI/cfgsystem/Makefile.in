@@ -84,6 +84,11 @@ install: $(MODULE) $(TARGET)-init
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
 			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
+		$(NETOPEER_MANAGER) add --name ietf-system \
+			--import $(NETOPEER_DIR)/ietf-system/ietf-x509-cert-to-name.yin; \
+		$(NETOPEER_MANAGER) add --name ietf-system \
+			--augment $(NETOPEER_DIR)/ietf-system/ietf-system-tls-auth.yin \
+			--features tls-map-certificates; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
