@@ -75,8 +75,11 @@
 #endif
 
 #define SSHDPID_ENV "SSHD_PID"
-#define STUNNELPID_ENV "STUNNEL_PID"
-#define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
+#ifdef ENABLE_TLS
+#	define STUNNELPID_ENV "STUNNEL_PID"
+#	define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
+#	define CREHASH_ENV "C_REHASH_PATH"
+#endif
 
 struct ch_app {
 	char* name;
@@ -146,6 +149,7 @@ static void kill_tlsd(void)
 		tlsd_pid = 0;
 		unsetenv(STUNNELPID_ENV);
 		unsetenv(STUNNELCAPATH_ENV);
+		unsetenv(CREHASH_ENV);
 	}
 }
 
@@ -951,8 +955,9 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			tlsd_pid = atoi(pidbuf);
 			nc_verb_verbose("TLS server (%s) started (PID %d)", TLSD_EXEC, tlsd_pid);
 
-			/* export stunnel PID for cfgsystem module */
+			/* export stunnel PID and c_rehash path for cfgsystem module */
 			setenv(STUNNELPID_ENV, pidbuf, 1);
+			setenv(CREHASH_ENV, C_REHASH, 1);
 		}
 	}
 	return EXIT_SUCCESS;

@@ -47,6 +47,7 @@
 #define SSHD_EXEC "@SSHD_EXEC@"
 #ifdef ENABLE_TLS
 #	define TLSD_EXEC "@STUNNEL_EXEC@"
+#	define C_REHASH "@C_REHASH@"
 #endif
 
 #define AGENT "netopeer-agent"
