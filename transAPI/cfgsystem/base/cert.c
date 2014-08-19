@@ -178,6 +178,79 @@ static int rehash_and_restart_stunnel(const char* stunnel_ca_path, char** msg) {
 	return EXIT_SUCCESS;
 }
 
+/* cert_flag == 0 - return only client certs, 1 - only CA certs, otherwise - ANY (not just with CA or client prefix) cert */
+static char* find_cert(const char* stunnel_ca_path, const char* cert, int cert_flag) {
+	int certfd;
+	DIR* dir;
+	struct stat st;
+	struct dirent* ent;
+	char* cert_path = NULL, *fs_cert;
+
+	if ((dir = opendir(stunnel_ca_path)) == NULL) {
+		return NULL;
+	}
+
+	errno = 0;
+	while ((ent = readdir(dir)) != NULL) {
+		if (strcmp((ent->d_name)+strlen(ent->d_name)-4, ".pem") != 0) {
+			continue;
+		}
+		if (cert_flag == 0 && strncmp(ent->d_name, CLIENT_PREFIX, strlen(CLIENT_PREFIX)) != 0) {
+			continue;
+		}
+		if (cert_flag == 1 && strncmp(ent->d_name, CA_PREFIX, strlen(CA_PREFIX)) != 0) {
+			continue;
+		}
+
+		asprintf(&cert_path, "%s/%s", stunnel_ca_path, ent->d_name);
+		if (stat(cert_path, &st) == -1) {
+			free(cert_path);
+			cert_path = NULL;
+			continue;
+		}
+		if ((certfd = open(cert_path, O_RDONLY)) == -1) {
+			free(cert_path);
+			cert_path = NULL;
+			continue;
+		}
+		fs_cert = malloc(st.st_size+1);
+		fs_cert[st.st_size] = '\0';
+		if (read(certfd, fs_cert, st.st_size) != st.st_size) {
+			free(cert_path);
+			cert_path = NULL;
+			free(fs_cert);
+			close(certfd);
+			continue;
+		}
+		close(certfd);
+
+		if (strncmp(fs_cert, "-----BEGIN CERTIFICATE-----\n", strlen("-----BEGIN CERTIFICATE-----\n")) != 0) {
+			free(cert_path);
+			cert_path = NULL;
+			free(fs_cert);
+			continue;
+		}
+		if (strncmp(fs_cert+strlen("-----BEGIN CERTIFICATE-----\n"), cert, strlen(cert)) != 0) {
+			free(cert_path);
+			cert_path = NULL;
+			free(fs_cert);
+			continue;
+		}
+		free(fs_cert);
+
+		/* we found a match */
+		break;
+	}
+	closedir(dir);
+
+	/* this errno value != 0 could only be set by readdir() */
+	if (errno != 0) {
+		return NULL;
+	}
+
+	return cert_path;
+}
+
 int export_cert(xmlNodePtr node, int ca_cert, char** msg) {
 	const char* node_content;
 	char* base64_cert, *cert_filename, *stunnel_ca_path;
@@ -186,12 +259,15 @@ int export_cert(xmlNodePtr node, int ca_cert, char** msg) {
 	assert(node);
 	assert(node->children);
 
+	node_content = (char*)node->children->content;
+
 	if ((stunnel_ca_path = getenv("STUNNEL_CA_PATH")) == NULL) {
 		asprintf(msg, "Could not get the CA path from the environment.");
 		return EXIT_FAILURE;
 	}
-	if (eaccess(stunnel_ca_path, W_OK) == -1) {
-		asprintf(msg, "Could not access CA path dir (%s).", strerror(errno));
+	if ((cert_filename = find_cert(stunnel_ca_path, node_content, ca_cert)) != NULL) {
+		free(cert_filename);
+		asprintf(msg, "Certificate already exists.");
 		return EXIT_FAILURE;
 	}
 
@@ -207,7 +283,6 @@ int export_cert(xmlNodePtr node, int ca_cert, char** msg) {
 		return EXIT_FAILURE;
 	}
 
-	node_content = (char*)node->children->content;
 	asprintf(&base64_cert, "-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----\n", node_content);
 
 	/* write the certificate into a new unique file */
@@ -229,93 +304,28 @@ int export_cert(xmlNodePtr node, int ca_cert, char** msg) {
 }
 
 int remove_cert(xmlNodePtr node, int ca_cert, char** msg) {
-	int certfd;
-	DIR* dir;
-	struct stat st;
-	struct dirent* ent;
-	char* stunnel_ca_path, *cert_path, *fs_cert, *conf_cert;
+	char* stunnel_ca_path, *cert_path, *node_content;
 
 	assert(node);
 	assert(node->children);
+
+	node_content = (char*)node->children->content;
 
 	if ((stunnel_ca_path = getenv("STUNNEL_CA_PATH")) == NULL) {
 		asprintf(msg, "Could not get the CA path from the environment.");
 		return EXIT_FAILURE;
 	}
-
-	if ((dir = opendir(stunnel_ca_path)) == NULL) {
-		asprintf(msg, "Could not open CA path dir (%s).", strerror(errno));
+	if ((cert_path = find_cert(stunnel_ca_path, node_content, ca_cert)) == NULL) {
+		asprintf(msg, "Failed to remove cert, it does not exist.");
 		return EXIT_FAILURE;
 	}
 
-	errno = 0;
-	while ((ent = readdir(dir)) != NULL) {
-		if (strcmp((ent->d_name)+strlen(ent->d_name)-4, ".pem") != 0) {
-			continue;
-		}
-		if (ca_cert && strncmp(ent->d_name, CA_PREFIX, strlen(CA_PREFIX)) != 0) {
-			continue;
-		}
-		if (!ca_cert && strncmp(ent->d_name, CLIENT_PREFIX, strlen(CLIENT_PREFIX)) != 0) {
-			continue;
-		}
-
-		asprintf(&cert_path, "%s/%s", stunnel_ca_path, ent->d_name);
-		if (stat(cert_path, &st) == -1) {
-			asprintf(msg, "Could not stat cert \"%s\" (%s).", cert_path, strerror(errno));
-			free(cert_path);
-			closedir(dir);
-			return EXIT_FAILURE;
-		}
-		if ((certfd = open(cert_path, O_RDONLY)) == -1) {
-			asprintf(msg, "Could not open cert \"%s\" (%s).", cert_path, strerror(errno));
-			free(cert_path);
-			closedir(dir);
-			return EXIT_FAILURE;
-		}
-		fs_cert = malloc(st.st_size+1);
-		fs_cert[st.st_size] = '\0';
-		if (read(certfd, fs_cert, st.st_size) != st.st_size) {
-			asprintf(msg, "Could not read cert \"%s\" (%s).", cert_path, strerror(errno));
-			free(cert_path);
-			free(fs_cert);
-			close(certfd);
-			closedir(dir);
-			return EXIT_FAILURE;
-		}
-		close(certfd);
-
-		if (strncmp(fs_cert, "-----BEGIN CERTIFICATE-----\n", strlen("-----BEGIN CERTIFICATE-----\n")) != 0) {
-			nc_verb_warning("Certificate file \"%s\" not a valid certificate.", cert_path);
-			free(cert_path);
-			free(fs_cert);
-			continue;
-		}
-		conf_cert = (char*)node->children->content;
-		if (strncmp(fs_cert+strlen("-----BEGIN CERTIFICATE-----\n"), conf_cert, strlen(conf_cert)) != 0) {
-			free(cert_path);
-			free(fs_cert);
-			continue;
-		}
-		free(fs_cert);
-
-		/* we found a match */
-		if (remove(cert_path) == -1) {
-			asprintf(msg, "Failed to remove the cert \"%s\" (%s).", cert_path, strerror(errno));
-			free(cert_path);
-			closedir(dir);
-			return EXIT_FAILURE;
-		}
+	if (remove(cert_path) == -1) {
+		asprintf(msg, "Failed to remove the cert \"%s\" (%s).", cert_path, strerror(errno));
 		free(cert_path);
-		break;
-	}
-	closedir(dir);
-
-	/* this errno value != 0 could only be set by readdir() */
-	if (errno != 0) {
-		asprintf(msg, "Failed to read CA cert directory (%s).", strerror(errno));
 		return EXIT_FAILURE;
 	}
+	free(cert_path);
 
 	return rehash_and_restart_stunnel(stunnel_ca_path, msg);
 }
