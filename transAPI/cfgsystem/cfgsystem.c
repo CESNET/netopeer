@@ -5,10 +5,13 @@
  */
 
 #define _GNU_SOURCE
+#define _BSD_SOURCE
 
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <signal.h>
 
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
@@ -86,6 +89,71 @@ static const char* get_node_content(const xmlNodePtr node)
 	}
 
 	return (const char*) (node->children->content);
+}
+
+static int export_cert(XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+{
+	const char* node_content, *env_var;
+	char* base64_cert, *msg = NULL, *cert_filename, *tmp, *stunnel_ca_path;
+	int cert_fd, ret;
+
+	if ((stunnel_ca_path = getenv("STUNNEL_CA_PATH")) == NULL) {
+		asprintf(&msg, "Could not get the CA path from the environment.");
+		return fail(error, msg, EXIT_FAILURE);
+	}
+	if (eaccess(stunnel_ca_path, W_OK) == -1) {
+		asprintf(&msg, "Could not access CA path dir (%s).", strerror(errno));
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	asprintf(&cert_filename, "%s/certXXXXXX.pem", stunnel_ca_path);
+	if ((cert_fd = mkstemps(cert_filename, 4)) == -1) {
+		asprintf(&msg, "Could not create a new unique certificate file (%s).", strerror(errno));
+		free(cert_filename);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	node_content = get_node_content(node);
+	asprintf(&base64_cert, "-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----\n", node_content);
+
+	/* write the certificate into a new unique file */
+	if ((ret = write(cert_fd, base64_cert, strlen(base64_cert))) == -1) {
+		asprintf(&msg, "Could not export the certificate into \"%s\" (%s).", cert_filename, strerror(errno));
+		free(cert_filename);
+		free(base64_cert);
+		return fail(error, msg, EXIT_FAILURE);
+	} else if (ret < strlen(base64_cert)) {
+		asprintf(&msg, "Could not export the certificate into \"%s\".", cert_filename);
+		free(cert_filename);
+		free(base64_cert);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+	free(cert_filename);
+	free(base64_cert);
+
+	/* rehash directory so that the new certificate is recognized */
+	if ((env_var = getenv("C_REHASH_PATH")) == NULL) {
+		asprintf(&msg, "Could not get \"c_rehash\" path from the environment.");
+		return fail(error, msg, EXIT_FAILURE);
+	}
+	asprintf(&tmp, "%s %s &>/dev/null", env_var, stunnel_ca_path);
+	ret = system(tmp);
+	free(tmp);
+	if (WEXITSTATUS(ret) != 0) {
+		asprintf(&msg, "Could not rehash CA dir using \"c_rehash\".");
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	/* tell stunnel to reload certificates and everything */
+	if ((env_var = getenv("STUNNEL_PID")) == NULL) {
+		nc_verb_warning("Could not get stunnel PID from the environment.");
+		nc_verb_warning("stunnel will not use any new certificates until restarted.");
+	} else if (kill(atoi(env_var), SIGHUP) == -1) {
+		nc_verb_warning("Failed to send SIGHUP to stunnel (%s).", strerror(errno));
+		nc_verb_warning("stunnel will not use any new certificates until restarted.");
+	}
+
+	return (EXIT_SUCCESS);
 }
 
 /**
@@ -230,6 +298,7 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_er
  */
 PUBLIC struct ns_pair namespace_mapping[] = {
 		{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"},
+		{"tlsns", "urn:ietf:params:xml:ns:yang:ietf-system-tls-auth"},
 		{NULL, NULL}
 };
 
@@ -1012,13 +1081,44 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
 	return (EXIT_SUCCESS);
 }
 
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+{
+	return export_cert(op, node, error);
+}
+
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+{
+	return export_cert(op, node, error);
+}
+
 /*
  * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
  * It is used by libnetconf library to decide which callbacks will be run.
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-	.callbacks_count = 14,
+	.callbacks_count = 16,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1048,7 +1148,11 @@ PUBLIC struct transapi_data_callbacks clbks = {
 		{.path = "/systemns:system/systemns:authentication/systemns:user",
 			.func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order",
-			.func = callback_systemns_system_systemns_authentication_systemns_auth_order }
+			.func = callback_systemns_system_systemns_authentication_systemns_auth_order },
+		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert",
+			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert },
+		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert",
+			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert }
 	}
 };
 
