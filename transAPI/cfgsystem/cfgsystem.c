@@ -10,8 +10,6 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <signal.h>
 
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
@@ -22,6 +20,7 @@
 #include "base/dns_resolver.h"
 #include "base/shutdown.h"
 #include "base/local_users.h"
+#include "base/cert.h"
 
 #ifndef PUBLIC
 #	define PUBLIC
@@ -89,71 +88,6 @@ static const char* get_node_content(const xmlNodePtr node)
 	}
 
 	return (const char*) (node->children->content);
-}
-
-static int export_cert(XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	const char* node_content, *env_var;
-	char* base64_cert, *msg = NULL, *cert_filename, *tmp, *stunnel_ca_path;
-	int cert_fd, ret;
-
-	if ((stunnel_ca_path = getenv("STUNNEL_CA_PATH")) == NULL) {
-		asprintf(&msg, "Could not get the CA path from the environment.");
-		return fail(error, msg, EXIT_FAILURE);
-	}
-	if (eaccess(stunnel_ca_path, W_OK) == -1) {
-		asprintf(&msg, "Could not access CA path dir (%s).", strerror(errno));
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	asprintf(&cert_filename, "%s/certXXXXXX.pem", stunnel_ca_path);
-	if ((cert_fd = mkstemps(cert_filename, 4)) == -1) {
-		asprintf(&msg, "Could not create a new unique certificate file (%s).", strerror(errno));
-		free(cert_filename);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	node_content = get_node_content(node);
-	asprintf(&base64_cert, "-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----\n", node_content);
-
-	/* write the certificate into a new unique file */
-	if ((ret = write(cert_fd, base64_cert, strlen(base64_cert))) == -1) {
-		asprintf(&msg, "Could not export the certificate into \"%s\" (%s).", cert_filename, strerror(errno));
-		free(cert_filename);
-		free(base64_cert);
-		return fail(error, msg, EXIT_FAILURE);
-	} else if (ret < strlen(base64_cert)) {
-		asprintf(&msg, "Could not export the certificate into \"%s\".", cert_filename);
-		free(cert_filename);
-		free(base64_cert);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-	free(cert_filename);
-	free(base64_cert);
-
-	/* rehash directory so that the new certificate is recognized */
-	if ((env_var = getenv("C_REHASH_PATH")) == NULL) {
-		asprintf(&msg, "Could not get \"c_rehash\" path from the environment.");
-		return fail(error, msg, EXIT_FAILURE);
-	}
-	asprintf(&tmp, "%s %s &>/dev/null", env_var, stunnel_ca_path);
-	ret = system(tmp);
-	free(tmp);
-	if (WEXITSTATUS(ret) != 0) {
-		asprintf(&msg, "Could not rehash CA dir using \"c_rehash\".");
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	/* tell stunnel to reload certificates and everything */
-	if ((env_var = getenv("STUNNEL_PID")) == NULL) {
-		nc_verb_warning("Could not get stunnel PID from the environment.");
-		nc_verb_warning("stunnel will not use any new certificates until restarted.");
-	} else if (kill(atoi(env_var), SIGHUP) == -1) {
-		nc_verb_warning("Failed to send SIGHUP to stunnel (%s).", strerror(errno));
-		nc_verb_warning("stunnel will not use any new certificates until restarted.");
-	}
-
-	return (EXIT_SUCCESS);
 }
 
 /**
@@ -1094,7 +1028,22 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	return export_cert(op, node, error);
+	char* msg = NULL;
+
+	if (op & XMLDIFF_ADD) {
+		if (export_cert(node, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		if (remove_cert(node, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the \"%s\".", op, __func__);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
 }
 
 /**
@@ -1109,7 +1058,22 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
  */
 PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	return export_cert(op, node, error);
+	char* msg = NULL;
+
+	if (op & XMLDIFF_ADD) {
+		if (export_cert(node, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		if (remove_cert(node, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the \"%s\".", op, __func__);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
 }
 
 /*
