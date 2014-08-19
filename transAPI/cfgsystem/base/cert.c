@@ -87,7 +87,7 @@ static int rehash_and_restart_stunnel(const char* stunnel_ca_path, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-int export_cert(xmlNodePtr node, char** msg) {
+int export_cert(xmlNodePtr node, int ca_cert, char** msg) {
 	const char* node_content;
 	char* base64_cert, *cert_filename, *stunnel_ca_path;
 	int cert_fd, ret;
@@ -104,7 +104,12 @@ int export_cert(xmlNodePtr node, char** msg) {
 		return EXIT_FAILURE;
 	}
 
-	asprintf(&cert_filename, "%s/cert_XXXXXX.pem", stunnel_ca_path);
+	if (ca_cert) {
+		asprintf(&cert_filename, "%s/"CA_PREFIX"cert_XXXXXX.pem", stunnel_ca_path);
+	} else {
+		asprintf(&cert_filename, "%s/"CLIENT_PREFIX"cert_XXXXXX.pem", stunnel_ca_path);
+	}
+
 	if ((cert_fd = mkstemps(cert_filename, 4)) == -1) {
 		asprintf(msg, "Could not create a new unique certificate file (%s).", strerror(errno));
 		free(cert_filename);
@@ -132,7 +137,7 @@ int export_cert(xmlNodePtr node, char** msg) {
 	return rehash_and_restart_stunnel(stunnel_ca_path, msg);
 }
 
-int remove_cert(xmlNodePtr node, char** msg) {
+int remove_cert(xmlNodePtr node, int ca_cert, char** msg) {
 	int certfd;
 	DIR* dir;
 	struct stat st;
@@ -155,6 +160,12 @@ int remove_cert(xmlNodePtr node, char** msg) {
 	errno = 0;
 	while ((ent = readdir(dir)) != NULL) {
 		if (strcmp((ent->d_name)+strlen(ent->d_name)-4, ".pem") != 0) {
+			continue;
+		}
+		if (ca_cert && strncmp(ent->d_name, CA_PREFIX, strlen(CA_PREFIX)) != 0) {
+			continue;
+		}
+		if (!ca_cert && strncmp(ent->d_name, CLIENT_PREFIX, strlen(CLIENT_PREFIX)) != 0) {
 			continue;
 		}
 

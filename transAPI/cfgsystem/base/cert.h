@@ -43,22 +43,29 @@
 #ifndef CERT_H_
 #define CERT_H_
 
+#define CA_PREFIX "ca_"
+#define CLIENT_PREFIX "cl_"
+
 /**
  * @brief export certificate into CA dir
  * The required paths and stunnel information is retrieved from the environment.
  * @param[in] node node, whose content is the certificate
+ * @param[in] ca_cert 0 if we are exporting a client certificate, otherwise
+ * it is a CA certificate
  * @param[out] msg error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int export_cert(xmlNodePtr node, char** msg);
+int export_cert(xmlNodePtr node, int ca_cert, char** msg);
 
 /**
  * @brief remove certificate from CA dir
  * The required paths and stunnel information is retrieved from the environment.
  * @param[in] node node, whose content is the certificate
+ * @param[in] ca_cert 0 if we are exporting a client certificate, otherwise
+ * it is a CA certificate
  * @param[out] msg error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int remove_cert(xmlNodePtr node, char** msg);
+int remove_cert(xmlNodePtr node, int ca_cert, char** msg);
 
 #endif /* CERT_H_ */

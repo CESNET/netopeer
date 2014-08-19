@@ -1031,11 +1031,11 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
 	char* msg = NULL;
 
 	if (op & XMLDIFF_ADD) {
-		if (export_cert(node, &msg) != EXIT_SUCCESS) {
+		if (export_cert(node, 1, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(node, &msg) != EXIT_SUCCESS) {
+		if (remove_cert(node, 1, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -1061,11 +1061,11 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
 	char* msg = NULL;
 
 	if (op & XMLDIFF_ADD) {
-		if (export_cert(node, &msg) != EXIT_SUCCESS) {
+		if (export_cert(node, 0, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(node, &msg) != EXIT_SUCCESS) {
+		if (remove_cert(node, 0, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
