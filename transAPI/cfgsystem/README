@@ -36,16 +36,19 @@ Functionality
 ~~~~~~~~~~~~~
 
 This module implements ietf-system data model as defined in
-ietf-netmod-system-mgmt-16 draft from May 14, 2014. It implements only the
-folowing features of the data model:
+ietf-netmod-system-mgmt-16 draft from May 14, 2014 and also augment model
+ietf-system-tls-auth from May 24, 2014. It implements only the folowing
+features of the data model:
 
 - authentication - configuration of the user authentication by manipulating
-  with the sshd_config of SSH daemon listening for the NETCONF connections.
+  with the sshd_config of SSH daemon listening for the NETCONF connections
+  and basic certificate management.
 - local-users - configuration of local user authentication by manipulating
   with the /etc/passwd, /etc/shadow and ~/.ssh/authorized_keys files.
 - ntp - configuration of usage NTP server(s) by manipulating with
   /etc/ntp.conf file and the ntp (or ntpd on RHEL based distros) service.
 - timezone-name - allows timezone configuration using TZ database.
+- tls-map-certificates - cert-to-name information for the server.
 
 The module also allows configuration of
 - DNS resolver by manipulating with the /etc/resolv.conf.
@@ -53,6 +56,15 @@ The module also allows configuration of
 For the detailed description of content for the specific configuration
 element, please read the ietf-netmod-system-mgmt-16 draft.
 
+!!Note:
+
+cfgsystem relies on retrieving some information from the environment
+variables, namely:
+
+SSHD_PID - PID number of the sshd process
+STUNNEL_PID - PID number of the stunnel process
+STUNNEL_CA_PATH - path to stunnel trusted CA directory
+C_REHASH_PATH - path to the c_rehash utility
 
 nc_cfgsystem.py
 ---------------
