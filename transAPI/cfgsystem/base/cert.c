@@ -58,6 +58,97 @@
 
 #include "cert.h"
 
+xmlNodePtr cert_getconfig(char* namespace, char** msg) {
+	xmlNodePtr tls_node, ca_node, client_node;
+	xmlNsPtr ns;
+	int certfd;
+	DIR* dir;
+	struct stat st;
+	struct dirent* ent;
+	char* stunnel_ca_path, *cert_path, *fs_cert, *start_ptr, *end_ptr;
+
+	tls_node = xmlNewNode(NULL, BAD_CAST "tls");
+	ns = xmlNewNs(tls_node, BAD_CAST namespace, NULL);
+	xmlSetNs(tls_node, ns);
+
+	ca_node = xmlNewChild(tls_node, NULL, BAD_CAST "trusted-ca-certs", NULL);
+	client_node = xmlNewChild(tls_node, NULL, BAD_CAST "trusted-client-certs", NULL);
+
+	if ((stunnel_ca_path = getenv("STUNNEL_CA_PATH")) == NULL) {
+		asprintf(msg, "Could not get the CA path from the environment.");
+		xmlFreeNode(tls_node);
+		return NULL;
+	}
+	if ((dir = opendir(stunnel_ca_path)) == NULL) {
+		asprintf(msg, "Could not open CA path dir (%s).", strerror(errno));
+		xmlFreeNode(tls_node);
+		return NULL;
+	}
+
+	errno = 0;
+	while ((ent = readdir(dir)) != NULL) {
+		if (strcmp((ent->d_name)+strlen(ent->d_name)-4, ".pem") != 0) {
+			continue;
+		}
+		if (strncmp(ent->d_name, CA_PREFIX, strlen(CA_PREFIX)) != 0 && strncmp(ent->d_name, CLIENT_PREFIX, strlen(CLIENT_PREFIX)) != 0) {
+			continue;
+		}
+
+		asprintf(&cert_path, "%s/%s", stunnel_ca_path, ent->d_name);
+		if (stat(cert_path, &st) == -1) {
+			nc_verb_warning("Could not stat cert \"%s\" (%s).", cert_path, strerror(errno));
+			errno = 0;
+			free(cert_path);
+			continue;
+		}
+		if ((certfd = open(cert_path, O_RDONLY)) == -1) {
+			nc_verb_warning("Could not open cert \"%s\" (%s).", cert_path, strerror(errno));
+			errno = 0;
+			free(cert_path);
+			continue;
+		}
+		fs_cert = malloc(st.st_size+1);
+		fs_cert[st.st_size] = '\0';
+		if (read(certfd, fs_cert, st.st_size) != st.st_size) {
+			nc_verb_warning("Could not read cert \"%s\" (%s).", cert_path, strerror(errno));
+			errno = 0;
+			free(cert_path);
+			free(fs_cert);
+			close(certfd);
+			continue;
+		}
+		close(certfd);
+
+		if ((start_ptr = strstr(fs_cert, "-----BEGIN CERTIFICATE-----\n")) == NULL || (end_ptr = strstr(start_ptr, "\n-----END CERTIFICATE-----")) == NULL) {
+			nc_verb_warning("Certificate file \"%s\" not a valid certificate.", cert_path);
+			free(cert_path);
+			free(fs_cert);
+			continue;
+		}
+		free(cert_path);
+		start_ptr += strlen("-----BEGIN CERTIFICATE-----\n");
+		*end_ptr = '\0';
+
+		if (strncmp(ent->d_name, CA_PREFIX, strlen(CA_PREFIX)) == 0) {
+			xmlNewTextChild(ca_node, NULL, BAD_CAST "trusted-ca-cert", BAD_CAST start_ptr);
+		}
+		if (strncmp(ent->d_name, CLIENT_PREFIX, strlen(CLIENT_PREFIX)) == 0) {
+			xmlNewTextChild(client_node, NULL, BAD_CAST "trusted-client-cert", BAD_CAST start_ptr);
+		}
+		free(fs_cert);
+	}
+	closedir(dir);
+
+	/* this errno value != 0 could only be set by readdir() */
+	if (errno != 0) {
+		asprintf(msg, "Failed to read CA cert directory (%s).", strerror(errno));
+		xmlFreeNode(tls_node);
+		return NULL;
+	}
+
+	return tls_node;
+}
+
 static int rehash_and_restart_stunnel(const char* stunnel_ca_path, char** msg) {
 	const char* env_var;
 	char* tmp;
@@ -218,11 +309,11 @@ int remove_cert(xmlNodePtr node, int ca_cert, char** msg) {
 		free(cert_path);
 		break;
 	}
+	closedir(dir);
 
 	/* this errno value != 0 could only be set by readdir() */
 	if (errno != 0) {
 		asprintf(msg, "Failed to read CA cert directory (%s).", strerror(errno));
-		closedir(dir);
 		return EXIT_FAILURE;
 	}
 

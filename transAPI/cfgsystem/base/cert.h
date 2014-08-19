@@ -47,6 +47,15 @@
 #define CLIENT_PREFIX "cl_"
 
 /**
+ * @brief get current stunnel certificates and create an xml with them
+ * The required stunnel information is retrieved from the environment.
+ * @param[in] namespace namespace for the whole xml to be in
+ * @param[out] msg error message in case of error
+ * @return xml tree on success, NULL on error
+ */
+xmlNodePtr cert_getconfig(char* namespace, char** msg);
+
+/**
  * @brief export certificate into CA dir
  * The required paths and stunnel information is retrieved from the environment.
  * @param[in] node node, whose content is the certificate

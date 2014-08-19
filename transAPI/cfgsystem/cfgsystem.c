@@ -98,7 +98,7 @@ static const char* get_node_content(const xmlNodePtr node)
  */
 PUBLIC int transapi_init(xmlDocPtr *running)
 {
-	xmlNodePtr root, container_cur, cur;
+	xmlNodePtr root, container_cur, cur, auth_root;
 	xmlNsPtr ns;
 	char* msg = NULL, *tmp;
 #define HOSTNAME_LENGTH 256
@@ -160,8 +160,18 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 
 	/* authentication */
 	if (ncds_feature_isenabled("ietf-system", "authentication")) {
-		if ((cur =  users_getxml(root->ns, &msg)) != NULL) {
-			xmlAddChild(root, cur);
+		/* user */
+		if ((auth_root =  users_getxml(root->ns, &msg)) != NULL) {
+			xmlAddChild(root, auth_root);
+		} else if (msg != NULL) {
+			augeas_close();
+			xmlFreeDoc(*running); *running = NULL;
+			return fail(NULL, msg, EXIT_FAILURE);
+		}
+
+		/* tls */
+		if ((cur =  cert_getconfig("urn:ietf:params:xml:ns:yang:ietf-system-tls-auth", &msg)) != NULL) {
+			xmlAddChild(auth_root, cur);
 		} else if (msg != NULL) {
 			augeas_close();
 			xmlFreeDoc(*running); *running = NULL;
