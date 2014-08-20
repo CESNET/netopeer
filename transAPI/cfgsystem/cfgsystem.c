@@ -20,7 +20,10 @@
 #include "base/dns_resolver.h"
 #include "base/shutdown.h"
 #include "base/local_users.h"
-#include "base/cert.h"
+
+#ifdef ENABLE_TLS
+#	include "base/cert.h"
+#endif
 
 #ifndef PUBLIC
 #	define PUBLIC
@@ -169,6 +172,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
 
+#ifdef ENABLE_TLS
 		/* tls */
 		if ((cur =  cert_getconfig("urn:ietf:params:xml:ns:yang:ietf-system-tls-auth", &msg)) != NULL) {
 			xmlAddChild(auth_root, cur);
@@ -177,6 +181,7 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 			xmlFreeDoc(*running); *running = NULL;
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
+#endif
 	}
 
 	/* Reset REORDER flags */
@@ -242,7 +247,9 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_er
  */
 PUBLIC struct ns_pair namespace_mapping[] = {
 		{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"},
+#ifdef ENABLE_TLS
 		{"tlsns", "urn:ietf:params:xml:ns:yang:ietf-system-tls-auth"},
+#endif
 		{NULL, NULL}
 };
 
@@ -1025,6 +1032,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
 	return (EXIT_SUCCESS);
 }
 
+#ifdef ENABLE_TLS
 /**
  * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert changes
  *
@@ -1085,6 +1093,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
 
 	return EXIT_SUCCESS;
 }
+#endif /* ENABLE_TLS */
 
 /*
  * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
@@ -1092,7 +1101,11 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
+#ifdef ENABLE_TLS
 	.callbacks_count = 16,
+#else
+	.callbacks_count = 14,
+#endif
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1123,10 +1136,12 @@ PUBLIC struct transapi_data_callbacks clbks = {
 			.func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order",
 			.func = callback_systemns_system_systemns_authentication_systemns_auth_order },
+#ifdef ENABLE_TLS
 		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert",
 			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert },
 		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert",
 			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert }
+#endif
 	}
 };
 

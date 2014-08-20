@@ -692,6 +692,7 @@ CFLAGS
 CC
 XML2_CONFIG
 NETOPEER_DIR
+tls
 PROJECTNAME
 target_alias
 host_alias
@@ -735,6 +736,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_debug
+enable_tls
 with_netopeer_confdir
 with_libxml2
 with_useradd
@@ -1378,6 +1380,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
+  --enable-tls            Enable TLS features - cert management and
+                          cert-to-name support.
   --enable-shared[=PKGS]  build shared libraries [default=yes]
   --enable-static[=PKGS]  build static libraries [default=yes]
   --enable-fast-install[=PKGS]
@@ -2218,6 +2222,18 @@ else
   CFLAGS="$CFLAGS -O3 -DNDEBUG"
 
 fi
+
+
+tls="no"
+# Check whether --enable-tls was given.
+if test "${enable_tls+set}" = set; then :
+  enableval=$enable_tls; if test "$enableval" = "yes"; then
+		tls="yes"
+		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+	fi
+
+fi
+
 
 
 
@@ -11018,7 +11034,7 @@ if ac_fn_c_try_compile "$LINENO"; then :
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	CPPFLAGS="-DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
+	CPPFLAGS="$CPPFLAGS -DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
 
 else
 
@@ -13643,8 +13659,8 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
 $as_echo "$as_me: " >&6;}
-{ $as_echo "$as_me:${as_lineno-$LINENO}: ------cfgsystem feature summary------" >&5
-$as_echo "$as_me: ------cfgsystem feature summary------" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: ------ietf-system feature summary------" >&5
+$as_echo "$as_me: ------ietf-system feature summary------" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}: On: $FEATURES" >&5
 $as_echo "$as_me: On: $FEATURES" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Off: $OFF_FEATURES" >&5
