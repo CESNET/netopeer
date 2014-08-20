@@ -26,6 +26,10 @@ CPPFLAGS = @CPPFLAGS@ -DNETOPEER_DIR=\"$(NETOPEER_DIR)\"
 LIBTOOL = $(libtool) --tag=CC --quiet
 NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
+ifeq ($(tls), yes)
+	certs_path = `sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`
+endif
+
 MODEL = model/ietf-system.yin \
 	model/iana-crypt-hash.yin \
 	model/ietf-system-data.rng \
@@ -98,8 +102,8 @@ install: $(MODULE) $(TARGET)-init
 				--features tls-map-certificates; \
 		fi; \
 	fi
-	export STUNNEL_CA_PATH=`sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`; \
-	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
+	export STUNNEL_CA_PATH=$(certs_path); \
+		./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
 .PHONY: uninstall
