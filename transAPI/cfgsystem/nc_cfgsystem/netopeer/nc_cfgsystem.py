@@ -90,6 +90,12 @@ class nc_cfgsystem(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if self.passauth_commented != self.new_commented or self.passauth_setting != self.new_setting:
+			return(True)
+
+		return(False)
+
 	def paint(self, window, focus, height, width):
 		tools = [('ENTER', 'set')]
 		try:
