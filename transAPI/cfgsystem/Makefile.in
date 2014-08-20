@@ -98,6 +98,7 @@ install: $(MODULE) $(TARGET)-init
 				--features tls-map-certificates; \
 		fi; \
 	fi
+	export STUNNEL_CA_PATH=`sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`; \
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
