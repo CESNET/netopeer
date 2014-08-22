@@ -48,10 +48,16 @@
 
 int comm_session_info(conn_t* conn, struct nc_session * session)
 {
-	struct passwd * user = getpwuid(getuid());
+	const char* username;
 	int cpblts_count, ret;
 	struct nc_cpblts* cpblts;
 	const char* sid;
+
+	/* get session username */
+	if ((username = nc_session_get_user(session)) == NULL) {
+		clb_print(NC_VERB_ERROR, "nc_session_get_user failed.");
+		return EXIT_FAILURE;
+	}
 
 	/* get session id */
 	if ((sid = nc_session_get_id(session)) == NULL) {
@@ -66,7 +72,7 @@ int comm_session_info(conn_t* conn, struct nc_session * session)
 	}
 	/* capabilities count */
 	cpblts_count = nc_cpblts_count(cpblts);
-	ret = comm_session_info_send(conn, user->pw_name, sid, cpblts_count, cpblts);
+	ret = comm_session_info_send(conn, username, sid, cpblts_count, cpblts);
 
 	return (ret);
 }
