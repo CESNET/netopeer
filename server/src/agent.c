@@ -499,6 +499,7 @@ int main (int argc, char** argv)
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);
 
+	/* create the session */
 	if (comm_session_info(con, netconf_con)) {
 		clb_print(NC_VERB_ERROR, "Failed to comunicate with server.");
 		return EXIT_FAILURE;
