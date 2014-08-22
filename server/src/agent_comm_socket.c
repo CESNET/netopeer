@@ -35,9 +35,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -290,12 +292,13 @@ nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 }
 
 #ifdef ENABLE_TLS
+
 char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
 {
 	msgtype_t result = 0, op = COMM_SOCKET_OP_CERT_TO_NAME;
 	unsigned int len;
-	int i;
-	char* username;
+	int i, boolean;
+	char* aux_string, *tmp;
 
 	if (*conn == -1) {
 		nc_verb_error("%s: invalid parameter.", __func__);
@@ -322,15 +325,26 @@ char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
 		return NULL;
 	}
 
-	// TODO ctn
-	/* get the username */
+	/* get boolean */
+	recv(*conn, &boolean, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* get the username/message */
 	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	if (len == 0) {
+	aux_string = malloc(len*sizeof(char));
+	recv(*conn, aux_string, len, COMM_SOCKET_SEND_FLAGS);
+
+	if (!boolean) {
+		asprintf(&tmp, "cert to name fail: %s", aux_string);
+		clb_print(NC_VERB_WARNING, tmp);
+		free(tmp);
+		free(aux_string);
 		return NULL;
 	}
-	username = malloc(len*sizeof(char));
-	recv(*conn, username, len, COMM_SOCKET_SEND_FLAGS);
 
-	return username;
+	asprintf(&tmp, "cert to name result: %s", aux_string);
+	clb_print(NC_VERB_VERBOSE, tmp);
+	free(tmp);
+	return aux_string;
 }
+
 #endif /* ENABLE_TLS */

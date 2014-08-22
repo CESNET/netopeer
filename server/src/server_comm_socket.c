@@ -301,46 +301,58 @@ send_reply:
 }
 
 #ifdef ENABLE_TLS
+
 static void cert_to_name (int socket)
 {
-	char *username = NULL;
-	int i, count;
+	int i, count, boolean;
 	unsigned int len;
-	char* arg;
+	char** strs, *msg = NULL, *username, *tosend;
 	msgtype_t result;
 
 	/* number of strings */
 	recv(socket, &count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
 
+	strs = calloc(count+1, sizeof(char*));
+
 	/* receive each string */
 	for (i = 0; i < count; ++i) {
 		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-		arg = malloc(len*sizeof(char));
-		recv(socket, arg, len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
-		free(arg);
+		strs[i] = malloc(len*sizeof(char));
+		recv(socket, strs[i], len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
 	}
 
 	/* cert-to-name */
-	// TODO ctn
-	username = strdup("root");
+	username = server_cert_to_name((const char**)strs, &msg);
+
+	for (i = 0; i < count; ++i) {
+		free(strs[i]);
+	}
+	free(strs);
+
+	if (username == NULL) {
+		tosend = msg;
+		boolean = 0;
+	} else {
+		tosend = username;
+		boolean = 1;
+	}
 
 	/* send reply */
 	result = COMM_SOCKET_OP_CERT_TO_NAME;
 	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 
-	/* send username */
-	if (username == NULL) {
-		len = 0;
-		send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-		return;
-	}
-	len = strlen(username) + 1;
+	/* send boolean */
+	send(socket, &boolean, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* send message/username */
+	len = strlen(tosend) + 1;
 	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	send(socket, username, len, COMM_SOCKET_SEND_FLAGS);
+	send(socket, tosend, len, COMM_SOCKET_SEND_FLAGS);
 
 	/* cleanup */
-	free(username);
+	free(tosend);
 }
+
 #endif
 
 static void process_operation (int socket)

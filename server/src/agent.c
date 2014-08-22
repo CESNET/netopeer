@@ -330,7 +330,6 @@ char *get_tls_username(conn_t* conn)
 	}
 
 	arg = comm_cert_to_name(conn, args, args_len);
-	// TODO ctn: get error and pass it further
 
 cleanup:
 	for (i = 0; i < 6; ++i) {
@@ -449,14 +448,9 @@ int main (int argc, char** argv)
 		username = get_tls_username(con);
 
 		if (username == NULL) {
-			// TODO ctn: get error and act accordingly
 			clb_print(NC_VERB_ERROR, "cert-to-name was unsuccessful.");
 			return EXIT_FAILURE;
 		}
-		aux_string = malloc(strlen("cert-to-name result: ")+strlen(username)+1);
-		sprintf(aux_string, "cert-to-name result: %s", username);
-		clb_print(NC_VERB_DEBUG, aux_string);
-		free(aux_string);
 
 		/* accept client session and handle capabilities */
 		netconf_con = nc_session_accept_username(capabilities, username);

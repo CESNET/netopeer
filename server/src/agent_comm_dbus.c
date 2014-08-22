@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#ifdef ENABLE_TLS
+#	define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -394,14 +397,14 @@ nc_reply* comm_kill_session(conn_t* conn, const char* sid)
 }
 
 #ifdef ENABLE_TLS
+
 char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
 {
 	int i;
 	DBusMessage *msg, *reply;
 	DBusError dbus_err;
 	DBusMessageIter args;
-	//struct nc_err * err;
-	char *username, *aux_str;
+	char *username = NULL, *aux_string, *tmp;
 	dbus_bool_t boolean;
 
 	dbus_error_init(&dbus_err);
@@ -435,24 +438,33 @@ char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
 		dbus_message_unref(reply);
 		return NULL;
 	}
-
 	dbus_message_iter_get_basic(&args, &boolean);
-	if (!boolean) {
-		// TODO ctn: pass error from dbus message further
-		dbus_message_unref(reply);
-		return NULL;
-	}
 
+	/* move iterator to next arg */
 	dbus_message_iter_next(&args);
+
+	/* second argument is always string, whether the error or the username */
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		clb_print(NC_VERB_ERROR, "send_operation(): unexpected argument in reply message.");
+		clb_print(NC_VERB_WARNING, "cert_to_name(): Reply's second argument is not a string.");
 		dbus_message_unref(reply);
 		return NULL;
 	}
-	dbus_message_iter_get_basic(&args, &aux_str);
-	username = strdup(aux_str);
+	dbus_message_iter_get_basic(&args, &aux_string);
+
 	dbus_message_unref(reply);
+
+	if (!boolean) {
+		asprintf(&tmp, "cert to name fail: %s", aux_string);
+		clb_print(NC_VERB_WARNING, tmp);
+		free(tmp);
+	} else {
+		asprintf(&tmp, "cert to name result: %s", aux_string);
+		clb_print(NC_VERB_VERBOSE, tmp);
+		free(tmp);
+		username = strdup(aux_string);
+	}
 
 	return username;
 }
+
 #endif /* ENABLE_TLS */

@@ -511,6 +511,7 @@ send_reply:
 }
 
 #ifdef ENABLE_TLS
+
 /**
  * @brief Translate a certificate from a client connected to Netopeer agent to
  * a username. The function sends reply to the Netopeer agent.
@@ -521,48 +522,61 @@ send_reply:
 static void cert_to_name (DBusConnection *conn, DBusMessage *msg)
 {
 	DBusMessageIter args;
-	char *aux_string = NULL;
-	DBusMessage * dbus_reply;
-	//struct nc_err * err;
+	char* aux_string, *str_msg = NULL, *username, **strs = NULL;
+	int strs_len;
+	DBusMessage* dbus_reply;
 	dbus_bool_t boolean;
-	//nc_reply * reply;
 
 	if (!dbus_message_iter_init (msg, &args)) {
 		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_CERT_TO_NAME);
 		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
 		return;
 	} else {
-		/*err = nc_err_new (NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, "cert-to-name failed");
-		reply = nc_reply_error (err);
-		aux_string = nc_reply_dump (reply);
-		nc_reply_free (reply);*/
-		aux_string = strdup("root");
+		do {
+			dbus_message_iter_get_basic(&args, &aux_string);
+
+			if (strs == NULL) {
+				strs_len = 1;
+				strs = malloc(sizeof(char*));
+			} else {
+				++strs_len;
+				strs = realloc(strs, strs_len * sizeof(char*));
+			}
+			strs[strs_len-1] = aux_string;
+		} while (dbus_message_iter_next(&args));
+		strs = realloc(strs, (strs_len+1) * sizeof(char*));
+		strs[strs_len] = NULL;
+
+		username = server_cert_to_name((const char**)strs, &str_msg);
+
+		free(strs);
+
+		if (username == NULL) {
+			aux_string = str_msg;
+			boolean = 0;
+		} else {
+			aux_string = username;
+			boolean = 1;
+		}
 
 		/* send D-Bus reply */
 		dbus_reply = dbus_message_new_method_return(msg);
 		if (dbus_reply == NULL) {
 			nc_verb_error("cert_to_name(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
-			/*err = nc_err_new (NC_ERR_OP_FAILED);
-			nc_err_set (err, NC_ERR_PARAM_MSG, "cert_to_name(): Failed to create dbus reply message.");*/
 			return;
 		}
 
-		boolean = 1;
-		dbus_message_iter_init_append (dbus_reply, &args);
-		dbus_message_iter_append_basic (&args, DBUS_TYPE_BOOLEAN, &boolean);
-		dbus_message_iter_append_basic (&args, DBUS_TYPE_STRING, &aux_string);
-		free (aux_string);
+		dbus_message_iter_init_append(dbus_reply, &args);
+		dbus_message_iter_append_basic(&args, DBUS_TYPE_BOOLEAN, &boolean);
+		dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &aux_string);
+		free(aux_string);
 
-		dbus_connection_send (conn, dbus_reply, NULL);
-		dbus_connection_flush (conn);
+		dbus_connection_send(conn, dbus_reply, NULL);
+		dbus_connection_flush(conn);
 		dbus_message_unref(dbus_reply);
-		/* parse message */
-		/* session ID */
-		//TODO ctn: parsing and cert-to-name fun
-		//dbus_message_iter_get_basic (&args, &session_id);
 	}
 }
+
 #endif /* ENABLE_TLS */
 
 /**
