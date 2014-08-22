@@ -1,5 +1,5 @@
-<!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Thu Jul 31 09:20:16 2014 -->
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Fri Aug 22 15:33:31 2014 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -115,7 +115,10 @@ support)</p>
 <p style="margin-left:22%;">Provides management of trusted
 Certificate Authority certificates utilized by
 <b>stunnel</b> , which is executed by <b>netopeer-server
-.</b></p>
+.</b> Only certificates with a prefix of <i>ca_</i> (trusted
+CA) or <i>cl_</i> (trusted client) are recognized in order
+to be compatible with the <b>cfgsystem</b> netopeer plugin
+certificate management.</p>
 
 <p style="margin-left:11%;">CRLs (only with TLS
 support)</p>

@@ -56,6 +56,10 @@ Provides management of trusted Certificate Authority certificates utilized by
 .B stunnel
 , which is executed by
 .B netopeer-server .
+Only certificates with a prefix of \fIca_\fR (trusted CA) or \fIcl_\fR (trusted
+client) are recognized in order to be compatible with the
+.B cfgsystem
+netopeer plugin certificate management.
 .IP "CRLs (only with TLS support)"
 Provides management of Certificate Revocation Lists utilized by
 .B stunnel

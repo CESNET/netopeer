@@ -51,7 +51,7 @@ class nc_cacerts(ncmodule.ncmodule):
 			return(False)
 		return(True)
 
-	def parse_cert(self, path):
+	def parse_cert(self, path, prefix = ''):
 		try:
 			cert = M2Crypto.X509.load_cert(path)
 		except (IOError, M2Crypto.X509.X509Error):
@@ -95,7 +95,7 @@ class nc_cacerts(ncmodule.ncmodule):
 		if issuer.emailAddress and len(issuer.emailAddress) > iss_line_len:
 			iss_line_len = len(issuer.emailAddress)
 
-		return((os.path.basename(path)[:-4], cert, subj_line_len, iss_line_len))
+		return((prefix + os.path.basename(path)[:-4], cert, subj_line_len, iss_line_len))
 
 	def set_stunnel_config(self, new_certspath):
 		if not self.stunnelpath:
@@ -158,7 +158,7 @@ class nc_cacerts(ncmodule.ncmodule):
 		if len(self.certspath) > self.line_len:
 			self.line_len = len(self.certspath)
 		for path in os.listdir(self.certspath):
-			if len(path) < 5 or path[-4:] != '.pem' or os.path.isdir(os.path.join(self.certspath, path)):
+			if len(path) < 8 or path[-4:] != '.pem' or (path[:3] != 'ca_' and path[:3] != 'cl_') or os.path.isdir(os.path.join(self.certspath, path)):
 				continue
 			cert = self.parse_cert(os.path.join(self.certspath, path))
 
@@ -181,8 +181,8 @@ class nc_cacerts(ncmodule.ncmodule):
 
 		try:
 			while len(self.certs_toadd) > 0:
-				path = self.certs_toadd.pop()
-				shutil.copyfile(path, os.path.join(self.certspath, os.path.basename(path)[:-4] + '.pem'))
+				(path, prefix) = self.certs_toadd.pop()
+				shutil.copyfile(path, os.path.join(self.certspath, prefix + os.path.basename(path)[:-4] + '.pem'))
 				changes = True
 		except IOError as e:
 			messages.append('Could not add \"' + path + '\": ' + e.strerror + '\n', 'error')
@@ -245,7 +245,7 @@ class nc_cacerts(ncmodule.ncmodule):
 
 			if cert_index == 0:
 				cert_count = height-7;
-				self.maddstrln(window, width, 'Trusted CA certificates in:');
+				self.maddstrln(window, width, 'Trusted CA/client certificates in:');
 				self.maddstrln(window, width, self.certspath, curses.color_pair(0) | curses.A_UNDERLINE | (curses.A_REVERSE if focus and self.selected == -2 else 0), self.line_len)
 				self.maddstrln(window, width, '')
 				self.maddstrln(window, width, 'Add a certificate', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == -1 else 0, self.line_len)
@@ -362,15 +362,25 @@ class nc_cacerts(ncmodule.ncmodule):
 				path = self.get_editable(0, 15, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE, True)
 				if path == '':
 					return(True)
-				if os.path.exists(os.path.join(self.certspath, os.path.basename(path))):
+				try:
+					cert = M2Crypto.X509.load_cert(path)
+				except (IOError, M2Crypto.X509.X509Error):
+					messages.append('\"' + path + '\" not a valid certificate', 'error')
+					return(True)
+				prefix = ''
+				if cert.check_ca() and os.path.basename(path)[:3] != 'ca_':
+					prefix = 'ca_'
+				if not cert.check_ca() and os.path.basename(path)[:3] != 'cl_':
+					prefix = 'cl_'
+				if os.path.exists(os.path.join(self.certspath, prefix + os.path.basename(path))):
 					messages.append('Certificate \"' + os.path.basename(path)[:-4] + '\" already in the CA directory', 'error')
 					return(True)
-				cert = self.parse_cert(path)
+				cert = self.parse_cert(path, prefix)
 
 				if cert:
 					self.certs.append(cert)
 					self.certs.sort()
-					self.certs_toadd.append(path)
+					self.certs_toadd.append((path, prefix))
 			else:
 				self.show_cert = not self.show_cert
 		elif key == curses.KEY_DC and self.selected > -1:
