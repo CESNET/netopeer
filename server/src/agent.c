@@ -246,7 +246,7 @@ send_reply:
 char *get_tls_username(conn_t* conn)
 {
 	int i, args_len;
-	char* hash_env, *san_env = NULL, *starti, *arg, *subj_env;
+	char* hash_env, *san_env = NULL, *starti, *arg = NULL, *subj_env;
 	char** args;
 
 	/* parse certificate hashes */
