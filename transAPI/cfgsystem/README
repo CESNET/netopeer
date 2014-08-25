@@ -66,6 +66,10 @@ the ietf-system model with features:
 
 - tls-map-certificates - cert-to-name information for the server.
 
+cert-to-name configuration will after installation include one entry
+resolving "server/stunnel/client.pem" certificate into the "tls_default"
+username.
+
 !!tls-map-certificates feature:
 
 This feature does not fully comply with ietf-system-tls-auth description.

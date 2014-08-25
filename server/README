@@ -220,6 +220,13 @@ by default. To disable starting a specific module, netopeer-configurator(1) can
 be used or it can be done directly via NETCONF modifying the Netopeer's
 configuration data.
 
+TLS transport
+-------------
+
+To learn more about the TLS transport implementation and how to use it, please
+refer to "server/stunnel/README" or the Wiki section on the netopeer project
+homepage.
+
 Example
 ~~~~~~~
 
