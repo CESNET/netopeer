@@ -430,6 +430,7 @@ static void kill_session (DBusConnection *conn, DBusMessage *msg)
 	dbus_bool_t boolean;
 	nc_reply * reply;
 
+	boolean = 0;
 
 	if (msg) {
 		if (!dbus_message_iter_init(msg, &args)) {
