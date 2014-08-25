@@ -112,6 +112,7 @@ char* get_netconf_dir(void)
 void get_default_client_cert(char** cert, char** key)
 {
 	char* netconf_dir;
+	struct stat st;
 	int ret;
 
 	assert(cert && !*cert);
@@ -163,9 +164,21 @@ void get_default_client_cert(char** cert, char** key)
 			*cert = NULL;
 			free(netconf_dir);
 			return;
+		} else {
+			/* check permissions on *.pem */
+			if (stat(*cert, &st) != 0) {
+				ERROR("get_default_client_cert", "Stat on \"%s\" failed: %s", *cert, strerror(errno));
+			} else if (st.st_mode & 0066) {
+				ERROR("get_default_client_cert", "Unsafe permissions on \"%s\"", *cert);
+			}
 		}
-
-		ERROR("get_default_client_cert", "Using \"" CERT_PEM "\" but this may be a security risk and separate certificate and key files should be used.");
+	} else {
+		/* check permissions on *.key */
+		if (stat(*key, &st) != 0) {
+			ERROR("get_default_client_cert", "Stat on \"%s\" failed: %s", *key, strerror(errno));
+		} else if (st.st_mode & 0066) {
+			ERROR("get_default_client_cert", "Unsafe permissions on \"%s\"", *key);
+		}
 	}
 
 	free(netconf_dir);
