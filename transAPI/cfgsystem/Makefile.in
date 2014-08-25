@@ -26,15 +26,16 @@ CPPFLAGS = @CPPFLAGS@ -DNETOPEER_DIR=\"$(NETOPEER_DIR)\"
 LIBTOOL = $(libtool) --tag=CC --quiet
 NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
-ifeq ($(tls), yes)
-	certs_path = `sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`
-endif
-
 MODEL = model/ietf-system.yin \
 	model/iana-crypt-hash.yin \
 	model/ietf-system-data.rng \
 	model/ietf-system-gdefs.rng \
 	model/ietf-system-schematron.xsl
+
+ifeq ($(tls), yes)
+	MODEL := $(MODEL) model/ietf-system-tls-auth.yin \
+		model/ietf-x509-cert-to-name.yin
+endif
 
 PYMODULES = nc_cfgsystem
 
@@ -95,6 +96,8 @@ install: $(MODULE) $(TARGET)-init
 			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 		if test "$(tls)" = "yes"; then \
+			cp ./datastore.xml $(NETOPEER_DIR)/ietf-system/datastore.xml; \
+			chmod og-rwx $(NETOPEER_DIR)/ietf-system/datastore.xml; \
 			$(NETOPEER_MANAGER) add --name ietf-system \
 				--import $(NETOPEER_DIR)/ietf-system/ietf-x509-cert-to-name.yin; \
 			$(NETOPEER_MANAGER) add --name ietf-system \
@@ -102,8 +105,12 @@ install: $(MODULE) $(TARGET)-init
 				--features tls-map-certificates; \
 		fi; \
 	fi
-	export STUNNEL_CA_PATH=$(certs_path); \
-		./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
+	if test "$(tls)" = "yes"; then \
+		export STUNNEL_CA_PATH=`sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`; \
+			./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@ tls-map-certificates; \
+	else \
+		./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@; \
+	fi
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
 .PHONY: uninstall
