@@ -1,19 +1,16 @@
 <device>
 	<name>NETCONF-server</name>
 	<data-models>
+		<model>
+			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-x509-cert-to-name.yin</path>
+		</model>
 		<model-main>
 			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-netconf-server.yin</path>
 			<feature>ssh</feature>
 			<feature>inbound-ssh</feature>
 			<feature>outbound-ssh</feature>
 			@NCSERVER_FEATURES@
-<!-- not supported
-			<feature>tls-map-certificates</feature>
--->
 		</model-main>
-		<model>
-			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-x509-cert-to-name.yin</path>
-		</model>
 	</data-models>
 	<repo>
 		<type>file</type>
