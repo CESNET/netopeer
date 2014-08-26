@@ -41,7 +41,8 @@ class netopeer_configuration:
 					continue
 				try:
 					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
-					self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
+					if getattr(module, fil[:-3]).name != None:
+						self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
 				except ImportError as e:
 					messages.append(str(e), 'error')
 				except NCModuleError as e:
