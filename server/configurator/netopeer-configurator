@@ -52,6 +52,25 @@ class netopeer_configuration:
 			print('Failed to load any module.')
 			exit(1)
 
+		tls_modules = []
+		i = 0
+		while i < len(self.ncmodules)-1:
+			module_name = self.ncmodules[i].__class__.__name__
+
+			# make Netopeer first
+			if module_name == 'nc_netopeer':
+				class_ins = self.ncmodules.pop(i)
+				self.ncmodules.insert(0, class_ins);
+
+			# remember TLS modules, append them at the end
+			if module_name == 'nc_crls' or module_name == 'nc_cacerts' or module_name == 'nc_servcert':
+				tls_modules.append(self.ncmodules.pop(i))
+				i -= 1
+
+			i += 1
+
+		self.ncmodules += tls_modules
+
 	def save_all(self):
 		for ncmodule in self.ncmodules:
 			ncmodule.update()
