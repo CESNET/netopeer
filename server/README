@@ -136,9 +136,10 @@ Managing the Netopeer modules
 -----------------------------
 
 The Netopeer server needs a configuration XML file for each module with path to
-a .so file, paths to data models and datastore. To manage the Netopeer modules,
-there is the netopeer-manager(1) tool. For more information about using this
-tool, see the man page:
+the .so file, paths to data models and the datastore. The data models are loaded
+in their order in the configuration to account for any import/augment situation.
+To manage the Netopeer modules, there is the netopeer-manager(1) tool. For more
+information about using this tool, see the man page:
 
  man netopeer-manager
 
