@@ -35,9 +35,8 @@ configure options:
 Functionality
 ~~~~~~~~~~~~~
 
-This module implements ietf-system data model as defined in
-ietf-netmod-system-mgmt-16 draft from May 14, 2014. It implements only the
-folowing features of the data model:
+This module implements ietf-system data model as defined in RFC 7317. It
+implements only the folowing features of the data model:
 
 - authentication - configuration of the user authentication by manipulating
   with the sshd_config of SSH daemon listening for the NETCONF connections.
@@ -51,7 +50,7 @@ The module also allows configuration of
 - DNS resolver by manipulating with the /etc/resolv.conf.
 
 For the detailed description of content for the specific configuration
-element, please read the ietf-netmod-system-mgmt-16 draft.
+element, please read the RFC 7317.
 
 
 nc_cfgsystem.py

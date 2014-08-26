@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system" xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types" xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types" xmlns:nacm="urn:ietf:params:xml:ns:yang:ietf-netconf-acm" xmlns:ianach="urn:ietf:params:xml:ns:yang:iana-crypt-hash" name="ietf-system">
+<module name="ietf-system"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system"
+        xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types"
+        xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types"
+        xmlns:ianach="urn:ietf:params:xml:ns:yang:iana-crypt-hash">
   <namespace uri="urn:ietf:params:xml:ns:yang:ietf-system"/>
   <prefix value="sys"/>
   <import module="ietf-yang-types">
@@ -52,22 +57,23 @@ set forth in Section 4.c of the IETF Trust's Legal Provisions
 Relating to IETF Documents
 (http://trustee.ietf.org/license-info).
 
-This version of this YANG module is part of RFC XXXX; see
+This version of this YANG module is part of RFC 7317; see
 the RFC itself for full legal notices.</text>
   </description>
-  <revision date="2014-05-14">
+  <revision date="2014-08-06">
     <description>
       <text>Initial revision.</text>
     </description>
     <reference>
-      <text>RFC XXXX: A YANG Data Model for System Management</text>
+      <text>RFC 7317: A YANG Data Model for System Management</text>
     </reference>
   </revision>
   <typedef name="timezone-name">
     <type name="string"/>
     <description>
-      <text>A timezone name as used by the Time Zone Database, sometimes
-referred to as the 'Olson Database'.
+      <text>A time zone name as used by the Time Zone Database,
+sometimes referred to as the 'Olson Database'.
+
 The exact set of valid values is an implementation-specific
 matter.  Client discovery of the exact set of time zone names
 for a particular server is out of scope.</text>
@@ -87,8 +93,8 @@ client.</text>
   </feature>
   <feature name="authentication">
     <description>
-      <text>Indicates that the device supports configuration
-for user authentication.</text>
+      <text>Indicates that the device supports configuration of
+user authentication.</text>
     </description>
   </feature>
   <feature name="local-users">
@@ -114,9 +120,8 @@ RFC 5607: Remote Authentication Dial-In User Service (RADIUS)
   </feature>
   <feature name="ntp">
     <description>
-      <text>Indicates that the device can be configured
-to use one or more NTP servers to set the
-system date and time.</text>
+      <text>Indicates that the device can be configured to use one or
+more NTP servers to set the system date and time.</text>
     </description>
   </feature>
   <feature name="ntp-udp-port">
@@ -125,15 +130,15 @@ system date and time.</text>
       <text>Indicates that the device supports the configuration of
 the UDP port for NTP servers.
 
-This is a 'feature' since many implementations do not support
-any other port than the default port.</text>
+This is a 'feature', since many implementations do not support
+any port other than the default port.</text>
     </description>
   </feature>
   <feature name="timezone-name">
     <description>
-      <text>Indicates that the local timezone on the device
+      <text>Indicates that the local time zone on the device
 can be configured to use the TZ database
-to set the timezone and manage daylight savings time.</text>
+to set the time zone and manage daylight saving time.</text>
     </description>
     <reference>
       <text>RFC 6557: Procedures for Maintaining the Time Zone Database</text>
@@ -144,8 +149,8 @@ to set the timezone and manage daylight savings time.</text>
       <text>Indicates that the device supports the configuration of
 the UDP and TCP port for DNS servers.
 
-This is a 'feature' since many implementations do not support
-any other port than the default port.</text>
+This is a 'feature', since many implementations do not support
+any port other than the default port.</text>
     </description>
   </feature>
   <identity name="authentication-method">
@@ -180,21 +185,21 @@ configured users.</text>
   <identity name="radius-pap">
     <base name="radius-authentication-type"/>
     <description>
-      <text>The device requests PAP authentication from the RADIUS
-server.</text>
+      <text>The device requests Password Authentication Protocol (PAP)
+authentication from the RADIUS server.</text>
     </description>
     <reference>
-      <text>RFC 2865: Remote Authentication Dial In User Service</text>
+      <text>RFC 2865: Remote Authentication Dial In User Service (RADIUS)</text>
     </reference>
   </identity>
   <identity name="radius-chap">
     <base name="radius-authentication-type"/>
     <description>
-      <text>The device requests CHAP authentication from the RADIUS
-server.</text>
+      <text>The device requests Challenge Handshake Authentication
+Protocol (CHAP) authentication from the RADIUS server.</text>
     </description>
     <reference>
-      <text>RFC 2865: Remote Authentication Dial In User Service</text>
+      <text>RFC 2865: Remote Authentication Dial In User Service (RADIUS)</text>
     </reference>
   </identity>
   <container name="system">
@@ -205,6 +210,7 @@ server.</text>
       <type name="string"/>
       <description>
         <text>The administrator contact information for the system.
+
 A server implementation MAY map this leaf to the sysContact
 MIB object.  Such an implementation needs to use some
 mechanism to handle the differences in size and characters
@@ -221,7 +227,7 @@ such a mechanism is outside the scope of this document.</text>
       <type name="inet:domain-name"/>
       <description>
         <text>The name of the host.  This name can be a single domain
-label, or the fully qualified domain name of the host.</text>
+label or the fully qualified domain name of the host.</text>
       </description>
     </leaf>
     <leaf name="location">
@@ -247,7 +253,7 @@ of such a mechanism is outside the scope of this document.</text>
       </description>
       <choice name="timezone">
         <description>
-          <text>The system timezone information.</text>
+          <text>The system time zone information.</text>
         </description>
         <case name="timezone-name">
           <if-feature name="timezone-name"/>
@@ -267,10 +273,10 @@ as 'Europe/Stockholm'.</text>
             <units name="minutes"/>
             <description>
               <text>The number of minutes to add to UTC time to
-identify the timezone for this system.  For example,
+identify the time zone for this system.  For example,
 'UTC - 8:00 hours' would be represented as '-480'.
-Note that automatic daylight savings time adjustment
-is not provided, if this object is used.</text>
+Note that automatic daylight saving time adjustment
+is not provided if this object is used.</text>
             </description>
           </leaf>
         </case>
@@ -286,16 +292,16 @@ is not provided, if this object is used.</text>
         <type name="boolean"/>
         <default value="true"/>
         <description>
-          <text>Indicates that the system should attempt
-to synchronize the system clock with an
-NTP server from the 'ntp/server' list.</text>
+          <text>Indicates that the system should attempt to
+synchronize the system clock with an NTP server
+from the 'ntp/server' list.</text>
         </description>
       </leaf>
       <list name="server">
         <key value="name"/>
         <description>
-          <text>List of NTP servers to use for
-system clock synchronization.  If '/system/ntp/enabled'
+          <text>List of NTP servers to use for system clock
+synchronization.  If '/system/ntp/enabled'
 is 'true', then the system will attempt to
 contact and utilize the specified NTP servers.</text>
         </description>
@@ -308,13 +314,13 @@ contact and utilize the specified NTP servers.</text>
         <choice name="transport">
           <mandatory value="true"/>
           <description>
-            <text>The transport protocol specific parameters for this
+            <text>The transport-protocol-specific parameters for this
 server.</text>
           </description>
           <case name="udp">
             <container name="udp">
               <description>
-                <text>Contains UDP specific configuration parameters
+                <text>Contains UDP-specific configuration parameters
 for NTP.</text>
               </description>
               <leaf name="address">
@@ -411,6 +417,7 @@ continues with the first server again.  When the resolver
 has traversed the list 'attempts' times without receiving
 any response, it gives up and returns an error to the
 calling application.
+
 Implementations MAY limit the number of entries in this
 list.</text>
         </description>
@@ -423,18 +430,20 @@ list.</text>
         <choice name="transport">
           <mandatory value="true"/>
           <description>
-            <text>The transport protocol specific parameters for this
+            <text>The transport-protocol-specific parameters for this
 server.</text>
           </description>
           <case name="udp-and-tcp">
             <container name="udp-and-tcp">
               <description>
-                <text>Contains UDP and TCP specific configuration
+                <text>Contains UDP- and TCP-specific configuration
 parameters for DNS.</text>
               </description>
               <reference>
-                <text>RFC 1035: Domain Implementation and Specification
-RFC 5966: DNS over TCP</text>
+                <text>RFC 1035: Domain Names - Implementation and
+          Specification
+RFC 5966: DNS Transport over TCP - Implementation
+          Requirements</text>
               </reference>
               <leaf name="address">
                 <type name="inet:ip-address"/>
@@ -459,8 +468,7 @@ RFC 5966: DNS over TCP</text>
         <description>
           <text>Resolver options.  The set of available options has been
 limited to those that are generally available across
-different resolver implementations, and generally
-useful.</text>
+different resolver implementations and generally useful.</text>
         </description>
         <leaf name="timeout">
           <type name="uint8">
@@ -481,8 +489,8 @@ retrying the query via a different name server.</text>
           <default value="2"/>
           <description>
             <text>The number of times the resolver will send a query to
-all its name servers before giving up and returning an
-error to the calling application.</text>
+all of its name servers before giving up and returning
+an error to the calling application.</text>
           </description>
         </leaf>
       </container>
@@ -517,13 +525,13 @@ error to the calling application.</text>
         <choice name="transport">
           <mandatory value="true"/>
           <description>
-            <text>The transport protocol specific parameters for this
+            <text>The transport-protocol-specific parameters for this
 server.</text>
           </description>
           <case name="udp">
             <container name="udp">
               <description>
-                <text>Contains UDP specific configuration parameters
+                <text>Contains UDP-specific configuration parameters
 for RADIUS.</text>
               </description>
               <leaf name="address">
@@ -545,12 +553,12 @@ for RADIUS.</text>
                 <mandatory value="true"/>
                 <nacm:default-deny-all/>
                 <description>
-                  <text>The shared secret which is known to both the
+                  <text>The shared secret, which is known to both the
 RADIUS client and server.</text>
                 </description>
                 <reference>
                   <text>RFC 2865: Remote Authentication Dial In User
-Service</text>
+          Service (RADIUS)</text>
                 </reference>
               </leaf>
             </container>
@@ -590,7 +598,7 @@ different server.</text>
           <default value="2"/>
           <description>
             <text>The number of times the device will send a query to
-all its RADIUS servers before giving up.</text>
+all of its RADIUS servers before giving up.</text>
           </description>
         </leaf>
       </container>
@@ -605,7 +613,7 @@ all its RADIUS servers before giving up.</text>
         <type name="identityref">
           <base name="authentication-method"/>
         </type>
-        <must condition="(. != &quot;sys:radius&quot; or ../../radius/server)">
+        <must condition='(. != "sys:radius" or ../../radius/server)'>
           <error-message>
             <value>When 'radius' is used, a RADIUS server must be configured.</value>
           </error-message>
@@ -676,13 +684,13 @@ RFC 4253.</text>
             <description>
               <text>The public key algorithm name for this SSH key.
 
-Valid values are the values in the IANA Secure Shell
-(SSH) Protocol Parameters registry, Public Key
-Algorithm Names</text>
+Valid values are the values in the IANA 'Secure Shell
+(SSH) Protocol Parameters' registry, Public Key
+Algorithm Names.</text>
             </description>
             <reference>
-              <text>IANA Secure Shell (SSH) Protocol Parameters registry,
-Public Key Algorithm Names</text>
+              <text>IANA 'Secure Shell (SSH) Protocol Parameters'
+registry, Public Key Algorithm Names</text>
             </reference>
           </leaf>
           <leaf name="key-data">
@@ -690,12 +698,11 @@ Public Key Algorithm Names</text>
             <mandatory value="true"/>
             <description>
               <text>The binary public key data for this SSH key, as
-specified by RFC 4253, Section 6.6, i.e.,:
+specified by RFC 4253, Section 6.6, i.e.:
 
   string    certificate or public key format
             identifier
-  byte[n]   key/certificate data
-</text>
+  byte[n]   key/certificate data.</text>
             </description>
             <reference>
               <text>RFC 4253: The Secure Shell (SSH) Transport Layer
@@ -722,8 +729,8 @@ identifying the system platform and operating system.</text>
       <leaf name="os-name">
         <type name="string"/>
         <description>
-          <text>The name of the operating system in use,
-for example 'Linux'</text>
+          <text>The name of the operating system in use -
+for example, 'Linux'.</text>
         </description>
         <reference>
           <text>IEEE Std 1003.1-2008 - utsname.sysname</text>
@@ -765,8 +772,7 @@ the hardware in use.</text>
     </container>
     <container name="clock">
       <description>
-        <text>Monitoring of the system
-date and time properties.</text>
+        <text>Monitoring of the system date and time properties.</text>
       </description>
       <leaf name="current-datetime">
         <type name="yang:date-and-time"/>
@@ -789,9 +795,9 @@ date and time properties.</text>
 to the specified value.
 
 If the system is using NTP (i.e., /system/ntp/enabled
-is set to 'true'), then this operation will
-fail with error-tag 'operation-failed',
-and error-app-tag value of 'ntp-active'</text>
+is set to 'true'), then this operation will fail with
+error-tag 'operation-failed' and error-app-tag value of
+'ntp-active'.</text>
     </description>
     <input>
       <leaf name="current-datetime">

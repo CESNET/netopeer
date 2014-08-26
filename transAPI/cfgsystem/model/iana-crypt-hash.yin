@@ -11,22 +11,23 @@
     <text>        Internet Assigned Numbers Authority
 
 Postal: ICANN
-        4676 Admiralty Way, Suite 330
-        Marina del Rey, CA 90292
+        12025 Waterfront Drive, Suite 300
+        Los Angeles, CA  90094-2536
+        United States
 
-Tel:    +1 310 823 9358
-E-Mail: iana&amp;iana.org</text>
+Tel:    +1 310 301 5800
+E-Mail: iana@iana.org&gt;</text>
   </contact>
   <description>
-    <text>This YANG module defines a typedef for storing passwords
-using a hash function, and features to indicate which hash
+    <text>This YANG module defines a type for storing passwords
+using a hash function and features to indicate which hash
 functions are supported by an implementation.
 
 The latest revision of this YANG module can be obtained from
 the IANA web site.
 
 Requests for new values should be made to IANA via
-email (iana&amp;iana.org).
+email (iana@iana.org).
 
 Copyright (c) 2014 IETF Trust and the persons identified as
 authors of the code.  All rights reserved.
@@ -38,15 +39,15 @@ set forth in Section 4.c of the IETF Trust's Legal Provisions
 Relating to IETF Documents
 (http://trustee.ietf.org/license-info).
 
-The initial version of this YANG module is part of RFC XXXX;
+The initial version of this YANG module is part of RFC 7317;
 see the RFC itself for full legal notices.</text>
   </description>
-  <revision date="2014-04-04">
+  <revision date="2014-08-06">
     <description>
       <text>Initial revision.</text>
     </description>
     <reference>
-      <text>RFC XXXX: A YANG Data Model for System Management</text>
+      <text>RFC 7317: A YANG Data Model for System Management</text>
     </reference>
   </revision>
   <typedef name="crypt-hash">
@@ -73,7 +74,7 @@ value is stored in the configuration data store.
 
 If a value starting with '$&lt;id&gt;$', where &lt;id&gt; is not '0', is
 received, the server knows that the value already represents a
-hashed value, and stores it as is in the data store.
+hashed value and stores it 'as is' in the data store.
 
 When a server needs to verify a password given by a user, it
 finds the stored password hash string for that user, extracts
@@ -96,13 +97,13 @@ by advertising the corresponding feature.</text>
     <reference>
       <text>IEEE Std 1003.1-2008 - crypt() function
 RFC 1321: The MD5 Message-Digest Algorithm
-FIPS.180-3.2008: Secure Hash Standard</text>
+FIPS.180-4.2012: Secure Hash Standard (SHS)</text>
     </reference>
   </typedef>
   <feature name="crypt-hash-md5">
     <description>
       <text>Indicates that the device supports the MD5
-hash function in 'crypt-hash' values</text>
+hash function in 'crypt-hash' values.</text>
     </description>
     <reference>
       <text>RFC 1321: The MD5 Message-Digest Algorithm</text>
@@ -111,19 +112,19 @@ hash function in 'crypt-hash' values</text>
   <feature name="crypt-hash-sha-256">
     <description>
       <text>Indicates that the device supports the SHA-256
-hash function in 'crypt-hash' values</text>
+hash function in 'crypt-hash' values.</text>
     </description>
     <reference>
-      <text>FIPS.180-3.2008: Secure Hash Standard</text>
+      <text>FIPS.180-4.2012: Secure Hash Standard (SHS)</text>
     </reference>
   </feature>
   <feature name="crypt-hash-sha-512">
     <description>
       <text>Indicates that the device supports the SHA-512
-hash function in 'crypt-hash' values</text>
+hash function in 'crypt-hash' values.</text>
     </description>
     <reference>
-      <text>FIPS.180-3.2008: Secure Hash Standard</text>
+      <text>FIPS.180-4.2012: Secure Hash Standard (SHS)</text>
     </reference>
   </feature>
 </module>
