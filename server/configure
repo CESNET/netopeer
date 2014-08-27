@@ -2833,6 +2833,8 @@ $as_echo "$STUNNEL_EXEC" >&6; }
 		as_fn_error $? "Missing stunnel required for NETCONF over TLS transport." "$LINENO" 5
 	elif test ! -x "$STUNNEL_EXEC"; then
 		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" is not executable file." "$LINENO" 5
+	elif ! $STUNNEL_EXEC -version 2>&1 | grep netopeer &>/dev/null; then
+		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" not patched, read README in \"server/stunnel\"." "$LINENO" 5
 	fi
 fi
 
