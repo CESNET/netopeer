@@ -2468,6 +2468,13 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 	}
 #ifdef ENABLE_TLS
 	if (usetls) {
+		/* use the default TLS user if not specified by user
+		 * (it does not have any effect except for seeing it
+		 * in status command as the session user) */
+		if (user == NULL) {
+			user = strdupa("certificate-based");
+		}
+
 		if (cert == NULL) {
 			if (key != NULL) {
 				ERROR(func_name, "Key specified without a certificate.");
