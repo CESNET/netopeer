@@ -44,6 +44,7 @@
 
 #include <stdio.h>
 #include <dlfcn.h>
+#include <string.h>
 #include <libxml/tree.h>
 
 #include <libnetconf.h>
@@ -135,9 +136,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	/* add imports and augments */
+	if (ncds_add_model("./model/ietf-x509-cert-to-name.yin") != 0 || ncds_add_model("./model/ietf-yang-types.yin") != 0 ||
+			ncds_add_model("./model/ietf-netconf-acm.yin") != 0 || ncds_add_model("./model/ietf-system-tls-auth.yin") != 0) {
+		nc_verb_error("Could not add import and augment models.");
+		nc_close(0);
+		return 1;
+	}
+
 	/* enable features */
 	for (i = 2; i < argc; ++i) {
-		if (ncds_feature_enable("ietf-system", argv[i]) != 0) {
+		if (strcmp(argv[i], "tls-map-certificates") == 0 ? ncds_feature_enable("ietf-system-tls-auth", argv[i]) != 0 :
+				ncds_feature_enable("ietf-system", argv[i]) != 0) {
 			nc_verb_error("Could not enable feature \"%s\".", argv[i]);
 			nc_close(0);
 			return 1;
@@ -172,6 +182,7 @@ int main(int argc, char** argv)
 		return 0;
 	}
 
+	/* just check the datastore, if everything is in order */
 	/* get datastore */
 	datastore = xmlReadFile(argv[1], NULL, XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
 	if (datastore != NULL) {
@@ -211,15 +222,15 @@ int main(int argc, char** argv)
 	/* dump the new config */
 	xmlDocDumpMemory(startup_doc, (xmlChar**)&new_startup_config, NULL);
 
-	/* apply copy-config rpc on the datastore */
-	if ((rpc = nc_rpc_copyconfig(NC_DATASTORE_CONFIG, NC_DATASTORE_STARTUP, new_startup_config)) == NULL) {
-		nc_verb_error("Could not create copy-config RPC.");
+	/* apply edit-config rpc on the datastore */
+	if ((rpc = nc_rpc_editconfig(NC_DATASTORE_STARTUP, NC_DATASTORE_CONFIG, 0, 0, 0, new_startup_config)) == NULL) {
+		nc_verb_error("Could not create edit-config RPC.");
 		nc_close(0);
 		return 1;
 	}
 	reply = ncds_apply_rpc(id, dummy_session, rpc);
 	if (nc_reply_get_type(reply) != NC_REPLY_OK) {
-		nc_verb_error("Copy-config RPC failed.");
+		nc_verb_error("Edit-config RPC failed.");
 		nc_close(0);
 		return 1;
 	}

@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="ietf-system-tls-auth"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:system-tls-auth="urn:ietf:params:xml:ns:yang:ietf-system-tls-auth"
+        xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system"
+        xmlns:nacm="urn:ietf:params:xml:ns:yang:ietf-netconf-acm"
+        xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types"
+        xmlns:x509c2n="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name">
+  <yang-version value="1"/>
+  <namespace uri="urn:ietf:params:xml:ns:yang:ietf-system-tls-auth"/>
+  <prefix value="system-tls-auth"/>
+  <import module="ietf-system">
+    <prefix value="sys"/>
+  </import>
+  <import module="ietf-netconf-acm">
+    <prefix value="nacm"/>
+  </import>
+  <import module="ietf-yang-types">
+    <prefix value="yang"/>
+  </import>
+  <import module="ietf-x509-cert-to-name">
+    <prefix value="x509c2n"/>
+  </import>
+  <organization>
+    <text>IETF NETCONF (Network Configuration) Working Group</text>
+  </organization>
+  <contact>
+    <text>WG Web:   &lt;http://tools.ietf.org/wg/netconf/&gt;
+WG List:  &lt;mailto:netconf@ietf.org&gt;
+
+WG Chair: Mehmet Ersue
+       &lt;mailto:mehmet.ersue@nsn.com&gt;
+
+WG Chair: Bert Wijnen
+       &lt;mailto:bertietf@bwijnen.net&gt;
+
+Editor:   Kent Watsen
+       &lt;mailto:kwatsen@juniper.net&gt;
+
+       Juergen Schoenwaelder
+       &lt;mailto:j.schoenwaelder@jacobs-university.de&gt;</text>
+  </contact>
+  <description>
+    <text>This module augments the ietf-system module in order to
+add TLS authentication configuration nodes to the
+'authentication' container.
+
+Copyright (c) 2014 IETF Trust and the persons identified as
+authors of the code. All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, is permitted pursuant to, and subject
+to the license terms contained in, the Simplified BSD
+License set forth in Section 4.c of the IETF Trust's
+Legal Provisions Relating to IETF Documents
+(http://trustee.ietf.org/license-info).
+
+This version of this YANG module is part of RFC XXXX; see
+the RFC itself for full legal notices.</text>
+  </description>
+  <revision date="2014-05-24">
+    <description>
+      <text>Initial version</text>
+    </description>
+    <reference>
+      <text>RFC XXXX: NETCONF Server Configuration Model</text>
+    </reference>
+  </revision>
+  <feature name="tls-map-certificates">
+    <description>
+      <text>The tls-map-certificates feature indicates that the
+NETCONF server implements mapping X.509 certificates to NETCONF
+usernames.</text>
+    </description>
+  </feature>
+  <feature name="tls-map-pre-shared-keys">
+    <description>
+      <text>The tls-map-pre-shared-keys feature indicates that the
+NETCONF server implements mapping TLS pre-shared keys to NETCONF
+usernames.</text>
+    </description>
+  </feature>
+  <grouping name="tls-global-config">
+    <container name="trusted-ca-certs">
+      <description>
+        <text>A list of Certificate Authority (CA) certificates that a
+NETCONF server can use to authenticate a NETCONF client's
+certificate.  A client's certificate is authenticated if
+its Issuer matches one of the configured trusted CA
+certificates.</text>
+      </description>
+      <leaf-list name="trusted-ca-cert">
+        <type name="binary"/>
+        <description>
+          <text>The binary certificate structure, as
+specified by RFC 5246, Section 7.4.6, i.e.,:
+
+opaque ASN.1Cert&lt;1..2^24&gt;;
+
+</text>
+        </description>
+        <reference>
+          <text>RFC 5246: The Transport Layer Security (TLS)
+  Protocol Version 1.2</text>
+        </reference>
+      </leaf-list>
+    </container>
+    <container name="trusted-client-certs">
+      <description>
+        <text>A list of client certificates that a NETCONF server can
+use to authenticate a NETCONF client's certificate.  A
+client's certificate is authenticated if it is an exact
+match to one of the configured trusted client certificates.</text>
+      </description>
+      <leaf-list name="trusted-client-cert">
+        <type name="binary"/>
+        <description>
+          <text>The binary certificate structure, as
+specified by RFC 5246, Section 7.4.6, i.e.,:
+
+opaque ASN.1Cert&lt;1..2^24&gt;;
+
+</text>
+        </description>
+        <reference>
+          <text>RFC 5246: The Transport Layer Security (TLS)
+  Protocol Version 1.2</text>
+        </reference>
+      </leaf-list>
+    </container>
+    <container name="cert-maps">
+      <if-feature name="tls-map-certificates"/>
+      <description>
+        <text>The cert-maps container is used by a NETCONF server to
+map the NETCONF client's presented X.509 certificate to
+a NETCONF username.
+
+If no matching and valid cert-to-name list entry can be
+found, then the NETCONF server MUST close the connection,
+and MUST NOT accept NETCONF messages over it.</text>
+      </description>
+      <uses name="x509c2n:cert-to-name"/>
+    </container>
+    <container name="psk-maps">
+      <if-feature name="tls-map-pre-shared-keys"/>
+      <description>
+        <text>During the TLS Handshake, the client indicates which
+key to use by including a PSK identity in the TLS
+ClientKeyExchange message. On the NETCONF server side,
+this PSK identity is used to look up an entry in the psk-map
+list. If such an entry is found, and the pre-shared keys
+match, then the client is authenticated. The NETCONF
+server uses the value from the user-name leaf in the
+psk-map list as the NETCONF username.  If the NETCONF
+server cannot find an entry in the psk-map list, or if
+the pre-shared keys do not match, then the NETCONF
+server terminates the connection.</text>
+      </description>
+      <reference>
+        <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport Layer
+  Security (TLS)</text>
+      </reference>
+      <list name="psk-map">
+        <key value="psk-identity"/>
+        <leaf name="psk-identity">
+          <type name="string"/>
+          <description>
+            <text>The PSK identity encoded as a UTF-8 string. For
+details how certain common PSK identity formats can
+be encoded in UTF-8, see section 5.1. of RFC 4279.</text>
+          </description>
+          <reference>
+            <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport
+Layer Security (TLS)</text>
+          </reference>
+        </leaf>
+        <leaf name="user-name">
+          <type name="nacm:user-name-type"/>
+          <mandatory value="true"/>
+          <description>
+            <text>The NETCONF username associated with this PSK
+identity.</text>
+          </description>
+        </leaf>
+        <leaf name="not-valid-before">
+          <type name="yang:date-and-time"/>
+          <description>
+            <text>This PSK identity is not valid before the given date
+and time.</text>
+          </description>
+        </leaf>
+        <leaf name="not-valid-after">
+          <type name="yang:date-and-time"/>
+          <description>
+            <text>This PSK identity is not valid after the given date
+and time.</text>
+          </description>
+        </leaf>
+        <leaf name="key">
+          <nacm:default-deny-all/>
+          <type name="yang:hex-string"/>
+          <mandatory value="true"/>
+          <description>
+            <text>The key associated with the PSK identity</text>
+          </description>
+          <reference>
+            <text>RFC 4279: Pre-Shared Key Ciphersuites for Transport
+Layer Security (TLS)</text>
+          </reference>
+        </leaf>
+      </list>
+    </container>
+  </grouping>
+  <augment target-node="/sys:system/sys:authentication">
+    <container name="tls">
+      <uses name="tls-global-config"/>
+    </container>
+  </augment>
+</module>

@@ -17,12 +17,15 @@ output = {CFGDIR}/stunnel.log
 cert = {CFGDIR}/server.pem
 ;key = {CFGDIR}/server.key
 
-; Verify peer with locally installed certificate.
-verify = 3
+; Verify peer first with trusted CA chain, on fail try to find exact local match.
+verify = 5
 
-; CA certificate, with verify level 3, it also includes allowed client
-; certificates.
-CAfile = {CFGDIR}/rootCA.pem
+; CA certificates directory, with verify level 3, it also includes allowed
+; client certificates.
+CApath = {CFGDIR}/certs
+
+; Certificate Revocation List directory
+CRLpath = {CFGDIR}/crl
 
 ; Disable support for insecure SSLv2 protocol
 options = NO_SSLv2
@@ -35,5 +38,3 @@ exec = {BINDIR}/{AGENT}
 ; **************************************************************************
 
 ; SSL server mode services
-
-

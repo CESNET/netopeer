@@ -323,6 +323,66 @@ class nc_nacm(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if not self.datastore_path:
+			return(False)
+
+		xpath_nacm = self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm')
+		if not xpath_nacm:
+			return(True)
+
+		if not self.almighty_group and self.almighty_users:
+			return(True)
+
+		nacm = xpath_nacm[0]
+		xpath_users = self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm/n:groups/n:group[n:name=\'almighty\']/n:user-name')
+		if len(xpath_users) != len(self.almighty_users):
+			return(True)
+
+		for user in self.almighty_users:
+			found = False
+			for node in xpath_users:
+				if node.getContent() == user:
+					found = True
+					break
+			if not found:
+				return(True)
+
+		if self.xml_enabled:
+			if (self.xml_enabled.getContent() == 'true' and not self.enabled) or (self.xml_enabled.getContent() == 'false' and self.enabled):
+				return(True)
+		elif not self.enabled:
+			return(True)
+
+		if self.xml_extgroups:
+			if (self.xml_extgroups.getContent() == 'true' and not self.extgroups) or (self.xml_extgroups.getContent() == 'false' and self.extgroups):
+				return(True)
+		elif not self.extgroups:
+			return(True)
+
+		if self.xml_r_default:
+			if (self.xml_r_default.getContent() == 'deny' and self.r_default == acm.action.PERMIT) or\
+					(self.xml_r_default.getContent() == 'permit' and self.r_default == acm.action.DENY):
+				return(True)
+		elif self.r_default == acm.action.DENY:
+			return(True)
+
+		if self.xml_w_default:
+			if (self.xml_w_default.getContent() == 'deny' and self.w_default == acm.action.PERMIT) or\
+					(self.xml_w_default.getContent() == 'permit' and self.w_default == acm.action.DENY):
+				return(True)
+		elif self.w_default == acm.action.PERMIT:
+			return(True)
+
+		if self.xml_x_default:
+			if (self.xml_x_default.getContent() == 'deny' and self.x_default == acm.action.PERMIT) or\
+					(self.xml_x_default.getContent() == 'permit' and self.x_default == acm.action.DENY):
+				return(True)
+		elif self.x_default == acm.action.DENY:
+			return(True)
+
+		return(False)
+
 	def paint(self, window, focus, height, width):
 		tools = []
 		if focus:

@@ -53,6 +53,7 @@ dbusservices = @DBUSSERVICES@
 modulesdir = @MODULESDIR@
 
 TOPDIR = @CONFIGURE_PWD@
+#if you edit this path, edit also configurator/config.py.in path
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
 CC = @CC@
 RPMBUILD = @RPMBUILD@
@@ -112,7 +113,7 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/ietf-netconf-server-data.rng \
 	config/ietf-netconf-server-gdefs.rng \
 	config/ietf-netconf-server-schematron.xsl
-	
+
 CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \
 	config/NETCONF-server.xml.in \
@@ -145,7 +146,7 @@ cd -;
 endef
 
 # Expand ${prefix} in $(1) file and store it as $(2) file
-define EXPAND 
+define EXPAND
 sed -e 's|$${prefix}|$(prefix)|g' $(1) > $(2);
 endef
 
@@ -178,7 +179,7 @@ $(AGENT): $(AGENT_OBJS)
 
 manager/netopeer-manager: manager/netopeer-manager.tmp
 	$(call EXPAND,$<,$@)
-	chmod +x $@	
+	chmod +x $@
 
 $(OBJDIR)/%.o: %.c
 	@[ -d $(dir $@) ] || \
@@ -190,7 +191,7 @@ clean:
 	rm -rf $(AGENT) $(SERVER) $(TOOLS) $(OBJDIR)
 
 .PHONY: doc
-doc: $(MANHTMLS) 
+doc: $(MANHTMLS)
 
 .PHONY: dist
 dist: $(NAME).spec tarball rpm
@@ -266,8 +267,11 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		$(INSTALL_DATA_PRIVATE) config/stunnel_config $(CFGDIR)/; \
 		rm -rf config/stunnel_config; \
 		$(INSTALL_DATA_PRIVATE) stunnel/server.* $(CFGDIR)/stunnel; \
-		$(INSTALL_DATA_PRIVATE) stunnel/rootCA.* $(CFGDIR)/stunnel; \
-		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/certs; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/crl; \
+		$(INSTALL_DATA_PRIVATE) stunnel/ca_rootCA.pem $(CFGDIR)/stunnel/certs; \
+		c_rehash $(CFGDIR)/stunnel/certs; \
+		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF TLS server configuration."; \
 	fi
 	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
 	if test -n "$(MANHTMLS)"; then \

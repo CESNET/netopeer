@@ -3,10 +3,10 @@
 .\"
 .TH "netopeer-configurator" 1 "Fri Jun 13 2014" "Netopeer"
 .SH NAME
-netopeer-configurator \- \fBnetopeer-server\fR's first run configurator 
+netopeer-configurator \- \fBnetopeer-server\fR's first run configurator
 .SH DESCRIPTION
 .B netopeer-configurator
-is a tool to make 
+is a tool to make
 .B netopeer-server
 configuration more easy. It is supposed mainly for the configuration before the
 first run of the
@@ -45,11 +45,34 @@ and
 .BR netopeer-agent s.
 In case of DBus communication, it also allows to change the groups of users
 allowed to connect to the NETCONF server.
+.IP "Server Certificate (only with TLS support)"
+Provides management of the server certificate utilized by
+.B stunnel
+, which is executed by
+.B netopeer-server .
+This certificate is sent to a client for TLS authentication.
+.IP "CA Certificates (only with TLS support)"
+Provides management of trusted Certificate Authority certificates utilized by
+.B stunnel
+, which is executed by
+.B netopeer-server .
+Only certificates with a prefix of \fIca_\fR (trusted CA) or \fIcl_\fR (trusted
+client) are recognized in order to be compatible with the
+.B cfgsystem
+netopeer plugin certificate management.
+.IP "CRLs (only with TLS support)"
+Provides management of Certificate Revocation Lists utilized by
+.B stunnel
+, which is executed by
+.B netopeer-server .
+These CRLs are checked, when determining if a client certificate was not revocated
+by its issuer.
 .SH "SEE ALSO"
 .BR netopeer-agent(1) ,
 .BR netopeer-cli(1) ,
 .BR netopeer-manager(1) ,
 .BR netopeer-server(8) ,
+.BR stunnel(8) ,
 .SS Homepage
 https://netopeer.googlecode.com
 .SH MAILING LIST

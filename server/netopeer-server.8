@@ -3,7 +3,7 @@
 .\"
 .TH "netopeer-server" 8 "Fri Jun 6 2014" "Netopeer"
 .SH NAME
-netopeer-server \- NETCONF protocol server 
+netopeer-server \- NETCONF protocol server
 .SH SYNOPSIS
 .B netopeer-server [\-dhV] [-v
 .IB level ]
@@ -67,7 +67,7 @@ Template configuration for the
 instance used for accepting incoming NETCONF over SSH connections. Note, that
 the template doesn't contain the listening address/port specification since
 they are set automatically by the \fBnetopeer-server\fR according to the
-configuration following \fIietf-netconf-server\fR data model. 
+configuration following \fIietf-netconf-server\fR data model.
 .RE
 .PP
 .I /etc/netopeer/stunnel_config
@@ -80,6 +80,37 @@ they are set automatically by the \fBnetopeer-server\fR according to the
 configuration following \fIietf-netconf-server\fR data model.
 .PP
 This file is installed only if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-enable\-tls\fR option.
+.RE
+.PP
+.I /etc/netopeer/stunnel/server.[crt|key|pem]
+.RS
+Server certificate for the netopeer
+.B stunnel(8)
+instance. This certificate is sent to a client during the TLS handshake.
+.PP
+These files are installed only if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-enable\-tls\fR option.
+.RE
+.PP
+.I /etc/netopeer/stunnel/certs
+.RS
+Directory with the trusted Certificate Authority certificates for the netopeer
+.B stunnel(8)
+instance. These certificates are used for client certificate TLS verification.
+.PP
+This directory is installed only if the \fBnetopeer-server\fR is compiled with the
+\fB\-\-enable\-tls\fR option.
+.RE
+.PP
+.I /etc/netopeer/stunnel/crl
+.RS
+Directory with Certificate Revocation Lists for the netopeer
+.B stunnel(8)
+instance. These CRLs are used during client certificate TLS verification when
+checking if the certificate was not revocated by its issuer.
+.PP
+This directory is installed only if the \fBnetopeer-server\fR is compiled with the
 \fB\-\-enable\-tls\fR option.
 .RE
 .PP
@@ -112,7 +143,7 @@ Datastore file for the internal NETCONF Access Control module.
 .PP
 .I /dev/shm/sem.NCDS_FLOCK_*
 .RS
-Datastores locks used internally by the \fBlibnetconf\fR library. 
+Datastores locks used internally by the \fBlibnetconf\fR library.
 .RE
 .SH NETOPEER MODULES
 TBD

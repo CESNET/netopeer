@@ -75,6 +75,11 @@
 #endif
 
 #define SSHDPID_ENV "SSHD_PID"
+#ifdef ENABLE_TLS
+#	define STUNNELPID_ENV "STUNNEL_PID"
+#	define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
+#	define CREHASH_ENV "C_REHASH_PATH"
+#endif
 
 struct ch_app {
 	char* name;
@@ -142,6 +147,9 @@ static void kill_tlsd(void)
 	if (tlsd_pid != 0) {
 		kill(tlsd_pid, SIGTERM);
 		tlsd_pid = 0;
+		unsetenv(STUNNELPID_ENV);
+		unsetenv(STUNNELCAPATH_ENV);
+		unsetenv(CREHASH_ENV);
 	}
 }
 
@@ -806,9 +814,10 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
 {
-	int cfgfile, running_cfgfile, pidfd;
+	int cfgfile, running_cfgfile, pidfd, cmdfd;
 	int pid, r;
-	char pidbuf[16];
+	char pidbuf[16], str[64], *buf, *ptr;
+	ssize_t str_len = 64;
 	struct stat stbuf;
 
 	if (op == XMLDIFF_REM) {
@@ -828,7 +837,7 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		goto err_return;
 	}
 
-	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
+	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_RDWR | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
 		nc_verb_error("Unable to prepare TLS server configuration (%s)", strerror(errno));
 		goto err_return;
 	}
@@ -847,6 +856,35 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 	free(tlsd_listen);
 	tlsd_listen = NULL;
 
+	/* having the configuration file open, export CApath for cfgsystem */
+	r = 0;
+	lseek(running_cfgfile, 0, SEEK_SET);
+	if ((buf = malloc(stbuf.st_size)) != NULL) {
+		if (read(running_cfgfile, buf, stbuf.st_size) == stbuf.st_size && (ptr = strstr(buf, "CApath")) != NULL) {
+			if (ptr - buf == 0 || *(ptr-1) == '\n') {
+				ptr += 6;
+				/* get to the actual path */
+				while (*ptr == ' ' || *ptr == '=') {
+					++ptr;
+				}
+
+				/* create fake separate path */
+				*strchr(ptr, '\n') = '\0';
+				setenv(STUNNELCAPATH_ENV, ptr, 1);
+			} else {
+				r = 1;
+			}
+		} else {
+			r = 1;
+		}
+		free(buf);
+	} else {
+		r = 1;
+	}
+	if (r) {
+		nc_verb_verbose("Failed to export stunnel CApath for cfgsystem module.");
+	}
+
 	/* close config files */
 	close(running_cfgfile);
 	close(cfgfile);
@@ -857,8 +895,31 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		/* give him some time to restart */
 		usleep(500000);
 	} else {
-		/* remove possible leftover pid file */
-		remove(CFG_DIR"/stunnel/stunnel.pid");
+		/* remove possible leftover pid file and kill it, if it really is stunnel process */
+		if (access(CFG_DIR"/stunnel/stunnel.pid", F_OK) == 0) {
+			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1) {
+				if ((r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
+					pidbuf[r] = '\0';
+					if (pidbuf[strlen(pidbuf)-1] == '\n') {
+						pidbuf[strlen(pidbuf)-1] = '\0';
+					}
+
+					sprintf(str, "/proc/%s/cmdline", pidbuf);
+					if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1) {
+						if ((str_len = read(cmdfd, &str, str_len-1)) != -1) {
+							str[str_len] = '\0';
+							if (strstr(str, "stunnel") != NULL) {
+								kill(tlsd_pid, SIGTERM);
+							}
+						}
+						close(cmdfd);
+					}
+					tlsd_pid = 0;
+				}
+				close(pidfd);
+			}
+			remove(CFG_DIR"/stunnel/stunnel.pid");
+		}
 
 		/* start stunnel */
 		pid = fork();
@@ -893,6 +954,10 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 			pidbuf[r] = 0;
 			tlsd_pid = atoi(pidbuf);
 			nc_verb_verbose("TLS server (%s) started (PID %d)", TLSD_EXEC, tlsd_pid);
+
+			/* export stunnel PID and c_rehash path for cfgsystem module */
+			setenv(STUNNELPID_ENV, pidbuf, 1);
+			setenv(CREHASH_ENV, C_REHASH, 1);
 		}
 	}
 	return EXIT_SUCCESS;

@@ -133,4 +133,15 @@ nc_reply* comm_kill_session(conn_t *conn, const char* sid);
  */
 int comm_close(conn_t *conn);
 
+#ifdef ENABLE_TLS
+/**
+ * @brief Perform cert-to-name and retrieve the username from the server
+ * @param[in] conn Connection handler
+ * @param[in] argv Arguments to be sent (first 6 - cert hashes, the rest SAN and/or CN
+ * @param[in] argv_len Number of arguments
+ * @return username or NULL
+ */
+char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len);
+#endif /* ENABLE_TLS */
+
 #endif /* COMM_H_ */

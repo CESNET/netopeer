@@ -670,6 +670,7 @@ LDFLAGS
 CFLAGS
 CC
 RPMBUILD
+C_REHASH
 UNAME
 STUNNEL_EXEC
 TLS
@@ -2832,17 +2833,8 @@ $as_echo "$STUNNEL_EXEC" >&6; }
 		as_fn_error $? "Missing stunnel required for NETCONF over TLS transport." "$LINENO" 5
 	elif test ! -x "$STUNNEL_EXEC"; then
 		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" is not executable file." "$LINENO" 5
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for NETCONF support in stunnel" >&5
-$as_echo_n "checking for NETCONF support in stunnel... " >&6; }
-		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-			CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
-		else
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-		fi
+	elif ! $STUNNEL_EXEC -version 2>&1 | grep netopeer &>/dev/null; then
+		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" not patched, read README in \"server/stunnel\"." "$LINENO" 5
 	fi
 fi
 
@@ -2926,6 +2918,55 @@ $as_echo "$target_cpu" >&6; }
         as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
         ;;
 esac
+
+#check for c_rehash
+if test "$tls" = "yes"; then
+	# Extract the first word of "c_rehash", so it can be a program name with args.
+set dummy c_rehash; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_C_REHASH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $C_REHASH in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_C_REHASH="$C_REHASH" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_C_REHASH="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_C_REHASH" && ac_cv_path_C_REHASH="no"
+  ;;
+esac
+fi
+C_REHASH=$ac_cv_path_C_REHASH
+if test -n "$C_REHASH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $C_REHASH" >&5
+$as_echo "$C_REHASH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+	if test "$C_REHASH" = "no"; then
+		as_fn_error $? "\"c_rehash not found!\"" "$LINENO" 5
+	fi
+
+fi
 
 # Check python for manager and configurator
 
@@ -3136,6 +3177,86 @@ $as_echo "no" >&6; }
 		fi
 	fi
 
+if test "$tls" = "yes"; then
+
+    if test -z $PYTHON;
+    then
+        PYTHON="python"
+    fi
+    PYTHON_NAME=`basename $PYTHON`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: M2Crypto" >&5
+$as_echo_n "checking $PYTHON_NAME module: M2Crypto... " >&6; }
+	$PYTHON -c "import M2Crypto" 2>/dev/null
+	if test $? -eq 0;
+	then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+		eval HAVE_PYMOD_M2CRYPTO=yes
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		eval HAVE_PYMOD_M2CRYPTO=no
+		#
+		if test -n "fatal"
+		then
+			as_fn_error $? "failed to find required module M2Crypto" "$LINENO" 5
+			exit 1
+		fi
+	fi
+
+
+    if test -z $PYTHON;
+    then
+        PYTHON="python"
+    fi
+    PYTHON_NAME=`basename $PYTHON`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: shutil" >&5
+$as_echo_n "checking $PYTHON_NAME module: shutil... " >&6; }
+	$PYTHON -c "import shutil" 2>/dev/null
+	if test $? -eq 0;
+	then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+		eval HAVE_PYMOD_SHUTIL=yes
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		eval HAVE_PYMOD_SHUTIL=no
+		#
+		if test -n "fatal"
+		then
+			as_fn_error $? "failed to find required module shutil" "$LINENO" 5
+			exit 1
+		fi
+	fi
+
+
+    if test -z $PYTHON;
+    then
+        PYTHON="python"
+    fi
+    PYTHON_NAME=`basename $PYTHON`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: signal" >&5
+$as_echo_n "checking $PYTHON_NAME module: signal... " >&6; }
+	$PYTHON -c "import signal" 2>/dev/null
+	if test $? -eq 0;
+	then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+		eval HAVE_PYMOD_SIGNAL=yes
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		eval HAVE_PYMOD_SIGNAL=no
+		#
+		if test -n "fatal"
+		then
+			as_fn_error $? "failed to find required module signal" "$LINENO" 5
+			exit 1
+		fi
+	fi
+
+fi
 
 # Check for rpmbuil
 # Extract the first word of "rpmbuild", so it can be a program name with args.
@@ -5658,8 +5779,6 @@ ac_config_files="$ac_config_files netopeer.rc"
 
 ac_config_files="$ac_config_files src/config.h"
 
-ac_config_files="$ac_config_files stunnel/stunnel.conf"
-
 ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
 
@@ -6380,7 +6499,6 @@ do
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
-    "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
     "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

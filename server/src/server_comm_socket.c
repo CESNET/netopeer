@@ -300,6 +300,61 @@ send_reply:
 	free(session_id);
 }
 
+#ifdef ENABLE_TLS
+
+static void cert_to_name (int socket)
+{
+	int i, count, boolean;
+	unsigned int len;
+	char** strs, *msg = NULL, *username, *tosend;
+	msgtype_t result;
+
+	/* number of strings */
+	recv(socket, &count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	strs = calloc(count+1, sizeof(char*));
+
+	/* receive each string */
+	for (i = 0; i < count; ++i) {
+		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		strs[i] = malloc(len*sizeof(char));
+		recv(socket, strs[i], len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
+	}
+
+	/* cert-to-name */
+	username = server_cert_to_name((const char**)strs, &msg);
+
+	for (i = 0; i < count; ++i) {
+		free(strs[i]);
+	}
+	free(strs);
+
+	if (username == NULL) {
+		tosend = msg;
+		boolean = 0;
+	} else {
+		tosend = username;
+		boolean = 1;
+	}
+
+	/* send reply */
+	result = COMM_SOCKET_OP_CERT_TO_NAME;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	/* send boolean */
+	send(socket, &boolean, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* send message/username */
+	len = strlen(tosend) + 1;
+	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(socket, tosend, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* cleanup */
+	free(tosend);
+}
+
+#endif
+
 static void process_operation (int socket)
 {
 	struct session_info *session;
@@ -423,11 +478,16 @@ poll_restart:
 				case COMM_SOCKET_OP_KILL_SESSION:
 					kill_session(agents[i].fd);
 					break;
+#ifdef ENABLE_TLS
+				case COMM_SOCKET_OP_CERT_TO_NAME:
+					cert_to_name(agents[i].fd);
+					break;
+#endif
 				case COMM_SOCKET_OP_GENERIC:
 					process_operation(agents[i].fd);
 					break;
 				default:
-					nc_verb_warning("Unsupported DBus message type received.");
+					nc_verb_warning("Unsupported UNIX socket message type received.");
 					result = COMM_SOCKET_RESULT_ERROR;
 					send(agents[i].fd, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 				}

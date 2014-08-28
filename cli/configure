@@ -647,6 +647,7 @@ CFLAGS
 CC
 READLINK
 RPMBUILD
+C_REHASH
 UNAME
 XML2_CONFIG
 ROFF2HTML
@@ -2545,7 +2546,7 @@ fi
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 else
-  CFLAGS="$CFLAGS -O3"
+  CFLAGS="$CFLAGS -O3 -DNDEBUG"
 	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 
 fi
@@ -2626,6 +2627,51 @@ $as_echo "$host_cpu is supported" >&6; }
 $as_echo "$as_me: WARNING: unsupported architecture $host_cpu" >&2;}
         ;;
 esac
+
+# Check for c_rehash
+if test "$tls" = "yes"; then
+	# Extract the first word of "c_rehash", so it can be a program name with args.
+set dummy c_rehash; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_C_REHASH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$C_REHASH"; then
+  ac_cv_prog_C_REHASH="$C_REHASH" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_C_REHASH="yes"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_prog_C_REHASH" && ac_cv_prog_C_REHASH="no"
+fi
+fi
+C_REHASH=$ac_cv_prog_C_REHASH
+if test -n "$C_REHASH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $C_REHASH" >&5
+$as_echo "$C_REHASH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+	if test "$C_REHASH" = "no"; then
+		as_fn_error $? "\"c_rehash not found!\"" "$LINENO" 5
+	fi
+fi
 
 # Check for rpmbuild
 # Extract the first word of "rpmbuild", so it can be a program name with args.
@@ -4543,7 +4589,68 @@ if test "$ac_res" != no; then :
   CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf does not support TLS transport, disabling it." >&5
-$as_echo "$as_me: WARNING: libnetconf does not support TLS transport, disabling it." >&2;}
+$as_echo "$as_me: WARNING: libnetconf does not support TLS transport, disabling it." >&2;}; tls = "no"
+
+fi
+
+fi
+if test "$tls" = "yes"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing X509_free" >&5
+$as_echo_n "checking for library containing X509_free... " >&6; }
+if ${ac_cv_search_X509_free+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char X509_free ();
+int
+main ()
+{
+return X509_free ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' crypto; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_X509_free=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_X509_free+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_X509_free+:} false; then :
+
+else
+  ac_cv_search_X509_free=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_X509_free" >&5
+$as_echo "$ac_cv_search_X509_free" >&6; }
+ac_res=$ac_cv_search_X509_free
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libcrypto not found." "$LINENO" 5
 
 fi
 

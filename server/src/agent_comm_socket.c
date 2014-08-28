@@ -35,9 +35,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -289,3 +291,60 @@ nc_reply* comm_kill_session (conn_t* conn, const char* sid)
 	return (reply);
 }
 
+#ifdef ENABLE_TLS
+
+char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
+{
+	msgtype_t result = 0, op = COMM_SOCKET_OP_CERT_TO_NAME;
+	unsigned int len;
+	int i, boolean;
+	char* aux_string, *tmp;
+
+	if (*conn == -1) {
+		nc_verb_error("%s: invalid parameter.", __func__);
+		return NULL;
+	}
+
+	/* operation ID */
+	send(*conn, &op, sizeof(op), COMM_SOCKET_SEND_FLAGS);
+
+	/* number of string arguments */
+	send(*conn, &argv_len, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* send each string */
+	for (i = 0; i < argv_len; ++i) {
+		len = strlen(argv[i]) + 1;
+		send(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		send(*conn, argv[i], len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
+	}
+
+	/* done, now get the result */
+	recv(*conn, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+	if (op != result) {
+		nc_verb_error("%s: communication failed, response mismatch - sending %d, but received %d.", __func__, op, result);
+		return NULL;
+	}
+
+	/* get boolean */
+	recv(*conn, &boolean, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* get the username/message */
+	recv(*conn, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	aux_string = malloc(len*sizeof(char));
+	recv(*conn, aux_string, len, COMM_SOCKET_SEND_FLAGS);
+
+	if (!boolean) {
+		asprintf(&tmp, "cert to name fail: %s", aux_string);
+		clb_print(NC_VERB_WARNING, tmp);
+		free(tmp);
+		free(aux_string);
+		return NULL;
+	}
+
+	asprintf(&tmp, "cert to name result: %s", aux_string);
+	clb_print(NC_VERB_VERBOSE, tmp);
+	free(tmp);
+	return aux_string;
+}
+
+#endif /* ENABLE_TLS */

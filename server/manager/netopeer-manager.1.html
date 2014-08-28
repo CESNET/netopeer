@@ -1,5 +1,5 @@
-<!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Thu Jun  5 10:01:25 2014 -->
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Mon Aug 18 13:41:13 2014 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -93,8 +93,10 @@ enabled by default and it will be loaded by the
 
 <p style="margin-left:11%; margin-top: 1em"><b>add
 [&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
-<b>&minus;&minus;model</b> <i>MODEL</i>
-<b>[&minus;&minus;transapi</b> <i>TRANSAPI</i><b>]
+<b>(&minus;&minus;model</b> <i>MODEL</i> <b>|
+&minus;&minus;augment</b> <i>AUGMENT</i> <b>|
+&minus;&minus;import</b> <i>IMPORT</i><b>)
+[&minus;&minus;transapi</b> <i>TRANSAPI</i><b>]
 [&minus;&minus;features</b> <i>FEATURE</i>
 <b>[</b><i>FEATURE</i> <b>...]] [&minus;&minus;datastore</b>
 <i>DATASTORE</i><b>]</b></p>
@@ -114,7 +116,26 @@ configuration.</p>
 
 <p style="margin-left:23%;">Specifies path (absolute or
 relative) to the module&rsquo;s main data model in YIN
-format.</p>
+format. In this option, the whole module configuration is
+created.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;augment</b>
+<i>AUGMENT</i></p>
+
+<p style="margin-left:23%;">Specifies path (absolute or
+relative) to an augment model of the main data model in YIN
+format. This model is always appended at the end of the
+model list.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;import</b>
+<i>IMPORT</i></p>
+
+<p style="margin-left:23%;">Specifies path (absolute or
+relative) to a model in YIN format that is imported by the
+main model. This model is always prepended at the beginning
+of the model list.</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;transapi</b>
@@ -148,76 +169,29 @@ where the configuration data will be stored. If not
 specified, datastore is implemented as <i>empty</i> and it
 will not able to store any configuration data.</p>
 
-
-<p style="margin-left:11%; margin-top: 1em"><b>add-augment</b>
-<br>
-Add an augment model, optionally with an extending transAPI
-module, to the existing <b>netopeer-server</b> module.</p>
-
-<p style="margin-left:11%; margin-top: 1em"><b>add-augment
-[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
-<b>&minus;&minus;model</b> <i>MODEL</i>
-<b>[&minus;&minus;transapi</b> <i>TRANSAPI</i><b>]
-[&minus;&minus;features</b> <i>FEATURE</i>
-<b>[</b><i>FEATURE</i> <b>...]]</b></p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
-<i>NAME</i></p>
-
-<p style="margin-left:23%;">Specifies the name of the
-<b>netopeer-server</b> module to extend.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;model</b>
-<i>MODEL</i></p>
-
-<p style="margin-left:23%;">Specifies path (absolute or
-relative) to the augmenting data model in YIN format.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;transapi</b>
-<i>TRANSAPI</i></p>
-
-<p style="margin-left:23%;">Optional parameter to specify
-path to the transAPI module related to the augmenting data
-model.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;features</b>
-<i>FEATURE</i> [<i>FEATURE</i> ...]</p>
-
-<p style="margin-left:23%;">See <b>add</b> command
-description.</p>
-
 <p style="margin-left:11%; margin-top: 1em"><b>list</b>
 <br>
 Print the list of all <b>netopeer-server</b>&rsquo;s
 modules.</p>
 
-
-<p style="margin-left:11%; margin-top: 1em"><b>list-augment</b>
-<br>
-Print the list of augmenting data models for the specified
-<b>netopeer-server</b>&rsquo;s main module.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><b>list-augment
-[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i></p>
+<p style="margin-left:11%; margin-top: 1em"><b>list
+[&minus;&minus;help] [&minus;&minus;name</b>
+<i>NAME</i><b>]</b></p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
 <i>NAME</i></p>
 
-<p style="margin-left:23%;">Specifies the name of the main
-<b>netopeer-server</b> module for which the list of
+<p style="margin-left:23%;">If specified, it is the name of
+the main <b>netopeer-server</b> module for which the list of
 extending data models will be printed.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>rm</b> <br>
 Remove the specified <b>netopeer-server</b> main module.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>rm
-[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i></p>
+[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
+<b>[&minus;&minus;model</b> <i>MODEL</i><b>]</b></p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
@@ -227,30 +201,12 @@ Remove the specified <b>netopeer-server</b> main module.</p>
 <b>netopeer-server</b> module to remove.</p>
 
 
-<p style="margin-left:11%; margin-top: 1em"><b>rm-augment</b>
-<br>
-Remove the specified augmenting model of the specified
-<b>netopeer-server</b> main module.</p>
-
-<p style="margin-left:11%; margin-top: 1em"><b>rm
-[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
-<b>&minus;&minus;model</b> <i>MODEL</i></p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
-<i>NAME</i></p>
-
-<p style="margin-left:23%;">Specifies the name of the main
-<b>netopeer-server</b> module.</p>
-
-
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;model</b>
 <i>MODEL</i></p>
 
-<p style="margin-left:23%;">Specifies the name of the
-augmenting data model in the <b>netopeer-server</b>
-<i>NAME</i> module. If a transAPI module was specified to
-the augmenting module, it is also removed.</p>
+<p style="margin-left:23%;">If specified, only this
+extending model will be removed instead of the whole
+module.</p>
 
 <h2>YIN FORMAT
 <a name="YIN FORMAT"></a>

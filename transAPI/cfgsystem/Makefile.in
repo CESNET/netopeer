@@ -13,6 +13,7 @@ libdir =  @libdir@
 mandir = @mandir@
 libtool = @libtool@
 sysconfdir = @sysconfdir@
+tls = @tls@
 NETOPEER_DIR = @NETOPEER_DIR@
 
 CC = @CC@
@@ -31,6 +32,11 @@ MODEL = model/ietf-system.yin \
 	model/ietf-system-gdefs.rng \
 	model/ietf-system-schematron.xsl
 
+ifeq ($(tls), yes)
+	MODEL := $(MODEL) model/ietf-system-tls-auth.yin \
+		model/ietf-x509-cert-to-name.yin
+endif
+
 PYMODULES = nc_cfgsystem
 
 SRCS = $(TARGET).c \
@@ -42,6 +48,11 @@ SRCS = $(TARGET).c \
 	base/encrypt.c \
 	base/salt.c \
 	base/local_users.c
+
+ifeq ($(tls), yes)
+	SRCS := $(SRCS) base/cert.c
+endif
+
 OBJDIR = .obj
 LOBJS = $(SRCS:%.c=$(OBJDIR)/%.lo)
 
@@ -84,8 +95,22 @@ install: $(MODULE) $(TARGET)-init
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
 			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
+		if test "$(tls)" = "yes"; then \
+			cp ./datastore.xml $(NETOPEER_DIR)/ietf-system/datastore.xml; \
+			chmod og-rwx $(NETOPEER_DIR)/ietf-system/datastore.xml; \
+			$(NETOPEER_MANAGER) add --name ietf-system \
+				--import $(NETOPEER_DIR)/ietf-system/ietf-x509-cert-to-name.yin; \
+			$(NETOPEER_MANAGER) add --name ietf-system \
+				--augment $(NETOPEER_DIR)/ietf-system/ietf-system-tls-auth.yin \
+				--features tls-map-certificates; \
+		fi; \
 	fi
-	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
+	if test "$(tls)" = "yes"; then \
+		export STUNNEL_CA_PATH=`sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`; \
+			./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@ tls-map-certificates; \
+	else \
+		./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@; \
+	fi
 	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
 
 .PHONY: uninstall

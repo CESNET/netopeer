@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <alloca.h>
 
 #include <libxml/tree.h>
 
@@ -242,46 +243,106 @@ send_reply:
 }
 
 #ifdef ENABLE_TLS
-char *get_tls_username(void)
+char *get_tls_username(conn_t* conn)
 {
-#ifndef PATCHED_STUNNEL
-	char *subj, *cn, *aux;
-	int len;
+	int i, args_len;
+	char* hash_env, *san_env = NULL, *starti, *arg = NULL, *subj_env;
+	char** args;
 
-	/* try to get information from environment variable commonly provided by stunnel(1) */
-	subj = getenv("SSL_CLIENT_DN");
-	if (!subj) {
-		/* we are not able to get correct username */
-		clb_print(NC_VERB_ERROR, "Missing \'SSL_CLIENT_DN\' enviornment variable, unable to get username.");
-		return (NULL);
-	}
-	/* parse subject to get CN */
-	cn = strstr(subj, "CN=");
-	if (!cn) {
-		clb_print(NC_VERB_ERROR, "Client certificate does not include commonName, unable to get username.");
-		return (NULL);
-	}
-	cn = cn + 3;
-	/* detect if the CN is followed by another item */
-	aux = strchr(cn, '/');
-	/* get the length of the CN value */
-	if (aux != NULL) {
-		len = aux - cn;
-	} else {
-		len = strlen(cn);
-	}
-	/* store (only) the CN value into the resulting string */
-	aux = malloc(len * sizeof(char));
-	strncpy(aux, cn, len);
-	aux[len] = '\0';
+	/* parse certificate hashes */
+	args_len = 6;
+	args = calloc(args_len, sizeof(char*));
 
-	return (aux);
-#else
-	/*
-	 * we are running with patched stunnel(1) which provides much more info
-	 * from the client certificate
-	 */
-#endif
+	hash_env = getenv("SSL_CLIENT_MD5");
+	if (hash_env == NULL) {
+		/* nothing we can do */
+		goto cleanup;
+	}
+	args[0] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[0], "01:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA1");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[1] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[1], "02:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA256");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[2] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[2], "03:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA256");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[3] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[3], "04:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA384");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[4] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[4], "05:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA512");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[5] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[5], "06:%s", hash_env);
+
+	/* parse SubjectAltName values */
+	san_env = getenv("SSL_CLIENT_SAN");
+	if (san_env != NULL) {
+		san_env = strdup(san_env);
+		arg = strtok(san_env, "/");
+		while (arg != NULL) {
+			++args_len;
+			args = realloc(args, args_len*sizeof(char*));
+			args[args_len-1] = arg;
+			arg = strtok(NULL, "/");
+		}
+	}
+
+	/* parse commonName */
+	subj_env = getenv("SSL_CLIENT_DN");
+	if (subj_env != NULL && (starti = strstr(subj_env, "CN=")) != NULL) {
+		/* detect if the CN is followed by another item */
+		arg = strchr(starti, '/');
+		/* get the length of the CN value */
+		if (arg != NULL) {
+			i = arg - starti;
+			arg = NULL;
+		} else {
+			i = strlen(starti);
+		}
+		/* store "CN=<value>" into the resulting string */
+		++args_len;
+		args = realloc(args, args_len*sizeof(char*));
+		args[args_len-1] = alloca(i+1);
+		strncpy(args[args_len-1], starti, i);
+		args[args_len-1][i+1] = '\0';
+	}
+
+	arg = comm_cert_to_name(conn, args, args_len);
+
+cleanup:
+	for (i = 0; i < 6; ++i) {
+		if (args[i] != NULL) {
+			free(args[i]);
+		}
+	}
+	free(args);
+	if (san_env != NULL) {
+		free(san_env);
+	}
+
+	return arg;
 }
 
 #endif /* ENABLE_TLS */
@@ -384,7 +445,12 @@ int main (int argc, char** argv)
 	 */
 	if (getenv("SSL_CLIENT_DN")) {
 		/* try to get client certificate from stunnel */
-		username = get_tls_username();
+		username = get_tls_username(con);
+
+		if (username == NULL) {
+			clb_print(NC_VERB_ERROR, "cert-to-name was unsuccessful.");
+			return EXIT_FAILURE;
+		}
 
 		/* accept client session and handle capabilities */
 		netconf_con = nc_session_accept_username(capabilities, username);
@@ -427,6 +493,7 @@ int main (int argc, char** argv)
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);
 
+	/* create the session */
 	if (comm_session_info(con, netconf_con)) {
 		clb_print(NC_VERB_ERROR, "Failed to comunicate with server.");
 		return EXIT_FAILURE;

@@ -17,9 +17,6 @@ class nc_cfgsystem(ncmodule.ncmodule):
 	starti = -1
 	endi = -1
 
-	#curses
-	selected = 0
-
 	def find(self):
 		if os.path.exists(os.path.join(config.paths['cfgdir'],'sshd_config')):
 			self.sshd_config_path = os.path.join(config.paths['cfgdir'],'sshd_config')
@@ -90,41 +87,38 @@ class nc_cfgsystem(ncmodule.ncmodule):
 
 		return(True)
 
+	def unsaved_changes(self):
+		if self.passauth_commented != self.new_commented or self.passauth_setting != self.new_setting:
+			return(True)
+
+		return(False)
+
 	def paint(self, window, focus, height, width):
 		tools = [('ENTER', 'set')]
 		try:
-			window.addstr('Netopeer sshd_config PasswordAuthentication value: ' + ('(commented) ' if self.new_commented else '') +\
-				('none' if not self.new_setting else self.new_setting) + '\n')
+			window.addstr('This value determines if local users can\nbe used for NETCONF SSH authentication.\n\n')
 
-			window.addstr('Password tunnelled send and local user authentication: ')
-			if self.new_commented or not self.new_setting:
-				window.addstr('yes (default)\n\n')
+			if self.new_commented or not self.new_setting or self.new_setting == 'yes':
+				value = 'YES'
+			elif self.new_setting == 'no':
+				value = 'NO'
 			else:
-				if self.new_setting == 'yes' or self.new_setting == 'no':
-					window.addstr(self.new_setting + '\n\n')
-				else:
-					window.addstr(self.new_setting + ' (invalid value)\n\n')
+				value = 'INVALID'
 
-			window.addstr('Set to \"yes\"\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 0 else 0)
-			window.addstr('Set to \"no\"\n', curses.color_pair(0) | curses.A_REVERSE if focus and self.selected == 1 else 0)
+			window.addstr('Netopeer sshd_config PasswordAuthentication: ' + value, curses.color_pair(0) | curses.A_REVERSE if focus else 0)
 		except curses.error:
 			pass
 
 		return(tools)
 
 	def handle(self, stdscr, window, height, width, key):
-		if key == curses.KEY_UP and self.selected > 0:
-			self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < 1:
-			self.selected = self.selected+1
-		elif key == ord('\n'):
+		if key == ord('\n'):
 			self.new_commented = False
-			if self.selected == 0:
-				self.new_setting = 'yes'
-			elif self.selected == 1:
+
+			if self.new_commented or not self.new_setting or self.new_setting == 'yes':
 				self.new_setting = 'no'
 			else:
-				curses.flash()
+				self.new_setting = 'yes'
 		else:
 			curses.flash()
 		return(True)

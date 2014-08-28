@@ -109,4 +109,11 @@ typedef DBusConnection conn_t;
  */
 #define NTPR_SRV_SET_SESSION "SetSessionParams"
 
+#ifdef ENABLE_TLS
+/**
+ * DBus CertToName method from the basic Netopeer server DBus interface/path
+ */
+#define NTPR_SRV_CERT_TO_NAME "CertToName"
+#endif /* ENABLE_TLS */
+
 #endif /* NETOPEER_DBUS_H_ */

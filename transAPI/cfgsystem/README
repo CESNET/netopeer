@@ -32,6 +32,11 @@ configure options:
   them manually. Otherwise, configure switches off the functionality of the
   cfgsystem that depends on that tools.
 
+--enable-tls
+
+  This enables all the TLS features of cfgsystem such as trusted client
+  and CA certificates or cert-to-name feature.
+
 Functionality
 ~~~~~~~~~~~~~
 
@@ -39,7 +44,8 @@ This module implements ietf-system data model as defined in RFC 7317. It
 implements only the folowing features of the data model:
 
 - authentication - configuration of the user authentication by manipulating
-  with the sshd_config of SSH daemon listening for the NETCONF connections.
+  with the sshd_config of SSH daemon listening for the NETCONF connections
+  and basic certificate management.
 - local-users - configuration of local user authentication by manipulating
   with the /etc/passwd, /etc/shadow and ~/.ssh/authorized_keys files.
 - ntp - configuration of usage NTP server(s) by manipulating with
@@ -52,6 +58,36 @@ The module also allows configuration of
 For the detailed description of content for the specific configuration
 element, please read the RFC 7317.
 
+TLS (with --enable-tls)
+
+Augment model ietf-system-tls-auth from May 24, 2014 is added to
+the ietf-system model with features:
+
+- tls-map-certificates - cert-to-name information for the server.
+
+cert-to-name configuration will after installation include one entry
+resolving "server/stunnel/client.pem" certificate into the "tls_default"
+username.
+
+!!tls-map-certificates feature:
+
+This feature does not fully comply with ietf-system-tls-auth description.
+Only peer certificates (not every certificate encountered while traversing
+the CA chain during verification, as is required) are checked for a matching
+cert-to-name entry in the configuration. For this reason it does not make
+much sense to use any other map-type than "specified" even though all
+map-types are implemented and work correctly with the aforementioned
+restriction.
+
+!!environment variables:
+
+cfgsystem relies on retrieving some information from the environment
+variables exported by netopeer-server(8), namely:
+
+SSHD_PID - PID number of the sshd process
+STUNNEL_PID - PID number of the stunnel process
+STUNNEL_CA_PATH - path to stunnel trusted CA directory
+C_REHASH_PATH - path to the c_rehash utility
 
 nc_cfgsystem.py
 ---------------

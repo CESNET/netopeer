@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#ifdef ENABLE_TLS
+#	define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -393,3 +396,75 @@ nc_reply* comm_kill_session(conn_t* conn, const char* sid)
 	return nc_reply_error(err);
 }
 
+#ifdef ENABLE_TLS
+
+char* comm_cert_to_name(conn_t* conn, char** argv, int argv_len)
+{
+	int i;
+	DBusMessage *msg, *reply;
+	DBusError dbus_err;
+	DBusMessageIter args;
+	char *username = NULL, *aux_string, *tmp;
+	dbus_bool_t boolean;
+
+	dbus_error_init(&dbus_err);
+
+	if ((msg = dbus_message_new_method_call(NTPR_DBUS_SRV_BUS_NAME, NTPR_DBUS_SRV_OP_PATH, NTPR_DBUS_SRV_IF, NTPR_SRV_CERT_TO_NAME)) == NULL) {
+		clb_print(NC_VERB_ERROR, "Creating message failed.");
+		return NULL;
+	}
+	dbus_message_iter_init_append(msg, &args);
+	for (i = 0; i < argv_len; ++i) {
+		dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &(argv[i]));
+	}
+
+	if ((reply = dbus_connection_send_with_reply_and_block(conn, msg, NTPR_DBUS_TIMEOUT, &dbus_err)) == NULL) {
+		clb_print(NC_VERB_ERROR, "send_cert_to_name(): Cannot send message over DBus.");
+		dbus_message_unref(msg);
+		return NULL;
+	}
+	dbus_message_unref(msg);
+
+	/* initialize message arguments iterator */
+	if (!dbus_message_iter_init(reply, &args)) {
+		clb_print(NC_VERB_ERROR, "send_operation(): unexpected number of arguments");
+		dbus_message_unref(reply);
+		return NULL;
+	}
+
+	/* first argument must be boolean */
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_BOOLEAN) {
+		clb_print(NC_VERB_ERROR, "send_operation(): unexpected argument in reply message.");
+		dbus_message_unref(reply);
+		return NULL;
+	}
+	dbus_message_iter_get_basic(&args, &boolean);
+
+	/* move iterator to next arg */
+	dbus_message_iter_next(&args);
+
+	/* second argument is always string, whether the error or the username */
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		clb_print(NC_VERB_WARNING, "cert_to_name(): Reply's second argument is not a string.");
+		dbus_message_unref(reply);
+		return NULL;
+	}
+	dbus_message_iter_get_basic(&args, &aux_string);
+
+	dbus_message_unref(reply);
+
+	if (!boolean) {
+		asprintf(&tmp, "cert to name fail: %s", aux_string);
+		clb_print(NC_VERB_WARNING, tmp);
+		free(tmp);
+	} else {
+		asprintf(&tmp, "cert to name result: %s", aux_string);
+		clb_print(NC_VERB_VERBOSE, tmp);
+		free(tmp);
+		username = strdup(aux_string);
+	}
+
+	return username;
+}
+
+#endif /* ENABLE_TLS */
