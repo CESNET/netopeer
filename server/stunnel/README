@@ -43,6 +43,10 @@ openssl x509 -req -in peer.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial 
 State after installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+Important: All the software (netopeer-server(8), cfgsystem plugin,
+	netopeer-cli(1), and libnetconf must be compiled with TLS support
+	(configure switch --enable-tls) for this to be true.
+
 During installation is the stunnel configuration file
 "server/config/stunnel_config(.in)" copied into the netopeer-server(8)
 configuration directory where will stunnel find it. It mainly includes
