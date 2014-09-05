@@ -328,7 +328,12 @@ int module_enable(struct module * module, int add)
 	if (server_start) {
 		ncds_break_locks(NULL);
 	}
-	ncds_device_init(&(module->id), NULL, 1);
+	if (ncds_device_init(&(module->id), NULL, 1) != 0) {
+		nc_verb_error("Device initialization of module %s failed.", module->name);
+		ncds_free(module->ds);
+		module->ds = NULL;
+		return (EXIT_FAILURE);
+	}
 
 	if (add) {
 		if (modules) {
@@ -338,7 +343,7 @@ int module_enable(struct module * module, int add)
 		modules = module;
 	}
 
-	return(EXIT_SUCCESS);
+	return (EXIT_SUCCESS);
 
 err_cleanup:
 
