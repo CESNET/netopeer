@@ -59,9 +59,10 @@ void clb_print(NC_VERB_LEVEL level, const char* msg);
 
 /**
  * @brief Connect to D-Bus
+ * @param[in] crashed 0 if the server finished correctly, otherwise if it crashed
  * @return Connection handler
  */
-conn_t* comm_init();
+conn_t* comm_init(int crashed);
 
 /**
  * @brief Communication loop

@@ -62,7 +62,7 @@ struct pollfd agents[AGENTS_QUEUE + 1];
 static int connected_agents = 0;
 static struct sockaddr_un server;
 
-conn_t* comm_init()
+conn_t* comm_init(int crashed)
 {
 	int i, flags;
 	mode_t mask;
@@ -76,9 +76,16 @@ conn_t* comm_init()
 
 	/* check another instance of the netopeer-server */
 	if (access(COMM_SOCKET_PATH, F_OK) == 0) {
-		nc_verb_error("Communication socket \'%s\' already exists.", COMM_SOCKET_PATH);
-		nc_verb_error("Another instance of the netopeer-server is running. If not, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
-		return (NULL);
+		if (crashed) {
+			if (unlink(COMM_SOCKET_PATH) != 0) {
+				nc_verb_error("Failed to remove leftover netopeer-server socket, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
+				return (NULL);
+			}
+		} else {
+			nc_verb_error("Communication socket \'%s\' already exists.", COMM_SOCKET_PATH);
+			nc_verb_error("Another instance of the netopeer-server is running. If not, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
+			return (NULL);
+		}
 	}
 
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);

@@ -49,7 +49,7 @@
 
 #define BUS_FLAGS DBUS_NAME_FLAG_DO_NOT_QUEUE
 
-conn_t* comm_init()
+conn_t* comm_init(int __attribute__((unused)) crashed)
 {
 	int i;
 	DBusConnection *ret = NULL;

@@ -135,7 +135,7 @@ int main (int argc, char** argv)
 	sigset_t block_mask;
 
 	char *aux_string = NULL, path[PATH_MAX];
-	int next_option;
+	int next_option, ret;
 	int daemonize = 0, len;
 	int verbose = 0;
 	struct module * netopeer_module = NULL, *server_module = NULL;
@@ -210,13 +210,6 @@ int main (int argc, char** argv)
 		return (EXIT_FAILURE);
 	}
 
-	/* Initiate communication subsystem for communicate with agents */
-	conn = comm_init();
-	if (conn == NULL) {
-		nc_verb_error("Communication subsystem not initiated.");
-		return (EXIT_FAILURE);
-	}
-
 	/*
 	 * this initialize the library and check potential ABI mismatches
 	 * between the version it was compiled for and the actual shared
@@ -225,9 +218,15 @@ int main (int argc, char** argv)
 	LIBXML_TEST_VERSION
 
 	/* initialize library including internal datastores and maybee something more */
-	if (nc_init (NC_INIT_ALL) < 0) {
+	if ((ret = nc_init (NC_INIT_ALL | NC_INIT_MULTILAYER)) < 0) {
 		nc_verb_error("Library initialization failed.");
-		comm_destroy(conn);
+		return (EXIT_FAILURE);
+	}
+
+	/* Initiate communication subsystem for communicate with agents */
+	conn = comm_init(ret & NC_INITRET_RECOVERY);
+	if (conn == NULL) {
+		nc_verb_error("Communication subsystem not initiated.");
 		return (EXIT_FAILURE);
 	}
 
@@ -284,7 +283,7 @@ restart:
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
 		comm_destroy(conn);
 		server_sessions_destroy_all ();
-		nc_close (1);
+		nc_close ();
 	}
 
 	/*

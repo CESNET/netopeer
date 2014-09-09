@@ -55,7 +55,7 @@
 #include "comm.h"
 
 /* Define libnetconf submodules necessary for the NETCONF agent */
-#define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING | NC_INIT_WD)
+#define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING | NC_INIT_WD | NC_INIT_SINGLELAYER)
 
 /**
  * Environment variabe with settings for verbose level
@@ -555,7 +555,7 @@ int main (int argc, char** argv)
 cleanup:
 	nc_rpc_free(rpc);
 	nc_session_free(netconf_con);
-	nc_close(0);
+	nc_close();
 
 	return (EXIT_SUCCESS);
 }
