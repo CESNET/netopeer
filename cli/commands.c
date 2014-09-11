@@ -2551,7 +2551,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 		/* create the session */
 		session = nc_session_connect (host, port, user, client_supported_cpblts);
 		if (session == NULL) {
-			ERROR(func_name, "connecting to the %s failed.", host);
+			ERROR(func_name, "connecting to the %s:%d as user \"%s\" failed.", host, port, user);
 			if (hostfree) {
 				free (host);
 			}
