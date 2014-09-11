@@ -1051,7 +1051,11 @@ int cmd_copyconfig (const char *arg)
 	}
 
 	/* create requests */
-	rpc = nc_rpc_copyconfig (source, target, config, url_dst);
+	if (config != NULL) {
+		rpc = nc_rpc_copyconfig(source, target, config, url_dst);
+	} else {
+		rpc = nc_rpc_copyconfig(source, target, url_dst);
+	}
 	nc_filter_free(filter);
 	free(config);
 	free(url_dst);
