@@ -329,7 +329,7 @@ class nc_nacm(ncmodule.ncmodule):
 
 		xpath_nacm = self.nacm_ctxt.xpathEval('/d:datastores/d:startup/n:nacm')
 		if not xpath_nacm:
-			return(True)
+			return(False)
 
 		if not self.almighty_group and self.almighty_users:
 			return(True)
