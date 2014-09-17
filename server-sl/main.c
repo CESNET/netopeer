@@ -274,7 +274,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	openlog("ncserver", LOG_PID | LOG_PERROR, LOG_DAEMON);
 	nc_callback_print(clb_print);
 
-	init = nc_init(NC_INIT_ALL);
+	init = nc_init(NC_INIT_SINGLELAYER | NC_INIT_ALL);
 	if (init == -1) {
 		clb_print(NC_VERB_ERROR, "libnetconf initiation failed.");
 		return (EXIT_FAILURE);
@@ -328,7 +328,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	 */
 	if (ncds_consolidate() != EXIT_SUCCESS) {
 		clb_print(NC_VERB_ERROR, "Setting up datastores failed.");
-		nc_close(0);
+		nc_close();
 		return (EXIT_FAILURE);
 	}
 
@@ -338,7 +338,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	 */
 	if (ncds_device_init(NULL, NULL, 0)) {
 		clb_print(NC_VERB_ERROR, "Setting up devices failed.");
-		nc_close(0);
+		nc_close();
 		return (EXIT_FAILURE);
 	}
 
@@ -380,7 +380,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	nc_session_free(config.session);
 	ncds_free(datastore);
 
-	nc_close(0);
+	nc_close();
 
 	/* bye, bye */
 	return (EXIT_SUCCESS);
