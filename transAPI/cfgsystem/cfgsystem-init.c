@@ -122,7 +122,7 @@ int main(int argc, char** argv)
 	}
 
 	/* init libnetconf for messages  from transAPI function */
-	if (nc_init(0) == -1) {
+	if (nc_init(NC_INIT_MULTILAYER) == -1) {
 		my_print(NC_VERB_ERROR, "Could not initialize libnetconf.");
 		return 1;
 	}
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 
 	/* register the datastore */
 	if ((ds = ncds_new(NCDS_TYPE_FILE, "./model/ietf-system.yin", NULL)) == NULL) {
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
 	if (ncds_add_model("./model/ietf-x509-cert-to-name.yin") != 0 || ncds_add_model("./model/ietf-yang-types.yin") != 0 ||
 			ncds_add_model("./model/ietf-netconf-acm.yin") != 0 || ncds_add_model("./model/ietf-system-tls-auth.yin") != 0) {
 		nc_verb_error("Could not add import and augment models.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 		if (strcmp(argv[i], "tls-map-certificates") == 0 ? ncds_feature_enable("ietf-system-tls-auth", argv[i]) != 0 :
 				ncds_feature_enable("ietf-system", argv[i]) != 0) {
 			nc_verb_error("Could not enable feature \"%s\".", argv[i]);
-			nc_close(0);
+			nc_close();
 			return 1;
 		}
 	}
@@ -157,28 +157,28 @@ int main(int argc, char** argv)
 	/* set the path to the target file */
 	if (ncds_file_set_path(ds, argv[1]) != 0) {
 		nc_verb_error("Could not set \"%s\" to the datastore.", argv[1]);
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 	if ((id = ncds_init(ds)) < 0) {
 		nc_verb_error("Failed to nitialize datastore.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 	if (ncds_consolidate() != 0) {
 		nc_verb_error("Could not consolidate the datastore.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
 	if (transapi_init(&startup_doc) != EXIT_SUCCESS) {
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
 	if (startup_doc == NULL || startup_doc->children == NULL) {
 		/* nothing to do */
-		nc_close(0);
+		nc_close();
 		return 0;
 	}
 
@@ -215,7 +215,7 @@ int main(int argc, char** argv)
 	capabs = nc_cpblts_new(capabilities);
 	if ((dummy_session = nc_session_dummy("session0", "root", NULL, capabs)) == NULL) {
 		nc_verb_error("Could not create a dummy session.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
@@ -225,16 +225,16 @@ int main(int argc, char** argv)
 	/* apply edit-config rpc on the datastore */
 	if ((rpc = nc_rpc_editconfig(NC_DATASTORE_STARTUP, NC_DATASTORE_CONFIG, 0, 0, 0, new_startup_config)) == NULL) {
 		nc_verb_error("Could not create edit-config RPC.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 	reply = ncds_apply_rpc(id, dummy_session, rpc);
 	if (nc_reply_get_type(reply) != NC_REPLY_OK) {
 		nc_verb_error("Edit-config RPC failed.");
-		nc_close(0);
+		nc_close();
 		return 1;
 	}
 
-	nc_close(0);
+	nc_close();
 	return ret;
 }
