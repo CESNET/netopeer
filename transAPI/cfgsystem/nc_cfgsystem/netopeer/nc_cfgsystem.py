@@ -4,6 +4,7 @@
 import curses
 import os
 import ncmodule
+import signal
 import config
 
 class nc_cfgsystem(ncmodule.ncmodule):
@@ -80,6 +81,16 @@ class nc_cfgsystem(ncmodule.ncmodule):
 		else:
 			sshd_config_file.write(content[self.endi:])
 		sshd_config_file.close()
+
+		pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+		for pid in pids:
+			try:
+				cmdfil = open(os.path.join('/proc', pid, 'cmdline'), 'r')
+				if cmdfil.read()[:15] == 'netopeer-server':
+					os.kill(int(pid), signal.SIGHUP)
+					break
+			except IOError:
+				pass
 
 		self.passauth_commented = False
 		self.passauth_setting = self.new_setting
