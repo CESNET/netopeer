@@ -1,0 +1,25 @@
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
+
+#define @DISTRO@
+
+/* avahi SW presence */
+#define @AVAHI_DAEMON@
+#define @AVAHI_AUTOIPD@
+
+/* path to the device statistics file */
+#define DEV_STATS_PATH "/proc/net/dev"
+
+/* directory with ifcfg scripts (on Debian a single file) */
+#define IFCFG_FILES_PATH "@IFCFGFILES_DIR@"
+
+/* ifcfg scripts prefix */
+#define IFCFG_FILES_PREFIX "@IFCFGFILES_PREFIX@"
+
+/* directory with additional bash scripts (executed by if(up/down)) */
+#define IFCFG_SCRIPTS_PATH "@IFCFGSCRIPTS_DIR@"
+
+/* sysctl script */
+#define SYSCTL_CONF_PATH "@SYSCTL_CONF_FILE@"
+
+#endif /* _CONFIG_H_ */

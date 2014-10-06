@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module name="ietf-interfaces"
-        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
-        xmlns:if="urn:ietf:params:xml:ns:yang:ietf-interfaces"
-        xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types"
-        xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type">
+<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:if="urn:ietf:params:xml:ns:yang:ietf-interfaces" xmlns:yang="urn:ietf:params:xml:ns:yang:ietf-yang-types" name="ietf-interfaces">
+  <yang-version value="1"/>
   <namespace uri="urn:ietf:params:xml:ns:yang:ietf-interfaces"/>
   <prefix value="if"/>
   <import module="ietf-yang-types">
     <prefix value="yang"/>
-  </import>
-  <import module="iana-if-type">
-    <prefix value="ianaift"/>
   </import>
   <organization>
     <text>IETF NETMOD (NETCONF Data Modeling Language) Working Group</text>
@@ -19,20 +13,20 @@
     <text>WG Web:   &lt;http://tools.ietf.org/wg/netmod/&gt;
 WG List:  &lt;mailto:netmod@ietf.org&gt;
 
-WG Chair: David Kessens
-          &lt;mailto:david.kessens@nsn.com&gt;
+WG Chair: Thomas Nadeau
+        &lt;mailto:tnadeau@lucidvision.com&gt;
 
 WG Chair: Juergen Schoenwaelder
-          &lt;mailto:j.schoenwaelder@jacobs-university.de&gt;
+        &lt;mailto:j.schoenwaelder@jacobs-university.de&gt;
 
 Editor:   Martin Bjorklund
-          &lt;mailto:mbj@tail-f.com&gt;</text>
+        &lt;mailto:mbj@tail-f.com&gt;</text>
   </contact>
   <description>
     <text>This module contains a collection of YANG definitions for
 managing network interfaces.
 
-Copyright (c) 2013 IETF Trust and the persons identified as
+Copyright (c) 2014 IETF Trust and the persons identified as
 authors of the code.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or
@@ -42,15 +36,15 @@ set forth in Section 4.c of the IETF Trust's Legal Provisions
 Relating to IETF Documents
 (http://trustee.ietf.org/license-info).
 
-This version of this YANG module is part of RFC XXXX; see
+This version of this YANG module is part of RFC 7223; see
 the RFC itself for full legal notices.</text>
   </description>
-  <revision date="2013-07-04">
+  <revision date="2014-05-08">
     <description>
       <text>Initial revision.</text>
     </description>
     <reference>
-      <text>RFC XXXX: A YANG Data Model for Interface Management</text>
+      <text>RFC 7223: A YANG Data Model for Interface Management</text>
     </reference>
   </revision>
   <typedef name="interface-ref">
@@ -71,6 +65,12 @@ configured interfaces.</text>
 the operationally present interfaces.</text>
     </description>
   </typedef>
+  <identity name="interface-type">
+    <description>
+      <text>Base identity from which specific interface types are
+derived.</text>
+    </description>
+  </identity>
   <feature name="arbitrary-names">
     <description>
       <text>This feature indicates that the device allows user-controlled
@@ -87,7 +87,8 @@ hardware is not present on the device.</text>
   </feature>
   <feature name="if-mib">
     <description>
-      <text>This feature indicates that the device implements IF-MIB.</text>
+      <text>This feature indicates that the device implements
+the IF-MIB.</text>
     </description>
     <reference>
       <text>RFC 2863: The Interfaces Group MIB</text>
@@ -108,7 +109,7 @@ system-controlled interface cannot be used by the system
 (e.g., the interface hardware present does not match the
 interface type), then the configuration is not applied to
 the system-controlled interface shown in the
-/interfaces-state/interface list.  If the the configuration
+/interfaces-state/interface list.  If the configuration
 of a user-controlled interface cannot be used by the system,
 the configured interface is not instantiated in the
 /interfaces-state/interface list.</text>
@@ -120,7 +121,6 @@ the configured interface is not instantiated in the
 
 A device MAY restrict the allowed values for this leaf,
 possibly depending on the type of the interface.
-
 For system-controlled interfaces, this leaf is the
 device-specific name of the interface.  The 'config false'
 list /interfaces-state/interface contains the currently
@@ -129,30 +129,22 @@ existing interfaces on the device.
 If a client tries to create configuration for a
 system-controlled interface that is not present in the
 /interfaces-state/interface list, the server MAY reject
-the request, if the implementation does not support
-pre-provisioning of interfaces, or if the name refers to
+the request if the implementation does not support
+pre-provisioning of interfaces or if the name refers to
 an interface that can never exist in the system.  A
 NETCONF server MUST reply with an rpc-error with the
 error-tag 'invalid-value' in this case.
 
 If the device supports pre-provisioning of interface
-configuration, the feature 'pre-provisioning' is
+configuration, the 'pre-provisioning' feature is
 advertised.
 
 If the device allows arbitrarily named user-controlled
-interfaces, the feature 'arbitrary-names' is advertised.
+interfaces, the 'arbitrary-names' feature is advertised.
 
 When a configured user-controlled interface is created by
 the system, it is instantiated with the same name in the
-/interface-state/interface list.  Since the name in that
-list MAY be mapped to ifName by an implementation, such an
-implementation MUST restrict the allowed values for this
-leaf so that it matches the restrictions of ifName.
-
-If a NETCONF server that implements this restriction is
-sent a value that doesn't match the restriction, it MUST
-reply with an rpc-error with the error-tag
-'invalid-value'.</text>
+/interface-state/interface list.</text>
         </description>
       </leaf>
       <leaf name="description">
@@ -160,15 +152,11 @@ reply with an rpc-error with the error-tag
         <description>
           <text>A textual description of the interface.
 
-This leaf MAY be mapped to ifAlias by an implementation.
-Such an implementation MUST restrict the allowed values
-for this leaf so that it matches the restrictions of
-ifAlias.
-
-If a NETCONF server that implements this restriction is
-sent a value that doesn't match the restriction, it MUST
-reply with an rpc-error with the error-tag
-'invalid-value'.
+A server implementation MAY map this leaf to the ifAlias
+MIB object.  Such an implementation needs to use some
+mechanism to handle the differences in size and characters
+allowed between this leaf and ifAlias.  The definition of
+such a mechanism is outside the scope of this document.
 
 Since ifAlias is defined to be stored in non-volatile
 storage, the MIB implementation MUST map ifAlias to the
@@ -179,9 +167,10 @@ Specifically, if the device supports ':startup', when
 ifAlias is read the device MUST return the value of
 'description' in the 'startup' datastore, and when it is
 written, it MUST be written to the 'running' and 'startup'
-datastores.  Note that it is up to the implementation if
-it modifies this single leaf in 'startup', or if it
-performs an implicit copy-config from 'running' to
+datastores.  Note that it is up to the implementation to
+
+decide whether to modify this single leaf in 'startup' or
+perform an implicit copy-config from 'running' to
 'startup'.
 
 If the device does not support ':startup', ifAlias MUST
@@ -193,7 +182,9 @@ datastore.</text>
         </reference>
       </leaf>
       <leaf name="type">
-        <type name="ianaift:iana-if-type"/>
+        <type name="identityref">
+          <base name="interface-type"/>
+        </type>
         <mandatory value="true"/>
         <description>
           <text>The type of the interface.
@@ -226,6 +217,8 @@ leaf in the 'running' datastore to set
 IF-MIB.ifAdminStatus to 'up' or 'down' after an ifEntry
 has been initialized, as described in RFC 2863.
 
+
+
 Changes in this leaf in the 'running' datastore are
 reflected in ifAdminStatus, but if ifAdminStatus is
 changed over SNMP, this leaf is not affected.</text>
@@ -249,13 +242,13 @@ changed over SNMP, this leaf is not affected.</text>
 should be generated for this interface.
 
 If this node is not configured, the value 'enabled' is
-operationally used by the server for interfaces which do
+operationally used by the server for interfaces that do
 not operate on top of any other interface (i.e., there are
 no 'lower-layer-if' entries), and 'disabled' otherwise.</text>
         </description>
         <reference>
           <text>RFC 2863: The Interfaces Group MIB -
-          ifLinkUpDownTrapEnable</text>
+  ifLinkUpDownTrapEnable</text>
         </reference>
       </leaf>
     </list>
@@ -279,14 +272,20 @@ not.</text>
         <description>
           <text>The name of the interface.
 
-This leaf MAY be mapped to ifName by an implementation.</text>
+A server implementation MAY map this leaf to the ifName
+MIB object.  Such an implementation needs to use some
+mechanism to handle the differences in size and characters
+allowed between this leaf and ifName.  The definition of
+such a mechanism is outside the scope of this document.</text>
         </description>
         <reference>
           <text>RFC 2863: The Interfaces Group MIB - ifName</text>
         </reference>
       </leaf>
       <leaf name="type">
-        <type name="ianaift:iana-if-type"/>
+        <type name="identityref">
+          <base name="interface-type"/>
+        </type>
         <mandatory value="true"/>
         <description>
           <text>The type of the interface.</text>
@@ -414,11 +413,13 @@ interface.</text>
         <description>
           <text>The interface's address at its protocol sub-layer.  For
 example, for an 802.x interface, this object normally
-contains a MAC address.  The interface's media-specific
-modules must define the bit and byte ordering and the
-format of the value of this object.  For interfaces that do
-not have such an address (e.g., a serial line), this node
-is not present.</text>
+contains a Media Access Control (MAC) address.  The
+interface's media-specific modules must define the bit
+
+
+and byte ordering and the format of the value of this
+object.  For interfaces that do not have such an address
+(e.g., a serial line), this node is not present.</text>
         </description>
         <reference>
           <text>RFC 2863: The Interfaces Group MIB - ifPhysAddress</text>
@@ -446,7 +447,7 @@ interface.</text>
       </leaf-list>
       <leaf name="speed">
         <type name="yang:gauge64"/>
-        <units name="bits / second"/>
+        <units name="bits/second"/>
         <description>
           <text>An estimate of the interface's current bandwidth in bits
 per second.  For interfaces that do not vary in
@@ -457,7 +458,7 @@ node is not present.</text>
         </description>
         <reference>
           <text>RFC 2863: The Interfaces Group MIB -
-          ifSpeed, ifHighSpeed</text>
+  ifSpeed, ifHighSpeed</text>
         </reference>
       </leaf>
       <container name="statistics">
@@ -495,7 +496,7 @@ other times as indicated by the value of
           <type name="yang:counter64"/>
           <description>
             <text>The number of packets, delivered by this sub-layer to a
-higher (sub-)layer, which were not addressed to a
+higher (sub-)layer, that were not addressed to a
 multicast or broadcast address at this sub-layer.
 
 Discontinuities in the value of this counter can occur
@@ -511,7 +512,7 @@ other times as indicated by the value of
           <type name="yang:counter64"/>
           <description>
             <text>The number of packets, delivered by this sub-layer to a
-higher (sub-)layer, which were addressed to a broadcast
+higher (sub-)layer, that were addressed to a broadcast
 address at this sub-layer.
 
 Discontinuities in the value of this counter can occur
@@ -521,15 +522,15 @@ other times as indicated by the value of
           </description>
           <reference>
             <text>RFC 2863: The Interfaces Group MIB -
-          ifHCInBroadcastPkts</text>
+  ifHCInBroadcastPkts</text>
           </reference>
         </leaf>
         <leaf name="in-multicast-pkts">
           <type name="yang:counter64"/>
           <description>
             <text>The number of packets, delivered by this sub-layer to a
-higher (sub-)layer, which were addressed to a multicast
-address at this sub-layer.  For a MAC layer protocol,
+higher (sub-)layer, that were addressed to a multicast
+address at this sub-layer.  For a MAC-layer protocol,
 this includes both Group and Functional addresses.
 
 Discontinuities in the value of this counter can occur
@@ -539,13 +540,13 @@ other times as indicated by the value of
           </description>
           <reference>
             <text>RFC 2863: The Interfaces Group MIB -
-          ifHCInMulticastPkts</text>
+  ifHCInMulticastPkts</text>
           </reference>
         </leaf>
         <leaf name="in-discards">
           <type name="yang:counter32"/>
           <description>
-            <text>The number of inbound packets which were chosen to be
+            <text>The number of inbound packets that were chosen to be
 discarded even though no errors had been detected to
 prevent their being deliverable to a higher-layer
 protocol.  One possible reason for discarding such a
@@ -584,14 +585,15 @@ other times as indicated by the value of
           <type name="yang:counter32"/>
           <description>
             <text>For packet-oriented interfaces, the number of packets
-received via the interface which were discarded because
+received via the interface that were discarded because
 of an unknown or unsupported protocol.  For
 character-oriented or fixed-length interfaces that
-support protocol multiplexing the number of transmission
-units received via the interface which were discarded
-because of an unknown or unsupported protocol.  For any
-interface that does not support protocol multiplexing,
-this counter is not present.
+support protocol multiplexing, the number of
+transmission units received via the interface that were
+discarded because of an unknown or unsupported protocol.
+For any interface that does not support protocol
+multiplexing, this counter is not present.
+
 Discontinuities in the value of this counter can occur
 at re-initialization of the management system, and at
 other times as indicated by the value of
@@ -620,7 +622,7 @@ other times as indicated by the value of
           <type name="yang:counter64"/>
           <description>
             <text>The total number of packets that higher-level protocols
-requested be transmitted, and which were not addressed
+requested be transmitted, and that were not addressed
 to a multicast or broadcast address at this sub-layer,
 including those that were discarded or not sent.
 
@@ -637,7 +639,7 @@ other times as indicated by the value of
           <type name="yang:counter64"/>
           <description>
             <text>The total number of packets that higher-level protocols
-requested be transmitted, and which were addressed to a
+requested be transmitted, and that were addressed to a
 broadcast address at this sub-layer, including those
 that were discarded or not sent.
 
@@ -648,16 +650,16 @@ other times as indicated by the value of
           </description>
           <reference>
             <text>RFC 2863: The Interfaces Group MIB -
-          ifHCOutBroadcastPkts</text>
+  ifHCOutBroadcastPkts</text>
           </reference>
         </leaf>
         <leaf name="out-multicast-pkts">
           <type name="yang:counter64"/>
           <description>
             <text>The total number of packets that higher-level protocols
-requested be transmitted, and which were addressed to a
+requested be transmitted, and that were addressed to a
 multicast address at this sub-layer, including those
-that were discarded or not sent.  For a MAC layer
+that were discarded or not sent.  For a MAC-layer
 protocol, this includes both Group and Functional
 addresses.
 
@@ -668,13 +670,13 @@ other times as indicated by the value of
           </description>
           <reference>
             <text>RFC 2863: The Interfaces Group MIB -
-          ifHCOutMulticastPkts</text>
+  ifHCOutMulticastPkts</text>
           </reference>
         </leaf>
         <leaf name="out-discards">
           <type name="yang:counter32"/>
           <description>
-            <text>The number of outbound packets which were chosen to be
+            <text>The number of outbound packets that were chosen to be
 discarded even though no errors had been detected to
 prevent their being transmitted.  One possible reason
 for discarding such a packet could be to free up buffer
@@ -697,6 +699,9 @@ packets that could not be transmitted because of errors.
 For character-oriented or fixed-length interfaces, the
 number of outbound transmission units that could not be
 transmitted because of errors.
+
+
+
 
 Discontinuities in the value of this counter can occur
 at re-initialization of the management system, and at

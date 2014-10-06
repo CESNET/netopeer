@@ -1,0 +1,64 @@
+Model node semantics
+--------------------
+
+With if-mib feature not supported, all the other features
+and nodes are behaving in the way described in the model
+with the exceptions mentioned below.
+
+/interfaces/interface/ipv4
+/interfaces/interface/ipv4/enabled
+
+With "ipv4" container missing altogether, IPv4 on the
+specific interface should be disabled. However, this is not
+currently possible on linux and therefore only all the the
+IPv4 addresses are flushed leaving the interface without any
+valid address and thus technically disabling IPv4.
+
+With "ipv4" container present and "enabled" child node
+either missing or set to "true", static routing is enabled
+with manually assigned IPv4 addresses from the
+configuration. If there are none set, this configuration
+equals having IPv4 disabled on this interface (missing
+"ipv4" container).
+
+Having "ipv4" container and "enabled" set on "false", DHCP
+client is started and manages this interface. Nevertheless,
+note that any "address" nodes are still valid and these IPv4
+addresses are assigned to the interface in addition to any
+addresses received by DHCP.
+
+/interfaces-state/interface/higher-layer-if
+/interfaces-state/interface/lower-layer-if
+
+These entries are never added to the state and are not
+supported.
+
+/interfaces-state/statistics/discontinuity-time
+
+This timestamp is generated/checked only while asking the
+server for its value, which makes it unable to be completely
+accurate. Usually, the timestamp returned represents
+no-later-than time of the discontinuity occurence. Note that
+even this may not hold, especially if there are long
+intervals between separate reads of this node.
+
+
+Troubleshooting
+---------------
+
+SUSE
+
+The nodes
+
+/interfaces/interface/ipv4/forwarding
+/interfaces/interface/ipv6/enabled
+/interfaces/interface/ipv6/forwarding
+/interfaces/interface/ipv6/mtu
+/interfaces/interface/ipv6/dup-addr-detect-transmits
+
+are set permanently by writing them into "/etc/sysctl.conf".
+On OpenSUSE, these settings may be overwritten during boot
+by SuSEfirewall2. If this happens, look into the config file
+"/etc/sysconfig/SuSEfirewall2" or simply run either
+"systemctl restart systemd-sysctl.service" or "sysctl -p"
+after each boot to re-apply these settings.
