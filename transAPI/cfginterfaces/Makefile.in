@@ -86,4 +86,4 @@ uninstall:
 clean:
 	$(LIBTOOL) --mode clean rm -f $(LOBJS)
 	$(LIBTOOL) --mode clean rm -f $(MODULE)
-	rm -rf $(MODULE) $(TARGET)-init config.h model/ietf-interfaces-data.rng $(OBJDIR)
+	rm -rf $(MODULE) $(TARGET)-init $(OBJDIR)
