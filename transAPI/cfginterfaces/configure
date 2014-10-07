@@ -674,10 +674,9 @@ build_vendor
 build_cpu
 build
 LIBTOOL
-SYSCTL_CONF_FILE
-IFCFGSCRIPTS_DIR
-IFCFGFILES_PREFIX
-IFCFGFILES_DIR
+SYSCTL_CONF
+IFCFG_SCRIPTS
+IFCFG_FILES
 DISTRO
 AVAHI_AUTOIPD
 AVAHI_DAEMON
@@ -3434,24 +3433,20 @@ $as_echo "$as_me: WARNING: Failed to detect the Linux distribution, assuming Red
 fi
 
 if test "$DISTRO" = "REDHAT"; then
-	IFCFGFILES_DIR=/etc/sysconfig/network-scripts
-	IFCFGFILES_PREFIX=ifcfg-
-	SYSCTL_CONF_FILE=
-	IFCFGSCRIPTS_DIR=
+	IFCFG_FILES=/etc/sysconfig/network-scripts
+	IFCFG_SCRIPTS=/sbin/ifup-local
+	SYSCTL_CONF=/etc/sysctl.conf
 elif test "$DISTRO" = "SUSE"; then
-	IFCFGFILES_DIR=/etc/sysconfig/network
-	IFCFGFILES_PREFIX=ifcfg-
-	IFCFGSCRIPTS_DIR=/etc/sysconfig/network/scripts
-	SYSCTL_CONF_FILE=/etc/sysctl.conf
+	IFCFG_FILES=/etc/sysconfig/network
+	IFCFG_SCRIPTS=/etc/sysconfig/network/scripts
+	SYSCTL_CONF=/etc/sysctl.conf
 elif test "$DISTRO" = "DEBIAN"; then
-	IFCFGFILES_DIR=/etc/network/interfaces
-	IFCFGFILES_PREFIX=
-	IFCFGSCRIPTS_DIR=
-	SYSCTL_CONF_FILE=
+	IFCFG_FILES=/etc/network/interfaces
+	IFCFG_SCRIPTS=
+	SYSCTL_CONF=
 else
 	as_fn_error $? "Distribution detection error!" "$LINENO" 5
 fi
-
 
 
 

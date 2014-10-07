@@ -11,15 +11,12 @@
 #define DEV_STATS_PATH "/proc/net/dev"
 
 /* directory with ifcfg scripts (on Debian a single file) */
-#define IFCFG_FILES_PATH "@IFCFGFILES_DIR@"
-
-/* ifcfg scripts prefix */
-#define IFCFG_FILES_PREFIX "@IFCFGFILES_PREFIX@"
+#define IFCFG_FILES_PATH "@IFCFG_FILES@"
 
 /* directory with additional bash scripts (executed by if(up/down)) */
-#define IFCFG_SCRIPTS_PATH "@IFCFGSCRIPTS_DIR@"
+#define IFCFG_SCRIPTS_PATH "@IFCFG_SCRIPTS@"
 
 /* sysctl script */
-#define SYSCTL_CONF_PATH "@SYSCTL_CONF_FILE@"
+#define SYSCTL_CONF_PATH "@SYSCTL_CONF@"
 
 #endif /* _CONFIG_H_ */
