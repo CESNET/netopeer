@@ -268,9 +268,8 @@ try:
 				node.appendChild(config.createTextNode(os.path.abspath(args.datastore)))
 			else:
 				node.appendChild(config.createTextNode('empty'))
-			config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'), addindent='\t', newl='\n')
-		else:
-			config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
+
+		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
 
 	elif args.subcommand == 'rm':
 		if args.model:
