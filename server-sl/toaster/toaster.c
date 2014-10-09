@@ -223,6 +223,7 @@ nc_reply * rpc_make_toast (xmlNodePtr input[])
 {
 	xmlNodePtr toasterDoneness = input[0];
 	xmlNodePtr toasterToastType = input[1];
+	struct nc_err *e = NULL;
 
 	struct nc_err * err;
 	nc_reply * reply;
@@ -238,11 +239,17 @@ nc_reply * rpc_make_toast (xmlNodePtr input[])
 	pthread_mutex_lock(&status->toaster_mutex);
 
 	if (status->enabled == 0) { /* toaster is off */
-		reply = nc_reply_error(nc_err_new (NC_ERR_RES_DENIED));
+		e = nc_err_new(NC_ERR_RES_DENIED);
+		nc_err_set(e, NC_ERR_PARAM_MSG, "toaster is turned off.");
+		reply = nc_reply_error(e);
 	} else if (status->toasting) { /* toaster is busy */
-		reply = nc_reply_error (nc_err_new (NC_ERR_IN_USE));
-	} else if (doneness == 0) { /* doneness must be from <1,10> */
-		reply = nc_reply_error (nc_err_new (NC_ERR_INVALID_VALUE));
+		e = nc_err_new(NC_ERR_IN_USE);
+		nc_err_set(e, NC_ERR_PARAM_MSG, "toaster is currently busy.");
+		reply = nc_reply_error(e);
+	} else if (doneness < 1 || doneness > 10) { /* doneness must be from <1,10> */
+		e = nc_err_new(NC_ERR_INVALID_VALUE);
+		nc_err_set(e, NC_ERR_PARAM_MSG, "toasterDoneness is out of range.");
+		reply = nc_reply_error(e);
 	} else if (pthread_create (&tid, NULL, make_toast, &doneness)) { /* toaster internal error (cannot turn heater on) */
 			err = nc_err_new (NC_ERR_OP_FAILED);
 			nc_err_set (err, NC_ERR_PARAM_MSG, "Toaster is broken!");
