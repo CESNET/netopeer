@@ -1,5 +1,5 @@
 AC_PREREQ([2.63])
-AC_INIT([cfgsystem], [1.0], [BUG-REPORT-ADDRESS])
+AC_INIT([cfgsystem], [1.0])
 AC_CONFIG_SRCDIR([cfgsystem.c])
 
 PROJECTNAME=cfgsystem
