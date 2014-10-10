@@ -290,8 +290,7 @@ int transapi_init(xmlDocPtr * running)
 		tmp = (char*)xmlBuildQName((xmlChar*)tmp2, BAD_CAST "ianaift", NULL, 0);
 		free(tmp2);
 		type = xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
-		ns = xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
-		xmlNewProp(type, BAD_CAST "dummy", NULL)->ns = ns;
+		xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
 		free(tmp);
 
 		if ((tmp = iface_get_enabled(devices[i], &msg)) == NULL) {
@@ -548,8 +547,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		tmp = (char*)xmlBuildQName((xmlChar*)tmp2, BAD_CAST "ianaift", NULL, 0);
 		free(tmp2);
 		type = xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
-		ns = xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
-		xmlNewProp(type, BAD_CAST "dummy", NULL)->ns = ns;
+		xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
 		free(tmp);
 
 		if ((tmp = iface_get_operstatus(devices[i], &msg)) == NULL) {
