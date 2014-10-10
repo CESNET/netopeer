@@ -32,3 +32,5 @@ make DESTDIR=$RPM_BUILD_ROOT install
 
 %files
 %{_bindir}/netopeer-cli
+%{_mandir}/man1/*
+%{_datadir}/netopeer/*.html

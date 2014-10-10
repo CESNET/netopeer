@@ -1,0 +1,31 @@
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+import string
+
+# all potentially useful paths
+# ./configure creates config.py that is used in runtime
+
+paths = {
+		'prefix' : '@prefix@',\
+		'exec_prefix' : '@exec_prefix@',\
+		'datarootdir' : '@datarootdir@',\
+		'datadir' : '@datadir@',\
+		'bindir' : '@bindir@',\
+		'includedir' : '@includedir@',\
+		'libdir' : '@libdir@',\
+		'mandir' : '@mandir@',\
+		'sysconfdir': '@sysconfdir@',\
+		'cfgdir': '@sysconfdir@/netopeer',\
+		'crehash': '@C_REHASH@',\
+		'dbusconfdir':'@DBUSCONF@',\
+		'dbusservices':'@DBUSSERVICES@',\
+		'modulesdir':'@MODULESDIR@',\
+	}
+
+options = {
+		'dbus' : True if string.find('@CPPFLAGS@', 'DISABLE_DBUS') < 0 else False,\
+		'tls'  : True if string.find('@CPPFLAGS@', 'ENABLE_TLS') >= 0 else False,\
+		'user' : 'root',\
+		'group' : '@GROUP@',\
+	}

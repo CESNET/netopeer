@@ -1,0 +1,55 @@
+.\" Process this file with
+.\" groff -man -Tascii netopeer-agent.1
+.\"
+.TH "netopeer-agent" 8 "Fri Jun 6 2014" "Netopeer"
+.SH NAME
+netopeer-agent \- NETCONF protocol agent 
+.SH SYNOPSIS
+.B netopeer-agent [\-h] [-v
+.IB level ]
+.SH DESCRIPTION
+.B netopeer-agent
+is the NETCONF protocol agent running as a SSH/TLS Subsystem. It accepts
+incoming NETCONF connection and passes the user requests (NETCONF RPC operations)
+to the
+.BR netopeer-server .
+.SH OPTIONS
+.PP
+.B \-h
+.RS
+Show help.
+.RE
+.PP
+.B \-v
+.I level
+.RS
+Set the verbosity level. Possible values are from 0 (default) to 3. This
+overrides any
+.B NETOPEER_VERBOSE
+environment variable.
+.RE
+.SH ENVIRONMENT
+.IP NETOPEER_VERBOSE
+Set the verbosity level. Possible values are from 0 (default) to 3. Overridden
+by the
+.B \-v
+option.
+.SH "SEE ALSO"
+.BR netopeer-cli(1) ,
+.BR netopeer-configurator(1) ,
+.BR netopeer-manager(1) ,
+.BR netopeer-server(8) ,
+.SS Homepage
+https://netopeer.googlecode.com
+.SH MAILING LIST
+To discuss various topics about
+.B netopeer-agent,
+join the Netopeer mailing list at <https://groups.google.com/group/netopeer>.
+.SH REPORTING BUGS
+Report bugs to the issue tracker at <https://code.google.com/p/netopeer/issues/list>.
+.SH AUTHORS
+Radek Krejci <rkrejci@cesnet.cz>
+.SH COPYRIGHT
+Copyright \(co 2014 CESNET, z.s.p.o.
+
+

@@ -647,8 +647,10 @@ CFLAGS
 CC
 READLINK
 RPMBUILD
+C_REHASH
 UNAME
 XML2_CONFIG
+ROFF2HTML
 PKG_CONFIG
 USERMAIL
 USERNAME
@@ -705,6 +707,7 @@ enable_option_checking
 with_libxml2
 enable_notifications
 enable_debug
+enable_tls
 with_libnetconf
 '
       ac_precious_vars='build_alias
@@ -1336,6 +1339,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-notifications Disable support of NETCONF Notifications (RFC 5277)
   --enable-debug          Compile with debug options
+  --enable-tls            Enable support for NETCONF over TLS.
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2421,6 +2425,49 @@ if test "x$PKG_CONFIG" = "xno"; then
 	as_fn_error $? "'pkgconfig' not found." "$LINENO" 5
 fi
 
+# check for roff2html from groff
+# Extract the first word of "roff2html", so it can be a program name with args.
+set dummy roff2html; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ROFF2HTML+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ROFF2HTML in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ROFF2HTML="$ROFF2HTML" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ROFF2HTML="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_ROFF2HTML" && ac_cv_path_ROFF2HTML="no"
+  ;;
+esac
+fi
+ROFF2HTML=$ac_cv_path_ROFF2HTML
+if test -n "$ROFF2HTML"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ROFF2HTML" >&5
+$as_echo "$ROFF2HTML" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+
 
 # Check whether --with-libxml2 was given.
 if test "${with_libxml2+set}" = set; then :
@@ -2499,8 +2546,18 @@ fi
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 else
-  CFLAGS="$CFLAGS -O3"
+  CFLAGS="$CFLAGS -O3 -DNDEBUG"
 	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
+
+fi
+
+
+tls="no"
+# Check whether --enable-tls was given.
+if test "${enable_tls+set}" = set; then :
+  enableval=$enable_tls; if test "$enableval" = "yes"; then
+		tls="yes"
+	fi
 
 fi
 
@@ -2570,6 +2627,51 @@ $as_echo "$host_cpu is supported" >&6; }
 $as_echo "$as_me: WARNING: unsupported architecture $host_cpu" >&2;}
         ;;
 esac
+
+# Check for c_rehash
+if test "$tls" = "yes"; then
+	# Extract the first word of "c_rehash", so it can be a program name with args.
+set dummy c_rehash; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_C_REHASH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$C_REHASH"; then
+  ac_cv_prog_C_REHASH="$C_REHASH" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_C_REHASH="yes"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_prog_C_REHASH" && ac_cv_prog_C_REHASH="no"
+fi
+fi
+C_REHASH=$ac_cv_prog_C_REHASH
+if test -n "$C_REHASH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $C_REHASH" >&5
+$as_echo "$C_REHASH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+	if test "$C_REHASH" = "no"; then
+		as_fn_error $? "\"c_rehash not found!\"" "$LINENO" 5
+	fi
+fi
 
 # Check for rpmbuild
 # Extract the first word of "rpmbuild", so it can be a program name with args.
@@ -3738,7 +3840,8 @@ fi
 	LDFLAGS="`xml2-config --libs` $LDFLAGS"
 fi
 
-### pthread ###
+if test "$notif" = "yes"; then
+	### pthread ###
 
 
 
@@ -4122,9 +4225,9 @@ fi
 # Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
 if test x"$ax_pthread_ok" = xyes; then
 
-	LIBS="$PTHREAD_LIBS $LIBS"
-	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-	CC="$PTHREAD_CC"
+		LIBS="$PTHREAD_LIBS $LIBS"
+		CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+		CC="$PTHREAD_CC"
         :
 else
         ax_pthread_ok=no
@@ -4138,6 +4241,7 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
+fi
 
 # libnetconf
 
@@ -4263,8 +4367,8 @@ fi
 
 # Check whether --with-libnetconf was given.
 if test "${with_libnetconf+set}" = set; then :
-  withval=$with_libnetconf; CPPFLAGS="-I$withval/include/"
-	LIBS="-L$withval/lib/ -lnetconf $LIBS"
+  withval=$with_libnetconf; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 
 else
 
@@ -4365,61 +4469,13 @@ fi
 fi
 
 REQS="$REQS libnetconf"
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for nc_verbosity in -lnetconf" >&5
-$as_echo_n "checking for nc_verbosity in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_nc_verbosity+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char nc_verbosity ();
-int
-main ()
-{
-return nc_verbosity ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_nc_verbosity=yes
-else
-  ac_cv_lib_netconf_nc_verbosity=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_nc_verbosity" >&5
-$as_echo "$ac_cv_lib_netconf_nc_verbosity" >&6; }
-if test "x$ac_cv_lib_netconf_nc_verbosity" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
-
-  LIBS="-lnetconf $LIBS"
-
-else
-  as_fn_error $? "libnetconf not found." "$LINENO" 5
-fi
-
 if test "$notif" = "yes"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ncntf_dispatch_receive in -lnetconf" >&5
-$as_echo_n "checking for ncntf_dispatch_receive in -lnetconf... " >&6; }
-if ${ac_cv_lib_netconf_ncntf_dispatch_receive+:} false; then :
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
+$as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lnetconf  $LIBS"
+  ac_func_search_save_LIBS=$LIBS
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -4438,29 +4494,235 @@ return ncntf_dispatch_receive ();
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_netconf_ncntf_dispatch_receive=yes
-else
-  ac_cv_lib_netconf_ncntf_dispatch_receive=no
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ncntf_dispatch_receive=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
+    conftest$ac_exeext
+  if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+  break
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_netconf_ncntf_dispatch_receive" >&5
-$as_echo "$ac_cv_lib_netconf_ncntf_dispatch_receive" >&6; }
-if test "x$ac_cv_lib_netconf_ncntf_dispatch_receive" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBNETCONF 1
-_ACEOF
-
-  LIBS="-lnetconf $LIBS"
+done
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
 
 else
-  CPPFLAGS="-DDISABLE_NOTIFICATIONS $PPCFLAGS"
+  ac_cv_search_ncntf_dispatch_receive=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ncntf_dispatch_receive" >&5
+$as_echo "$ac_cv_search_ncntf_dispatch_receive" >&6; }
+ac_res=$ac_cv_search_ncntf_dispatch_receive
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf does not support NETCONF Notifications, disabling it." >&5
+$as_echo "$as_me: WARNING: libnetconf does not support NETCONF Notifications, disabling it." >&2;}
+
 fi
 
 fi
+if test "$tls" = "yes"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_tls_init" >&5
+$as_echo_n "checking for library containing nc_tls_init... " >&6; }
+if ${ac_cv_search_nc_tls_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char nc_tls_init ();
+int
+main ()
+{
+return nc_tls_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_tls_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_tls_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_nc_tls_init+:} false; then :
+
+else
+  ac_cv_search_nc_tls_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_tls_init" >&5
+$as_echo "$ac_cv_search_nc_tls_init" >&6; }
+ac_res=$ac_cv_search_nc_tls_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf does not support TLS transport, disabling it." >&5
+$as_echo "$as_me: WARNING: libnetconf does not support TLS transport, disabling it." >&2;}; tls = "no"
+
+fi
+
+fi
+if test "$tls" = "yes"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing X509_free" >&5
+$as_echo_n "checking for library containing X509_free... " >&6; }
+if ${ac_cv_search_X509_free+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char X509_free ();
+int
+main ()
+{
+return X509_free ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' crypto; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_X509_free=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_X509_free+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_X509_free+:} false; then :
+
+else
+  ac_cv_search_X509_free=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_X509_free" >&5
+$as_echo "$ac_cv_search_X509_free" >&6; }
+ac_res=$ac_cv_search_X509_free
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libcrypto not found." "$LINENO" 5
+
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_init" >&5
+$as_echo_n "checking for library containing nc_init... " >&6; }
+if ${ac_cv_search_nc_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char nc_init ();
+int
+main ()
+{
+return nc_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_nc_init+:} false; then :
+
+else
+  ac_cv_search_nc_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_init" >&5
+$as_echo "$ac_cv_search_nc_init" >&6; }
+ac_res=$ac_cv_search_nc_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libnetconf not found." "$LINENO" 5
+fi
+
+
+#if test "$notif" = "yes"; then
+#	AC_CHECK_LIB([netconf], [ncntf_dispatch_receive],
+#		[],
+#		[CPPFLAGS="-DDISABLE_NOTIFICATIONS $CPPFLAGS"
+#		AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))]
+#	)
+#else
+#	AC_CHECK_LIB([netconf], [nc_init], [], AC_MSG_ERROR([libnetconf not found.]))
+#fi
 
 ### libreadline ###
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
@@ -4787,6 +5049,69 @@ done
 
 BUILDREQS="$BUILDREQS readline-devel"
 REQS="$REQS readline"
+
+### libxml2 ###
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for xmlReadFile in -lxml2" >&5
+$as_echo_n "checking for xmlReadFile in -lxml2... " >&6; }
+if ${ac_cv_lib_xml2_xmlReadFile+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lxml2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char xmlReadFile ();
+int
+main ()
+{
+return xmlReadFile ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_xml2_xmlReadFile=yes
+else
+  ac_cv_lib_xml2_xmlReadFile=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_xml2_xmlReadFile" >&5
+$as_echo "$ac_cv_lib_xml2_xmlReadFile" >&6; }
+if test "x$ac_cv_lib_xml2_xmlReadFile" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBXML2 1
+_ACEOF
+
+  LIBS="-lxml2 $LIBS"
+
+else
+  as_fn_error $? "MIssing libxml2" "$LINENO" 5
+fi
+
+for ac_header in libxml/tree.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "libxml/tree.h" "ac_cv_header_libxml_tree_h" "$ac_includes_default"
+if test "x$ac_cv_header_libxml_tree_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBXML_TREE_H 1
+_ACEOF
+
+else
+  as_fn_error $? "Missing libxml2 headers." "$LINENO" 5
+fi
+
+done
+
 
 ###################### Check for configure parameters ##########################
 
@@ -5159,6 +5484,7 @@ done
 
 
 ############################### Set output #####################################
+
 
 
 

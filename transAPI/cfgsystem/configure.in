@@ -1,0 +1,156 @@
+AC_PREREQ([2.63])
+AC_INIT([cfgsystem], [1.0], [BUG-REPORT-ADDRESS])
+AC_CONFIG_SRCDIR([cfgsystem.c])
+
+PROJECTNAME=cfgsystem
+AC_SUBST(PROJECTNAME)
+
+# --enable-debug option
+AC_ARG_ENABLE([debug],
+	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
+	CFLAGS="$CFLAGS -g -DDEBUG",
+	CFLAGS="$CFLAGS -O3 -DNDEBUG"
+)
+
+tls="no"
+AC_ARG_ENABLE([tls],
+	AC_HELP_STRING([--enable-tls], [Enable TLS features - cert management and cert-to-name support.]),
+	if test "$enableval" = "yes"; then
+		tls="yes"
+		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
+	fi
+)
+AC_SUBST(tls)
+
+AC_ARG_WITH([netopeer-confdir],
+	[AC_HELP_STRING([--with-netopeer-confdir=DIR], [Netopeer server configuration directory (by default ${sysconfdir}/netopeer/)])],
+	[NETOPEER_DIR="$withval"],
+	[NETOPEER_DIR="${sysconfdir}/netopeer/"]
+)
+AC_SUBST(NETOPEER_DIR)
+
+# --with-libxml2=path-to-libxml2-git-repository
+AC_ARG_WITH([libxml2],
+	[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
+	[
+		AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
+		if test "$XML2_CONFIG" = "no"; then
+			AC_MSG_ERROR([Missing development package of libxml2.])
+		fi
+		CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
+		LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
+		WITH_LIBXML2="$withval"
+	]
+)
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+
+AC_ARG_WITH([useradd],
+	[AC_HELP_STRING([--with-useradd=PATH], [Path to useradd(1) utility])],
+	[USERADD=$withval],
+	[AC_PATH_PROG(USERADD, [useradd], [], [$PATH:/usr/sbin:/sbin])]
+)
+AC_SUBST(USERADD)
+AC_ARG_WITH([userdel],
+	[AC_HELP_STRING([--with-userdel=PATH], [Path to userdel(1) utility])],
+	[USERDEL=$withval],
+	[AC_PATH_PROG(USERDEL, [userdel], [], [$PATH:/usr/sbin:/sbin])]
+)
+AC_SUBST(USERDEL)
+AC_ARG_WITH([shutdown],
+	[AC_HELP_STRING([--with-shutdown=PATH], [Path to shutdown(1) utility])],
+	[SHUTDOWN=$withval],
+	[AC_PATH_PROG(SHUTDOWN, [shutdown], [], [$PATH:/usr/sbin:/sbin])]
+)
+AC_SUBST(SHUTDOWN)
+
+if test -d "/usr/share/zoneinfo/"; then
+	FEATURES="timezone-name"
+else
+	OFF_FEATURES="timezone-name"
+fi
+if test -n "$USERADD" -a -n "$USERDEL"; then
+	FEATURES="$FEATURES authentication local-users"
+else
+	OFF_FEATURES="$OFF_FEATURES authentication local-users"
+fi
+if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
+	FEATURES="$FEATURES ntp"
+else
+	OFF_FEATURES="$OFF_FEATURES ntp"
+fi
+
+# Use libtool
+AC_PROG_LIBTOOL
+# Always use ./libtool unless overridden from command-line
+if test -z "$libtool"; then
+	libtool='./libtool'
+fi
+AC_SUBST(libtool)
+
+# Check for compiler's visibility attribute
+SAVE_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden"
+AC_MSG_CHECKING(for ELF visibility)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#pragma GCC visibility push(hidden)
+		__attribute__((visibility("default")))
+		int var=10;
+		]])
+	],[
+	AC_MSG_RESULT([yes])
+	CPPFLAGS="$CPPFLAGS -DPUBLIC=__attribute__\(\(visibility\(\\\"default\\\"\)\)\)"
+	],[
+	AC_MSG_RESULT([no])
+	CFLAGS="$SAVE_CFLAGS"
+	]
+)
+
+AC_PATH_PROG(NETOPEER_MANAGER, [netopeer-manager], [])
+AC_SUBST(NETOPEER_MANAGER)
+
+# Checks for libraries.
+export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
+
+PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
+LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+AC_SUBST(LIBNETCONF_DATADIR)
+
+PKG_CHECK_MODULES(AUGEAS, augeas >= 1.0.0)
+CPPFLAGS="$CPPFLAGS $AUGEAS_CFLAGS"
+LIBS="$LIBS $AUGEAS_LIBS"
+
+AC_SEARCH_LIBS([crypt], [crypt], ,AC_MSG_ERROR([crypt() not found!]))
+
+# Check for libxml2.
+if test -z "$WITH_LIBXML2" ; then
+	AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no])
+	if test "$XML2_CONFIG" = "no"; then
+		AC_MSG_ERROR([Missing development package of libxml2.])
+	fi
+	AC_CHECK_LIB([xml2], [main], [LIBS="`xml2-config --libs` $LIBS" CFLAGS="`xml2-config --cflags` $CFLAGS"], AC_MSG_ERROR([Libxml2 not found ]))
+fi
+
+# Checks for header files.
+AC_CHECK_HEADERS([stdlib.h libnetconf.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+#AC_TYPE_UINT32_T
+
+# Checks for library functions.
+AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
+
+AC_SUBST(FEATURES)
+
+AC_CONFIG_FILES([Makefile model/ietf-system-data.rng base/common.h])
+AC_OUTPUT
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([------ietf-system feature summary------])
+AC_MSG_NOTICE([On: $FEATURES])
+AC_MSG_NOTICE([Off: $OFF_FEATURES])
+AC_MSG_NOTICE([Not supported: radius radius-authentication ntp-udp-port dns-udp-tcp-port])

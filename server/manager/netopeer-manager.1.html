@@ -1,0 +1,275 @@
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Mon Aug 18 13:41:13 2014 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
+<title>netopeer-manager</title>
+
+</head>
+<body>
+
+<h1 align="center">netopeer-manager</h1>
+
+<a href="#NAME">NAME</a><br>
+<a href="#SYNOPSIS">SYNOPSIS</a><br>
+<a href="#DESCRIPTION">DESCRIPTION</a><br>
+<a href="#OPTIONS">OPTIONS</a><br>
+<a href="#COMMANDS">COMMANDS</a><br>
+<a href="#YIN FORMAT">YIN FORMAT</a><br>
+<a href="#SEE ALSO">SEE ALSO</a><br>
+<a href="#MAILING LIST">MAILING LIST</a><br>
+<a href="#REPORTING BUGS">REPORTING BUGS</a><br>
+<a href="#AUTHORS">AUTHORS</a><br>
+<a href="#COPYRIGHT">COPYRIGHT</a><br>
+
+<hr>
+
+
+<h2>NAME
+<a name="NAME"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em">netopeer-manager
+&minus; Modules manager for the <b>netopeer-server</b></p>
+
+<h2>SYNOPSIS
+<a name="SYNOPSIS"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-manager
+[&minus;&minus;help]</b> <i>&lt;command&gt;</i> <b>[</b>
+<i>&lt;arguments&gt;</i> <b>]</b></p>
+
+<h2>DESCRIPTION
+<a name="DESCRIPTION"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-manager</b>
+provides access to the configuration of the
+<b>netopeer-server</b> modules. The <b>netopeer-server</b>
+modules extends its functionality to control another devices
+or applications via transAPI or just by storing
+configuration data.</p>
+
+<h2>OPTIONS
+<a name="OPTIONS"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;&minus;help</b></p>
+
+<p style="margin-left:22%;">Prints the generic description
+and a list of commands. Detailed description and list of
+<i>arguments</i> for the specific <i>command</i> are
+displayed by using <i>&minus;&minus;help</i> argument of the
+<i>command</i>.</p>
+
+<h2>COMMANDS
+<a name="COMMANDS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>add</b> <br>
+Add a new <b>netopeer-server</b> module. Added module is
+enabled by default and it will be loaded by the
+<b>netopeer-server</b> during its next start.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>add
+[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
+<b>(&minus;&minus;model</b> <i>MODEL</i> <b>|
+&minus;&minus;augment</b> <i>AUGMENT</i> <b>|
+&minus;&minus;import</b> <i>IMPORT</i><b>)
+[&minus;&minus;transapi</b> <i>TRANSAPI</i><b>]
+[&minus;&minus;features</b> <i>FEATURE</i>
+<b>[</b><i>FEATURE</i> <b>...]] [&minus;&minus;datastore</b>
+<i>DATASTORE</i><b>]</b></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
+<i>NAME</i></p>
+
+<p style="margin-left:23%;">Specifies the name of the
+<b>netopeer-server</b> module. The <i>NAME</i> is used as an
+identifier of the module in the <b>netopeer-server</b>
+configuration.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;model</b>
+<i>MODEL</i></p>
+
+<p style="margin-left:23%;">Specifies path (absolute or
+relative) to the module&rsquo;s main data model in YIN
+format. In this option, the whole module configuration is
+created.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;augment</b>
+<i>AUGMENT</i></p>
+
+<p style="margin-left:23%;">Specifies path (absolute or
+relative) to an augment model of the main data model in YIN
+format. This model is always appended at the end of the
+model list.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;import</b>
+<i>IMPORT</i></p>
+
+<p style="margin-left:23%;">Specifies path (absolute or
+relative) to a model in YIN format that is imported by the
+main model. This model is always prepended at the beginning
+of the model list.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;transapi</b>
+<i>TRANSAPI</i></p>
+
+<p style="margin-left:23%;">Optional parameter to specify
+path to the transAPI module related to the module&rsquo;s
+main data model. If the transAPI module is not specified,
+<b>netopeer-server</b> will allow the configuration data
+manipulation according to the data model, but the changes
+will not be applied to any device. This part of the process
+is handled just by the transAPI module.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;features</b>
+<i>FEATURE</i> [<i>FEATURE</i> ...]</p>
+
+<p style="margin-left:23%;">Data model can define various
+features that extend its basic functionality. By default,
+<b>netopeer-server</b> supposes all features to be disabled.
+This option explicitly specifies list of features to enable.
+If one want to enable all features, value <i>*</i> can be
+used.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;datastore</b>
+<i>DATASTORE</i></p>
+
+<p style="margin-left:23%;">Specifies path to the file
+where the configuration data will be stored. If not
+specified, datastore is implemented as <i>empty</i> and it
+will not able to store any configuration data.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>list</b>
+<br>
+Print the list of all <b>netopeer-server</b>&rsquo;s
+modules.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>list
+[&minus;&minus;help] [&minus;&minus;name</b>
+<i>NAME</i><b>]</b></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
+<i>NAME</i></p>
+
+<p style="margin-left:23%;">If specified, it is the name of
+the main <b>netopeer-server</b> module for which the list of
+extending data models will be printed.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>rm</b> <br>
+Remove the specified <b>netopeer-server</b> main module.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>rm
+[&minus;&minus;help] &minus;&minus;name</b> <i>NAME</i>
+<b>[&minus;&minus;model</b> <i>MODEL</i><b>]</b></p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;name</b>
+<i>NAME</i></p>
+
+<p style="margin-left:23%;">Specifies the name of the main
+<b>netopeer-server</b> module to remove.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;model</b>
+<i>MODEL</i></p>
+
+<p style="margin-left:23%;">If specified, only this
+extending model will be removed instead of the whole
+module.</p>
+
+<h2>YIN FORMAT
+<a name="YIN FORMAT"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">YIN is an
+alternative XML-based syntax to YANG language. Both, YANG
+and YIN, are defined in <i>RFC 6020</i>.</p>
+
+<p style="margin-left:11%; margin-top: 1em">To convert YANG
+to YIN format, which is required by the Netopeer tools, we
+recommend to use <b>pyang(1)</b>:</p>
+
+<p style="margin-left:17%; margin-top: 1em"><tt>$ pyang -f
+yin data-model.yang -o data-model.yin</tt></p>
+
+<h2>SEE ALSO
+<a name="SEE ALSO"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><tt><b>netopeer-agent(1)</b></tt>,
+<b>netopeer-cli(1)</b>, <b>netopeer-configurator(1)</b>,
+<b>netopeer-server(1)</b>, <b>pyang(1)</b>, <br>
+RFC 6020 (YANG Data Modeling Language) <br>
+https://netopeer.googlecode.com (Netopeer homepage)</p>
+
+<h2>MAILING LIST
+<a name="MAILING LIST"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">To discuss
+various topics about <b>netopeer-manager,</b> join the
+Netopeer mailing list at
+&lt;https://groups.google.com/group/netopeer&gt;.</p>
+
+<h2>REPORTING BUGS
+<a name="REPORTING BUGS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Report bugs to
+the issue tracker at
+&lt;https://code.google.com/p/netopeer/issues/list&gt;.</p>
+
+<h2>AUTHORS
+<a name="AUTHORS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Radek Krejci
+&lt;rkrejci@cesnet.cz&gt;</p>
+
+<h2>COPYRIGHT
+<a name="COPYRIGHT"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Copyright
+&copy; 2014 CESNET, z.s.p.o.</p>
+<hr>
+</body>
+</html>

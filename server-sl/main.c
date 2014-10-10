@@ -38,6 +38,7 @@
  *
  */
 
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <syslog.h>
@@ -63,7 +64,7 @@ struct srv_config {
 	ncds_id dsid;
 	struct event_base *event_base;
 	struct event *event_input;
-};
+} config;
 
 struct ntf_thread_config {
 	struct nc_session *session;
@@ -96,6 +97,11 @@ void print_version()
 	fprintf(stdout, "compile time: %s, %s\n", __DATE__, __TIME__);
 }
 
+void signal_handler(int sig)
+{
+	event_base_loopexit(config.event_base, NULL);
+}
+
 #ifndef DISABLE_NOTIFICATIONS
 void* notification_thread(void* arg)
 {
@@ -109,7 +115,7 @@ void* notification_thread(void* arg)
 }
 #endif /* DISABLE_NOTIFICATIONS */
 
-void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
+void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void* UNUSED(arg))
 {
 	nc_rpc *rpc = NULL;
 	nc_reply *reply = NULL;
@@ -117,7 +123,6 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 	NC_OP req_op;
 	struct nc_err *e;
 	int ret;
-	struct srv_config *config = (struct srv_config*)arg;
 
 #ifndef DISABLE_NOTIFICATIONS
 	struct ntf_thread_config *ntf_config = NULL;
@@ -125,16 +130,16 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 #endif
 
 	/* receive incoming message */
-	ret = nc_session_recv_rpc(config->session, -1, &rpc);
+	ret = nc_session_recv_rpc(config.session, -1, &rpc);
 	if (ret != NC_MSG_RPC) {
 		switch(ret) {
 		case NC_MSG_NONE:
 			/* the request was already processed by libnetconf or no message available */
 			return;
 		case NC_MSG_UNKNOWN:
-			if (nc_session_get_status(config->session) != NC_SESSION_STATUS_WORKING) {
+			if (nc_session_get_status(config.session) != NC_SESSION_STATUS_WORKING) {
 				/* something really bad happend, and communication os not possible anymore */
-				event_base_loopbreak(config->event_base);
+				event_base_loopbreak(config.event_base);
 			}
 			return;
 		default:
@@ -151,7 +156,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 		case NC_OP_CLOSESESSION:
 			/* exit the event loop immediately without processing any following request */
 			reply = nc_reply_ok();
-			event_base_loopbreak(config->event_base);
+			event_base_loopbreak(config.event_base);
 			break;
 		case NC_OP_KILLSESSION:
 			/* todo: kill the requested session */
@@ -159,13 +164,13 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 			break;
 #ifndef DISABLE_NOTIFICATIONS
 		case NC_OP_CREATESUBSCRIPTION:
-			if (nc_cpblts_enabled(config->session, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
+			if (nc_cpblts_enabled(config.session, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
 				reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
 				break;
 			}
 
 			/* check if notifications are allowed on this session */
-			if (nc_session_notif_allowed(config->session) == 0) {
+			if (nc_session_notif_allowed(config.session) == 0) {
 				clb_print(NC_VERB_ERROR, "Notification subscription is not allowed on this session.");
 				e = nc_err_new(NC_ERR_OP_FAILED);
 				nc_err_set(e, NC_ERR_PARAM_TYPE, "protocol");
@@ -187,7 +192,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 				e = NULL;
 				break;
 			}
-			ntf_config->session = config->session;
+			ntf_config->session = config.session;
 			ntf_config->subscribe_rpc = nc_rpc_dup(rpc);
 
 			/* perform notification sending */
@@ -212,7 +217,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 		case NC_OP_GETCONFIG:
 		case NC_OP_GETSCHEMA:
 		case NC_OP_VALIDATE:
-			reply = ncds_apply_rpc2all(config->session, rpc,  NULL);
+			reply = ncds_apply_rpc2all(config.session, rpc,  NULL);
 			break;
 		default:
 			reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
@@ -228,7 +233,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 		case NC_OP_EDITCONFIG:
 		case NC_OP_COMMIT:
 		case NC_OP_DISCARDCHANGES:
-			reply = ncds_apply_rpc2all(config->session, rpc, NULL);
+			reply = ncds_apply_rpc2all(config.session, rpc, NULL);
 			break;
 		default:
 			reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
@@ -236,7 +241,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 		}
 	} else {
 		/* process other operations */
-		reply = ncds_apply_rpc2all(config->session, rpc, NULL);
+		reply = ncds_apply_rpc2all(config.session, rpc, NULL);
 	}
 
 	/* create reply */
@@ -249,7 +254,7 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 	}
 
 	/* and send the reply to the client */
-	nc_session_send_reply(config->session, rpc, reply);
+	nc_session_send_reply(config.session, rpc, reply);
 	nc_rpc_free(rpc);
 	nc_reply_free(reply);
 
@@ -258,15 +263,15 @@ void process_rpc(evutil_socket_t UNUSED(in), short UNUSED(events), void *arg)
 
 int main(int UNUSED(argc), char** UNUSED(argv))
 {
-	struct srv_config config;
 	struct ncds_ds* datastore;
 	int init;
+	struct sigaction action;
 
 	/* set verbosity and function to print libnetconf's messages */
 	nc_verbosity(NC_VERB_DEBUG);
 
 	/* set message printing into the system log */
-	openlog("ncserver", LOG_PID, LOG_DAEMON);
+	openlog("ncserver", LOG_PID | LOG_PERROR, LOG_DAEMON);
 	nc_callback_print(clb_print);
 
 	init = nc_init(NC_INIT_ALL);
@@ -354,7 +359,17 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 		return (EXIT_FAILURE);
 	}
 
-	config.event_input = event_new(config.event_base, (evutil_socket_t)nc_session_get_eventfd(config.session), EV_READ | EV_PERSIST, process_rpc, (void*) (&config));
+	/* set signal handler */
+	sigfillset(&action.sa_mask);
+	action.sa_handler = signal_handler;
+	action.sa_flags = 0;
+	sigaction(SIGINT, &action, NULL );
+	sigaction(SIGQUIT, &action, NULL );
+	sigaction(SIGABRT, &action, NULL );
+	sigaction(SIGTERM, &action, NULL );
+	sigaction(SIGKILL, &action, NULL );
+
+	config.event_input = event_new(config.event_base, (evutil_socket_t)nc_session_get_eventfd(config.session), EV_READ | EV_PERSIST, process_rpc, NULL);
 	/* add the event to the event base and run the main event loop */
 	event_add (config.event_input, NULL);
 	event_base_dispatch(config.event_base);

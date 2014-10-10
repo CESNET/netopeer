@@ -31,36 +31,35 @@ if you want to develop your own device modules.
 %setup
 
 %build
-./configure --with-distro=@DISTRO@ --prefix=%{_prefix} @LIBNETCONF_WITH@ --sysconfdir=%{_sysconfdir};
+./configure --with-distro=@DISTRO@ --prefix=%{_prefix} @CONFIGURE_PARAMS@ --sysconfdir=%{_sysconfdir};
 make
 make doc
 
 %install
-make DESTDIR=$RPM_BUILD_ROOT RUN="RPM" install
+make DESTDIR=$RPM_BUILD_ROOT install
 
 %post
-if [ `grep -i "Subsystem netconf" %{_sysconfdir}/ssh/sshd_config | wc -l` -le 0 ]; then echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/ssh/sshd_config; fi
-
-netopeer-dm-manager add -n Netopeer -d %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin -c urn:cesnet:tmc:netopeer:1.0 -r file %{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+#SSHD config
+if test -f /etc/ssh/sshd_config; then \
+        grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > %{_sysconfdir}/netopeer/sshd_config; \
+else \
+        touch %{_sysconfdir}/netopeer/sshd_config; \
+fi; \
+echo "" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "# NETCONF SSH Subsystem settings" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/sshd_config; \
 
 %postun
-#delete device module from configuration only when erasing, not on update.
-#https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Running_scriptlets_only_in_certain_situations
-if [ $1 -eq 0 ] ; then
-	netopeer-dm-manager del -n Netopeer -f %{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
-fi
 
 %files
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
-%{_bindir}/netopeer-dm-manager
-%{_prefix}/share/@PACKAGE_NAME@/doxygen/*
-%{_sysconfdir}/dbus-1/system.d/org.liberouter.netopeer2.conf
-%{_datadir}/dbus-1/system-services/org.liberouter.netopeer2.server.service
-%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/datastore.xml
-%{_sysconfdir}/liberouter/netopeer2/cfgnetopeer/netopeer-cfgnetopeer.yin
+%{_bindir}/netopeer-manager
+%{_sysconfdir}/netopeer/*
 %{_sysconfdir}/init.d/netopeer.rc
-%{_sysconfdir}/liberouter/netopeer2/modules.conf.d/
+%{_mandir}/man1/*
+%{_mandir}/man8/*
+%{_datadir}/netopeer/*.html
+@DBUSCONFFILE@
+@DBUSSERVICESFILE@
 
-%files devel
-%{_prefix}/include/device_module_interface.h

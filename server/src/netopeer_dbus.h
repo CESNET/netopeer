@@ -40,6 +40,13 @@
 #ifndef NETOPEER_DBUS_H_
 #define NETOPEER_DBUS_H_
 
+#include <dbus/dbus.h>
+
+/**
+ * @brief Main communication type
+ */
+typedef DBusConnection conn_t;
+
 /**
  * Timeout for sending and receiving messages via DBus, -1 means default DBus's
  * timeout.
@@ -47,44 +54,33 @@
 #define NTPR_DBUS_TIMEOUT -1
 
 /**
- * Environment variabe with settings for verbose level
- */
-#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
-
-/**
- * Environment variabe with settings for debug messages level
- */
-#define ENVIRONMENT_DEBUG "NETOPEER_DEBUG"
-
-
-/**
  * DBus bus name for the Netopeer server
  */
-#define NTPR_DBUS_SRV_BUS_NAME "org.liberouter.netopeer2.server"
+#define NTPR_DBUS_SRV_BUS_NAME "org.liberouter.netopeer.server"
 
 /**
  * DBus interface name for the Netopeer server
  */
-#define NTPR_DBUS_SRV_IF "org.liberouter.netopeer2.server"
+#define NTPR_DBUS_SRV_IF "org.liberouter.netopeer.server"
 
 /**
  * DBus interface name for the Netopeer agent
  */
-#define NTPR_DBUS_AGENT_IF "org.liberouter.netopeer2.agent"
+#define NTPR_DBUS_AGENT_IF "org.liberouter.netopeer.agent"
 
 /**
  * DBus path for basic methods of the Netopeer server
  */
-#define NTPR_DBUS_SRV_PATH "/org/liberouter/netopeer2/server"
+#define NTPR_DBUS_SRV_PATH "/org/liberouter/netopeer/server"
 
 /**
  * DBus path for methods of the NETCONF operations implemented by server
  */
-#define NTPR_DBUS_SRV_OP_PATH "/org/liberouter/netopeer2/server/operations"
+#define NTPR_DBUS_SRV_OP_PATH "/org/liberouter/netopeer/server/operations"
 /**
  * DBus path for basic methods of the Netopeer agent
  */
-#define NTPR_AGENT_PATH "/org/liberouter/netopeer2/agent"
+#define NTPR_AGENT_PATH "/org/liberouter/netopeer/agent"
 
 /**
  * DBus GetCapabilities method from the basic Netopeer server DBus interface/path
@@ -113,19 +109,11 @@
  */
 #define NTPR_SRV_SET_SESSION "SetSessionParams"
 
+#ifdef ENABLE_TLS
 /**
- * DBus Ping method from the basic Netopeer server DBus interface/path
+ * DBus CertToName method from the basic Netopeer server DBus interface/path
  */
-#define NTPR_SRV_PING "Ping"
-
-/**
- * DBus Ping method from the basic Netopeer agent DBus interface/path
- */
-#define NTPR_AGENT_PING "Ping"
-
-/**
- * DBus TerminateSession method from the basic Netopeer agent DBus interface/path
- */
-#define NTPR_AGENT_TERMINATE "TerminateSession"
+#define NTPR_SRV_CERT_TO_NAME "CertToName"
+#endif /* ENABLE_TLS */
 
 #endif /* NETOPEER_DBUS_H_ */

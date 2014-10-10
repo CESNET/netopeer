@@ -1,0 +1,183 @@
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Fri Aug 22 15:33:31 2014 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
+<title>netopeer-configurator</title>
+
+</head>
+<body>
+
+<h1 align="center">netopeer-configurator</h1>
+
+<a href="#NAME">NAME</a><br>
+<a href="#DESCRIPTION">DESCRIPTION</a><br>
+<a href="#SEE ALSO">SEE ALSO</a><br>
+<a href="#MAILING LIST">MAILING LIST</a><br>
+<a href="#REPORTING BUGS">REPORTING BUGS</a><br>
+<a href="#AUTHORS">AUTHORS</a><br>
+<a href="#COPYRIGHT">COPYRIGHT</a><br>
+
+<hr>
+
+
+<h2>NAME
+<a name="NAME"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em">netopeer-configurator
+&minus; <b>netopeer-server</b>&rsquo;s first run
+configurator</p>
+
+<h2>DESCRIPTION
+<a name="DESCRIPTION"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-configurator</b>
+is a tool to make <b>netopeer-server</b> configuration more
+easy. It is supposed mainly for the configuration before the
+first run of the <b>netopeer-server</b>. However, it can be
+used whenever to check the current settings and modify the
+selected properties of the <b>netopeer-server</b>.</p>
+
+<p style="margin-left:11%; margin-top: 1em">Because the
+<b>netopeer-configurator</b> accesses configuration files in
+the system directories, it is necessary to run it as the
+<i>root</i> user.</p>
+
+<p style="margin-left:11%; margin-top: 1em">The
+<b>netopeer-configurator</b> provides information from the
+following areas: <br>
+Netopeer</p>
+
+<p style="margin-left:22%;">Generic configuration of the
+Netopeer server. It provides information about the
+server&rsquo;s binaries and the Netopeer modules. It allows
+to enable/disable the installed modules. To install/remove
+the Netopeer modules, use the <b>netopeer-manager</b>
+tool.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>NACM</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>NETCONF Access Control Module. This part allows to
+change the default settings of the NACM. It is useful mainly
+because the NACM by default avoids any write to the
+configuration, so via the NETCONF the user is not allowed to
+specify even NACM rules. The <b>netopeer-configurator</b>
+allows to change the basic settings of the NACM as well as
+to specify the users that will be permitted to do anything
+(all access right in all modules will be granted).</p></td></tr>
+</table>
+
+<p style="margin-left:11%;">Intercommunication</p>
+
+<p style="margin-left:22%;">Provides information about the
+communication between the <b>netopeer-server</b> and
+<b>netopeer-agent</b>s. In case of DBus communication, it
+also allows to change the groups of users allowed to connect
+to the NETCONF server.</p>
+
+<p style="margin-left:11%;">Server Certificate (only with
+TLS support)</p>
+
+<p style="margin-left:22%;">Provides management of the
+server certificate utilized by <b>stunnel</b> , which is
+executed by <b>netopeer-server .</b> This certificate is
+sent to a client for TLS authentication.</p>
+
+<p style="margin-left:11%;">CA Certificates (only with TLS
+support)</p>
+
+<p style="margin-left:22%;">Provides management of trusted
+Certificate Authority certificates utilized by
+<b>stunnel</b> , which is executed by <b>netopeer-server
+.</b> Only certificates with a prefix of <i>ca_</i> (trusted
+CA) or <i>cl_</i> (trusted client) are recognized in order
+to be compatible with the <b>cfgsystem</b> netopeer plugin
+certificate management.</p>
+
+<p style="margin-left:11%;">CRLs (only with TLS
+support)</p>
+
+<p style="margin-left:22%;">Provides management of
+Certificate Revocation Lists utilized by <b>stunnel</b> ,
+which is executed by <b>netopeer-server .</b> These CRLs are
+checked, when determining if a client certificate was not
+revocated by its issuer.</p>
+
+<h2>SEE ALSO
+<a name="SEE ALSO"></a>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-agent(1)</b>,
+<b>netopeer-cli(1)</b>, <b>netopeer-manager(1)</b>,
+<b>netopeer-server(8)</b>, <b>stunnel(8)</b>,</p>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>Homepage</b>
+<br>
+https://netopeer.googlecode.com</p>
+
+<h2>MAILING LIST
+<a name="MAILING LIST"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">To discuss
+various topics about <b>netopeer-configurator,</b> join the
+Netopeer mailing list at
+&lt;https://groups.google.com/group/netopeer&gt;.</p>
+
+<h2>REPORTING BUGS
+<a name="REPORTING BUGS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Report bugs to
+the issue tracker at
+&lt;https://code.google.com/p/netopeer/issues/list&gt;.</p>
+
+<h2>AUTHORS
+<a name="AUTHORS"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Radek Krejci
+&lt;rkrejci@cesnet.cz&gt;</p>
+
+<h2>COPYRIGHT
+<a name="COPYRIGHT"></a>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Copyright
+&copy; 2014 CESNET, z.s.p.o.</p>
+<hr>
+</body>
+</html>

@@ -46,17 +46,17 @@ abs_srcdir = @abs_srcdir@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 bindir = @bindir@
+datarootdir = @datarootdir@
+mandir = @mandir@
 readlink = @READLINK@
 
-# Set path to search for libnetconf if installed into other than default location.
-LIBNETCONF_SEARCH = "-Wl,-rpath,$(prefix)/lib"
-
 CC = @CC@
-LIBS = @LDFLAGS@ @PTHREAD_LIBS@ $(LIBNETCONF_SEARCH) -lnetconf -lreadline -lxml2
+LIBS = @LIBS@
 CFLAGS = -Wall @CFLAGS@
 CPPFLAGS = @CPPFLAGS@ -DVERSION=\"$(VERSION)\"
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
 
 RPMBUILD = @RPMBUILD@
 RPMDIR = RPMBUILD
@@ -81,6 +81,17 @@ HDRS = 	commands.h \
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
+MANPAGES = doc/netopeer-cli.1
+MANHTMLS = $(MANPAGES:%=%.html)
+
+MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
+define MANINSTALL
+[ -d $(call MANPATH,$(1)) ] || \
+	(mkdir -p $(call MANPATH,$(1)); \
+	chmod 755 $(call MANPATH,$(1))); \
+$(INSTALL_DATA) $(1) $(call MANPATH,$(1))/;
+endef
+
 all: $(NAME)
 
 $(NAME): $(OBJS)
@@ -95,12 +106,22 @@ $(OBJDIR)/%.o: %.c
 		(mkdir -p $$(dirname $@))
 	$(CC) $(CFLAGS) $(INCLUDES) $(CPPFLAGS) -fPIC -c $< -o $@
 
+%.1.html: %.1
+	@if [ "@ROFF2HTML@" = "no" ]; then \
+		echo "Missing roff2html"; \
+	else \
+		@ROFF2HTML@ $< > $@; \
+	fi
+
+.PHONY: doc
+doc: $(MANHTMLS)
+
 .PHONY: tarball
-tarball: $(SRCS) $(HEADERS)
+tarball: $(SRCS) $(HEADERS) $(MANHTMLS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
-	for i in $(SRCS) $(HDRS) configure.in configure \
-	    ltmain.sh Makefile.in VERSION $(NAME).spec.in \
+	for i in $(SRCS) $(HDRS) $(MANPAGES) $(MANHTMLS) configure.in configure \
+	    Makefile.in VERSION $(NAME).spec.in \
 	    install-sh config.sub config.guess; do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
@@ -123,15 +144,23 @@ rpm: tarball
 	fi
 
 .PHONY: install
-install: $(NAME)
+install: $(NAME) $(MANPAGES) $(MANHTMLS)
 	[ -d $(DESTDIR)/$(bindir) ] || \
 		(mkdir -p $(DESTDIR)/$(bindir); chmod 755 $(DESTDIR)/$(bindir))
 	$(INSTALL_PROGRAM) $(NAME) $(DESTDIR)/$(bindir)/;
+	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
+	if test -n "$(MANHTMLS)"; then \
+		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
+			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
+	fi
+	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/)
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(DESTDIR)/$(bindir)/$(NAME);
+	$(foreach man,$(MANPAGES),rm -rf $(call MANPATH,$(man))/$(notdir $(man)))
+	$(foreach man,$(MANHTMLS),rm -rf $(DESTDIR)/$(datarootdir)/netopeer/$(notdir $(man)))
 
 .PHONY: clean
 clean:
-	rm -rf $(NAME) .obj $(OBJS); 
+	rm -rf $(NAME) .obj $(OBJS) $(MANHTMLS); 

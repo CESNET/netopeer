@@ -1,9 +1,10 @@
 /*
-* This is automaticaly generated callbacks file
+* This is automatically generated callbacks file
 * It contains 3 parts: Configuration callbacks, RPC callbacks and state data callbacks.
-* Do NOT alter function signatures or any structure untill you exactly know what you are doing.
+* Do NOT alter function signatures or any structure until you exactly know what you are doing.
 */
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
@@ -15,10 +16,7 @@
 #include <sys/shm.h>
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 2;
-
-/* Determines whether XML arguments are passed as (xmlDocPtr) or (char *). */
-int with_libxml2 = 1;
+int transapi_version = 4;
 
 /*
  * Signal to libnetconf that configuration data were modified by any callback.
@@ -26,6 +24,25 @@ int with_libxml2 = 1;
  * 1 - data have been modified
  */
 int config_modified = 0;
+
+/*
+ * Determines the callbacks order.\n'
+ * Set this variable before compilation and DO NOT modify it in runtime.\n'
+ * TRANSAPI_CLBCKS_LEAF_TO_ROOT (default)\n'
+ * TRANSAPI_CLBCKS_ROOT_TO_LEAF\n'
+ */
+const TRANSAPI_CLBCKS_ORDER_TYPE callbacks_order = TRANSAPI_CLBCKS_ORDER_DEFAULT;
+
+/* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
+Feel free to use it to distinguish module behavior for different error-option values.
+ * Possible values:
+ * NC_EDIT_ERROPT_STOP - Following callback after failure are not executed, all successful callbacks executed till
+                         failure point must be applied to the device.
+ * NC_EDIT_ERROPT_CONT - Failed callbacks are skipped, but all callbacks needed to apply configuration changes are executed
+ * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
+                         executed again with previous configuration data to roll it back.
+ */
+NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
 /* toaster status structure */
 struct toaster_status {
@@ -40,9 +57,11 @@ struct toaster_status * status = NULL;
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
  *
+ * @param[out] running	Current configuration of managed device.
+
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int transapi_init(void)
+int transapi_init(xmlDocPtr * running)
 {
 	key_t shmkey;
 	int shmid;
@@ -65,7 +84,7 @@ int transapi_init(void)
 	if ((status = shmat (shmid, NULL, 0)) == (void*)-1) {
 		return EXIT_FAILURE;
 	}
-	/* first run after shared memory removed (reboot, manualy) initiate the mutex */
+	/* first run after shared memory removed (reboot, manually) initiate the mutex */
 	if (first) {
 		if (pthread_mutex_init (&status->toaster_mutex, NULL)) {
 			return EXIT_FAILURE;
@@ -84,37 +103,31 @@ void transapi_close(void)
 	shmdt(status);
 	return;
 }
+
 /**
- * @brief Retrieve state data from device and return them as serialized XML *
- * @param model	Device data model. Serialized YIN.
- * @param running	Running datastore content. Serialized XML.
- * @param[out] err	Double poiter to error structure. Fill error when some occurs.
+ * @brief Retrieve state data from device and return them as XML document
  *
- * @return State data as serialized XML or NULL in case of error.
+ * @param model	Device data model. libxml2 xmlDocPtr.
+ * @param running	Running datastore content. libxml2 xmlDocPtr.
+ * @param[out] err  Double poiter to error structure. Fill error when some occurs.
+ * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-char * get_state_data (char * model, char * running, struct nc_err **err)
+xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
 {
 	xmlDocPtr state;
 	xmlNodePtr root;
 	xmlNsPtr ns;
-	xmlBufferPtr buf = xmlBufferCreate();
-	char * ret;
 
-	state = xmlNewDoc (BAD_CAST "1.0");
-	root = xmlNewDocNode (state, NULL, BAD_CAST "toaster", NULL);
-	xmlDocSetRootElement (state, root);
-	ns = xmlNewNs (root, BAD_CAST "http://netconfcentral.org/ns/toaster", NULL);
-	xmlNewChild (root, ns, BAD_CAST "toasterManufacturer", BAD_CAST "CESNET, z.s.p.o.");
-	xmlNewChild (root, ns, BAD_CAST "toasterModelNumber", BAD_CAST "toaster");
-	xmlNewChild (root, ns, BAD_CAST "toasterStatus", BAD_CAST (status->enabled ? "down" : "up" ));
+	state = xmlNewDoc(BAD_CAST "1.0");
+	root = xmlNewDocNode(state, NULL, BAD_CAST "toaster", NULL);
+	xmlDocSetRootElement(state, root);
+	ns = xmlNewNs(root, BAD_CAST "http://netconfcentral.org/ns/toaster", NULL);
+	xmlSetNs(root, ns);
+	xmlNewChild(root, ns, BAD_CAST "toasterManufacturer", BAD_CAST "CESNET, z.s.p.o.");
+	xmlNewChild(root, ns, BAD_CAST "toasterModelNumber", BAD_CAST "toaster");
+	xmlNewChild(root, ns, BAD_CAST "toasterStatus", BAD_CAST (status->toasting ? "down" : "up"));
 
-	xmlNodeDump (buf, state, root, 0, 0);
-	ret = strdup(xmlBufferContent(buf));
-
-	xmlBufferFree(buf);
-	xmlFreeDoc(state);
-
-	return ret;
+	return (state);
 }
 
 /*
@@ -148,20 +161,10 @@ int callback_toaster_toaster (void ** data, XMLDIFF_OP op, xmlNodePtr node, stru
 		nc_err_set(*error, NC_ERR_PARAM_MSG, "Invalid configuration data modification for toaster module.");
 		return (EXIT_FAILURE);
 	} else {
-		if (op & XMLDIFF_MOD) {/* some child(s) was changed and has no callback */
-			fprintf (stderr, "Node was modified.\n");
-			/* TODO: process the change */
-		}
-
-		if (op & XMLDIFF_CHAIN) { /* some child(s) was changed and it was processed by its callback */
-			fprintf (stderr, "Child(s) of node was modified.\n");
-			/* TODO: finalize children operation */
-		}
-
 		if (op & XMLDIFF_REM) {
 			status->enabled = 0;
 			if (status->toasting != 0) {
-				fprintf (stderr, "Interrupting ongoing toasting!\n");
+				nc_verb_warning("Interrupting ongoing toasting!");
 				status->toasting = 0;
 			}
 		} else if (op & XMLDIFF_ADD) {
@@ -169,7 +172,7 @@ int callback_toaster_toaster (void ** data, XMLDIFF_OP op, xmlNodePtr node, stru
 		}
 	}
 
-	fprintf (stderr, "Turning toaster %s\n", status->enabled ? "on" : "off");
+	nc_verb_verbose("Turning toaster %s.", status->enabled ? "on" : "off");
 
 	pthread_mutex_unlock(&status->toaster_mutex);
 
@@ -181,7 +184,7 @@ int callback_toaster_toaster (void ** data, XMLDIFF_OP op, xmlNodePtr node, stru
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
-struct transapi_xml_data_callbacks clbks =  {
+struct transapi_data_callbacks clbks =  {
 	.callbacks_count = 1,
 	.data = NULL,
 	.callbacks = {
@@ -223,13 +226,13 @@ nc_reply * rpc_make_toast (xmlNodePtr input[])
 
 	struct nc_err * err;
 	nc_reply * reply;
-	int doneness; 
+	static int doneness;
 	pthread_t tid;
 
 	if (toasterDoneness == NULL) { /* doneness not specified, use default*/
 		doneness = 5;
 	} else { /* get doneness value */
-		doneness = atoi (xmlNodeGetContent(toasterDoneness));
+		doneness = atoi ((char*)xmlNodeGetContent(toasterDoneness));
 	}
 
 	pthread_mutex_lock(&status->toaster_mutex);
@@ -278,16 +281,16 @@ nc_reply * rpc_cancel_toast (xmlNodePtr input[])
 
 	return reply;
 }
+
 /*
 * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
 * It is used by libnetconf library to decide which callbacks will be run when RPC arrives.
 * DO NOT alter this structure
 */
-struct transapi_xml_rpc_callbacks rpc_clbks = {
+struct transapi_rpc_callbacks rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
 		{.name="make-toast", .func=rpc_make_toast, .arg_count=2, .arg_order={"toasterDoneness", "toasterToastType"}},
 		{.name="cancel-toast", .func=rpc_cancel_toast, .arg_count=0, .arg_order={}}
 	}
 };
-

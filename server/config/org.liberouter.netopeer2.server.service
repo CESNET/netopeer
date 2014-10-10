@@ -1,4 +1,0 @@
-[D-BUS Service]
-Name=org.liberouter.netopeer2.server
-Exec=/usr/bin/netopeer-server
-User=root

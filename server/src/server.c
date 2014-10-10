@@ -43,34 +43,31 @@
 #include <errno.h>
 #include <libgen.h>
 #include <signal.h>
-#include <dbus/dbus.h>
 #include <limits.h>
 #include <syslog.h>
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 
-#include <commlbr.h>
-
 #include <libnetconf_xml.h>
 
+#include "common.c"
+#include "comm.h"
 #include "server_operations.h"
-#include "netopeer_dbus.h"
-
-/* program version */
-#define VERSION "0.0.1"
 
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
+
+int server_start = 0;
 
 /**
  * \brief Print program version
  *
  * \return              none
  */
-static void print_version (void)
+static void print_version (char *progname)
 {
-	fprintf (stdout, "%s version: %s\n", getprogname(), VERSION);
+	fprintf (stdout, "%s version: %s\n", progname, VERSION);
 	exit (0);
 }
 
@@ -80,24 +77,17 @@ static void print_version (void)
  *
  * \return               none
  */
-static void print_usage (void)
+static void print_usage (char * progname)
 {
-	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", getprogname());
-#ifdef DEBUG
-	fprintf(stdout," -D level            debug messages output (0-5)\n");
-#endif
+	fprintf (stdout, "Usage: %s [-dhV] [-v level]\n", progname);
 	fprintf (stdout, " -d                  daemonize server\n");
 	fprintf (stdout, " -h                  display help\n");
-	fprintf (stdout, " -v level            verbose output level (0-5)\n");
+	fprintf (stdout, " -v level            verbose output level\n");
 	fprintf (stdout, " -V                  show program version\n");
 	exit (0);
 }
 
-#ifdef DEBUG
-#	define OPTSTRING "dD:hv:V"
-#else
-#	define OPTSTRING "dhv:V"
-#endif
+#define OPTSTRING "dhv:V"
 
 /*!
  * \brief Signal handler
@@ -108,7 +98,7 @@ static void print_usage (void)
  */
 void signal_handler (int sig)
 {
-	VERB (NC_VERB_VERBOSE, "Signal %d received.", sig);
+//	nc_verb_verbose("Signal %d received.", sig);
 
 	switch (sig) {
 	case SIGINT:
@@ -121,12 +111,17 @@ void signal_handler (int sig)
 			done = 1;
 		} else {
 			/* second attempt */
-			VERB (NC_VERB_ERROR, "Hey! I need some time to stop, be patient next time!");
+//			nc_verb_error("Hey! I need some time to stop, be patient next time!");
 			exit (EXIT_FAILURE);
 		}
 		break;
+	case SIGHUP:
+		/* restart the daemon */
+		restart_soft = 1;
+		done = 1;
+		break;
 	default:
-		VERB (NC_VERB_ERROR, "exiting on signal: %d", sig);
+//		nc_verb_error("exiting on signal: %d", sig);
 		exit (EXIT_FAILURE);
 		break;
 	}
@@ -134,30 +129,24 @@ void signal_handler (int sig)
 
 int main (int argc, char** argv)
 {
-	DBusConnection * conn = NULL;
-	DBusMessage * msg = NULL;
+	conn_t* conn = NULL;
 
 	struct sigaction action;
 	sigset_t block_mask;
 
 	char *aux_string = NULL, path[PATH_MAX];
-	int next_option;
+	int next_option, ret;
 	int daemonize = 0, len;
+	int verbose = 0;
+	struct module * netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
-		verbose = -1;
+		verbose = NC_VERB_ERROR;
 	} else {
 		verbose = atoi (aux_string);
 	}
 
-#ifdef DEBUG
-	if ((aux_string = getenv(ENVIRONMENT_DEBUG)) == NULL) {
-		debug = -1;
-	} else {
-		debug = atoi(aux_string);
-	}
-#endif
 	aux_string = NULL; /* for sure to avoid unwanted changes in environment */
 
 	/* parse given options */
@@ -166,22 +155,17 @@ int main (int argc, char** argv)
 		case 'd':
 			daemonize = 1;
 			break;
-#ifdef DEBUG
-		case 'D':
-		debug = atoi(optarg);
-		break;
-#endif
 		case 'h':
-			print_usage ();
+			print_usage (argv[0]);
 			break;
 		case 'v':
 			verbose = atoi (optarg);
 			break;
 		case 'V':
-			print_version ();
+			print_version (argv[0]);
 			break;
 		default:
-			print_usage ();
+			print_usage (argv[0]);
 			break;
 		}
 	}
@@ -196,6 +180,7 @@ int main (int argc, char** argv)
 	sigaction (SIGABRT, &action, NULL);
 	sigaction (SIGTERM, &action, NULL);
 	sigaction (SIGKILL, &action, NULL);
+	sigaction (SIGHUP, &action, NULL);
 
 	nc_callback_print (clb_print);
 
@@ -211,16 +196,17 @@ int main (int argc, char** argv)
 	/* go to the background as a daemon */
 	if (daemonize == 1) {
 		if (daemon(0, 0) != 0) {
-			VERB (NC_VERB_ERROR, "Going to background failed (%s)", strerror(errno));
+			nc_verb_error("Going to background failed (%s)", strerror(errno));
 			return (EXIT_FAILURE);
 		}
+		openlog("netopeer-server", LOG_PID, LOG_DAEMON);
+	} else {
+		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
-	openlog ("netopeer-server", LOG_PID, LOG_DAEMON);
 
-	/* connect server to dbus */
-	conn = cl_dbus_init (DBUS_BUS_SYSTEM, NTPR_DBUS_SRV_BUS_NAME, DBUS_NAME_FLAG_DO_NOT_QUEUE);
-	if (conn == NULL) {
-		VERB (NC_VERB_ERROR, "Connecting to DBus failed.");
+	/* make sure we were executed by root */
+	if (geteuid() != 0) {
+		nc_verb_error("Failed to start, must have root privileges.");
 		return (EXIT_FAILURE);
 	}
 
@@ -232,81 +218,72 @@ int main (int argc, char** argv)
 	LIBXML_TEST_VERSION
 
 	/* initialize library including internal datastores and maybee something more */
-	if (nc_init (NC_INIT_NOTIF|NC_INIT_NACM|NC_INIT_MONITORING|NC_INIT_WD) < 0) {
-		VERB (NC_VERB_ERROR, "Library initialization failed.");
+	if ((ret = nc_init (NC_INIT_ALL | NC_INIT_MULTILAYER)) < 0) {
+		nc_verb_error("Library initialization failed.");
 		return (EXIT_FAILURE);
 	}
 
+	/* Initiate communication subsystem for communicate with agents */
+	conn = comm_init(ret & NC_INITRET_RECOVERY);
+	if (conn == NULL) {
+		nc_verb_error("Communication subsystem not initiated.");
+		return (EXIT_FAILURE);
+	}
+
+	server_start = 1;
+
 restart:
-	/* start netopeer device module - it will start all modules that are
-	 * in its configuration and in server configuration */
-	if (server_modules_allow ("Netopeer")) {
-		VERB (NC_VERB_ERROR, "Starting necessary plugin Netopeer failed!");
+	/* start NETCONF server module */
+	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
+		nc_verb_error("Creating necessary NETCONF server plugin failed!");
+		comm_destroy(conn);
+		return(EXIT_FAILURE);
+	}
+	server_module->name = strdup(NCSERVER_MODULE_NAME);
+	if (module_enable(server_module, 0)) {
+		nc_verb_error("Starting necessary NETCONF server plugin failed!");
+		free(server_module->name);
+		free(server_module);
+		comm_destroy(conn);
 		return EXIT_FAILURE;
 	}
 
-	VERB (NC_VERB_VERBOSE, "Netopeer server successfully initialized.");
+	/* start netopeer device module - it will start all modules that are
+	 * in its configuration and in server configuration */
+	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
+		nc_verb_error("Creating necessary Netopeer plugin failed!");
+		module_disable(server_module, 1);
+		comm_destroy(conn);
+		return(EXIT_FAILURE);
+	}
+	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
+	if (module_enable(netopeer_module, 0)) {
+		nc_verb_error("Starting necessary Netopeer plugin failed!");
+		module_disable(server_module, 1);
+		free(netopeer_module->name);
+		free(netopeer_module);
+		comm_destroy(conn);
+		return EXIT_FAILURE;
+	}
+
+	server_start = 0;
+	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
-		/* blocking read of the next available message */
-		dbus_connection_read_write (conn, 1000);
-
-		while (!done && (msg = dbus_connection_pop_message (conn)) != NULL) {
-			VERB (NC_VERB_VERBOSE, "message is a method-call");
-			VERB (NC_VERB_VERBOSE, "message path: %s", dbus_message_get_path (msg));
-			VERB (NC_VERB_VERBOSE, "message interface: %s", dbus_message_get_interface (msg));
-			VERB (NC_VERB_VERBOSE, "message member: %s", dbus_message_get_member (msg));
-			VERB (NC_VERB_VERBOSE, "message destination: %s", dbus_message_get_destination (msg));
-
-			if (cl_dbus_handlestdif (msg, conn, NTPR_DBUS_SRV_IF) != 0) {
-				VERB (NC_VERB_VERBOSE, "D-Bus standard interface message");
-
-				/* free the message */
-				dbus_message_unref(msg);
-
-				/* go for next message */
-				continue;
-			}
-
-			VERB (NC_VERB_VERBOSE, "Some message received");
-
-			/* check if message is a method-call */
-			if (dbus_message_get_type (msg) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
-				/* process specific members in interface NTPR_DBUS_SRV_IF */
-				if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_GET_CAPABILITIES) == TRUE) {
-					/* GetCapabilities request */
-					get_capabilities (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_SET_SESSION) == TRUE) {
-					/* SetSessionParams request */
-					set_new_session (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CLOSE_SESSION) == TRUE) {
-					/* CloseSession request */
-					close_session (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
-					/* KillSession request */
-					kill_session (conn, msg);
-				} else if (dbus_message_is_method_call (msg, NTPR_DBUS_SRV_IF, NTPR_SRV_PROCESS_OP) == TRUE) {
-					/* All other requests */
-					process_operation (conn, msg);
-				} else {
-					VERB (NC_VERB_WARNING, "Unsupported DBus request received (interface %s, member %s)", dbus_message_get_destination(msg), dbus_message_get_member(msg));
-				}
-			} else {
-				VERB (NC_VERB_WARNING, "Unsupported DBus message type received.");
-			}
-
-			/* free the message */
-			dbus_message_unref(msg);
-		}
+		comm_loop(conn, 500);
 	}
+
+	/* unload Netopeer module -> unload all modules */
+	module_disable(server_module, 1);
+	module_disable(netopeer_module, 1);
 
 	/* main cleanup */
 
 	if (!restart_soft) {
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		if (conn != NULL) dbus_connection_unref (conn);
+		comm_destroy(conn);
 		server_sessions_destroy_all ();
-		nc_close (1);
+		nc_close ();
 	}
 
 	/*
@@ -315,16 +292,13 @@ restart:
 	 */
 	xmlCleanupParser ();
 
-	/* Unload all loaded modules */
-	server_modules_free_list (NULL);
-
 	if (restart_soft) {
-		VERB(NC_VERB_VERBOSE, "Server is going to soft restart.");
+		nc_verb_verbose("Server is going to soft restart.");
 		restart_soft = 0;
 		done = 0;
 		goto restart;
 	} else if (restart_hard) {
-		VERB(NC_VERB_VERBOSE, "Server is going to hard restart.");
+		nc_verb_verbose("Server is going to hard restart.");
 		len = readlink("/proc/self/exe", path, PATH_MAX);
 		path[len] = 0;
 		execv(path, argv);

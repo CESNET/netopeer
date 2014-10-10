@@ -1,9 +1,10 @@
 /**
- * \file server_operations.c
- * \author Radek Krejci <rkrejci@cesent.cz>
- * \brief Netopeer server operations.
+ * \file server_operations.h
+ * @author David Kupka <xkupka01@stud.fit.vutbr.cz>
+ *         Radek Krejci <rkrejci@cesnet.cz
+ * \brief Netopeer server operations definitions.
  *
- * Copyright (C) 2011 CESNET, z.s.p.o.
+ * Copyright (C) 2014 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,450 +37,528 @@
  * if advised of the possibility of such damage.
  *
  */
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <stddef.h>
+
+#ifdef ENABLE_TLS
+#	define _GNU_SOURCE
+
+#	include <assert.h>
+#	include <stdio.h>
+#	include <ctype.h>
+#endif
+
+#include <stdlib.h>
 #include <signal.h>
-#include <errno.h>
+#include <time.h>
 #include <string.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <syslog.h>
-
-#include <libxml/tree.h>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
-#include <libxml/xpathInternals.h>
-
-#include <dbus/dbus.h>
-
-#include <commlbr.h>
-#include <libnetconf_xml.h>
-#include <libnetconf.h>
 
 #include "server_operations.h"
-#include "netopeer_operations.h"
-#include "netopeer_dbus.h"
 
-struct device_related_config {
-	struct server_module * device;
-	char * config;
+/**
+ * Internal list of NETCONF sessions - agents connected via DBus
+ */
+static struct session_info *sessions = NULL;
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list. The session is specified by its session ID.
+ *
+ * @param session_id NETCONF session ID of the required session
+ *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* server_sessions_get_by_ncid(const char* id)
+{
+	struct session_info *aux_session = sessions;
+
+	while (aux_session != NULL) {
+		if (strcmp(id, nc_session_get_id(aux_session->session)) == 0) {
+			break;
+		}
+		aux_session = aux_session->next;
+	}
+
+	return (aux_session);
+}
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list. The session is specified by its session ID.
+ *
+ * @param id ID of agent holding the session
+ *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* server_sessions_get_by_agentid(const char* id)
+{
+	struct session_info *aux_session = sessions;
+
+	while (aux_session != NULL) {
+		if (strcmp(id, aux_session->id) == 0) {
+			break;
+		}
+		aux_session = aux_session->next;
+	}
+
+	return (aux_session);
+}
+
+/**
+ * @brief Add new session information structure into the internal list of
+ * sessions
+ *
+ * @param session Session information structure to add.
+ */
+void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id)
+{
+	struct session_info *session, *session_iter = sessions;
+	session = calloc(1, sizeof(struct session_info));
+	/* create dummy session */
+	session->session = nc_session_dummy(session_id, username, NULL, cpblts);
+	/* add to monitored session list, library will connect this dummy session with real session in agent */
+	nc_session_monitor(session->session);
+	/* agent id */
+	session->id = strdup(id);
+
+	if (sessions == NULL) {
+		/* first session */
+		sessions = session;
+		session->prev = NULL;
+	} else {
+		while (session_iter->next != NULL) {
+			session_iter = session_iter->next;
+		}
+		session_iter->next = session;
+		session->prev = session_iter;
+	}
+}
+
+/**
+ * @brief Remove session with specified NETCONF session ID from the internal
+ * session list.
+ *
+ * @param session_id NETCONF session ID of the session to remove
+ *
+ * @return 0 on success, non-zero on error
+ */
+int server_sessions_remove(const char* session_id)
+{
+	struct session_info *session;
+
+	/* get required session */
+	session = (struct session_info *) server_sessions_get_by_ncid(session_id);
+	if (session == NULL) {
+		return (EXIT_FAILURE);
+	}
+
+	/* remove from the list */
+	if (session->prev != NULL) {
+		session->prev->next = session->next;
+	} else {
+		sessions = session->next;
+	}
+	if (session->next != NULL) {
+		session->next->prev = session->prev;
+	}
+
+	/* close & free libnetconf session */
+	nc_session_free(session->session);
+	/* free session structure */
+	free(session->id);
+	free(session);
+
+	return (EXIT_SUCCESS);
+}
+
+void server_sessions_stop(struct session_info *session)
+{
+	const char * sid = NULL;
+
+	if (session) {
+		sid = nc_session_get_id(session->session);
+		server_sessions_remove(sid);
+	}
+}
+
+void server_sessions_kill(struct session_info *session)
+{
+	const char * sid = NULL;
+	int agent_pid;
+
+	if (session) {
+		server_sessions_stop(session);
+
+		if ((agent_pid = atoi(sid)) != 0) {
+			/* ask agent to quit */
+			kill(agent_pid, SIGTERM);
+		}
+	}
+}
+
+/**
+ * @brief Free all session info structures.
+ */
+void server_sessions_destroy_all(void)
+{
+	struct session_info * tmp = sessions, *rem;
+
+	while (tmp != NULL) {
+		rem = tmp;
+		tmp = tmp->next;
+		server_sessions_stop(rem);
+	}
+}
+
+/**
+ * @brief Get pointer to the NETCONF session information structure in the
+ * internal list.
+ *
+ * @param session_id NETCONF session ID. *
+ * @return Session information structure or NULL if no such session exists.
+ */
+const struct session_info* srv_get_session(const char* session_id)
+{
+	if (session_id == NULL) {
+		return (NULL);
+	}
+
+	struct session_info *aux_session = sessions;
+	while (aux_session != NULL) {
+		if ((aux_session->id != NULL) && (strncmp(session_id, aux_session->id, sizeof(session_id) + 1) == 0)) {
+			break;
+		}
+		aux_session = aux_session->next;
+	}
+
+	return (aux_session);
+}
+
+#ifdef ENABLE_TLS
+
+static const char* capabilities[] = {
+	"urn:ietf:params:netconf:base:1.0",
+	"urn:ietf:params:netconf:base:1.1",
+	"urn:ietf:params:netconf:capability:startup:1.0"
 };
 
-void clb_print(NC_VERB_LEVEL level, const char* msg)
-{
+struct ctn_ptr {
+	xmlNodePtr node;
+	unsigned int id;
+	char* fingerprint;
+	char* map_type;
+	char* name;
+	struct ctn_ptr* next;
+};
 
-	switch (level) {
-	case NC_VERB_ERROR:
-		syslog(LOG_ERR, "%s", msg);
-		break;
-	case NC_VERB_WARNING:
-		syslog(LOG_WARNING, "%s", msg);
-		break;
-	case NC_VERB_VERBOSE:
-		syslog(LOG_INFO, "%s", msg);
-		break;
-	case NC_VERB_DEBUG:
-		syslog(LOG_DEBUG, "%s", msg);
-		break;
-	}
-}
+static void ctn_ptr_insert(struct ctn_ptr** root, xmlNodePtr item_node) {
+	xmlNodePtr node_cur;
+	struct ctn_ptr* cur, *item;
+	char* ptr;
 
-void get_capabilities (DBusConnection *conn, DBusMessage *msg)
-{
-	DBusMessage *reply = NULL;
-	DBusMessageIter args;
-	dbus_bool_t stat = 1;
-	const char * cpblt;
-	int cpblts_count;
-	struct nc_cpblts * cpblts;
-
-	/* create reply message */
-	reply = dbus_message_new_method_return (msg);
-
-	/* add the arguments to the reply */
-	dbus_message_iter_init_append(reply, &args);
-	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_BOOLEAN, &stat)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
-		return;
-	}
-	cpblts = nc_session_get_cpblts_default();
-	cpblts_count = nc_cpblts_count(cpblts);
-	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_UINT16, &cpblts_count)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
+	if (root == NULL || item_node == NULL) {
 		return;
 	}
 
-	nc_cpblts_iter_start(cpblts);
-	while ((cpblt = nc_cpblts_iter_next(cpblts)) != NULL) {
-		if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &cpblt)) {
-			VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
-			return;
-		}
-	}
+	/* create the new item */
+	item = calloc(1, sizeof(struct ctn_ptr));
 
-	nc_cpblts_free(cpblts);
-
-	VERB (NC_VERB_VERBOSE, "Sending capabilities to agent.");
-	/* send the reply && flush the connection */
-	if (!dbus_connection_send(conn, reply, NULL)) {
-		VERB (NC_VERB_ERROR, "Memory allocation failed (%s:%d)", __FILE__, __LINE__);
-		return;
-	}
-	dbus_connection_flush(conn);
-
-	/* free the reply */
-	dbus_message_unref(reply);
-}
-
-/**
- * @brief Set new NETCONF session connected to the server via Netopeer agent and
- * its DBus connection. The function sends reply to the Netopeer agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg SetSessionParams DBus message from the Netopeer agent
- */
-void set_new_session (DBusConnection *conn, DBusMessage *msg)
-{
-	DBusMessageIter args;
-	char *aux_string = NULL, * session_id = NULL, * username = NULL, *dbus_id;
-	struct nc_cpblts * cpblts;
-	int i = 0, cpblts_count = 0;
-
-	if (!dbus_message_iter_init (msg, &args)) {
-		VERB (NC_VERB_ERROR, "%s: DBus message has no arguments.", NTPR_SRV_SET_SESSION);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
-		return;
-	} else {
-		/* dbus session-id */
-		dbus_id = strdup (dbus_message_get_sender(msg));
-
-		/* parse message */
-		/* session ID */
-		dbus_message_iter_get_basic (&args, &session_id);
-
-		/* username */
-		dbus_message_iter_next (&args);
-		dbus_message_iter_get_basic (&args, &username);
-
-		/* number of capabilities */
-		dbus_message_iter_next (&args);
-		dbus_message_iter_get_basic (&args, &cpblts_count);
-		/* capabilities strings */
-		cpblts = nc_cpblts_new (NULL);
-
-		for (i = 0; i < cpblts_count; i++) {
-			if (!dbus_message_iter_next(&args)) {
-				VERB (NC_VERB_ERROR, "D-Bus message has too few arguments");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
-				nc_cpblts_free (cpblts);
-				return;
-			} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
-				VERB (NC_VERB_ERROR, "TODO");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "TODO");
-				nc_cpblts_free (cpblts);
-				return;
-			} else {
-				dbus_message_iter_get_basic (&args, &aux_string);
-				nc_cpblts_add (cpblts, aux_string);
+	/* fill everything in the new item */
+	node_cur = item_node->children;
+	while (node_cur != NULL) {
+		if (node_cur->type == XML_ELEMENT_NODE) {
+			if (xmlStrEqual(node_cur->name, BAD_CAST "id")) {
+				assert(item->id == 0);
+				item->id = atoi((char*)node_cur->children->content);
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "fingerprint")) {
+				assert(item->fingerprint == NULL);
+				item->fingerprint = (char*)node_cur->children->content;
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "map-type")) {
+				assert(item->map_type == NULL);
+				if ((ptr = strrchr((char*)node_cur->children->content, ':')) != NULL) {
+					item->map_type = ptr+1;
+				} else {
+					item->map_type = (char*)node_cur->children->content;
+				}
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "name")) {
+				assert(item->name == NULL);
+				item->name = (char*)node_cur->children->content;
 			}
 		}
+		node_cur = node_cur->next;
 	}
+	assert(item->id);
+	assert(item->fingerprint);
+	assert(item->map_type);
+	if (strcmp(item->map_type, "specified") == 0) {
+		assert(item->name);
+	}
+	item->node = item_node;
 
-	/* add session to the list */
-	server_sessions_add (session_id, username, cpblts, dbus_id);
-	/* clean */
-	free (dbus_id);
-	nc_cpblts_free (cpblts);
-
-	/* send reply */
-	cl_dbus_positive_reply (msg, conn);
-}
-
-/**
- * @brief Perform NETCONF <close-session> operation requested by client via
- * Netopeer agent. This function do not require any reply sent to the agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg KillSession DBus message from the Netopeer agent
- */
-void close_session (DBusConnection *conn, DBusMessage *msg)
-{
-	struct session_info *sender_session;
-	/*
-	 * get session information about sender which will be removed from active
-	 * sessions
-	 */
-	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
-	if (sender_session == NULL) {
-		VERB (NC_VERB_WARNING, "Unable to close session - session is not in the list of active sessions");
+	/* empty list */
+	if (*root == NULL) {
+		*root = item;
 		return;
 	}
 
-	server_sessions_stop (sender_session, NC_SESSION_TERM_CLOSED);
-}
-
-/**
- * @brief Perform NETCONF <kill-session> operation requested by client via
- * Netopeer agent. The function sends reply to the Netopeer agent.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg KillSession DBus message from the Netopeer agent
- */
-void kill_session (DBusConnection *conn, DBusMessage *msg)
-{
-	char *aux_string = NULL, *session_id = NULL;
-	DBusMessageIter args;
-	DBusMessage * dbus_reply;
-
-	struct session_info *session;
-	struct session_info *sender_session;
-	struct nc_err * err;
-	dbus_bool_t boolean;
-	nc_reply * reply;
-
-
-	if (msg) {
-		if (!dbus_message_iter_init(msg, &args)) {
-			VERB (NC_VERB_ERROR, "kill_session(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
-			err = nc_err_new (NC_ERR_OP_FAILED);
-			nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (No parameters of D-Bus message).");
-			reply = nc_reply_error (err);
-			goto send_reply;
-		} else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) {
-			VERB (NC_VERB_ERROR, "kill_session(): First parameter of D-Bus message is not a session ID.");
-			err = nc_err_new (NC_ERR_OP_FAILED);
-			nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): First parameter of D-Bus message is not a session ID.");
-			reply = nc_reply_error (err);
-			goto send_reply;
-		} else {
-			dbus_message_iter_get_basic(&args, &session_id);
-			if (session_id == NULL) {
-				VERB (NC_VERB_ERROR, "kill_session(): Getting session ID parameter from D-Bus message failed.");
-				err = nc_err_new (NC_ERR_OP_FAILED);
-				nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): Getting session ID parameter from D-Bus message failed.");
-				reply = nc_reply_error (err);
-				goto send_reply;
-			}
-		}
-	} else {
-		VERB (NC_VERB_ERROR, "kill_session(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
-		err = nc_err_new (NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, "Internal server error (msg parameter is NULL).");
-		reply = nc_reply_error (err);
-		goto send_reply;
-	}
-	if ((session = (struct session_info *)server_sessions_get_by_id (session_id)) == NULL) {
-		VERB (NC_VERB_ERROR, "Requested session to kill (%s) is not available.", session_id);
-		asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id);
-		err = nc_err_new (NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
-		free (aux_string);
-		reply = nc_reply_error (err);
-		goto send_reply;
-	}
-
-	/* check if the request does not relate to the current session */
-	sender_session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
-	if (sender_session != NULL) {
-		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
-			VERB (NC_VERB_VERBOSE, "Request to kill own session.");
-			err = nc_err_new (NC_ERR_INVALID_VALUE);
-			reply = nc_reply_error (err);
-			goto send_reply;
-		}
-	}
-
-	server_sessions_stop (session, NC_SESSION_TERM_KILLED);
-
-	reply = nc_reply_ok();
-	boolean = 1;
-
-send_reply:
-	aux_string = nc_reply_dump (reply);
-	nc_reply_free (reply);
-	/* send D-Bus reply */
-	dbus_reply = dbus_message_new_method_return(msg);
-	if (dbus_reply == NULL) {
-		VERB (NC_VERB_ERROR, "kill_session(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
-		err = nc_err_new (NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, "kill_session(): Failed to create dbus reply message.");
-		return;
-	}
-	dbus_message_iter_init_append (dbus_reply, &args);
-	dbus_message_iter_append_basic (&args, DBUS_TYPE_BOOLEAN, &boolean);
-	dbus_message_iter_append_basic (&args, DBUS_TYPE_STRING, &aux_string);
-	free (aux_string);
-
-	dbus_connection_send (conn, dbus_reply, NULL);
-	dbus_connection_flush (conn);
-	dbus_message_unref(dbus_reply);
-}
-
-/**
- * @brief Take care of all others NETCONF operation. Based on namespace
- * associated to operation decide to which device module pass the message.
- *
- * @param conn DBus connection to the Netopeer agent
- * @param msg DBus message from the Netopeer agent
- */
-void process_operation (DBusConnection *conn, DBusMessage *msg)
-{
-	char * msg_pass, *reply_string;
-	DBusMessageIter args;
-	DBusMessage * dbus_reply;
-	dbus_bool_t boolean = 1;
-	struct session_info * session;
-	nc_rpc * rpc;
-	nc_reply * reply;
-	struct nc_err * err;
-
-	if (msg) {
-		session = (struct session_info *)server_sessions_get_by_dbusid (dbus_message_get_sender(msg));
-		if (session == NULL) {/* in case session was closed but client/agent is still sending messages */
-			err = nc_err_new (NC_ERR_INVALID_VALUE);
-			nc_err_set(err, NC_ERR_PARAM_MSG, "Your session is no longer valid!");
-			reply = nc_reply_error (err);
-		} else if (!dbus_message_iter_init(msg, &args)) { /* can not initialize message iterator */
-			VERB (NC_VERB_ERROR, "process_operation(): No parameters of D-Bus message (%s:%d).", __FILE__, __LINE__);
-			cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (No parameters of D-Bus message.)");
-			return;
-		} else { /* everything seems fine */
-			if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&args)) { /* message is not formated as expected */
-				VERB (NC_VERB_ERROR, "process_operation(): Second parameter of D-Bus message is not a NETCONF operation.");
-				cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (Second parameter of D-Bus message is not a NETCONF operation.)");
-				return;
-			} else { /* message looks alright, build it to nc_rpc "object" */
-				dbus_message_iter_get_basic(&args, &msg_pass);
-				rpc = nc_rpc_build (msg_pass, session->session);
-			}
-			VERB (NC_VERB_VERBOSE, "Request %s", msg_pass);
-		}
-	} else {
-		VERB (NC_VERB_ERROR, "process_operation(): msg parameter is NULL (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "Internal server error (msg parameter is NULL).");
+	/* check if we don't have to add before root */
+	if ((*root)->id > item->id) {
+		item->next = *root;
+		*root = item;
 		return;
 	}
 
-
-	if ((reply = server_process_rpc (session->session, rpc)) == NULL) {
-			VERB (NC_VERB_ERROR, "process_operation(): Some error occured when device operation executed and error structure isn't filled (%s:%d).", __FILE__, __LINE__);
-			cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Device module error (NULL returned and error not filled).");
-			return;
+	/* we are adding after root, so just traverse the list and do stuff */
+	cur = *root;
+	while (cur->next != NULL && cur->next->id < item->id) {
+		cur = cur->next;
 	}
-	reply_string = nc_reply_dump (reply);
-	nc_reply_free (reply);
-	nc_rpc_free (rpc);
+	item->next = cur->next;
+	cur->next = item;
+}
 
-	dbus_reply = dbus_message_new_method_return(msg);
-	if (dbus_reply == NULL || reply_string == NULL) {
-		VERB (NC_VERB_ERROR, "process_operation(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
-		cl_dbus_error_reply (msg, conn, DBUS_ERROR_FAILED, "Internal server error (Failed to create dbus reply message.)");
-		free(reply_string);
+static void ctn_ptr_free(struct ctn_ptr** root) {
+	struct ctn_ptr* cur, *tofree;
+
+	if (root == NULL) {
 		return;
 	}
 
-	dbus_message_iter_init_append (dbus_reply, &args);
-	dbus_message_iter_append_basic (&args, DBUS_TYPE_BOOLEAN, &boolean);
-	dbus_message_iter_append_basic (&args, DBUS_TYPE_STRING, &reply_string);
-	free (reply_string);
-
-	dbus_connection_send (conn, dbus_reply, NULL);
-	dbus_connection_flush (conn);
-	dbus_message_unref(dbus_reply);
-
-	return;
+	cur = *root;
+	while (cur != NULL) {
+		tofree = cur;
+		cur = cur->next;
+		free(tofree);
+	}
+	*root = NULL;
 }
 
-nc_reply * server_process_rpc (struct nc_session * session, const nc_rpc * rpc)
-{
-	nc_reply *reply = NCDS_RPC_NOT_APPLICABLE, * old_reply = NULL, *new_reply;
-	struct server_module_list * destroy, *list;
-	const struct server_module * dm;
-	ncds_id *ids = NULL;
+char* server_cert_to_name(const char** args, char** msg) {
+	xmlDocPtr doc;
+	xmlNodePtr ctn_list;
+	struct ctn_ptr* root = NULL, *item;
+	char* cert_maps_xml, alg[4], *username = NULL, *ptr;
+	struct nc_session* dummy_session;
+	struct nc_cpblts* capabs;
+	struct nc_filter* filter;
+	nc_rpc* rpc;
+	nc_reply* reply;
 	int i;
 
-	switch (nc_rpc_get_op (rpc)) {
-	case NC_OP_UNKNOWN:
-		/* send to device module */
-		destroy = list = server_modules_get_all();
-		for (; list != NULL; list = list->next) {
-			if (list->dev->transapi) { /* ncds_apply_rpc is covering  custom RPCs for transapi module */
-				reply = ncds_apply_rpc(list->dev->repo_id, session, rpc);
-			} else if (list->dev->execute_operation) { /* old style modules */
-				reply = list->dev->execute_operation (session, rpc);
-			} else { /* none -> some weird module */
-				VERB(NC_VERB_WARNING, "Module %s has no functionality.", list->dev->name);
-				continue;
-			}
-			/* merge results from the previous runs */
-			if (old_reply == NULL) {
-				old_reply = reply;
-			} else if (old_reply != (void*)(-1) || reply != (void*)(-1)) {
-				if ((new_reply = nc_reply_merge(2, old_reply, reply)) == NULL) {
-					if (nc_reply_get_type(old_reply) == NC_REPLY_ERROR) {
-						return (old_reply);
-					} else if (nc_reply_get_type(reply) == NC_REPLY_ERROR) {
-						return (reply);
-					} else {
-						return (nc_reply_error(nc_err_new(NC_ERR_OP_FAILED)));
+	assert(*msg == NULL);
+
+	for (i = 0; i < 6; ++i) {
+		sprintf(alg, "0%d:", i+1);
+		if (args[i] == NULL || strncmp(args[i], alg, strlen(alg)) != 0) {
+			asprintf(msg, "Incorrect certificate hashes received.");
+			return NULL;
+		}
+	}
+
+	/* create the dummy session */
+	capabs = nc_cpblts_new(capabilities);
+	if ((dummy_session = nc_session_dummy("ctnsession", "root", NULL, capabs)) == NULL) {
+		asprintf(msg, "Could not create a dummy session.");
+		nc_cpblts_free(capabs);
+		return NULL;
+	}
+	nc_cpblts_free(capabs);
+
+	/* create a filter */
+	filter = nc_filter_new(NC_FILTER_SUBTREE, "<system><authentication><tls><cert-maps></cert-maps></tls></authentication></system>");
+
+	/* apply copy-config rpc on the datastore */
+	if ((rpc = nc_rpc_getconfig(NC_DATASTORE_RUNNING, filter)) == NULL) {
+		asprintf(msg, "Could not create get-config RPC.");
+		nc_session_free(dummy_session);
+		nc_filter_free(filter);
+		return NULL;
+	}
+	if ((reply = ncds_apply_rpc2all(dummy_session, rpc, NULL)) == NULL) {
+		asprintf(msg, "Get-config RPC failed.");
+		nc_filter_free(filter);
+		nc_rpc_free(rpc);
+		nc_session_free(dummy_session);
+		return NULL;
+	}
+	nc_filter_free(filter);
+	nc_rpc_free(rpc);
+	nc_session_free(dummy_session);
+
+	if (nc_reply_get_type(reply) != NC_REPLY_DATA) {
+		asprintf(msg, "Unexpected reply to RPC get-config.");
+		nc_reply_free(reply);
+		return NULL;
+	}
+	cert_maps_xml = nc_reply_get_data(reply);
+	nc_reply_free(reply);
+
+	if ((doc = xmlReadDoc(BAD_CAST cert_maps_xml, NULL, NULL, 0)) == NULL) {
+		asprintf(msg, "Failed to parse cert-maps.");
+		free(cert_maps_xml);
+		return NULL;
+	}
+	free(cert_maps_xml);
+
+	/* make ctn_list a list of <cert-to-name> */
+	if ((ctn_list = xmlDocGetRootElement(doc)) == NULL) {
+		asprintf(msg, "Empty/invalid config structure.");
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+	for (i = 0; i < 4; ++i) {
+		ctn_list = xmlFirstElementChild(ctn_list);
+		if (ctn_list == NULL) {
+			asprintf(msg, "Empty/invalid config structure.");
+			xmlFreeDoc(doc);
+			return NULL;
+		}
+	}
+
+	/* create ascending list of entries by their priority and parse them */
+	while (ctn_list != NULL) {
+		if (ctn_list->type == XML_ELEMENT_NODE) {
+			ctn_ptr_insert(&root, ctn_list);
+		}
+		ctn_list = ctn_list->next;
+	}
+
+	/* find a matching fingerprint */
+	item = root;
+	while (item != NULL) {
+		/* get the number of the algorithm */
+		i = (item->fingerprint)[1]-48;
+		--i;
+		if (strcmp(item->fingerprint, args[i]) == 0) {
+			/* we found our entry */
+			i = 6;
+			if (strcmp(item->map_type, "specified") == 0) {
+				username = strdup(item->name);
+
+			} else if (strcmp(item->map_type, "san-rfc822-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "EMAIL=", 6) == 0) {
+						username = strdup(args[i]+6);
+						break;
 					}
+					++i;
 				}
-				old_reply = reply = new_reply;
-			}
-		}
-		server_modules_free_list(destroy);
-		break;
-	default:
-		/* just apply */
-		old_reply = reply = ncds_apply_rpc2all(session, rpc, &ids);
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-rfc822-name\", but no email found in the cert.");
+				}
 
-		if (nc_rpc_get_type(rpc) == NC_RPC_DATASTORE_WRITE &&
-				nc_rpc_get_target(rpc) == NC_DATASTORE_RUNNING &&
-				nc_reply_get_type(reply) == NC_REPLY_OK) {
-			for (i = 0; ids[i] != ((ncds_id) -1); i++) {
-				if ((dm = server_modules_get_by_repoid(ids[i])) == NULL) {
-					VERBOSE(NC_VERB_VERBOSE, "Module with datastore ID %d not found.", ids[i]);
-				} else if (dm->transapi == 0 && dm->execute_operation) { /* old style module */
-					reply = dm->execute_operation(session, rpc);
-					reply = old_reply = nc_reply_merge(2, old_reply, reply);
+			} else if (strcmp(item->map_type, "san-dns-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "DNS=", 4) == 0) {
+						username = strdup(args[i]+4);
+						break;
+					}
+					++i;
 				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-dns-name\", but no DNS domain found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "san-ip-address") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "IP=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-ip-address\", but no IP found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "san-any") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "EMAIL=", 6) == 0) {
+						username = strdup(args[i]+6);
+						break;
+					} else if (strncmp(args[i], "DNS=", 4) == 0) {
+						username = strdup(args[i]+4);
+						break;
+					} else if (strncmp(args[i], "IP=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-any\", but no suitable subjectAltName value found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "common-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "CN=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"common-name\", but no common name found in the cert.");
+				}
+
+			} else {
+				if (*msg != NULL) {
+					free(*msg);
+				}
+				asprintf(msg, "Unknown matching algorithm.");
+				ctn_ptr_free(&root);
+				xmlFreeDoc(doc);
+				return NULL;
+			}
+
+			/* definite success */
+			if (username != NULL) {
+				if (*msg != NULL) {
+					free(*msg);
+					*msg = NULL;
+				}
+
+				/* convert username to lowercase according to the model */
+				if ((ptr = strchr(username, '@')) == NULL) {
+					/* DNS */
+					ptr = username;
+				} /* else EMAIL */
+
+				for (; *ptr != '\0'; ++ptr) {
+					*ptr = tolower(*ptr);
+				}
+				ctn_ptr_free(&root);
+				xmlFreeDoc(doc);
+				return username;
 			}
 		}
-		break;
+		item = item->next;
 	}
 
-	return reply;
+	if (*msg == NULL) {
+		asprintf(msg, "No matching fingerprint found in the cert-maps configuration.");
+	}
+	ctn_ptr_free(&root);
+	xmlFreeDoc(doc);
+	return NULL;
 }
 
-nc_reply * device_process_rpc (int dmid, const struct nc_session * session, const nc_rpc * rpc)
+#endif /* ENABLE_TLS */
+
+nc_reply * server_process_rpc(struct nc_session * session, const nc_rpc * rpc)
 {
-	struct server_module_list * list = calloc (1, sizeof (struct server_module_list));
-	nc_reply * reply, * dev_reply;
-	static const nc_rpc * last_rpc = NULL;
-	struct nc_err * err;
-
-	if (rpc == last_rpc) {
-		VERBOSE(NC_VERB_ERROR, "Potentialy infinite loop detected.");
-		err = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set (err, NC_ERR_PARAM_MSG, "Potentialy infinite loop detected.");
-		return nc_reply_error(err);
-	}
-	last_rpc = rpc;
-
-	list->dev = (struct server_module*)server_modules_get_by_dmid (dmid);
-
-	if (nc_rpc_get_op(rpc) != NC_OP_UNKNOWN) {
-		reply = ncds_apply_rpc(list->dev->repo_id, session, rpc);
-	}
-	if (nc_rpc_get_type(rpc) == NC_RPC_DATASTORE_WRITE && nc_rpc_get_target(rpc) == NC_DATASTORE_RUNNING) {
-		dev_reply = list->dev->execute_operation(session, rpc);
-		reply = nc_reply_merge(2, dev_reply, reply);
-	}
-
-	last_rpc = NULL;
-	free (list);
-	return reply;
+	return (ncds_apply_rpc2all(session, rpc, NULL));
 }
-
