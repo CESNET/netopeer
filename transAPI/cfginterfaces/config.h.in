@@ -7,6 +7,10 @@
 #define @AVAHI_DAEMON@
 #define @AVAHI_AUTOIPD@
 
+/* installed DHCP client (the command followed by the interface) */
+#define DHCP_CLIENT_RENEW "@DHCP_CLIENT_RENEW@"
+#define DHCP_CLIENT_RELEASE "@DHCP_CLIENT_RELEASE@"
+
 /* path to the device statistics file */
 #define DEV_STATS_PATH "/proc/net/dev"
 

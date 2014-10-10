@@ -204,7 +204,7 @@ int transapi_init(xmlDocPtr * running)
 {
 	int i, j;
 	unsigned int dev_count, ipv4_enabled;
-	xmlNodePtr root, interface, ip, addr, autoconf;
+	xmlNodePtr root, interface, ip, addr, autoconf, type;
 	xmlNsPtr ns, ipns;
 	char** devices, *msg = NULL, *tmp, *tmp2;
 	struct ip_addrs ips, neighs;
@@ -273,7 +273,6 @@ int transapi_init(xmlDocPtr * running)
 	root = xmlNewNode(NULL, BAD_CAST "interfaces");
 	ns = xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-interfaces", NULL);
 	xmlSetNs(root, ns);
-	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
 
 	xmlDocSetRootElement(*running, root);
 
@@ -290,7 +289,9 @@ int transapi_init(xmlDocPtr * running)
 		}
 		tmp = (char*)xmlBuildQName((xmlChar*)tmp2, BAD_CAST "ianaift", NULL, 0);
 		free(tmp2);
-		xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
+		type = xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
+		ns = xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
+		xmlNewProp(type, BAD_CAST "dummy", NULL)->ns = ns;
 		free(tmp);
 
 		if ((tmp = iface_get_enabled(devices[i], &msg)) == NULL) {
@@ -511,7 +512,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	int i, j;
 	unsigned int dev_count;
 	xmlDocPtr doc;
-	xmlNodePtr root, interface, ip, addr, stat_node;
+	xmlNodePtr root, interface, ip, addr, stat_node, type;
 	xmlNsPtr ns, ipns;
 	char** devices, *msg = NULL, *tmp, *tmp2;
 	struct device_stats stats;
@@ -546,7 +547,9 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		}
 		tmp = (char*)xmlBuildQName((xmlChar*)tmp2, BAD_CAST "ianaift", NULL, 0);
 		free(tmp2);
-		xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
+		type = xmlNewTextChild(interface, interface->ns, BAD_CAST "type", BAD_CAST tmp);
+		ns = xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
+		xmlNewProp(type, BAD_CAST "dummy", NULL)->ns = ns;
 		free(tmp);
 
 		if ((tmp = iface_get_operstatus(devices[i], &msg)) == NULL) {

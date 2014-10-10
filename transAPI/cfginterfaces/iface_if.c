@@ -190,14 +190,12 @@ static char* read_from_sys_net(const char* if_name, const char* variable) {
  * other variables are rewritten if found in the file
  */
 static int write_ifcfg_var(const char* if_name, const char* variable, const char* value) {
-#ifdef DEBIAN
-
-#else
+#if defined(REDHAT) || defined(SUSE)
 	int fd = -1, i;
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *tmp = NULL, *new_var = NULL;
 
-	asprintf(&path, "%s/%s%s", IFCFG_FILES_PATH, IFCFG_FILES_PREFIX, if_name);
+	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
 
 	if ((fd = open(path, O_RDWR)) == -1) {
 		goto fail;
@@ -233,7 +231,13 @@ static int write_ifcfg_var(const char* if_name, const char* variable, const char
 			ptr = strstr(content, new_var);
 		} while (ptr != NULL);
 	} else {
-		ptr = strstr(content, variable);
+		ptr = content;
+		while ((ptr = strstr(ptr, variable)) != NULL) {
+			if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+				break;
+			}
+			++ptr;
+		}
 	}
 
 	/* write the stuff before the variable, if any */
@@ -276,67 +280,102 @@ fail:
 	free(content);
 	free(tmp);
 	free(new_var);
-
 	return EXIT_FAILURE;
 #endif
 }
 
 static char* read_ifcfg_var(const char* if_name, const char* variable) {
-#ifdef DEBIAN
+#if defined(REDHAT) || defined(SUSE)
+	int fd = -1;
+	unsigned int size;
+	char* path, *ptr, *ptr2, *values = NULL, *content = NULL;
 
-#else
-	int ret;
-	char* path, *line = NULL, *ptr;
-	FILE* ifcfg;
-	size_t len = 0;
+	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
 
-	asprintf(&path, "%s/%s%s", IFCFG_FILES_PATH, IFCFG_FILES_PREFIX, if_name);
-
-	if ((ifcfg = fopen(path, "r")) == NULL) {
-		free(path);
-		return NULL;
-	}
-	free(path);
-
-	do {
-		ret = getline(&line, &len, ifcfg);
-	} while (ret != -1 && strncmp(line, variable, strlen(variable)) != 0);
-
-	fclose(ifcfg);
-
-	if (ret == -1) {
-		free(line);
-		return NULL;
+	if ((fd = open(path, O_RDONLY)) == -1) {
+		goto finish;
 	}
 
-	if ((ptr = strchr(line, '=')) == NULL) {
-		free(line);
-		return NULL;
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto finish;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto finish;
+	}
+
+	content = malloc((size+1)*sizeof(char));
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto finish;
+	}
+	close(fd);
+	fd = -1;
+	content[size] = '\0';
+
+	ptr = content;
+	while ((ptr = strstr(ptr, variable)) != NULL) {
+		if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+			break;
+		}
+		++ptr;
+	}
+	if (ptr == NULL) {
+		goto finish;
+	}
+
+	if ((ptr = strchr(ptr, '=')) == NULL) {
+		goto finish;
 	}
 	++ptr;
 	while (*ptr == ' ') {
 		++ptr;
 	}
-	if (ptr[strlen(ptr)-1] == '\n') {
-		ptr[strlen(ptr)-1] = '\0';
+
+	/* cut ptr at the end of all the values */
+	if (ptr[0] == '"') {
+		++ptr;
+		if (strchr(ptr, '"') == NULL) {
+			goto finish;
+		}
+		*strchr(ptr, '"') = '\0';
+	} else {
+		ptr2 = ptr;
+
+		while (strstr(ptr2, "\\\n") != NULL && (strchr(ptr2, '=') == NULL || strstr(ptr2, "\\\n") < strchr(ptr2, '='))) {
+			ptr2 = strstr(ptr2, "\\\n")+2;
+		}
+		if (strchr(ptr2, '\n') != NULL) {
+			*strchr(ptr2, '\n') = '\0';
+		}
 	}
 
-	ptr = strdup(ptr);
-	free(line);
-	return ptr;
+	values = malloc(strlen(ptr)*sizeof(char));
+	values[0] = '\0';
+	ptr2 = strtok(ptr, "\\\n");
+	while (ptr2 != NULL) {
+		strcat(values, ptr2);
+		ptr2 = strtok(NULL, "\\\n");
+	}
+
+finish:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(path);
+	free(content);
+	return values;
 #endif
 }
 
 /* variables ending with the "x" suffix are interpreted as a regexp "*" instead of the "x" */
-static int remove_ifcfg_var(const char* if_name, const char* variable, const char* value) {
-#ifdef DEBIAN
-
-#else
+static int remove_ifcfg_var(const char* if_name, const char* variable, const char* value, char** suffix) {
+#if defined(REDHAT) || defined(SUSE)
 	int fd = -1;
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *tmp = NULL, *new_var = NULL;
 
-	asprintf(&path, "%s/%s%s", IFCFG_FILES_PATH, IFCFG_FILES_PREFIX, if_name);
+	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
 
 	if ((fd = open(path, O_RDWR)) == -1) {
 		goto fail;
@@ -368,10 +407,14 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 			}
 		}
 	} else {
-		asprintf(&new_var, "%s=", variable);
-		ptr = content;
 		/* find the exact variable with the exact same value */
-		ptr = strstr(ptr, new_var);
+		ptr = content;
+		while ((ptr = strstr(ptr, variable)) != NULL) {
+			if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+				break;
+			}
+			++ptr;
+		}
 		if (ptr != NULL) {
 			if (strncmp(strchr(ptr, '=')+1, value, strlen(value)) != 0) {
 				ptr = NULL;
@@ -379,9 +422,13 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 		}
 	}
 
-	/* variable was not found */
 	if (ptr == NULL) {
+		/* variable was not found */
 		goto fail;
+	} else if (suffix != NULL) {
+		/* return the found suffix */
+		tmp = ptr+strlen(variable)-1;
+		*suffix = strndup(tmp, strchr(tmp, '=')-tmp);
 	}
 
 	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
@@ -422,6 +469,269 @@ fail:
 #endif
 }
 
+#ifdef REDHAT
+static int write_ifcfg_multival_var(const char* if_name, const char* variable, const char* value) {
+	int fd = -1;
+	unsigned int size;
+	char* path, *content = NULL, *ptr, *ptr2, *tmp = NULL;
+
+	if ((ptr = read_ifcfg_var(if_name, variable)) != NULL && strstr(ptr, value) != NULL) {
+		free(ptr);
+		return EXIT_SUCCESS;
+	}
+
+	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
+
+	if ((fd = open(path, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+10+strlen(value)+1+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	/* find the exact same variable */
+	ptr = content;
+	while ((ptr = strstr(ptr, variable)) != NULL) {
+		if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+			break;
+		}
+		++ptr;
+	}
+
+	/* write the stuff before the variable, if any */
+	if (ptr != NULL) {
+		if (write(fd, content, ptr-content) != ptr-content) {
+			goto fail;
+		}
+	}
+
+	/* write the variable and its new value */
+	if (ptr == NULL) {
+		asprintf(&tmp, "%s=%s\n", variable, value);
+		if (write(fd, tmp, strlen(tmp)) != strlen(tmp)) {
+			goto fail;
+		}
+		free(tmp);
+		tmp = NULL;
+		ptr = content;
+	/* add the value to the variable */
+	} else {
+		if (strchr(ptr, '=') == NULL) {
+			goto fail;
+		}
+		/* ptr:VARIABLE   =   values... */
+		if (write(fd, ptr, (strchr(ptr, '=')+1)-ptr) != (strchr(ptr, '=')+1)-ptr) {
+			goto fail;
+		}
+
+		ptr = strchr(ptr, '=')+1;
+		/* ptr:    values... */
+
+		while (*ptr == ' ') {
+			++ptr;
+		}
+		/* ptr:values... */
+
+		/* we need " for more values */
+		if (write(fd, "\"", 1) != 1) {
+			goto fail;
+		}
+
+		if (ptr[0] != '"') {
+			if (strchr(ptr, '\n') == NULL) {
+				tmp = strdup(ptr);
+				ptr += strlen(ptr);
+			} else {
+				tmp = strndup(ptr, strchr(ptr, '\n')-ptr);
+				ptr = strchr(ptr, '\n')+1;
+			}
+		} else {
+			++ptr;
+			if (strstr(ptr, "\"\n") == NULL) {
+				goto fail;
+			}
+			tmp = strndup(ptr, strstr(ptr, "\"\n")-ptr);
+			ptr = strstr(ptr, "\"\n")+2;
+		}
+
+		if (tmp[strlen(tmp)-1] == '"') {
+			tmp[strlen(tmp)-1] = '\0';
+		}
+
+		/* tmp has all the values */
+		ptr2 = strtok(tmp, " \\\n");
+		while (ptr2 != NULL) {
+			if (write(fd, ptr2, strlen(ptr2)) != strlen(ptr2)) {
+				goto fail;
+			}
+			if (write(fd, " \\\n", 3) != 3) {
+				goto fail;
+			}
+			ptr2 = strtok(NULL, " \\\n");
+		}
+
+		/* all the previous values are written now */
+		if (write(fd, value, strlen(value)) != strlen(value)) {
+			goto fail;
+		}
+		if (write(fd, "\"\n", 2) != 2) {
+			goto fail;
+		}
+
+	}
+
+	/* either write the remaining part of the old content or the whole previous content */
+	if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+		goto fail;
+	}
+
+	close(fd);
+	free(path);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(path);
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+
+static int remove_ifcfg_multival_var(const char* if_name, const char* variable, const char* value) {
+	int fd = -1;
+	unsigned int size;
+	char* path, *content = NULL, *ptr, *ptr2, *values = NULL;
+
+	if ((values = read_ifcfg_var(if_name, variable)) == NULL || strstr(values, value) == NULL) {
+		goto fail;
+	}
+
+	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
+	if ((fd = open(path, O_RDWR)) == -1) {
+		goto fail;
+	}
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+10+strlen(value)+1+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	/* find the exact same variable */
+	ptr = content;
+	while ((ptr = strstr(ptr, variable)) != NULL) {
+		if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+			break;
+		}
+		++ptr;
+	}
+	if (ptr == NULL) {
+		goto fail;
+	}
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	/* write the stuff before the variable */
+	if (write(fd, content, ptr-content) != ptr-content) {
+		goto fail;
+	}
+
+	/* make ptr point to the next variable */
+	ptr2 = strchr(ptr, '=')+1;
+	while (strstr(ptr2, "\\\n") != NULL && (strchr(ptr2, '=') == NULL || strstr(ptr2, "\\\n") < strchr(ptr2, '='))) {
+		ptr2 = strstr(ptr2, "\\\n")+2;
+	}
+	if (strchr(ptr2, '\n') != NULL) {
+		ptr = strchr(ptr2, '\n')+1;
+	} else {
+		ptr = ptr2+strlen(ptr2);
+	}
+
+	/* write the variable with the new content */
+	if (strcmp(values, value) != 0) {
+		if (write(fd, variable, strlen(variable)) != strlen(variable)) {
+			goto fail;
+		}
+		if (write(fd, "=\"", 2) != 2) {
+			goto fail;
+		}
+
+		ptr2 = strtok(values, " ");
+		while (ptr2 != NULL) {
+			if (write(fd, ptr2, strlen(ptr2)) != strlen(ptr2)) {
+				goto fail;
+			}
+
+			if ((ptr2 = strtok(NULL, " ")) != NULL) {
+				if (strcmp(ptr2, value) != 0) {
+					if (write(fd, " \\\n", 3) != 3) {
+						goto fail;
+					}
+				} else {
+					ptr2 = strtok(NULL, " ");
+				}
+			}
+		}
+
+		if (write(fd, "\"\n", 2) != 2) {
+			goto fail;
+		}
+	}
+
+	/* write the remaining part of the original content */
+	if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+		goto fail;
+	}
+
+	close(fd);
+	free(path);
+	free(content);
+	free(values);
+
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(path);
+	free(content);
+	free(values);
+
+	return EXIT_FAILURE;
+}
+#endif
+
 /*
  * cfginterfaces.h function definitions
  */
@@ -437,7 +747,7 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg) {
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
@@ -452,8 +762,14 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg) {
 	pclose(output);
 
 	/* permanent */
-	if (write_ifcfg_var(if_name, "STARTMODE", (boolean ? "auto" : "off")) != EXIT_SUCCESS) {
-		asprintf(msg, "Failed to write to ifcfg file of %s.", if_name);
+#ifdef REDHAT
+	if (write_ifcfg_var(if_name, "ONBOOT", (boolean ? "yes" : "no")) != EXIT_SUCCESS)
+#endif
+#ifdef SUSE
+	if (write_ifcfg_var(if_name, "STARTMODE", (boolean ? "auto" : "off")) != EXIT_SUCCESS)
+#endif
+	{
+		asprintf(msg, "%s: failed to write to ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
@@ -494,7 +810,7 @@ int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
 
 	/* permanent */
 	if (write_ifcfg_var(if_name, "MTU", str_mtu) != EXIT_SUCCESS) {
-		asprintf(msg, "Failed to write to the ifcfg file of %s.", if_name);
+		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
@@ -502,7 +818,10 @@ int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
 }
 
 int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
-	char* cmd, *line = NULL, *value;
+#ifdef REDHAT
+	char* suffix = NULL, str_prefix[4];
+#endif
+	char* cmd, *line = NULL, *value = NULL;
 	FILE* output;
 	size_t len = 0;
 
@@ -511,7 +830,7 @@ int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
@@ -526,22 +845,53 @@ int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 	pclose(output);
 
 	/* permanent */
+#ifdef REDHAT
+	if (op & XMLDIFF_ADD) {
+		if (write_ifcfg_var(if_name, "IPADDRx", ip) != EXIT_SUCCESS) {
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+		/* let's assume the suffix will be equal to that of IPADDR, should normally be */
+		sprintf(str_prefix, "%d", prefix);
+		if (write_ifcfg_var(if_name, "PREFIXx", str_prefix) != EXIT_SUCCESS) {
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+			free(value);
+			return EXIT_FAILURE;
+		}
+		free(value);
+	} else {
+		if (remove_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
+			free(suffix);
+			asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+		asprintf(&value, "PREFIX%s", suffix);
+		free(suffix);
+		if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
+			free(value);
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+	}
+#endif
+#ifdef SUSE
 	asprintf(&value, "%s/%d", ip, prefix);
 	if (op & XMLDIFF_ADD) {
 		if (write_ifcfg_var(if_name, "IPADDRx", value) != EXIT_SUCCESS) {
 			free(value);
-			asprintf(msg, "Failed to write to the ifcfg file of %s.", if_name);
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			return EXIT_FAILURE;
 		}
 	} else {
-		if (remove_ifcfg_var(if_name, "IPADDRx", value) != EXIT_SUCCESS) {
+		if (remove_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
 			free(value);
-			asprintf(msg, "Failed to remove an entry from the ifcfg file of %s.", if_name);
+			asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
 			return EXIT_FAILURE;
 		}
 	}
-	free(value);
+#endif
 
+	free(value);
 	return EXIT_SUCCESS;
 }
 
@@ -556,7 +906,7 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 	output = popen(cmd, "r");
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		goto fail;
 	}
 
@@ -567,7 +917,7 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 			output = popen(cmd, "r");
 
 			if (output == NULL) {
-				asprintf(msg, "Failed to execute command in %s.", __func__);
+				asprintf(msg, "%s: failed to execute a command.", __func__);
 				goto fail;
 			}
 
@@ -586,43 +936,53 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 	output = NULL;
 
 	/* permanent */
+
+#ifdef REDHAT
+	asprintf(&cmd, "if test \"$1\"=\"%s\"; then\n\tip neigh add %s lladdr %s dev %s\nfi\n", if_name, ip, mac, if_name);
+	asprintf(&path, "%s", IFCFG_SCRIPTS_PATH);
+#endif
+
+#ifdef SUSE
 	asprintf(&cmd, "ip neigh add %s lladdr %s dev %s\n", ip, mac, if_name);
 	asprintf(&path, "%s/ifup-%s-neigh", IFCFG_SCRIPTS_PATH, if_name);
+#endif
+
+	errno = 0;
+	if (stat(path, &st) == -1 && errno != ENOENT) {
+		asprintf(msg, "%s: failed to stat the script \"%s\": %s", __func__, path, strerror(errno));
+		goto fail;
+	}
 
 	if (op & XMLDIFF_ADD) {
+#ifdef SUSE
 		if (write_ifcfg_var(if_name, "POST_UP_SCRIPT", path) != EXIT_SUCCESS) {
-			asprintf(msg, "Failed to write to the ifcfg file of %s.", if_name);
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			goto fail;
 		}
-
-		if (stat(path, &st) == -1 && errno != ENOENT) {
-			asprintf(msg, "Failed to stat ifcfg neigh script of %s: %s", if_name, strerror(errno));
-			goto fail;
-		}
-
+#endif
 		/* opening/creating the script */
 		if (errno == ENOENT) {
-			if ((fd = open(path, O_WRONLY|O_CREAT|O_EXCL|00700)) == -1) {
-				asprintf(msg, "Failed to create \"%s\": %s", path, strerror(errno));
+			if ((fd = open(IFCFG_SCRIPTS_PATH, O_WRONLY|O_CREAT|O_EXCL|00700)) == -1) {
+				asprintf(msg, "%s: failed to create \"%s\": %s", __func__, path, strerror(errno));
 				goto fail;
 			}
 			if (write(fd, "#! /bin/bash\n", 13) != 13) {
-				asprintf(msg, "Failed to write to ifcfg script of %s: %s", if_name, strerror(errno));
+				asprintf(msg, "%s: failed to write to the script \"%s\": %s", __func__, path, strerror(errno));
 				goto fail;
 			}
 		} else {
 			if ((fd = open(path, O_RDWR)) == -1) {
-				asprintf(msg, "Failed to open \"%s\": %s", path, strerror(errno));
+				asprintf(msg, "%s: failed to open \"%s\": %s", __func__, path, strerror(errno));
 				goto fail;
 			}
 			content = malloc(st.st_size+1);
 			if (read(fd, content, st.st_size) != st.st_size) {
-				asprintf(msg, "Failed to read from \"%s\": %s", path, strerror(errno));
+				asprintf(msg, "%s: failed to read from \"%s\": %s", __func__, path, strerror(errno));
 				goto fail;
 			}
 			content[st.st_size] = '\0';
 			if (strstr(content, cmd) != NULL) {
-				asprintf(msg, "Duplicate neighbor entry of %s for neighbor %s - %s.", if_name, ip, mac);
+				asprintf(msg, "%s: duplicate neighbor entry of %s for neighbor %s - %s.", __func__, if_name, ip, mac);
 				goto fail;
 			}
 			free(content);
@@ -631,25 +991,21 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 
 		/* write new content */
 		if (write(fd, cmd, strlen(cmd)) != strlen(cmd)) {
-			asprintf(msg, "Failed to write a new neighbor to ifcfg script of %s: %s", if_name, strerror(errno));
+			asprintf(msg, "%s: failed to write a new neighbor to the script \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 	} else {
-		if (stat(path, &st) == -1) {
-			asprintf(msg, "Failed to stat ifcfg neigh script of %s: %s", if_name, strerror(errno));
-			goto fail;
-		}
 		if ((fd = open(path, O_RDWR)) == -1) {
-			asprintf(msg, "Failed to open \"%s\": %s", path, strerror(errno));
+			asprintf(msg, "%s: failed to open \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		content = malloc(st.st_size);
 		if (read(fd, content, st.st_size) != st.st_size) {
-			asprintf(msg, "Failed to read from \"%s\": %s", path, strerror(errno));
+			asprintf(msg, "%s: failed to read from \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		if ((ptr = strstr(content, cmd)) == NULL) {
-			asprintf(msg, "Missing neighbor entry to be deleted of %s for neighbor %s - %s.", if_name, ip, mac);
+			asprintf(msg, "%s: missing neighbor entry to be deleted of %s for neighbor %s - %s.", __func__, if_name, ip, mac);
 			goto fail;
 		}
 		/* removing the only entry */
@@ -657,21 +1013,21 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 			goto delete_script;
 		}
 		if (ftruncate(fd, 0) == -1) {
-			asprintf(msg, "Failed to truncate the file \"%s\": %s", path, strerror(errno));
+			asprintf(msg, "%s: failed to truncate the file \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		if (lseek(fd, 0, SEEK_SET) == -1) {
-			asprintf(msg, "Failed to rewinding the file \"%s\": %s", path, strerror(errno));
+			asprintf(msg, "%s: failed to rewinding the file \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		/* write the content before our entry */
 		if (write(fd, content, ptr-content) != ptr-content) {
-			asprintf(msg, "Failed to write to ifcfg script of %s: %s", if_name, strerror(errno));
+			asprintf(msg, "%s: failed to write to the script \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		/* write the content after our entry */
 		if (write(fd, ptr+strlen(cmd), strlen(ptr+strlen(cmd))) != strlen(ptr+strlen(cmd))) {
-			asprintf(msg, "Failed to write to ifcfg script of %s: %s", if_name, strerror(errno));
+			asprintf(msg, "%s: failed to write to the script \"%s\": %s", __func__, path, strerror(errno));
 			goto fail;
 		}
 		free(content);
@@ -693,13 +1049,17 @@ delete_script:
 	content = NULL;
 
 	if (unlink(path) == -1) {
-		asprintf(msg, "Failed to unlink \"%s\": %s", path, strerror(errno));
+		asprintf(msg, "%s: failed to unlink \"%s\": %s", __func__, path, strerror(errno));
 		goto fail;
 	}
-	if (remove_ifcfg_var(if_name, "POST_UP_SCRIPT", path) != EXIT_SUCCESS) {
-		asprintf(msg, "Failed to remove \"%s\" from the ifcfg file of %s.", "POST_UP_SCRIPT", if_name);
+#ifdef SUSE
+	if (remove_ifcfg_var(if_name, "POST_UP_SCRIPT", path, NULL) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to remove \"%s\" from the script \"%s\".", __func__, "POST_UP_SCRIPT", path);
 		goto fail;
 	}
+#endif
+
+	free(path);
 
 	return EXIT_SUCCESS;
 
@@ -727,12 +1087,12 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 
 	/* kill DHCP daemon and flush IPv4 addresses */
 	if (enabled == 0 || enabled == 2) {
-		asprintf(&cmd, "dhcpcd --release %s 2>&1", if_name);
+		asprintf(&cmd, DHCP_CLIENT_RELEASE " %s 2>&1", if_name);
 		output = popen(cmd, "r");
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -752,7 +1112,7 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -773,7 +1133,7 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -788,12 +1148,12 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 		line = NULL;
 		pclose(output);
 
-		asprintf(&cmd, "dhcpcd --renew %s 2>&1", if_name);
+		asprintf(&cmd, DHCP_CLIENT_RENEW " %s 2>&1", if_name);
 		output = popen(cmd, "r");
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -830,8 +1190,14 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 	}
 
 	/* permanent */
-	if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static")) != EXIT_SUCCESS) {
-		asprintf(msg, "Failed to write to the ifcfg file of %s.", if_name);
+#ifdef REDHAT
+	if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none")) != EXIT_SUCCESS)
+#endif
+#ifdef SUSE
+	if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static")) != EXIT_SUCCESS)
+#endif
+	{
+		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
@@ -863,16 +1229,107 @@ int iface_ipv6_mtu(const char* if_name, unsigned short mtu, char** msg) {
 	}
 
 	/* permanent */
+#ifdef REDHAT
+	if (write_ifcfg_var(if_name, "IPV6_MTU", str_mtu) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+#endif
+#ifdef SUSE
 	if (write_sysctl_proc_net(0, if_name, "mtu", str_mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
 
 int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
+#ifdef SUSE
 	return iface_ipv4_ip(if_name, ip, prefix, op, msg);
+#endif
+#ifdef REDHAT
+	char* cmd, *line = NULL, *value, *var;
+	FILE* output;
+	size_t len = 0;
+
+	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
+	output = popen(cmd, "r");
+	free(cmd);
+
+	if (output == NULL) {
+		asprintf(msg, "%s: failed to execute a command.", __func__);
+		return EXIT_FAILURE;
+	}
+
+	/* the IPs may not be actually set anymore, for instance on the whole "ipv6" node deletion */
+	if (getline(&line, &len, output) != -1 && op & XMLDIFF_ADD) {
+		asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+		free(line);
+		pclose(output);
+		return EXIT_FAILURE;
+	}
+	free(line);
+	pclose(output);
+
+	/* permanent */
+	asprintf(&value, "%s/%d", ip, prefix);
+	if (op & XMLDIFF_ADD) {
+		var = read_ifcfg_var(if_name, "IPV6ADDR");
+		if (var == NULL) {
+			/* no IPV6ADDR entry, add it */
+			if (write_ifcfg_var(if_name, "IPV6ADDR", value) != EXIT_SUCCESS) {
+				free(value);
+				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
+		} else if (strcmp(var, value) == 0) {
+			/* already there */
+			free(var);
+		} else {
+			free(var);
+			/* we have an IPV6ADDR entry, add it to secondaries */
+			if (write_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
+				free(value);
+				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
+		}
+	} else {
+		if (remove_ifcfg_var(if_name, "IPV6ADDR", value, NULL) == EXIT_SUCCESS) {
+			/* it was the primary address, make one of the secondaries into primary, if there are any */
+			if ((var = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES")) != NULL) {
+				if (strchr(var, ' ') != NULL) {
+					*strchr(var, ' ') = '\0';
+				}
+				if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", var) != EXIT_SUCCESS) {
+					free(var);
+					free(value);
+					asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+				if (write_ifcfg_var(if_name, "IPV6ADDR", var) != EXIT_SUCCESS) {
+					free(var);
+					free(value);
+					asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+				free(var);
+			}
+		} else {
+			/* it is not a primary address, so just delete it from the secondaries */
+			if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
+				free(value);
+				asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
+		}
+	}
+
+	free(value);
+	return EXIT_SUCCESS;
+#endif
 }
 
 int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg) {
@@ -913,7 +1370,7 @@ int iface_ipv6_creat_glob_addr(const char* if_name, unsigned char boolean, char*
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -929,10 +1386,18 @@ int iface_ipv6_creat_glob_addr(const char* if_name, unsigned char boolean, char*
 	}
 
 	/* permanent */
+#ifdef REDHAT
+	if (write_ifcfg_var(if_name, "IPV6_AUTOCONF", (boolean ? "yes" : "no")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+#endif
+#ifdef SUSE
 	if (write_sysctl_proc_net(0, if_name, "autoconf", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -954,7 +1419,7 @@ int iface_ipv6_creat_temp_addr(const char* if_name, unsigned char boolean, char*
 		free(cmd);
 
 		if (output == NULL) {
-			asprintf(msg, "Failed to execute command in %s.", __func__);
+			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
 
@@ -1019,10 +1484,18 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 	}
 
 	/* permanent */
+#ifdef REDHAT
+	if (write_ifcfg_var(if_name, "IPV6INIT", (boolean ? "yes" : "no")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+#endif
+#ifdef SUSE
 	if (write_sysctl_proc_net(0, if_name, "disable_ipv6", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1033,7 +1506,7 @@ char** iface_get_ifcs(unsigned int* dev_count, char** msg) {
 	char** ret = NULL;
 
 	if ((dir = opendir("/sys/class/net")) == NULL) {
-		asprintf(msg, "Failed to open \"/sys/class/net\" (%s).", strerror(errno));
+		asprintf(msg, "%s: failed to open \"/sys/class/net\" (%s).", __func__, strerror(errno));
 		return NULL;
 	}
 
@@ -1055,7 +1528,7 @@ char** iface_get_ifcs(unsigned int* dev_count, char** msg) {
 	closedir(dir);
 
 	if (ret == NULL) {
-		asprintf(msg, "No network interfaces detected.");
+		asprintf(msg, "%s: no network interfaces detected.", __func__);
 	}
 
 	return ret;
@@ -1066,7 +1539,7 @@ char* iface_get_type(const char* if_name, char** msg) {
 	int num;
 
 	if ((val = read_from_sys_net(if_name, "type")) == NULL) {
-		asprintf(msg, "Failed to read from \"/sys/class/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1121,7 +1594,7 @@ char* iface_get_operstatus(const char* if_name, char** msg) {
 	char* sysval;
 
 	if ((sysval = read_from_sys_net(if_name, "operstate")) == NULL) {
-		asprintf(msg, "Failed to read from \"/sys/class/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1147,7 +1620,7 @@ char* iface_get_lastchange(const char* if_name, char** msg) {
 	asprintf(&path, "/sys/class/net/%s/operstate", if_name);
 
 	if (stat(path, &st) == -1) {
-		asprintf(msg, "Stat on \"%s\" failed (%s).", path, strerror(errno));
+		asprintf(msg, "%s: stat on \"%s\" failed (%s).", __func__, path, strerror(errno));
 		free(path);
 		return NULL;
 	}
@@ -1160,7 +1633,7 @@ char* iface_get_hwaddr(const char* if_name, char** msg) {
 	char* ret;
 
 	if ((ret = read_from_sys_net(if_name, "address")) == NULL) {
-		asprintf(msg, "Failed to read from \"/sys/class/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1205,7 +1678,7 @@ int iface_get_stats(const char* if_name, struct device_stats* stats, char** msg)
 	int i;
 
 	if ((file = fopen(DEV_STATS_PATH, "r")) == NULL) {
-		asprintf(msg, "Unable to open \"%s\" (%s).", DEV_STATS_PATH, strerror(errno));
+		asprintf(msg, "%s: unable to open \"%s\" (%s).", __func__, DEV_STATS_PATH, strerror(errno));
 		return EXIT_FAILURE;
 	}
 
@@ -1305,7 +1778,7 @@ int iface_get_ipv4_presence(const char* if_name, char** msg) {
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
@@ -1324,6 +1797,16 @@ char* iface_get_ipv4_enabled(const char* if_name, char** msg) {
 	char* bootprot, *ret;
 
 	bootprot = read_ifcfg_var(if_name, "BOOTPROTO");
+
+#ifdef REDHAT
+	if (bootprot == NULL || strcmp(bootprot, "none") == 0) {
+		/* none seems to be the default */
+		ret = strdup("true");
+	} else {
+		ret = strdup("false");
+	}
+#endif
+#ifdef SUSE
 	if (bootprot == NULL || strcmp(bootprot, "static") == 0) {
 		/* static is the default */
 		ret = strdup("true");
@@ -1331,6 +1814,7 @@ char* iface_get_ipv4_enabled(const char* if_name, char** msg) {
 		/* all the others are definitely not static */
 		ret = strdup("false");
 	}
+#endif
 
 	free(bootprot);
 	return ret;
@@ -1340,7 +1824,7 @@ char* iface_get_ipv4_forwarding(const char* if_name, char** msg) {
 	char* procval, *ret;
 
 	if ((procval = read_from_proc_net(1, if_name, "forwarding")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1358,7 +1842,7 @@ char* iface_get_ipv4_mtu(const char* if_name, char** msg) {
 	char* ret;
 
 	if ((ret = read_from_sys_net(if_name, "mtu")) == NULL) {
-		asprintf(msg, "Failed to read from \"/sys/class/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1375,16 +1859,21 @@ int iface_get_ipv4_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
 	origin = read_ifcfg_var(if_name, "BOOTPROTO");
-	if (origin == NULL || strcmp(origin, "static") == 0) {
+#ifdef REDHAT
+	if (origin == NULL || strcmp(origin, "none") == 0)
+#endif
+#ifdef SUSE
+	if (origin == NULL || strcmp(origin, "static") == 0)
+#endif
+	{
 		/* static is the default */
 		free(origin);
 		origin = strdup("static");
-
 	} else if (strncmp(origin, "dhcp", 4) == 0) {
 		free(origin);
 		origin = strdup("dhcp");
@@ -1441,7 +1930,7 @@ int iface_get_ipv4_neighs(const char* if_name, struct ip_addrs* ips, struct ip_a
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
@@ -1490,7 +1979,7 @@ int iface_get_ipv6_presence(const char* if_name, char** msg) {
 	char* procval;
 
 	if ((procval = read_from_proc_net(0, if_name, "disable_ipv6")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return -1;
 	}
 
@@ -1508,7 +1997,7 @@ char* iface_get_ipv6_forwarding(const char* if_name, char** msg) {
 	char* procval, *ret;
 
 	if ((procval = read_from_proc_net(0, if_name, "forwarding")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1526,7 +2015,7 @@ char* iface_get_ipv6_mtu(const char* if_name, char** msg) {
 	char* ret;
 
 	if ((ret = read_from_proc_net(0, if_name, "mtu")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1543,16 +2032,21 @@ int iface_get_ipv6_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
 	origin = read_ifcfg_var(if_name, "BOOTPROTO");
-	if (origin == NULL || strcmp(origin, "static") == 0) {
+#ifdef REDHAT
+	if (origin == NULL || strcmp(origin, "none") == 0)
+#endif
+#ifdef SUSE
+	if (origin == NULL || strcmp(origin, "static") == 0)
+#endif
+	{
 		/* static is the default */
 		free(origin);
 		origin = strdup("static");
-
 	} else if (strncmp(origin, "dhcp", 4) == 0) {
 		free(origin);
 		origin = strdup("dhcp");
@@ -1625,7 +2119,7 @@ int iface_get_ipv6_neighs(const char* if_name, struct ip_addrs* ips, struct ip_a
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return EXIT_FAILURE;
 	}
 
@@ -1701,7 +2195,7 @@ char* iface_get_enabled(const char* if_name, char** msg) {
 	free(cmd);
 
 	if (output == NULL) {
-		asprintf(msg, "Failed to execute command in %s.", __func__);
+		asprintf(msg, "%s: failed to execute a command.", __func__);
 		return NULL;
 	}
 
@@ -1715,11 +2209,11 @@ char* iface_get_enabled(const char* if_name, char** msg) {
 		} else if (strcmp(ptr, "UNKNOWN") == 0 && strncmp(if_name, "lo", 2) == 0) {
 			ptr = strdup("true");
 		} else {
-			asprintf(msg, "Unknown interface %s state \"%s\".", if_name, ptr);
+			asprintf(msg, "%s: unknown interface %s state \"%s\".", __func__, if_name, ptr);
 			ptr = NULL;
 		}
 	} else {
-		asprintf(msg, "Could not retrieve interface %s state.", if_name);
+		asprintf(msg, "%s: could not retrieve interface %s state.", __func__, if_name);
 	}
 
 	free(line);
@@ -1731,7 +2225,7 @@ char* iface_get_ipv6_dup_addr_det(const char* if_name, char** msg) {
 	char *ret;
 
 	if ((ret = read_from_proc_net(0, if_name, "dad_transmits")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1742,7 +2236,7 @@ char* iface_get_ipv6_creat_glob_addr(const char* if_name, char** msg) {
 	char* glob_addr, *ret;
 
 	if ((glob_addr = read_from_proc_net(0, if_name, "autoconf")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1760,7 +2254,7 @@ char* iface_get_ipv6_creat_temp_addr(const char* if_name, char** msg) {
 	char* temp_addr, *ret;
 
 	if ((temp_addr = read_from_proc_net(0, if_name, "use_tempaddr")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1778,7 +2272,7 @@ char* iface_get_ipv6_temp_val_lft(const char* if_name, char** msg) {
 	char *ret;
 
 	if ((ret = read_from_proc_net(0, if_name, "temp_valid_lft")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
@@ -1789,7 +2283,7 @@ char* iface_get_ipv6_temp_pref_lft(const char* if_name, char** msg) {
 	char *ret;
 
 	if ((ret = read_from_proc_net(0, if_name, "temp_prefered_lft")) == NULL) {
-		asprintf(msg, "Failed to read from \"/proc/sys/net/...\".");
+		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 

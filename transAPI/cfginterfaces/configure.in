@@ -1,5 +1,5 @@
 AC_PREREQ([2.63])
-AC_INIT([cfginterfaces], [1.0], [BUG-REPORT-ADDRESS])
+AC_INIT([cfginterfaces], [1.0])
 AC_CONFIG_SRCDIR([cfginterfaces.c])
 
 PROJECTNAME=cfginterfaces
@@ -43,8 +43,19 @@ fi
 
 AC_CHECK_PROG([DHCPCD], [dhcpcd], [yes], [no])
 if test "$DHCPCD" = "no"; then
-	AC_MSG_ERROR([Missing the dhcpcd daemon.])
+	AC_CHECK_PROG([DHCLIENT], [dhclient], [yes], [no])
+	if test "$DHCLIENT" = "no"; then
+		AC_MSG_ERROR([Missing the dhcpcd daemon.])
+	else
+		DHCP_CLIENT_RENEW="dhclient"
+		DHCP_CLIENT_RELEASE="dhclient -r"
+	fi
+else
+	DHCP_CLIENT_RENEW="dhcpcd --renew"
+	DHCP_CLIENT_RELEASE="dhcpcd --release"
 fi
+AC_SUBST(DHCP_CLIENT_RENEW)
+AC_SUBST(DHCP_CLIENT_RELEASE)
 
 AC_CHECK_PROG([AVAHI_DAEMON], [avahi-daemon], [yes], [no])
 if test "$AVAHI_DAEMON" = "yes"; then
@@ -76,15 +87,15 @@ if test "$DISTRO" = "unknown"; then
 fi
 
 if test "$DISTRO" = "REDHAT"; then
-	IFCFG_FILES=/etc/sysconfig/network-scripts
-	IFCFG_SCRIPTS=/sbin/ifup-local
-	SYSCTL_CONF=/etc/sysctl.conf
+	IFCFG_FILES="/etc/sysconfig/network-scripts"
+	IFCFG_SCRIPTS="/sbin/ifup-local"
+	SYSCTL_CONF="/etc/sysctl.conf"
 elif test "$DISTRO" = "SUSE"; then
-	IFCFG_FILES=/etc/sysconfig/network
-	IFCFG_SCRIPTS=/etc/sysconfig/network/scripts
-	SYSCTL_CONF=/etc/sysctl.conf
+	IFCFG_FILES="/etc/sysconfig/network"
+	IFCFG_SCRIPTS="/etc/sysconfig/network/scripts"
+	SYSCTL_CONF="/etc/sysctl.conf"
 elif test "$DISTRO" = "DEBIAN"; then
-	IFCFG_FILES=/etc/network/interfaces
+	IFCFG_FILES="/etc/network/interfaces"
 	IFCFG_SCRIPTS=
 	SYSCTL_CONF=
 else

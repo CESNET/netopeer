@@ -46,9 +46,19 @@ intervals between separate reads of this node.
 Troubleshooting
 ---------------
 
-SUSE
+RedHat
 
-The nodes
+/interfaces/interface/ipv6/autoconf/create-temporary-addresses
+/interfaces/interface/ipv6/autoconf/temporary-valid-lifetime
+/interfaces/interface/ipv6/autoconf/temporary-preferred-lifetime
+
+These autoconf nodes (ipv6-privacy-autoconf feature) may not
+have any effect or disappear after reboot. To address this
+issue, add "IPV6_PRIVACY=rfc3041" line to every interface
+ifcfg file that should support it.
+
+
+SUSE
 
 /interfaces/interface/ipv4/forwarding
 /interfaces/interface/ipv6/enabled
@@ -56,9 +66,9 @@ The nodes
 /interfaces/interface/ipv6/mtu
 /interfaces/interface/ipv6/dup-addr-detect-transmits
 
-are set permanently by writing them into "/etc/sysctl.conf".
-On OpenSUSE, these settings may be overwritten during boot
-by SuSEfirewall2. If this happens, look into the config file
-"/etc/sysconfig/SuSEfirewall2" or simply run either
-"systemctl restart systemd-sysctl.service" or "sysctl -p"
-after each boot to re-apply these settings.
+These nodes are set permanently by writing them into
+"/etc/sysctl.conf". On OpenSUSE, these settings may be
+overwritten during boot by SuSEfirewall2. If this happens,
+look into the config file "/etc/sysconfig/SuSEfirewall2" or
+simply run either "systemctl restart systemd-sysctl.service"
+or "sysctl -p" after each boot to re-apply these settings.
