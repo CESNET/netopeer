@@ -1517,7 +1517,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 
 		/* check if the device is managed by ifup/down scripts */
 		if (only_managed) {
-			asprintf(&path, "%s/%s", IFCFG_FILES_PATH, dent->d_name);
+			asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, dent->d_name);
 			if (access(path, F_OK) == -1 && errno == ENOENT) {
 				free(path);
 				continue;
