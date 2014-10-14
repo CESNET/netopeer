@@ -373,7 +373,7 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 #if defined(REDHAT) || defined(SUSE)
 	int fd = -1;
 	unsigned int size;
-	char* path, *content = NULL, *ptr, *tmp = NULL, *new_var = NULL;
+	char* path, *content = NULL, *ptr, *ptr2, *new_var = NULL;
 
 	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
 
@@ -427,8 +427,8 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 		goto fail;
 	} else if (suffix != NULL) {
 		/* return the found suffix */
-		tmp = ptr+strlen(variable)-1;
-		*suffix = strndup(tmp, strchr(tmp, '=')-tmp);
+		ptr2 = ptr+strlen(variable)-1;
+		*suffix = strndup(ptr2, strchr(ptr2, '=')-ptr2);
 	}
 
 	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
@@ -451,7 +451,6 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 	close(fd);
 	free(path);
 	free(content);
-	free(tmp);
 	free(new_var);
 
 	return EXIT_SUCCESS;
@@ -462,7 +461,6 @@ fail:
 	}
 	free(path);
 	free(content);
-	free(tmp);
 	free(new_var);
 
 	return EXIT_FAILURE;
