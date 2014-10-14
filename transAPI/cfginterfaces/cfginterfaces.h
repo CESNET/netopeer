@@ -52,7 +52,7 @@ int iface_ipv6_temp_pref_lft(const char* if_name, unsigned int temp_pref_lft, ch
 int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg);
 
 /* state */
-char** iface_get_ifcs(unsigned int* dev_count, char** msg);
+char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char** msg);
 
 char* iface_get_type(const char* if_name, char** msg);
 char* iface_get_operstatus(const char* if_name, char** msg);

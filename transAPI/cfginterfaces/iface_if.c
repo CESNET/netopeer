@@ -1500,10 +1500,10 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-char** iface_get_ifcs(unsigned int* dev_count, char** msg) {
+char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char** msg) {
 	DIR* dir;
 	struct dirent* dent;
-	char** ret = NULL;
+	char** ret = NULL, *path;
 
 	if ((dir = opendir("/sys/class/net")) == NULL) {
 		asprintf(msg, "%s: failed to open \"/sys/class/net\" (%s).", __func__, strerror(errno));
@@ -1513,6 +1513,16 @@ char** iface_get_ifcs(unsigned int* dev_count, char** msg) {
 	while ((dent = readdir(dir))) {
 		if (strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0) {
 			continue;
+		}
+
+		/* check if the device is managed by ifup/down scripts */
+		if (only_managed) {
+			asprintf(&path, "%s/%s", IFCFG_FILES_PATH, dent->d_name);
+			if (access(path, F_OK) == -1 && errno == ENOENT) {
+				free(path);
+				continue;
+			}
+			free(path);
 		}
 
 		/* add a device */

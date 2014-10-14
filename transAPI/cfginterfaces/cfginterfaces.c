@@ -217,7 +217,7 @@ int transapi_init(xmlDocPtr * running)
 	ips.count = 0;
 	neighs.count = 0;
 
-	devices = iface_get_ifcs(&dev_count, &msg);
+	devices = iface_get_ifcs(1, &dev_count, &msg);
 	if (devices == NULL) {
 		return finish(msg, EXIT_FAILURE, NULL);
 	}
@@ -520,7 +520,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	ips.count = 0;
 	neighs.count = 0;
 
-	devices = iface_get_ifcs(&dev_count, &msg);
+	devices = iface_get_ifcs(0, &dev_count, &msg);
 	if (devices == NULL) {
 		finish(msg, 0, err);
 		return NULL;
