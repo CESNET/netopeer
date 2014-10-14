@@ -350,7 +350,7 @@ static char* read_ifcfg_var(const char* if_name, const char* variable) {
 		}
 	}
 
-	values = malloc(strlen(ptr)*sizeof(char));
+	values = malloc((strlen(ptr)+1)*sizeof(char));
 	values[0] = '\0';
 	ptr2 = strtok(ptr, "\\\n");
 	while (ptr2 != NULL) {
