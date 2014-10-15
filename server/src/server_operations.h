@@ -80,6 +80,20 @@ struct module {
 	struct module *prev, *next;
 };
 
+#ifdef ENABLE_TLS
+
+/**
+ * @brief Perform the cert-to-name procedure
+ *
+ * @param[in] args Hashes and any relevant cert information array terminated by NULL
+ * @param[out] msg Error message in case of an error
+ *
+ * @return Resolved NETCONF username, NULL on error
+ */
+char* server_cert_to_name(const char** args, char** msg);
+
+#endif /* ENABLE_TLS */
+
 /**
  * @brief Free all session info structures.
  */

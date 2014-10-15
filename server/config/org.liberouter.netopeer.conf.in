@@ -4,13 +4,13 @@
 <busconfig>
 
   <!-- Only user root can own the service -->
-  <policy user="@USER@">
+  <policy user="root">
     <allow own="org.liberouter.netopeer.server"/>
   </policy>
 
   <!-- Allow group users to invoke methods -->
   <!-- Change this if you want to be more restrictive -->
-  <policy group="@GROUP@">
+  <policy @DBUSPOLICY@>
     <allow send_destination="org.liberouter.netopeer.server"/>
     <allow receive_sender="org.liberouter.netopeer.server"/>
   </policy>

@@ -62,16 +62,30 @@ struct pollfd agents[AGENTS_QUEUE + 1];
 static int connected_agents = 0;
 static struct sockaddr_un server;
 
-conn_t* comm_init()
+conn_t* comm_init(int crashed)
 {
 	int i, flags;
 	mode_t mask;
-	uid_t uid;
-	struct passwd *pwd;
+#ifdef COMM_SOCKET_GROUP
 	struct group *grp;
+#endif
 
 	if (sock != -1) {
 		return (&sock);
+	}
+
+	/* check another instance of the netopeer-server */
+	if (access(COMM_SOCKET_PATH, F_OK) == 0) {
+		if (crashed) {
+			if (unlink(COMM_SOCKET_PATH) != 0) {
+				nc_verb_error("Failed to remove leftover netopeer-server socket, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
+				return (NULL);
+			}
+		} else {
+			nc_verb_error("Communication socket \'%s\' already exists.", COMM_SOCKET_PATH);
+			nc_verb_error("Another instance of the netopeer-server is running. If not, please remove \'%s\' file manually.", COMM_SOCKET_PATH);
+			return (NULL);
+		}
 	}
 
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -83,9 +97,10 @@ conn_t* comm_init()
 	flags = fcntl(sock, F_GETFL, 0);
 	fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
+	/* prepare structure */
+	memset(&server, 0, sizeof(struct sockaddr_un));
 	server.sun_family = AF_UNIX;
 	strncpy(server.sun_path, COMM_SOCKET_PATH, sizeof(server.sun_path) - 1);
-	unlink(server.sun_path);
 
 	/* set socket permission using umask */
 	mask = umask(~COMM_SOCKET_PERM);
@@ -96,17 +111,7 @@ conn_t* comm_init()
 	}
 	umask(mask);
 
-	/* check owner and set group to apply permissions */
-	pwd = getpwnam(COMM_SOCKET_OWNER);
-	if (pwd == NULL) {
-		nc_verb_error("Setting communication socket permissions failed (getpwnam(): %s).", strerror(errno));
-		goto error_cleanup;
-	}
-	if ((uid = geteuid()) != 0 && uid != pwd->pw_uid) {
-		nc_verb_error("Insufficient permission to run netopeer-server, only \'%s\' is allowed to run it.", COMM_SOCKET_OWNER);
-		goto error_cleanup;
-	}
-
+#ifdef COMM_SOCKET_GROUP
 	grp = getgrnam(COMM_SOCKET_GROUP);
 	if (grp == NULL) {
 		nc_verb_error("Setting communication socket permissions failed (getgrnam(): %s).", strerror(errno));
@@ -114,11 +119,9 @@ conn_t* comm_init()
 	}
 	if (chown(server.sun_path, -1, grp->gr_gid) == -1) {
 		nc_verb_error("Setting communication socket permissions failed (fchown(): %s).", strerror(errno));
-		if (errno == EPERM) {
-			nc_verb_error("Check that user \'%s\' is memeber of the greoup \'%s\'.", COMM_SOCKET_OWNER, COMM_SOCKET_GROUP);
-		}
 		goto error_cleanup;
 	}
+#endif
 
 	/* start listening */
 	if (listen(sock, AGENTS_QUEUE) == -1) {
@@ -197,8 +200,16 @@ static void set_new_session(int socket)
 	cpblts_list[cpblts_count] = NULL;
 	for (i = 0; i < cpblts_count; i++) {
 		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-		cpblts_list[i] = malloc(sizeof(char) * len);
-		recv(socket, cpblts_list[i], len, COMM_SOCKET_SEND_FLAGS);
+		if ((cpblts_list[i] = recv_msg(socket, len, NULL)) == NULL) {
+			/* something went wrong */
+			for(i--; i >= 0; i--) {
+				free(cpblts_list[i]);
+			}
+			free(cpblts_list);
+			result = COMM_SOCKET_RESULT_ERROR;
+			send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+			return;
+		}
 	}
 	cpblts = nc_cpblts_new((const char* const*)cpblts_list);
 
@@ -243,46 +254,40 @@ static void close_session(int socket)
 	nc_verb_verbose("Agent %s removed.", id);
 }
 
-static void kill_session (int socket)
+static void kill_session(int socket)
 {
 	struct session_info *session, *sender_session;
-	struct nc_err* err;
+	struct nc_err* err = NULL;
 	char *session_id = NULL, *aux_string = NULL;
-	unsigned int len;
+	size_t len = 0;
 	char id[6];
 	nc_reply *reply;
 	msgtype_t result;
 
-	/* session ID*/
+	/* session ID */
 	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	session_id = malloc(sizeof(char) * len);
-	recv(socket, session_id, len, COMM_SOCKET_SEND_FLAGS);
-
-
-	if ((session = (struct session_info *)server_sessions_get_by_agentid(session_id)) == NULL) {
-		nc_verb_error("Requested session to kill (%s) is not available.", session_id);
-		err = nc_err_new (NC_ERR_OP_FAILED);
-		if (asprintf (&aux_string, "Internal server error (Requested session (%s) is not available)", session_id) > 0) {
-			nc_err_set (err, NC_ERR_PARAM_MSG, aux_string);
-			free (aux_string);
-		}
+	session_id = recv_msg(socket, len, &err);
+	if (err != NULL) {
 		reply = nc_reply_error(err);
 		goto send_reply;
 	}
 
-	/* check if the request does not relate to the current session */
-	snprintf(id, sizeof(id), "%d", socket);
-	sender_session = (struct session_info *)srv_get_session(id);
-	if (sender_session != NULL) {
-		if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
-			nc_verb_verbose("Request to kill own session.");
-			err = nc_err_new (NC_ERR_INVALID_VALUE);
-			reply = nc_reply_error (err);
-			goto send_reply;
+	if ((session = (struct session_info *)server_sessions_get_by_ncid(session_id)) == NULL) {
+		/* break locks using dummy session */
+		ncds_break_locks(NULL);
+	} else {
+		/* check if the request does not relate to the current session */
+		snprintf(id, sizeof(id), "%d", socket);
+		if ((sender_session = (struct session_info *)srv_get_session(id)) != NULL) {
+			if (strcmp (nc_session_get_id ((const struct nc_session*)(sender_session->session)), session_id) == 0) {
+				nc_verb_verbose("Requesting to kill own session.");
+				err = nc_err_new (NC_ERR_INVALID_VALUE);
+				reply = nc_reply_error (err);
+				goto send_reply;
+			}
 		}
+		server_sessions_kill(session);
 	}
-
-	server_sessions_kill(session);
 	reply = nc_reply_ok();
 
 send_reply:
@@ -290,7 +295,7 @@ send_reply:
 	nc_reply_free (reply);
 
 	/* send reply */
-	result = COMM_SOCKET_OP_CLOSE_SESSION;
+	result = COMM_SOCKET_OP_KILL_SESSION;
 	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 
 	len = strlen(aux_string) + 1;
@@ -298,13 +303,69 @@ send_reply:
 	send(socket, aux_string, len, COMM_SOCKET_SEND_FLAGS);
 
 	/* cleanup */
-	free (aux_string);
+	free(aux_string);
+	free(session_id);
 }
+
+#ifdef ENABLE_TLS
+
+static void cert_to_name (int socket)
+{
+	int i, count, boolean;
+	unsigned int len;
+	char** strs, *msg = NULL, *username, *tosend;
+	msgtype_t result;
+
+	/* number of strings */
+	recv(socket, &count, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	strs = calloc(count+1, sizeof(char*));
+
+	/* receive each string */
+	for (i = 0; i < count; ++i) {
+		recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+		strs[i] = malloc(len*sizeof(char));
+		recv(socket, strs[i], len*sizeof(char), COMM_SOCKET_SEND_FLAGS);
+	}
+
+	/* cert-to-name */
+	username = server_cert_to_name((const char**)strs, &msg);
+
+	for (i = 0; i < count; ++i) {
+		free(strs[i]);
+	}
+	free(strs);
+
+	if (username == NULL) {
+		tosend = msg;
+		boolean = 0;
+	} else {
+		tosend = username;
+		boolean = 1;
+	}
+
+	/* send reply */
+	result = COMM_SOCKET_OP_CERT_TO_NAME;
+	send(socket, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
+
+	/* send boolean */
+	send(socket, &boolean, sizeof(int), COMM_SOCKET_SEND_FLAGS);
+
+	/* send message/username */
+	len = strlen(tosend) + 1;
+	send(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
+	send(socket, tosend, len, COMM_SOCKET_SEND_FLAGS);
+
+	/* cleanup */
+	free(tosend);
+}
+
+#endif
 
 static void process_operation (int socket)
 {
 	struct session_info *session;
-	struct nc_err* err;
+	struct nc_err* err = NULL;
 	char *msg_dump = NULL;
 	unsigned int len;
 	char id[6];
@@ -314,8 +375,11 @@ static void process_operation (int socket)
 
 	/* RPC dump */
 	recv(socket, &len, sizeof(unsigned int), COMM_SOCKET_SEND_FLAGS);
-	msg_dump = malloc(sizeof(char) * len);
-	recv(socket, msg_dump, len, COMM_SOCKET_SEND_FLAGS);
+	msg_dump = recv_msg(socket, len, &err);
+	if (err != NULL) {
+		reply = nc_reply_error(err);
+		goto send_reply;
+	}
 
 	snprintf(id, sizeof(id), "%d", socket);
 	if ((session = (struct session_info *)server_sessions_get_by_agentid(id)) == NULL) {
@@ -421,11 +485,16 @@ poll_restart:
 				case COMM_SOCKET_OP_KILL_SESSION:
 					kill_session(agents[i].fd);
 					break;
+#ifdef ENABLE_TLS
+				case COMM_SOCKET_OP_CERT_TO_NAME:
+					cert_to_name(agents[i].fd);
+					break;
+#endif
 				case COMM_SOCKET_OP_GENERIC:
 					process_operation(agents[i].fd);
 					break;
 				default:
-					nc_verb_warning("Unsupported DBus message type received.");
+					nc_verb_warning("Unsupported UNIX socket message type received.");
 					result = COMM_SOCKET_RESULT_ERROR;
 					send(agents[i].fd, &result, sizeof(result), COMM_SOCKET_SEND_FLAGS);
 				}

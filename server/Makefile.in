@@ -43,26 +43,32 @@ exec_prefix = @exec_prefix@
 datarootdir = @datarootdir@
 datadir = @datadir@
 bindir = @bindir@
+BINDIR = $(shell eval echo $(bindir))
 includedir = @includedir@
 libdir =  @libdir@
 mandir = @mandir@
 sysconfdir = @sysconfdir@
 dbusconfdir = @DBUSCONF@
 dbusservices = @DBUSSERVICES@
+modulesdir = @MODULESDIR@
 
 TOPDIR = @CONFIGURE_PWD@
+#if you edit this path, edit also configurator/config.py.in path
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer
 CC = @CC@
-DOXYGEN = @DOXYGEN@
-DOXYGEN_CONFIG = Doxyfile
-DOXYGEN_DIR = doxygen
 RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
+<<<<<<< HEAD
 INSTALL_DATA = @INSTALL@ -m 600
 ifeq ($(shell id -u $(USER)),0)
   INSTALL_OWNER = -o @USER@ -g @GROUP@
 endif
+=======
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_DATA_PRIVATE = @INSTALL@ -m 600
+
+>>>>>>> master
 RPMDIR = RPMBUILD
 
 AGENT = netopeer-agent
@@ -84,16 +90,34 @@ SERVER_SRCS =  src/server.c \
 SERVER_HDRS = src/comm.h \
 	src/server_operations.h \
 	@SERVER_HDRS_COMM@
+SERVER_MODULES_CONF = config/Netopeer.xml \
+	config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
+<<<<<<< HEAD
 OPENWRT_MODULES = ietf-system
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 DEFINE = -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
+=======
+COMMON_SRCS = src/common.c
+
+MANAGER_SRCS = manager/netopeer-manager.in
+
+CONFIGURATOR_SRCS = configurator/setup.py \
+	configurator/netopeer-configurator \
+	configurator/netopeer/*.py \
+	configurator/netopeer/*.py.in
+
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
+>>>>>>> master
 
 OBJDIR= .obj
-SUBDIRS = manager
+TOOLS = manager/netopeer-manager
+PYTOOLS = configurator/netopeer-configurator
 
 CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/netopeer-cfgnetopeer-data.rng \
@@ -104,13 +128,18 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/ietf-netconf-server-data.rng \
 	config/ietf-netconf-server-gdefs.rng \
 	config/ietf-netconf-server-schematron.xsl
-	
+
 CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \
 	config/NETCONF-server.xml.in \
 	config/org.liberouter.netopeer.conf.in \
-	config/org.liberouter.netopeer.server.service.in
+	config/org.liberouter.netopeer.server.service.in \
+	config/Netopeer.xml.in \
+	stunnel/stunnel.conf.in
 
+H_IN = src/config.h.in
+
+<<<<<<< HEAD
 all: $(AGENT) $(SERVER) submakes
 
 .PHONY: submakes
@@ -123,8 +152,54 @@ submakes:
 	for i in $(OPENWRT_MODULES); do \
 		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
 	done
+=======
+MANPAGES = manager/netopeer-manager.1 \
+	netopeer-server.8 \
+	netopeer-agent.1 \
+	configurator/netopeer-configurator.1
 
-$(SERVER): $(SERVER_OBJS)
+MANHTMLS = $(MANPAGES:%=%.html)
+>>>>>>> master
+
+MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
+define MANINSTALL
+[ -d $(call MANPATH,$(1)) ] || \
+	(mkdir -p $(call MANPATH,$(1)); \
+	chmod 755 $(call MANPATH,$(1))); \
+$(INSTALL_DATA) $(1) $(call MANPATH,$(1))/;
+endef
+
+define PYINSTALL
+cd $(dir $(1)); \
+python setup.py install; \
+cd -;
+endef
+
+# Expand ${prefix} in $(1) file and store it as $(2) file
+define EXPAND
+sed -e 's|$${prefix}|$(prefix)|g' $(1) > $(2);
+endef
+
+all: $(AGENT) $(SERVER) $(TOOLS)
+
+$(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
+	$(call EXPAND,$(@:%=%.tmp),$@)
+
+%.1.html: %.1
+	@if [ "@ROFF2HTML@" = "no" ]; then \
+		echo "Missing roff2html"; \
+	else \
+		@ROFF2HTML@ $< > $@; \
+	fi
+
+%.8.html: %.8
+	@if [ "@ROFF2HTML@" = "no" ]; then \
+		echo "Missing roff2html"; \
+	else \
+		@ROFF2HTML@ $< > $@; \
+	fi
+
+$(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(SERVER_OBJS) $(SERVER_LIBS) -o $@;
 
@@ -132,6 +207,7 @@ $(AGENT): $(AGENT_OBJS)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
+<<<<<<< HEAD
 src/openwrt/%.so: $(OBJDIR)/src/openwrt/%.o
 	@rm -f $@
 	$(CC) -shared $< $(LIBS) -Wl,-soname -Wl,$@ -o $@;
@@ -140,33 +216,33 @@ $(OBJDIR)/%.o: %.c
 	@[ -d $$(dirname $@) ] || \
 		(mkdir -p $$(dirname $@))
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -c $< -o $@
+=======
+manager/netopeer-manager: manager/netopeer-manager.tmp
+	$(call EXPAND,$<,$@)
+	chmod +x $@
+
+$(OBJDIR)/%.o: %.c
+	@[ -d $(dir $@) ] || \
+		(mkdir -p $(dir $@))
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
+>>>>>>> master
 
 .PHONY: clean
 clean:
-	for i in $(SUBDIRS) ; do $(MAKE) -C $$i clean ; done
-	rm -rf $(AGENT) $(SERVER) $(OBJDIR) doxygen/
+	rm -rf $(AGENT) $(SERVER) $(TOOLS) $(OBJDIR)
 
 .PHONY: doc
-doc: $(DOXYGEN_CONFIG)
-	@if [ -n "$(DOXYGEN)" ]; then \
-		(cat $(DOXYGEN_CONFIG); \
-		echo 'OUTPUT_DIRECTORY = $(DOXYGEN_DIR)' ) | \
-		$(DOXYGEN) - > /dev/null 2>&1; \
-	else \
-		echo "Missing doxygen"; \
-		exit 1; \
-	fi
+doc: $(MANHTMLS)
 
 .PHONY: dist
 dist: $(NAME).spec tarball rpm
 
 .PHONY: tarball
-tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS)
+tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(MANHTMLS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
-	@for i in $(SUBDIRS) ; do $(MAKE) -C $$i tarball-prepare; done; \
-	for i in $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) configure.in configure \
-	    Makefile.in VERSION Doxyfile $(NAME).spec.in netopeer.rc.in install-sh; do \
+	@for i in $(SERVER_SRCS) $(AGENT_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) $(H_IN) configure.in configure \
+	    Makefile.in VERSION $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) $(MANHTMLS) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \
 	done;
@@ -190,39 +266,32 @@ distclean:
 	rm -rf $(RPMDIR)
 
 .PHONY: install
-install: $(SERVER) $(AGENT) $(CFGS)
+install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
-	for i in $(SUBDIRS) ; do \
-		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C $$i install \
-		|| exit 1; \
-	done
+	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
+	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool)))
 	if test -n "$(dbusconfdir)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
 	fi
 	if test -n "$(dbusservices)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
+		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
 	fi
-	if test -f config/Netopeer.xml; then \
-		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/Netopeer.xml $(CFGDIR)/modules.conf.d/; \
-	fi
-	if test -f config/NETCONF-server.xml; then \
-		$(INSTALL) -d $(CFGDIR)/modules.conf.d/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/NETCONF-server.xml $(CFGDIR)/modules.conf.d/; \
-	fi
+	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
+	for i in $(SERVER_MODULES_CONF); do \
+		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
+	done
 	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
 	for i in $(CFGS); do \
-		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/cfgnetopeer/; \
+		$(INSTALL_DATA_PRIVATE) $$i $(CFGDIR)/cfgnetopeer/; \
 	done
 	touch $(CFGDIR)/cfgnetopeer/datastore.xml
 	touch $(CFGDIR)/cfgnetopeer/datastore-server.xml
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	$(INSTALL) -d $(CFGDIR)/modules.conf.d/;
 	@if test ! -f $(CFGDIR)/sshd_config; then \
 		if test -f /etc/ssh/sshd_config; then \
 			grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
@@ -234,21 +303,31 @@ install: $(SERVER) $(AGENT) $(CFGS)
 		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
 	fi
 	chmod 600 $(CFGDIR)/sshd_config;
-	if test -n "$(INSTALL_OWNER)"; then \
-		chown @USER@ $(CFGDIR)/sshd_config; \
-	fi
 	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
 	@if test -n "@TLS@"; then \
-		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); print}' config/stunnel_config.in > config/stunnel_config; \
+		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); sub(/{BINDIR}/, "'$(BINDIR)'"); sub(/{AGENT}/, "'$(AGENT)'"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) config/stunnel_config $(CFGDIR)/; \
+		$(INSTALL_DATA_PRIVATE) config/stunnel_config $(CFGDIR)/; \
 		rm -rf config/stunnel_config; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/server.* $(CFGDIR)/stunnel; \
-		$(INSTALL_DATA) $(INSTALL_OWNER) stunnel/rootCA.* $(CFGDIR)/stunnel; \
-		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF SSH server configuration."; \
+		$(INSTALL_DATA_PRIVATE) stunnel/server.* $(CFGDIR)/stunnel; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/certs; \
+		$(INSTALL) -d $(CFGDIR)/stunnel/crl; \
+		$(INSTALL_DATA_PRIVATE) stunnel/ca_rootCA.pem $(CFGDIR)/stunnel/certs; \
+		c_rehash $(CFGDIR)/stunnel/certs; \
+		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF TLS server configuration."; \
 	fi
+	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
+	if test -n "$(MANHTMLS)"; then \
+		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
+			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
+	fi
+<<<<<<< HEAD
 	for i in $(OPENWRT_MODULES); do \
 		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
 		|| exit 1; \
 	done
+=======
+	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
+
+>>>>>>> master
 

@@ -50,7 +50,9 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sendfile.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <time.h>
 
 #ifndef DISABLE_NOTIFICATIONS
@@ -59,7 +61,11 @@
 
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
-#include <libnetconf_tls.h>
+#ifdef ENABLE_TLS
+#	include <openssl/pem.h>
+#	include <openssl/x509v3.h>
+#	include <libnetconf_tls.h>
+#endif
 
 #include "commands.h"
 #include "configuration.h"
@@ -105,6 +111,10 @@ COMMAND commands[] = {
 #ifndef DISABLE_NOTIFICATIONS
 		{"subscribe", cmd_subscribe, "NETCONF Event Notifications <create-subscription> operation"},
 #endif
+#ifdef ENABLE_TLS
+		{"cert", cmd_cert, "Manage trusted or your own certificates"},
+		{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
+#endif
 		{"status", cmd_status, "Print information about the current NETCONF session"},
 		{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
 		{"verbose", cmd_verbose, "Enable/disable verbose messages"},
@@ -117,11 +127,27 @@ COMMAND commands[] = {
 		{NULL, NULL, NULL}
 };
 
+char* cert_commands[] = {
+		"display",
+		"add",
+		"remove",
+		"displayown",
+		"replaceown",
+		NULL
+};
+
+char* crl_commands[] = {
+		"display",
+		"add",
+		"remove",
+		NULL
+};
+
 typedef enum GENERIC_OPS {
 	GO_COMMIT,
 	GO_DISCARD_CHANGES
 } GENERIC_OPS;
-int cmd_generic_op(GENERIC_OPS op, char *arg);
+int cmd_generic_op(GENERIC_OPS op, const char *arg);
 
 struct arglist {
 	char **list;
@@ -229,7 +255,7 @@ void addargs (struct arglist *args, char *format, ...)
 	free(aux1);
 }
 
-int cmd_status (char* UNUSED(arg))
+int cmd_status (const char* UNUSED(arg))
 {
 	const char *s;
 	struct nc_cpblts* cpblts;
@@ -532,7 +558,7 @@ void cmd_editconfig_help()
 	fprintf (stdout, "\nIf neither --config nor --url is specified, user is prompted to set edit data manually.\n");
 }
 
-int cmd_editconfig (char *arg)
+int cmd_editconfig (const char *arg)
 {
 	int c;
 	char *config_m = NULL, *config = NULL;
@@ -741,7 +767,7 @@ void cmd_validate_help ()
 			ds_url = "";
 		}
 	}
-	fprintf (stdout, "validate [--help] [--config <file> | running%s%s%s]\n",
+	fprintf (stdout, "validate [--help] --config [<file>] | running%s%s%s\n",
 			ds_startup, ds_candidate, ds_url);
 
 	if (session != NULL &&
@@ -750,7 +776,7 @@ void cmd_validate_help ()
 	}
 }
 
-int cmd_validate (char *arg)
+int cmd_validate (const char *arg)
 {
 	int c;
 	int config_fd;
@@ -777,7 +803,7 @@ int cmd_validate (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "c:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "c::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'c':
 			if (optarg == NULL) {
@@ -890,7 +916,7 @@ void cmd_copyconfig_help ()
 			ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_copyconfig (char *arg)
+int cmd_copyconfig (const char *arg)
 {
 	int c;
 	int config_fd;
@@ -1025,7 +1051,11 @@ int cmd_copyconfig (char *arg)
 	}
 
 	/* create requests */
-	rpc = nc_rpc_copyconfig (source, target, config, url_dst);
+	if (config != NULL) {
+		rpc = nc_rpc_copyconfig(source, target, config, url_dst);
+	} else {
+		rpc = nc_rpc_copyconfig(source, target, url_dst);
+	}
 	nc_filter_free(filter);
 	free(config);
 	free(url_dst);
@@ -1053,11 +1083,11 @@ void cmd_get_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get [--help] %s[--filter[=file]]\n", defaults);
+	fprintf (stdout, "get [--help] %s[--filter [file]]\n", defaults);
 }
 
 
-int cmd_get (char *arg)
+int cmd_get (const char *arg)
 {
 	int c;
 	struct nc_filter *filter = NULL;
@@ -1083,7 +1113,7 @@ int cmd_get (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -1171,7 +1201,7 @@ void cmd_deleteconfig_help ()
 	fprintf (stdout, "delete-config [--help]  %s%s%s\n", ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_deleteconfig (char *arg)
+int cmd_deleteconfig (const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1245,7 +1275,7 @@ void cmd_killsession_help ()
 	fprintf (stdout, "kill-session [--help] <sessionID>\n");
 }
 
-int cmd_killsession (char *arg)
+int cmd_killsession (const char *arg)
 {
 	int c;
 	char *id;
@@ -1329,7 +1359,7 @@ void cmd_capability_help (void)
 	fprintf (stdout, "capability {--help|--add <uri>|--rem {<uri>|*}|--list|--default\n");
 }
 
-int cmd_capability (char * arg)
+int cmd_capability (const char * arg)
 {
 	struct arglist cmd;
 	int c = -1;
@@ -1424,7 +1454,7 @@ void cmd_getconfig_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get-config [--help] %s[--filter[=file]] running", defaults);
+	fprintf (stdout, "get-config [--help] %s[--filter [file]] running", defaults);
 	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
 		fprintf (stdout, "|startup");
 	}
@@ -1434,7 +1464,7 @@ void cmd_getconfig_help ()
 	fprintf (stdout, "\n");
 }
 
-int cmd_getconfig (char *arg)
+int cmd_getconfig (const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1461,7 +1491,7 @@ int cmd_getconfig (char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -1519,7 +1549,7 @@ void cmd_getschema_help ()
 	fprintf (stdout, "get-schema [--help] [--version <version>] [--format <format>] <identifier>\n");
 }
 
-int cmd_getschema (char *arg)
+int cmd_getschema (const char *arg)
 {
 	int c;
 	char *format = NULL, *version = NULL, *identifier = NULL;
@@ -1619,7 +1649,7 @@ void cmd_un_lock_help (char* operation)
 
 #define LOCK_OP 1
 #define UNLOCK_OP 2
-int cmd_un_lock (int op, char *arg)
+int cmd_un_lock (int op, const char *arg)
 {
 	int c;
 	NC_DATASTORE target;
@@ -1697,28 +1727,658 @@ int cmd_un_lock (int op, char *arg)
 	return (send_recv_process(operation, rpc));
 }
 
-int cmd_lock (char *arg)
+int cmd_lock (const char *arg)
 {
 	return cmd_un_lock (LOCK_OP, arg);
 }
 
-int cmd_unlock (char *arg)
+int cmd_unlock (const char *arg)
 {
 	return cmd_un_lock (UNLOCK_OP, arg);
 }
 
+#ifdef ENABLE_TLS
+int cp(const char* to, const char* from) {
+	int fd_to, fd_from;
+	struct stat st;
+	ssize_t from_len;
+	int saved_errno;
+
+	fd_from = open(from, O_RDONLY);
+	if (fd_from < 0) {
+		return -1;
+	}
+
+	fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd_to < 0) {
+		goto out_error;
+	}
+
+	if (fstat(fd_from, &st) < 0) {
+		goto out_error;
+	}
+
+	from_len = st.st_size;
+
+	if (sendfile(fd_to, fd_from, NULL, from_len) < from_len) {
+		goto out_error;
+	}
+	return 0;
+
+out_error:
+	saved_errno = errno;
+
+	close(fd_from);
+	if (fd_to >= 0)
+		close(fd_to);
+
+	errno = saved_errno;
+	return -1;
+}
+
+void parse_cert(const char* name, const char* path) {
+	int i, j, has_san, first_san;
+	ASN1_OCTET_STRING *ip;
+	ASN1_INTEGER *bs;
+	BIO *bio_out;
+	FILE *fp;
+	X509 *cert;
+	STACK_OF(GENERAL_NAME) *san_names = NULL;
+	GENERAL_NAME *san_name;
+
+	fp = fopen(path, "r");
+	if (fp == NULL) {
+		ERROR("parse_cert", "Unable to open: %s", path);
+		return;
+	}
+	cert = PEM_read_X509(fp, NULL, NULL, NULL);
+	if (cert == NULL) {
+		ERROR("parse_cert", "Unable to parse certificate: %s", path);
+		fclose(fp);
+		return;
+	}
+
+	bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
+
+	bs = X509_get_serialNumber(cert);
+	BIO_printf(bio_out, "-----%s----- serial: ", name);
+	for (i = 0; i < bs->length; i++) {
+		BIO_printf(bio_out, "%02x", bs->data[i]);
+	}
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Subject: ");
+	X509_NAME_print(bio_out, X509_get_subject_name(cert), 0);
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Issuer:  ");
+	X509_NAME_print(bio_out, X509_get_issuer_name(cert), 0);
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Valid until: ");
+	ASN1_TIME_print(bio_out, X509_get_notAfter(cert));
+	BIO_printf(bio_out, "\n");
+
+	has_san = 0;
+	first_san = 1;
+	san_names = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+	if (san_names != NULL) {
+		for (i = 0; i < sk_GENERAL_NAME_num(san_names); ++i) {
+			san_name = sk_GENERAL_NAME_value(san_names, i);
+			if (san_name->type == GEN_EMAIL || san_name->type == GEN_DNS || san_name->type == GEN_IPADD) {
+				if (!has_san) {
+					BIO_printf(bio_out, "X509v3 Subject Alternative Name:\n\t");
+					has_san = 1;
+				}
+				if (!first_san) {
+					BIO_printf(bio_out, ", ");
+				}
+				if (first_san) {
+					first_san = 0;
+				}
+				if (san_name->type == GEN_EMAIL) {
+					BIO_printf(bio_out, "RFC822:%s", (char*) ASN1_STRING_data(san_name->d.rfc822Name));
+				}
+				if (san_name->type == GEN_DNS) {
+					BIO_printf(bio_out, "DNS:%s", (char*) ASN1_STRING_data(san_name->d.dNSName));
+				}
+				if (san_name->type == GEN_IPADD) {
+					BIO_printf(bio_out, "IP:");
+					ip = san_name->d.iPAddress;
+					if (ip->length == 4) {
+						BIO_printf(bio_out, "%d.%d.%d.%d", ip->data[0], ip->data[1], ip->data[2], ip->data[3]);
+					} else if (ip->length == 16) {
+						for (j = 0; j < ip->length; ++j) {
+							if (j > 0 && j < 15 && j%2 == 1) {
+								BIO_printf(bio_out, "%02x:", ip->data[j]);
+							} else {
+								BIO_printf(bio_out, "%02x", ip->data[j]);
+							}
+						}
+					}
+				}
+			}
+		}
+		sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+	}
+	if (has_san) {
+		BIO_printf(bio_out, "\n");
+	}
+	BIO_printf(bio_out, "\n");
+
+	X509_free(cert);
+	BIO_vfree(bio_out);
+	fclose(fp);
+}
+
+void cmd_cert_help ()
+{
+	fprintf (stdout, "cert [--help | display | add <cert_path> | remove <cert_name> | displayown | replaceown (<cert_path.pem> | <cert_path.crt> <key_path.key>)]\n");
+}
+
+int cmd_cert (const char* arg)
+{
+	int ret;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *path, *path2, *dest;
+	char* trusted_dir, *netconf_dir, *c_rehash_cmd;
+	DIR* dir = NULL;
+	struct dirent *d;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_cert_help();
+
+	} else if (strcmp(cmd, "display") == 0) {
+		int none = 1;
+		char* name;
+
+		if ((trusted_dir = get_default_trustedCA_dir(NULL)) == NULL) {
+			ERROR("cert display", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		dir = opendir(trusted_dir);
+		while ((d = readdir(dir)) != NULL) {
+			if (strcmp(d->d_name+strlen(d->d_name)-4, ".pem") == 0) {
+				none = 0;
+				name = strdup(d->d_name);
+				name[strlen(name)-4] = '\0';
+				asprintf(&path, "%s/%s", trusted_dir, d->d_name);
+				parse_cert(name, path);
+				free(name);
+				free(path);
+			}
+		}
+		closedir(dir);
+		if (none) {
+			fprintf(stdout, "No certificates found in the default trusted CA directory.\n");
+		}
+		free(trusted_dir);
+
+	} else if (strcmp(cmd, "add") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("cert add", "Missing or wrong path to the certificate");
+			return (EXIT_FAILURE);
+		}
+		if (eaccess(path, R_OK) != 0) {
+			ERROR("cert add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		trusted_dir = get_default_trustedCA_dir(NULL);
+		if (trusted_dir == NULL) {
+			ERROR("cert add", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s", trusted_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
+			ERROR("cert add", "Memory allocation failed");
+			free(trusted_dir);
+			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+
+		if (strcmp(dest+strlen(dest)-4, ".pem") != 0) {
+			ERROR("cert add", "CA certificates are expected to be in *.pem format");
+			strcpy(dest+strlen(dest)-4, ".pem");
+		}
+
+		if (cp(dest, path) != 0) {
+			ERROR("cert add", "Could not copy the certificate: %s", strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("cert add", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "remove") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL) {
+			ERROR("cert remove", "Missing the certificate name");
+			return (EXIT_FAILURE);
+		}
+
+		// delete ".pem" if the user unnecessarily included it
+		if (strlen(path) > 4 && strcmp(path+strlen(path)-4, ".pem") == 0) {
+			path[strlen(path)-4] = '\0';
+		}
+
+		trusted_dir = get_default_trustedCA_dir(NULL);
+		if (trusted_dir == NULL) {
+			ERROR("cert remove", "Could not get the default trusted CA directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s.pem", trusted_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
+			ERROR("cert remove", "Memory allocation failed");
+			free(trusted_dir);
+			return (EXIT_FAILURE);
+		}
+		free(trusted_dir);
+
+		if (remove(dest) != 0) {
+			ERROR("cert remove", "Cannot remove certificate \"%s\": %s (use the name from \"cert display\" output)", path, strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("cert remove", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "displayown") == 0) {
+		int crt = 0, key = 0, pem = 0;
+
+		netconf_dir = get_netconf_dir();
+		if (netconf_dir == NULL) {
+			ERROR("cert displayown", "Could not get the client home directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/client.pem", netconf_dir) == -1) {
+			ERROR("cert displayown", "Memory allocation failed");
+			free(netconf_dir);
+			return (EXIT_FAILURE);
+		}
+		free(netconf_dir);
+		if (eaccess(dest, R_OK) == 0) {
+			pem = 1;
+		}
+
+		strcpy(dest+strlen(dest)-4, ".key");
+		if (eaccess(dest, R_OK) == 0) {
+			key = 1;
+		}
+
+		strcpy(dest+strlen(dest)-4, ".crt");
+		if (eaccess(dest, R_OK) == 0) {
+			crt = 1;
+		}
+
+		if (!crt && !key && !pem) {
+			fprintf(stdout, "FAIL: No client certificate found, use \"cert replaceown\" to set some.\n");
+		} else if (crt && !key && !pem) {
+			fprintf(stdout, "FAIL: Client *.crt certificate found, but is of no use without its private key *.key.\n");
+		} else if (!crt && key && !pem) {
+			fprintf(stdout, "FAIL: Private key *.key found, but is of no use without a certificate.\n");
+		} else if (!crt && !key && pem) {
+			fprintf(stdout, "OK: Using *.pem client certificate with the included private key.\n");
+		} else if (crt && key && !pem) {
+			fprintf(stdout, "OK: Using *.crt certificate with a separate private key.\n");
+		} else if (crt && !key && pem) {
+			fprintf(stdout, "WORKING: Using *.pem client certificate with the included private key (leftover certificate *.crt detected).\n");
+		} else if (!crt && key && pem) {
+			fprintf(stdout, "WORKING: Using *.pem client certificate with the included private key (leftover private key detected).\n");
+		} else if (crt && key && pem) {
+			fprintf(stdout, "WORKING: Using *.crt certificate with a separate private key (lower-priority *.pem certificate with a private key detected).\n");
+		}
+
+		if (crt) {
+			parse_cert("CRT", dest);
+		}
+		if (pem) {
+			strcpy(dest+strlen(dest)-4, ".pem");
+			parse_cert("PEM", dest);
+		}
+		free(dest);
+
+	} else if (strcmp(cmd, "replaceown") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("cert replaceown", "Missing the certificate or invalid path.");
+			return (EXIT_FAILURE);
+		}
+		if (eaccess(path, R_OK) != 0) {
+			ERROR("cert replaceown", "Cannot access the certificate \"%s\": %s", path, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		path2 = strtok_r(NULL, " ", &ptr);
+		if (path2 != NULL) {
+			if (strlen(path2) < 5) {
+				ERROR("cert replaceown", "Invalid private key path.");
+				return (EXIT_FAILURE);
+			}
+			if (eaccess(path2, R_OK) != 0) {
+				ERROR("cert replaceown", "Cannot access the private key \"%s\": %s", path2, strerror(errno));
+				return (EXIT_FAILURE);
+			}
+		}
+
+		netconf_dir = get_netconf_dir();
+		if (netconf_dir == NULL) {
+			ERROR("cert replaceown", "Could not get the client home directory");
+			return (EXIT_FAILURE);
+		}
+		if (asprintf(&dest, "%s/client.XXX", netconf_dir) == -1) {
+			ERROR("cert replaceown", "Memory allocation failed");
+			free(netconf_dir);
+			return (EXIT_FAILURE);
+		}
+		free(netconf_dir);
+
+		if (path2 != NULL) {
+			/* CRT & KEY */
+			strcpy(dest+strlen(dest)-4, ".pem");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old certificate (*.pem)");
+			}
+
+			strcpy(dest+strlen(dest)-4, ".crt");
+			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+			strcpy(dest+strlen(dest)-4, ".key");
+			if (cp(dest, path2) != 0) {
+				ERROR("cert replaceown", "Could not copy the private key \"%s\": %s", path, strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+		} else {
+			/* PEM */
+			strcpy(dest+strlen(dest)-4, ".key");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old private key");
+			}
+			strcpy(dest+strlen(dest)-4, ".crt");
+			if (remove(dest) != 0 && errno == EACCES) {
+				ERROR("cert replaceown", "Could not remove old certificate (*.crt)");
+			}
+
+			strcpy(dest+strlen(dest)-4, ".pem");
+			if (cp(dest, path) != 0) {
+				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
+				free(dest);
+				return (EXIT_FAILURE);
+			}
+		}
+
+		free(dest);
+
+	} else {
+		ERROR("cert", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+void parse_crl(const char* name, const char* path) {
+	int i;
+	BIO *bio_out;
+	FILE *fp;
+	X509_CRL *crl;
+	ASN1_INTEGER* bs;
+	X509_REVOKED* rev;
+
+	fp = fopen(path, "r");
+	if (fp == NULL) {
+		ERROR("parse_crl", "Unable to open \"%s\": %s", path, strerror(errno));
+		return;
+	}
+	crl = PEM_read_X509_CRL(fp, NULL, NULL, NULL);
+	if (crl == NULL) {
+		ERROR("parse_crl", "Unable to parse certificate: %s", path);
+		fclose(fp);
+		return;
+	}
+
+	bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
+
+	BIO_printf(bio_out, "-----%s-----\n", name);
+
+	BIO_printf(bio_out, "Issuer: ");
+	X509_NAME_print(bio_out, X509_CRL_get_issuer(crl), 0);
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Last update: ");
+	ASN1_TIME_print(bio_out, X509_CRL_get_lastUpdate(crl));
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "Next update: ");
+	ASN1_TIME_print(bio_out, X509_CRL_get_nextUpdate(crl));
+	BIO_printf(bio_out, "\n");
+
+	BIO_printf(bio_out, "REVOKED:\n");
+
+	if ((rev = sk_X509_REVOKED_pop(X509_CRL_get_REVOKED(crl))) == NULL) {
+		BIO_printf(bio_out, "\tNone\n");
+	}
+	while (rev != NULL) {
+		bs = rev->serialNumber;
+		BIO_printf(bio_out, "\tSerial no.: ");
+		for (i = 0; i < bs->length; i++) {
+			BIO_printf(bio_out, "%02x", bs->data[i]);
+		}
+		BIO_printf(bio_out, "  Date: ");
+
+		ASN1_TIME_print(bio_out, rev->revocationDate);
+		BIO_printf(bio_out, "\n");
+
+		X509_REVOKED_free(rev);
+		rev = sk_X509_REVOKED_pop(X509_CRL_get_REVOKED(crl));
+	}
+
+	X509_CRL_free(crl);
+	BIO_vfree(bio_out);
+	fclose(fp);
+}
+
+void cmd_crl_help() {
+	fprintf (stdout, "crl [--help | display | add <crl_path> | remove <crl_name>]\n");
+}
+
+int cmd_crl (const char* arg) {
+	int ret;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *path, *dest;
+	char* crl_dir, *c_rehash_cmd;
+	DIR* dir = NULL;
+	struct dirent *d;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_crl_help();
+
+	} else if (strcmp(cmd, "display") == 0) {
+		int none = 1;
+		char* name;
+
+		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
+			ERROR("crl display", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		dir = opendir(crl_dir);
+		while ((d = readdir(dir)) != NULL) {
+			if (strcmp(d->d_name+strlen(d->d_name)-4, ".pem") == 0) {
+				none = 0;
+				name = strdup(d->d_name);
+				name[strlen(name)-4] = '\0';
+				asprintf(&path, "%s/%s", crl_dir, d->d_name);
+				parse_crl(name, path);
+				free(name);
+				free(path);
+			}
+		}
+		closedir(dir);
+		if (none) {
+			fprintf(stdout, "No CRLs found in the default CRL directory.\n");
+		}
+		free(crl_dir);
+
+	} else if (strcmp(cmd, "add") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL || strlen(path) < 5) {
+			ERROR("crl add", "Missing or wrong path to the certificate");
+			return (EXIT_FAILURE);
+		}
+		if (eaccess(path, R_OK) != 0) {
+			ERROR("crl add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		crl_dir = get_default_CRL_dir(NULL);
+		if (crl_dir == NULL) {
+			ERROR("crl add", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s", crl_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
+			ERROR("crl add", "Memory allocation failed");
+			free(crl_dir);
+			return (EXIT_FAILURE);
+		}
+		free(crl_dir);
+
+		if (strcmp(dest+strlen(dest)-4, ".pem") != 0) {
+			ERROR("crl add", "CRLs are expected to be in *.pem format");
+			strcpy(dest+strlen(dest)-4, ".pem");
+		}
+
+		if (cp(dest, path) != 0) {
+			ERROR("crl add", "Could not copy the CRL \"%s\": %s", path, strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("crl add", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else if (strcmp(cmd, "remove") == 0) {
+		path = strtok_r(NULL, " ", &ptr);
+		if (path == NULL) {
+			ERROR("crl remove", "Missing the certificate name");
+			return (EXIT_FAILURE);
+		}
+
+		// delete ".pem" if the user unnecessarily included it
+		if (strlen(path) > 4 && strcmp(path+strlen(path)-4, ".pem") == 0) {
+			path[strlen(path)-4] = '\0';
+		}
+
+		crl_dir = get_default_CRL_dir(NULL);
+		if (crl_dir == NULL) {
+			ERROR("crl remove", "Could not get the default CRL directory");
+			return (EXIT_FAILURE);
+		}
+
+		if (asprintf(&dest, "%s/%s.pem", crl_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
+			ERROR("crl remove", "Memory allocation failed");
+			free(crl_dir);
+			return (EXIT_FAILURE);
+		}
+		free(crl_dir);
+
+		if (remove(dest) != 0) {
+			ERROR("crl remove", "Cannot remove CRL \"%s\": %s (use the name from \"crl display\" output)", path, strerror(errno));
+			free(dest);
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+		free(dest);
+
+		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
+			ERROR("crl remove", "c_rehash execution failed");
+			free(c_rehash_cmd);
+			return (EXIT_FAILURE);
+		}
+
+		free(c_rehash_cmd);
+
+	} else {
+		ERROR("crl", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+#endif
+
+void cmd_connect_help ()
+{
+#ifdef ENABLE_TLS
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>] host\n");
+#else
+	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] host\n");
+#endif
+}
+
 void cmd_listen_help ()
 {
-	fprintf (stdout, "listen [--help] [--tls <cert_path> [--key <key_path>]] [--port <num>] [--login <username>]\n");
+#ifdef ENABLE_TLS
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>]\n");
+#else
+	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+#endif
 }
+
+#define DEFAULT_PORT_SSH 830
+#define DEFAULT_PORT_TLS 6513
 
 #define DEFAULT_PORT_CH_SSH 6666
 #define DEFAULT_PORT_CH_TLS 6667
 #define ACCEPT_TIMEOUT 60000 /* 1 minute */
-int cmd_listen (char* arg)
+
+static int cmd_connect_listen (const char* arg, int is_connect)
 {
-	static int listening = 0;
-	char *user = NULL, *cert = NULL, *key = NULL;
+	char* func_name = (is_connect ? strdupa("connect") : strdupa("listen"));
+	static unsigned short listening = 0;
+	char *host = NULL, *user = NULL;
+#ifdef ENABLE_TLS
+	DIR* dir = NULL;
+	struct dirent* d;
+	int usetls = 0, n;
+	char *cert = NULL, *key = NULL, *trusted_dir = NULL, *crl_dir = NULL, *trusted_store = NULL;
+#endif
+	int hostfree = 0;
 	unsigned short port = 0;
 	int c;
 	int timeout = ACCEPT_TIMEOUT;
@@ -1727,8 +2387,12 @@ int cmd_listen (char* arg)
 			{"help", 0, 0, 'h'},
 			{"port", 1, 0, 'p'},
 			{"login", 1, 0, 'l'},
-			{"tls", 1, 0, 't'},
+#ifdef ENABLE_TLS
+			{"tls", 0, 0, 't'},
+			{"cert", 1, 0, 'c'},
 			{"key", 1, 0, 'k'},
+			{"trusted", 1, 0, 's'},
+#endif
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1737,7 +2401,7 @@ int cmd_listen (char* arg)
 	optind = 0;
 
 	if (session != NULL) {
-		ERROR("listen", "already connected to %s.", nc_session_get_host (session));
+		ERROR(func_name, "already connected to %s.", nc_session_get_host (session));
 		return (EXIT_FAILURE);
 	}
 
@@ -1748,190 +2412,225 @@ int cmd_listen (char* arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
+#ifdef ENABLE_TLS
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
+#else
+	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
+#endif
+	{
 		switch (c) {
 		case 'h':
-			cmd_listen_help ();
+			if (is_connect) {
+				cmd_connect_help();
+			} else {
+				cmd_listen_help();
+			}
 			clear_arglist(&cmd);
 			return (EXIT_SUCCESS);
 			break;
 		case 'p':
 			port = (unsigned short) atoi (optarg);
-			break;
-		case 'k':
-			key = optarg;
+			if (!is_connect && listening != 0 && listening != port) {
+				nc_callhome_listen_stop();
+				listening = 0;
+			}
 			break;
 		case 'l':
 			user = optarg;
 			break;
+#ifdef ENABLE_TLS
 		case 't':
 			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
 				if (port == 0) {
-					port = DEFAULT_PORT_CH_TLS;
+					port = (is_connect ? DEFAULT_PORT_TLS : DEFAULT_PORT_CH_TLS);
 				}
+				usetls = 1;
 			}
-			cert = optarg;
 			break;
+		case 'c':
+			asprintf(&cert, "%s", optarg);
+			break;
+		case 'k':
+			asprintf(&key, "%s", optarg);
+			break;
+		case 's':
+			trusted_store = optarg;
+			break;
+#endif
 		default:
-			ERROR("listen", "unknown option -%c.", c);
-			cmd_listen_help ();
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			ERROR(func_name, "unknown option -%c.", c);
+			if (is_connect) {
+				cmd_connect_help();
+			} else {
+				cmd_listen_help();
+			}
+			goto error_cleanup;
 		}
 	}
 	if (port == 0) {
-		port = DEFAULT_PORT_CH_SSH;
+		port = (is_connect ? DEFAULT_PORT_SSH : DEFAULT_PORT_CH_SSH);
 	}
-	if (cert) {
-		if (nc_tls_init(cert, key, "/var/lib/libnetconf/certs/TrustStore.pem", NULL) != EXIT_SUCCESS) {
-			ERROR("listen", "Initiating TLS failed.");
-			return (EXIT_FAILURE);
+#ifdef ENABLE_TLS
+	if (usetls) {
+		/* use the default TLS user if not specified by user
+		 * (it does not have any effect except for seeing it
+		 * in status command as the session user) */
+		if (user == NULL) {
+			user = strdupa("certificate-based");
 		}
-	}
 
-	/* create the session */
-	if (!listening) {
-		if (nc_callhome_listen(port) == EXIT_FAILURE) {
-			ERROR("listen", "unable to start listening for incoming Call Home");
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+		if (cert == NULL) {
+			if (key != NULL) {
+				ERROR(func_name, "Key specified without a certificate.");
+				goto error_cleanup;
+			}
+			get_default_client_cert(&cert, &key);
+			if (cert == NULL) {
+				ERROR(func_name, "Could not find the default client certificate, check with \"cert displayown\" command.");
+				goto error_cleanup;
+			}
 		}
-		listening = 1;
-	}
+		if (trusted_store == NULL) {
+			trusted_dir = get_default_trustedCA_dir(NULL);
+			if ((dir = opendir(trusted_dir)) == NULL) {
+				ERROR(func_name, "Could not use the trusted CA directory.");
+				goto error_cleanup;
+			}
 
-	if (verb_level == 0) {
-		fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
-	}
-	session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
-	if (session == NULL ) {
-		if (timeout == 0) {
-			ERROR("listen", "no call home")
+			/* check whether we have any trusted CA, verification should fail otherwise */
+			n = 0;
+			while ((d = readdir(dir)) != NULL) {
+				if (++n > 2) {
+					break;
+				}
+			}
+			closedir(dir);
+			if (n <= 2) {
+				ERROR(func_name, "Trusted CA directory empty, use \"cert add\" command to add certificates.");
+			}
 		} else {
-			ERROR("listen", "receiving call Home failed.");
-		}
-	}
-
-	clear_arglist(&cmd);
-	return (EXIT_SUCCESS);
-}
-
-void cmd_connect_help ()
-{
-	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls <cert_path> [--key <key_path>]] host\n");
-}
-
-#define DEFAULT_PORT_SSH 830
-#define DEFAULT_PORT_TLS 6513
-int cmd_connect (char* arg)
-{
-	char *host = NULL, *user = NULL, *cert = NULL, *key = NULL;
-	int hostfree = 0;
-	unsigned short port = 0;
-	int c;
-	struct arglist cmd;
-	struct option long_options[] = {
-			{"help", 0, 0, 'h'},
-			{"port", 1, 0, 'p'},
-			{"login", 1, 0, 'l'},
-			{"tls", 1, 0, 't'},
-			{"key", 1, 0, 'k'},
-			{0, 0, 0, 0}
-	};
-	int option_index = 0;
-
-	/* set back to start to be able to use getopt() repeatedly */
-	optind = 0;
-
-	if (session != NULL) {
-		ERROR("connect", "already connected to %s.", nc_session_get_host (session));
-		return (EXIT_FAILURE);
-	}
-
-	/* set default transport protocol */
-	nc_session_transport(NC_TRANSPORT_SSH);
-
-	/* process given arguments */
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
-
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1) {
-		switch (c) {
-		case 'h':
-			cmd_connect_help ();
-			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
-			break;
-		case 'p':
-			port = (unsigned short) atoi (optarg);
-			break;
-		case 'k':
-			key = optarg;
-			break;
-		case 'l':
-			user = optarg;
-			break;
-		case 't':
-			if (nc_session_transport(NC_TRANSPORT_TLS) == EXIT_SUCCESS) {
-				if (port == 0) {
-					port = DEFAULT_PORT_TLS;
-				}
+			if (eaccess(trusted_store, R_OK) != 0) {
+				ERROR(func_name, "Could not access trusted CA store \"%s\": %s", trusted_store, strerror(errno));
+				goto error_cleanup;
 			}
-			cert = optarg;
-			break;
-		default:
-			ERROR("connect", "unknown option -%c.", c);
-			cmd_connect_help ();
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			if (strlen(trusted_store) < 5 || strcmp(trusted_store+strlen(trusted_store)-4, ".pem") != 0) {
+				ERROR(func_name, "Trusted CA store in an unknown format.");
+				goto error_cleanup;
+			}
 		}
-	}
-	if (port == 0) {
-		port = DEFAULT_PORT_SSH;
-	}
-	if (cert) {
-		if (nc_tls_init(cert, key, NULL, NULL) != EXIT_SUCCESS) {
-			ERROR("connect", "Initiating TLS failed.");
-			return (EXIT_FAILURE);
+		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
+			ERROR(func_name, "Could not use the CRL directory.");
+			goto error_cleanup;
 		}
-	}
-	if (optind == cmd.count) {
-		/* get mandatory argument */
-		host = malloc (sizeof(char) * BUFFER_SIZE);
-		if (host == NULL) {
-			ERROR("connect", "memory allocation error (%s).", strerror (errno));
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
-		}
-		hostfree = 1;
-		INSTRUCTION("Hostname to connect to: ");
-		if (scanf ("%1023s", host) == EOF) {
-			ERROR("connect", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
-			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
-		}
-	} else if ((optind + 1) == cmd.count) {
-		host = cmd.list[optind];
-	}
 
-	/* create the session */
-	session = nc_session_connect (host, port, user, client_supported_cpblts);
-	if (session == NULL) {
-		ERROR("connect", "connecting to the %s failed.", host);
+		if (nc_tls_init(cert, key, trusted_store, trusted_dir, NULL, crl_dir) != EXIT_SUCCESS) {
+			ERROR(func_name, "Initiating TLS failed.");
+			goto error_cleanup;
+		}
+	}
+#endif
+
+	if (is_connect) {
+		if (optind == cmd.count) {
+			/* get mandatory argument */
+			host = malloc (sizeof(char) * BUFFER_SIZE);
+			if (host == NULL) {
+				ERROR(func_name, "memory allocation error (%s).", strerror (errno));
+				goto error_cleanup;
+			}
+			hostfree = 1;
+			INSTRUCTION("Hostname to connect to: ");
+			if (scanf ("%1023s", host) == EOF) {
+				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
+				goto error_cleanup;
+			}
+		} else if ((optind + 1) == cmd.count) {
+			host = cmd.list[optind];
+		}
+
+		/* create the session */
+		session = nc_session_connect (host, port, user, client_supported_cpblts);
+		if (session == NULL) {
+			ERROR(func_name, "connecting to the %s:%d as user \"%s\" failed.", host, port, user);
+			if (hostfree) {
+				free (host);
+			}
+			goto error_cleanup;
+		}
 		if (hostfree) {
 			free (host);
 		}
-		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+	} else {
+		/* create the session */
+		if (!listening) {
+			if (nc_callhome_listen(port) == EXIT_FAILURE) {
+				ERROR(func_name, "unable to start listening for incoming Call Home");
+				goto error_cleanup;
+			}
+			listening = port;
+		}
+
+		if (verb_level == 0) {
+			fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
+		}
+		session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
+		if (session == NULL ) {
+			if (timeout == 0) {
+				ERROR(func_name, "no call home")
+			} else {
+				ERROR(func_name, "receiving call Home failed.");
+			}
+		}
 	}
-	if (hostfree) {
-		free (host);
+
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
 	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
 	clear_arglist(&cmd);
 
 	return (EXIT_SUCCESS);
+
+error_cleanup:
+#ifdef ENABLE_TLS
+	if (trusted_dir != NULL) {
+		free(trusted_dir);
+	}
+	if (crl_dir != NULL) {
+		free(crl_dir);
+	}
+	if (cert != NULL) {
+		free(cert);
+	}
+	if (key != NULL) {
+		free(key);
+	}
+#endif
+	clear_arglist(&cmd);
+	return (EXIT_FAILURE);
 }
 
-int cmd_disconnect (char* UNUSED(arg))
+int cmd_connect (const char* arg)
+{
+	return cmd_connect_listen(arg, 1);
+}
+
+int cmd_listen (const char* arg)
+{
+	return cmd_connect_listen(arg, 0);
+}
+
+int cmd_disconnect (const char* UNUSED(arg))
 {
 	if (session == NULL) {
 		ERROR("disconnect", "not connected to any NETCONF server.");
@@ -1943,7 +2642,7 @@ int cmd_disconnect (char* UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_quit (char* UNUSED(arg))
+int cmd_quit (const char* UNUSED(arg))
 {
 	done = 1;
 	if (session != NULL) {
@@ -1952,7 +2651,7 @@ int cmd_quit (char* UNUSED(arg))
 	return (0);
 }
 
-int cmd_verbose (char *UNUSED(arg))
+int cmd_verbose (const char *UNUSED(arg))
 {
 	if (verb_level != 1) {
 		verb_level = 1;
@@ -1967,7 +2666,7 @@ int cmd_verbose (char *UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_debug (char *UNUSED(arg))
+int cmd_debug (const char *UNUSED(arg))
 {
 	if (verb_level != 2) {
 		verb_level = 2;
@@ -1982,13 +2681,14 @@ int cmd_debug (char *UNUSED(arg))
 	return (EXIT_SUCCESS);
 }
 
-int cmd_help (char* arg)
+int cmd_help (const char* arg)
 {
 	int i;
+	char *args = strdupa(arg);
 	char *cmd = NULL;
 	char cmdline[BUFFER_SIZE];
 
-	strtok (arg, " ");
+	strtok (args, " ");
 	if ((cmd = strtok (NULL, " ")) == NULL) {
 		/* generic help for the application */
 		print_version ();
@@ -2063,14 +2763,14 @@ void* notification_thread(void* arg)
 
 void cmd_subscribe_help()
 {
-	fprintf (stdout, "subscribe [--help] [--filter] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
+	fprintf (stdout, "subscribe [--help] [--filter [file]] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
 	fprintf (stdout, "\t<time> has following format:\n");
 	fprintf (stdout, "\t\t+<num>  - current time plus the given number of seconds.\n");
 	fprintf (stdout, "\t\t<num>   - absolute time as number of seconds since 1970-01-01.\n");
 	fprintf (stdout, "\t\t-<num>  - current time minus the given number of seconds.\n");
 }
 
-int cmd_subscribe(char *arg)
+int cmd_subscribe(const char *arg)
 {
 	int c;
 	struct nc_filter *filter = NULL;
@@ -2108,7 +2808,7 @@ int cmd_subscribe(char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "bef:ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "bef::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'b':
 		case 'e':
@@ -2218,12 +2918,12 @@ int cmd_subscribe(char *arg)
 
 void cmd_userrpc_help()
 {
-	fprintf (stdout, "user-rpc [--help] [--file <file>]]\n\n"
+	fprintf (stdout, "user-rpc [--help] [--file <file>]\n\n"
 	"\'--file <file>\' - input file with RPC message content.\n"
 	"If \'--file\' is omitted, user is asked to enter content manually.\n");
 }
 
-int cmd_userrpc(char *arg)
+int cmd_userrpc(const char *arg)
 {
 	int c;
 	int config_fd;
@@ -2319,7 +3019,7 @@ void cmd_discardchanges_help()
 	fprintf (stdout, "discard-changes\n");
 }
 
-int cmd_discardchanges(char *arg)
+int cmd_discardchanges(const char *arg)
 {
 	return (cmd_generic_op(GO_DISCARD_CHANGES, arg));
 }
@@ -2329,14 +3029,15 @@ void cmd_commit_help()
 	fprintf (stdout, "commit\n");
 }
 
-int cmd_commit(char *arg)
+int cmd_commit(const char *arg)
 {
 	return (cmd_generic_op(GO_COMMIT, arg));
 }
 
-int cmd_generic_op(GENERIC_OPS op, char *arg)
+int cmd_generic_op(GENERIC_OPS op, const char *arg)
 {
 	int i;
+	char* args = strdupa(arg);
 	char* op_string = NULL;
 	nc_rpc* (*op_func)(void);
 	void (*op_help)(void);
@@ -2360,10 +3061,10 @@ int cmd_generic_op(GENERIC_OPS op, char *arg)
 
 	/* check input parameters - no parameter is accepted */
 	/* remove trailing white spaces */
-	for (i = strlen(arg) - 1; i >= 0 && isspace(arg[i]); i--) {
-		arg[i] = '\0';
+	for (i = strlen(args) - 1; i >= 0 && isspace(args[i]); i--) {
+		args[i] = '\0';
 	}
-	if (strcmp(arg, op_string) != 0) {
+	if (strcmp(args, op_string) != 0) {
 		op_help();
 		return (EXIT_FAILURE);
 	}

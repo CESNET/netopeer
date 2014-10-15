@@ -39,6 +39,7 @@
  */
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <readline/readline.h>
@@ -50,6 +51,7 @@
 #include <pwd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include <libnetconf.h>
 #include <libnetconf_ssh.h>
@@ -61,63 +63,275 @@
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
-/* NetConf Client home */
-#define NCC_DIR ".netconf_client"
+/* NetConf Client home (appended to ~/) */
+#define NCC_DIR ".netopeer-cli"
+/* all these appended to NCC_DIR */
+#define CA_DIR "certs"
+#define CRL_DIR "crl"
+#define CERT_CRT "client.crt"
+#define CERT_PEM "client.pem"
+#define CERT_KEY "client.key"
 
-void load_config (struct nc_cpblts **cpblts)
+char* get_netconf_dir(void)
 {
+	int ret;
 	struct passwd * pw;
-	char * user_home, *netconf_dir, * history_file, *config_file;
+	char* user_home, *netconf_dir;
+
+	if ((pw = getpwuid(getuid())) == NULL) {
+		ERROR("get_netconf_dir", "Determining home directory failed: getpwuid: %s.", strerror(errno));
+		return NULL;
+	}
+	user_home = pw->pw_dir;
+
+	if (asprintf(&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+		ERROR("get_netconf_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		return NULL;
+	}
+
+	ret = eaccess(netconf_dir, R_OK | X_OK);
+	if (ret == -1) {
+		if (errno == ENOENT) {
+			/* directory does not exist */
+			ERROR("get_netconf_dir", "Configuration directory \"%s\" does not exist, creating it.", netconf_dir);
+			if (mkdir(netconf_dir, 0700) != 0) {
+				ERROR("get_netconf_dir", "Configuration directory \"%s\" cannot be created: %s", netconf_dir, strerror(errno));
+				free(netconf_dir);
+				return NULL;
+			}
+		} else {
+			ERROR("get_netconf_dir", "Configuration directory \"%s\" exists but something else failed: %s", netconf_dir, strerror(errno));
+			free(netconf_dir);
+			return NULL;
+		}
+	}
+
+	return netconf_dir;
+}
+
+void get_default_client_cert(char** cert, char** key)
+{
+	char* netconf_dir;
+	struct stat st;
+	int ret;
+
+	assert(cert && !*cert);
+	assert(key &&!*key);
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return;
+	}
+
+	// trying to use *.crt and *.key format
+	if (asprintf(cert, "%s/%s", netconf_dir, CERT_CRT) == -1 || asprintf(key, "%s/%s", netconf_dir, CERT_KEY) == -1) {
+		ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+		free(netconf_dir);
+		return;
+	}
+
+	if (eaccess(*cert, R_OK) == -1 || eaccess(*key, R_OK) == -1) {
+		if (errno != ENOENT) {
+			ERROR("get_default_client_cert", "Unable to access \"%s\" and \"%s\": %s", *cert, *key, strerror(errno));
+			free(*key);
+			*key = NULL;
+			free(*cert);
+			*cert = NULL;
+			free(netconf_dir);
+			return;
+		}
+
+		// *.crt & *.key failed, trying to use *.pem format
+		free(*key);
+		*key = NULL;
+		free(*cert);
+		if (asprintf(cert, "%s/%s", netconf_dir, CERT_PEM) == -1) {
+			ERROR("get_default_client_cert", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+			ERROR("get_default_client_cert", "Unable to use the default client certificate due to the previous error.");
+			free(netconf_dir);
+			return;
+		}
+
+		ret = eaccess(*cert, R_OK);
+		if (ret == -1) {
+			if (errno != ENOENT) {
+				ERROR("get_default_client_cert", "Unable to access \"%s\": %s", *cert, strerror(errno));
+			} else {
+				// *.pem failed as well
+				ERROR("get_default_client_cert", "Unable to find the default client certificate.");
+			}
+			free(*cert);
+			*cert = NULL;
+			free(netconf_dir);
+			return;
+		} else {
+			/* check permissions on *.pem */
+			if (stat(*cert, &st) != 0) {
+				ERROR("get_default_client_cert", "Stat on \"%s\" failed: %s", *cert, strerror(errno));
+			} else if (st.st_mode & 0066) {
+				ERROR("get_default_client_cert", "Unsafe permissions on \"%s\"", *cert);
+			}
+		}
+	} else {
+		/* check permissions on *.key */
+		if (stat(*key, &st) != 0) {
+			ERROR("get_default_client_cert", "Stat on \"%s\" failed: %s", *key, strerror(errno));
+		} else if (st.st_mode & 0066) {
+			ERROR("get_default_client_cert", "Unsafe permissions on \"%s\"", *key);
+		}
+	}
+
+	free(netconf_dir);
+	return;
+}
+
+char* get_default_trustedCA_dir(DIR** ret_dir)
+{
+	char* netconf_dir, *cert_dir;
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return NULL;
+	}
+
+	if (asprintf(&cert_dir, "%s/%s", netconf_dir, CA_DIR) == -1) {
+		ERROR("get_default_trustedCA_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_trustedCA_dir", "Unable to use the trusted CA directory due to the previous error.");
+		free(netconf_dir);
+		return NULL;
+	}
+	free(netconf_dir);
+
+	if (ret_dir != NULL) {
+		if ((*ret_dir = opendir(cert_dir)) == NULL) {
+			ERROR("get_default_trustedCA_dir", "Unable to open the default trusted CA directory: %s", strerror(errno));
+			free(cert_dir);
+			return NULL;
+		}
+		return NULL;
+	}
+
+	if (eaccess(cert_dir, R_OK | W_OK | X_OK) < 0) {
+		ERROR("get_default_trustedCA_dir", "Unable to fully access the default trusted CA directory: %s", strerror(errno));
+		free(cert_dir);
+		return NULL;
+	}
+	return cert_dir;
+}
+
+char* get_default_CRL_dir(DIR** ret_dir)
+{
+	char* netconf_dir, *crl_dir;
+
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
+		return NULL;
+	}
+
+	if (asprintf(&crl_dir, "%s/%s", netconf_dir, CRL_DIR) == -1) {
+		ERROR("get_default_CRL_dir", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("get_default_CRL_dir", "Unable to use the trusted CA directory due to the previous error.");
+		free(netconf_dir);
+		return NULL;
+	}
+	free(netconf_dir);
+
+	if (ret_dir != NULL) {
+		if ((*ret_dir = opendir(crl_dir)) == NULL) {
+			ERROR("get_default_CRL_dir", "Unable to open the default CRL directory: %s", strerror(errno));
+			free(crl_dir);
+			return NULL;
+		}
+		return NULL;
+	}
+
+	if (eaccess(crl_dir, R_OK | W_OK | X_OK) < .0) {
+		ERROR("get_default_CRL_dir", "Unable to fully access the default CRL directory: %s", strerror(errno));
+		free(crl_dir);
+		return NULL;
+	}
+	return crl_dir;
+}
+
+void load_config(struct nc_cpblts **cpblts)
+{
+	char * netconf_dir, *history_file, *config_file;
+#ifdef ENABLE_TLS
+	struct stat st;
+	char* trusted_dir, *crl_dir;
+#endif
 	char * tmp_cap;
 	int ret, history_fd, config_fd;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_cap, tmp_node;
 
 #ifndef DISABLE_LIBSSH
-	char * key_priv, * key_pub, *prio;
+	char * key_priv, *key_pub, *prio;
 	xmlNodePtr tmp_auth, tmp_pref, tmp_key;
 #endif
 
+	assert(cpblts);
+
 	(*cpblts) = nc_session_get_cpblts_default();
 
-	if ((pw = getpwuid(getuid())) == NULL) {
-		ERROR("load_config", "Determining home directory failed (%s).", strerror(errno));
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
 	}
-	user_home = pw->pw_dir;
 
-	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
+#ifdef ENABLE_TLS
+	if (asprintf (&trusted_dir, "%s/%s", netconf_dir, CA_DIR) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
-		return;
-	}
-
-	ret = access (netconf_dir, R_OK|X_OK);
-	if (ret == -1) {
-		if (errno == ENOENT) {
-			/* directory does not exist */
-			ERROR ("load_config", "Configuration directory (%s) does not exist, creating it.", netconf_dir);
-			if (mkdir (netconf_dir, 0777) != 0) {
-				ERROR ("load_config", "Configuration directory (%s) cannot be created (%s)", netconf_dir, strerror(errno));
-				free (netconf_dir);
-				return;
+		ERROR("load_config", "Unable to check trusted CA directory due to the previous error.");
+		trusted_dir = NULL;
+	} else {
+		if (stat(trusted_dir, &st) == -1) {
+			if (errno == ENOENT) {
+				ERROR("load_config", "Trusted CA directory (%s) does not exist, creating it", trusted_dir);
+				if (mkdir(trusted_dir, 0700) == -1) {
+					ERROR("load_config", "Trusted CA directory cannot be created (%s)", strerror(errno));
+				}
+			} else {
+				ERROR("load_config", "Accessing the trusted CA directory failed (%s)", strerror(errno));
 			}
 		} else {
-			ERROR ("load_config", "Configuration directory (%s) exists but something else failed (%s)", netconf_dir, strerror(errno));
-			free (netconf_dir);
-			return;
+			if (!S_ISDIR(st.st_mode)) {
+				ERROR("load_config", "Accessing the trusted CA directory failed (Not a directory)");
+			}
 		}
 	}
+	free(trusted_dir);
 
-	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
+	if (asprintf (&crl_dir, "%s/%s", netconf_dir, CRL_DIR) == -1) {
+		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+		ERROR("load_config", "Unable to check CRL directory due to the previous error.");
+		crl_dir = NULL;
+	} else {
+		if (stat(crl_dir, &st) == -1) {
+			if (errno == ENOENT) {
+				ERROR("load_config", "CRL directory (%s) does not exist, creating it", crl_dir);
+				if (mkdir(crl_dir, 0700) == -1) {
+					ERROR("load_config", "CRL directory cannot be created (%s)", strerror(errno));
+				}
+			} else {
+				ERROR("load_config", "Accessing the CRL directory failed (%s)", strerror(errno));
+			}
+		} else {
+			if (!S_ISDIR(st.st_mode)) {
+				ERROR("load_config", "Accessing the CRL directory failed (Not a directory)");
+			}
+		}
+	}
+	free(crl_dir);
+#endif /* ENABLE_TLS */
+
+	if (asprintf(&history_file, "%s/history", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to load commands history due to the previous error.");
 		history_file = NULL;
 	} else {
-		ret = access(history_file, R_OK);
+		ret = eaccess(history_file, R_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "History file (%s) does not exist, creating it", history_file);
-				if ((history_fd = creat(history_file, 0666)) == -1) {
+				if ((history_fd = creat(history_file, 0600)) == -1) {
 					ERROR("load_config", "History file cannot be created (%s)", strerror(errno));
 				} else {
 					close(history_fd);
@@ -133,16 +347,16 @@ void load_config (struct nc_cpblts **cpblts)
 		}
 	}
 
-	if (asprintf (&config_file, "%s/config.xml", netconf_dir) == -1) {
+	if (asprintf(&config_file, "%s/config.xml", netconf_dir) == -1) {
 		ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("load_config", "Unable to load configuration due to the previous error.");
 		config_file = NULL;
 	} else {
-		ret = access(config_file, R_OK);
+		ret = eaccess(config_file, R_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				ERROR("load_config", "Configuration file (%s) does not exits, creating it", config_file);
-				if ((config_fd = creat(config_file, 0666)) == -1) {
+				if ((config_fd = creat(config_file, 0600)) == -1) {
 					ERROR("load_config", "Configuration file cannot be created (%s)", strerror(errno));
 				} else {
 					close(config_fd);
@@ -221,63 +435,37 @@ void load_config (struct nc_cpblts **cpblts)
 		}
 	}
 
-	free (config_file);
-	free (history_file);
-	free (netconf_dir);
+	free(config_file);
+	free(history_file);
+	free(netconf_dir);
 }
 
 /**
  * \brief Store configuration and history
  */
-void store_config (struct nc_cpblts * cpblts)
+void store_config(struct nc_cpblts *cpblts)
 {
-	struct passwd * pw;
-	char * user_home, *netconf_dir, * history_file, *config_file;
+	char *netconf_dir, *history_file, *config_file;
 	const char * cap;
 	int history_fd, ret;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_caps;
-	FILE * config_f;
+	FILE *config_f;
 
-	if ((pw = getpwuid(getuid())) == NULL) {
-		ERROR("store_config", "Determining home directory failed (%s).", strerror(errno));
-		return;
-	}
-	user_home = pw->pw_dir;
-
-	if (asprintf (&netconf_dir, "%s/%s", user_home, NCC_DIR) == -1) {
-		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
+	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
 	}
 
-	ret = access (netconf_dir, R_OK|W_OK|X_OK);
-	if (ret == -1) {
-		if (errno == ENOENT) {
-			/* directory does not exist, create it */
-			if (mkdir (netconf_dir, 0777)) {
-				/* directory can not be created */
-				free (netconf_dir);
-				ERROR("store_config", "Storing history failed (mkdir(): %s)", strerror(errno));
-				return;
-			}
-		} else {
-			/* directory exist but cannot be accessed */
-			free (netconf_dir);
-			ERROR("store_config", "Accessing the directory for storing the history failed (%s)", strerror(errno));
-			return;
-		}
-	}
-
-	if (asprintf (&history_file, "%s/history", netconf_dir) == -1) {
+	if (asprintf(&history_file, "%s/history", netconf_dir) == -1) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("store_config", "Unable to store commands history due to the previous error.");
 		history_file = NULL;
 	} else {
-		ret = access(history_file, R_OK | W_OK);
+		ret = eaccess(history_file, R_OK | W_OK);
 		if (ret == -1) {
 			if (errno == ENOENT) {
 				/* file does not exit, create it */
-				if ((history_fd = creat(history_file, 0666)) == -1) {
+				if ((history_fd = creat(history_file, 0600)) == -1) {
 					/* history file can not be created */
 				} else {
 					close(history_fd);
@@ -292,12 +480,12 @@ void store_config (struct nc_cpblts * cpblts)
 		free(history_file);
 	}
 
-	if (asprintf (&config_file, "%s/config.xml", netconf_dir) == -1) {
+	if (asprintf(&config_file, "%s/config.xml", netconf_dir) == -1) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("store_config", "Unable to store configuration due to the previous error.");
 		config_file = NULL;
 	} else {
-		if (access(config_file, R_OK | W_OK) == -1 || (config_doc = xmlReadFile(config_file, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR)) == NULL) {
+		if (eaccess(config_file, R_OK | W_OK) == -1 || (config_doc = xmlReadFile(config_file, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR)) == NULL) {
 			config_doc = xmlNewDoc(BAD_CAST "1.0");
 			config_doc->children = xmlNewDocNode(config_doc, NULL, BAD_CAST "netconf-client", NULL);
 		}
@@ -328,6 +516,6 @@ void store_config (struct nc_cpblts * cpblts)
 		}
 	}
 
-	free (netconf_dir);
-	free (config_file);
+	free(netconf_dir);
+	free(config_file);
 }

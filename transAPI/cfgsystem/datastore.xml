@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<datastores xmlns="urn:cesnet:tmc:datastores:file">
+  <running lock=""/>
+  <startup lock="">
+    <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system" xmlns:x509c2n="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name">
+      <authentication>
+        <tls xmlns="urn:ietf:params:xml:ns:yang:ietf-system-tls-auth">
+          <cert-maps>
+            <cert-to-name>
+              <id>1</id>
+              <fingerprint>01:c6:ad:20:85:e3:3d:c4:37:8a:6e:c6:67:5a:3d:50:06</fingerprint>
+              <map-type>x509c2n:specified</map-type>
+              <name>tls_default</name>
+            </cert-to-name>
+          </cert-maps>
+        </tls>
+      </authentication>
+    </system>
+  </startup>
+  <candidate modified="false" lock=""/>
+</datastores>

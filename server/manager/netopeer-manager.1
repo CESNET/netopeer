@@ -1,0 +1,158 @@
+.\" Process this file with
+.\" groff -man -Tascii netopeer-manager.1
+.\"
+.TH "netopeer-manager" 1 "Thu Jun 5 2014" "Netopeer"
+.SH NAME
+netopeer-manager \- Modules manager for the \fBnetopeer-server\fR
+.SH SYNOPSIS
+.B netopeer-manager [\-\-help]
+.I <command>
+.B [
+.I <arguments>
+.B ]
+.SH DESCRIPTION
+.B netopeer-manager
+provides access to the configuration of the
+.B netopeer-server
+modules. The
+.B netopeer-server
+modules extends its functionality to control another devices or applications
+via transAPI or just by storing configuration data.
+.SH OPTIONS
+.PP
+.B \-\-help
+.RS
+Prints the generic description and a list of commands. Detailed description and
+list of \fIarguments\fR for the specific \fIcommand\fR are displayed by using
+\fI\-\-help\fR argument of the \fIcommand\fR.
+.RE
+.SH COMMANDS
+.SS add
+.PP
+Add a new \fBnetopeer-server\fR module. Added module is enabled by default and
+it will be loaded by the \fBnetopeer-server\fR during its next start.
+.PP
+.B add [\-\-help] \-\-name \fINAME\fP (\-\-model \fIMODEL\fP | \-\-augment \fIAUGMENT\fP | \-\-import \fIIMPORT\fP) [\-\-transapi \fITRANSAPI\fP] [\-\-features \fIFEATURE\fP [\fIFEATURE\fP ...]]  [\-\-datastore \fIDATASTORE\fP]
+.RS 4
+.PP
+.B \-\-name
+.I NAME
+.RS 4
+Specifies the name of the \fBnetopeer-server\fR module. The \fINAME\fR is used
+as an identifier of the module in the \fBnetopeer-server\fR configuration.
+.RE
+.PP
+.B \-\-model
+\fIMODEL\fR
+.RS 4
+Specifies path (absolute or relative) to the module's main data model in YIN
+format. In this option, the whole module configuration is created.
+.RE
+.PP
+.B \-\-augment
+\fIAUGMENT\fR
+.RS 4
+Specifies path (absolute or relative) to an augment model of the main data
+model in YIN format. This model is always appended at the end of the model list.
+.RE
+.PP
+.B \-\-import
+\fIIMPORT\fR
+.RS 4
+Specifies path (absolute or relative) to a model in YIN format that is imported
+by the main model. This model is always prepended at the beginning of the model list.
+.RE
+.PP
+.B \-\-transapi
+\fITRANSAPI\fR
+.RS 4
+Optional parameter to specify path to the transAPI module related to the module's
+main data model. If the transAPI module is not specified, \fBnetopeer-server\fR
+will allow the configuration data manipulation according to the data model, but
+the changes will not be applied to any device. This part of the process is
+handled just by the transAPI module.
+.RE
+.PP
+.B \-\-features
+\fIFEATURE\fR [\fIFEATURE\fR ...]
+.RS 4
+Data model can define various features that extend its basic functionality. By
+default, \fBnetopeer-server\fR supposes all features to be disabled. This option
+explicitly specifies list of features to enable. If one want to enable all
+features, value \fI*\fR can be used.
+.RE
+.PP
+.B \-\-datastore
+\fIDATASTORE\fP
+.RS 4
+Specifies path to the file where the configuration data will be stored. If not
+specified, datastore is implemented as \fIempty\fR and it will not able to store
+any configuration data.
+.RE
+.RE
+.SS list
+.PP
+Print the list of all \fBnetopeer-server\fR's modules.
+.PP
+.B list [\-\-help] [\-\-name \fINAME\fP]
+.RS 4
+.PP
+.B \-\-name
+.I NAME
+.RS 4
+If specified, it is the name of the main \fBnetopeer-server\fR module for which
+the list of extending data models will be printed.
+.RE
+.RE
+.SS rm
+.PP
+Remove the specified \fBnetopeer-server\fR main module.
+.PP
+.B rm [\-\-help] \-\-name \fINAME\fP [\-\-model \fIMODEL\fP]
+.RS 4
+.PP
+.B \-\-name
+.I NAME
+.RS 4
+Specifies the name of the main \fBnetopeer-server\fR module to remove.
+.RE
+.PP
+.B \-\-model
+\fIMODEL\fP
+.RS 4
+If specified, only this extending model will be removed instead of the whole module.
+.RE
+.RE
+.SH YIN FORMAT
+YIN is an alternative XML-based syntax to YANG language. Both, YANG and YIN, are
+defined in \fIRFC 6020\fR.
+.PP
+To convert YANG to YIN format, which is required by the Netopeer tools, we
+recommend to use \fBpyang(1)\fR:
+.PP
+.RS 4
+\fC$ pyang -f yin data-model.yang -o data-model.yin \fR
+.RE
+.SH "SEE ALSO"
+.BR netopeer-agent(1) ,
+.BR netopeer-cli(1) ,
+.BR netopeer-configurator(1) ,
+.BR netopeer-server(1) ,
+.BR pyang(1) ,
+.br
+RFC 6020 (YANG Data Modeling Language)
+.br
+https://netopeer.googlecode.com (Netopeer homepage)
+.ad
+.SH MAILING LIST
+To discuss various topics about
+.B netopeer-manager,
+join the Netopeer mailing list at <https://groups.google.com/group/netopeer>.
+.SH REPORTING BUGS
+Report bugs to the issue tracker at <https://code.google.com/p/netopeer/issues/list>.
+.SH AUTHORS
+Radek Krejci <rkrejci@cesnet.cz>
+.SH COPYRIGHT
+Copyright \(co 2014 CESNET, z.s.p.o.
+
+

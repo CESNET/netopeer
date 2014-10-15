@@ -38,6 +38,14 @@
  *
  */
 
+#ifdef ENABLE_TLS
+#	define _GNU_SOURCE
+
+#	include <assert.h>
+#	include <stdio.h>
+#	include <ctype.h>
+#endif
+
 #include <stdlib.h>
 #include <signal.h>
 #include <time.h>
@@ -103,7 +111,6 @@ const struct session_info* server_sessions_get_by_agentid(const char* id)
 void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id)
 {
 	struct session_info *session, *session_iter = sessions;
-
 	session = calloc(1, sizeof(struct session_info));
 	/* create dummy session */
 	session->session = nc_session_dummy(session_id, username, NULL, cpblts);
@@ -224,6 +231,332 @@ const struct session_info* srv_get_session(const char* session_id)
 
 	return (aux_session);
 }
+
+#ifdef ENABLE_TLS
+
+static const char* capabilities[] = {
+	"urn:ietf:params:netconf:base:1.0",
+	"urn:ietf:params:netconf:base:1.1",
+	"urn:ietf:params:netconf:capability:startup:1.0"
+};
+
+struct ctn_ptr {
+	xmlNodePtr node;
+	unsigned int id;
+	char* fingerprint;
+	char* map_type;
+	char* name;
+	struct ctn_ptr* next;
+};
+
+static void ctn_ptr_insert(struct ctn_ptr** root, xmlNodePtr item_node) {
+	xmlNodePtr node_cur;
+	struct ctn_ptr* cur, *item;
+	char* ptr;
+
+	if (root == NULL || item_node == NULL) {
+		return;
+	}
+
+	/* create the new item */
+	item = calloc(1, sizeof(struct ctn_ptr));
+
+	/* fill everything in the new item */
+	node_cur = item_node->children;
+	while (node_cur != NULL) {
+		if (node_cur->type == XML_ELEMENT_NODE) {
+			if (xmlStrEqual(node_cur->name, BAD_CAST "id")) {
+				assert(item->id == 0);
+				item->id = atoi((char*)node_cur->children->content);
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "fingerprint")) {
+				assert(item->fingerprint == NULL);
+				item->fingerprint = (char*)node_cur->children->content;
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "map-type")) {
+				assert(item->map_type == NULL);
+				if ((ptr = strrchr((char*)node_cur->children->content, ':')) != NULL) {
+					item->map_type = ptr+1;
+				} else {
+					item->map_type = (char*)node_cur->children->content;
+				}
+			} else if (xmlStrEqual(node_cur->name, BAD_CAST "name")) {
+				assert(item->name == NULL);
+				item->name = (char*)node_cur->children->content;
+			}
+		}
+		node_cur = node_cur->next;
+	}
+	assert(item->id);
+	assert(item->fingerprint);
+	assert(item->map_type);
+	if (strcmp(item->map_type, "specified") == 0) {
+		assert(item->name);
+	}
+	item->node = item_node;
+
+	/* empty list */
+	if (*root == NULL) {
+		*root = item;
+		return;
+	}
+
+	/* check if we don't have to add before root */
+	if ((*root)->id > item->id) {
+		item->next = *root;
+		*root = item;
+		return;
+	}
+
+	/* we are adding after root, so just traverse the list and do stuff */
+	cur = *root;
+	while (cur->next != NULL && cur->next->id < item->id) {
+		cur = cur->next;
+	}
+	item->next = cur->next;
+	cur->next = item;
+}
+
+static void ctn_ptr_free(struct ctn_ptr** root) {
+	struct ctn_ptr* cur, *tofree;
+
+	if (root == NULL) {
+		return;
+	}
+
+	cur = *root;
+	while (cur != NULL) {
+		tofree = cur;
+		cur = cur->next;
+		free(tofree);
+	}
+	*root = NULL;
+}
+
+char* server_cert_to_name(const char** args, char** msg) {
+	xmlDocPtr doc;
+	xmlNodePtr ctn_list;
+	struct ctn_ptr* root = NULL, *item;
+	char* cert_maps_xml, alg[4], *username = NULL, *ptr;
+	struct nc_session* dummy_session;
+	struct nc_cpblts* capabs;
+	struct nc_filter* filter;
+	nc_rpc* rpc;
+	nc_reply* reply;
+	int i;
+
+	assert(*msg == NULL);
+
+	for (i = 0; i < 6; ++i) {
+		sprintf(alg, "0%d:", i+1);
+		if (args[i] == NULL || strncmp(args[i], alg, strlen(alg)) != 0) {
+			asprintf(msg, "Incorrect certificate hashes received.");
+			return NULL;
+		}
+	}
+
+	/* create the dummy session */
+	capabs = nc_cpblts_new(capabilities);
+	if ((dummy_session = nc_session_dummy("ctnsession", "root", NULL, capabs)) == NULL) {
+		asprintf(msg, "Could not create a dummy session.");
+		nc_cpblts_free(capabs);
+		return NULL;
+	}
+	nc_cpblts_free(capabs);
+
+	/* create a filter */
+	filter = nc_filter_new(NC_FILTER_SUBTREE, "<system><authentication><tls><cert-maps></cert-maps></tls></authentication></system>");
+
+	/* apply copy-config rpc on the datastore */
+	if ((rpc = nc_rpc_getconfig(NC_DATASTORE_RUNNING, filter)) == NULL) {
+		asprintf(msg, "Could not create get-config RPC.");
+		nc_session_free(dummy_session);
+		nc_filter_free(filter);
+		return NULL;
+	}
+	if ((reply = ncds_apply_rpc2all(dummy_session, rpc, NULL)) == NULL) {
+		asprintf(msg, "Get-config RPC failed.");
+		nc_filter_free(filter);
+		nc_rpc_free(rpc);
+		nc_session_free(dummy_session);
+		return NULL;
+	}
+	nc_filter_free(filter);
+	nc_rpc_free(rpc);
+	nc_session_free(dummy_session);
+
+	if (nc_reply_get_type(reply) != NC_REPLY_DATA) {
+		asprintf(msg, "Unexpected reply to RPC get-config.");
+		nc_reply_free(reply);
+		return NULL;
+	}
+	cert_maps_xml = nc_reply_get_data(reply);
+	nc_reply_free(reply);
+
+	if ((doc = xmlReadDoc(BAD_CAST cert_maps_xml, NULL, NULL, 0)) == NULL) {
+		asprintf(msg, "Failed to parse cert-maps.");
+		free(cert_maps_xml);
+		return NULL;
+	}
+	free(cert_maps_xml);
+
+	/* make ctn_list a list of <cert-to-name> */
+	if ((ctn_list = xmlDocGetRootElement(doc)) == NULL) {
+		asprintf(msg, "Empty/invalid config structure.");
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+	for (i = 0; i < 4; ++i) {
+		ctn_list = xmlFirstElementChild(ctn_list);
+		if (ctn_list == NULL) {
+			asprintf(msg, "Empty/invalid config structure.");
+			xmlFreeDoc(doc);
+			return NULL;
+		}
+	}
+
+	/* create ascending list of entries by their priority and parse them */
+	while (ctn_list != NULL) {
+		if (ctn_list->type == XML_ELEMENT_NODE) {
+			ctn_ptr_insert(&root, ctn_list);
+		}
+		ctn_list = ctn_list->next;
+	}
+
+	/* find a matching fingerprint */
+	item = root;
+	while (item != NULL) {
+		/* get the number of the algorithm */
+		i = (item->fingerprint)[1]-48;
+		--i;
+		if (strcmp(item->fingerprint, args[i]) == 0) {
+			/* we found our entry */
+			i = 6;
+			if (strcmp(item->map_type, "specified") == 0) {
+				username = strdup(item->name);
+
+			} else if (strcmp(item->map_type, "san-rfc822-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "EMAIL=", 6) == 0) {
+						username = strdup(args[i]+6);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-rfc822-name\", but no email found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "san-dns-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "DNS=", 4) == 0) {
+						username = strdup(args[i]+4);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-dns-name\", but no DNS domain found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "san-ip-address") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "IP=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-ip-address\", but no IP found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "san-any") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "EMAIL=", 6) == 0) {
+						username = strdup(args[i]+6);
+						break;
+					} else if (strncmp(args[i], "DNS=", 4) == 0) {
+						username = strdup(args[i]+4);
+						break;
+					} else if (strncmp(args[i], "IP=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"san-any\", but no suitable subjectAltName value found in the cert.");
+				}
+
+			} else if (strcmp(item->map_type, "common-name") == 0) {
+				while (args[i] != NULL) {
+					if (strncmp(args[i], "CN=", 3) == 0) {
+						username = strdup(args[i]+3);
+						break;
+					}
+					++i;
+				}
+				if (username == NULL) {
+					if (*msg != NULL) {
+						free(*msg);
+					}
+					asprintf(msg, "Map-type \"common-name\", but no common name found in the cert.");
+				}
+
+			} else {
+				if (*msg != NULL) {
+					free(*msg);
+				}
+				asprintf(msg, "Unknown matching algorithm.");
+				ctn_ptr_free(&root);
+				xmlFreeDoc(doc);
+				return NULL;
+			}
+
+			/* definite success */
+			if (username != NULL) {
+				if (*msg != NULL) {
+					free(*msg);
+					*msg = NULL;
+				}
+
+				/* convert username to lowercase according to the model */
+				if ((ptr = strchr(username, '@')) == NULL) {
+					/* DNS */
+					ptr = username;
+				} /* else EMAIL */
+
+				for (; *ptr != '\0'; ++ptr) {
+					*ptr = tolower(*ptr);
+				}
+				ctn_ptr_free(&root);
+				xmlFreeDoc(doc);
+				return username;
+			}
+		}
+		item = item->next;
+	}
+
+	if (*msg == NULL) {
+		asprintf(msg, "No matching fingerprint found in the cert-maps configuration.");
+	}
+	ctn_ptr_free(&root);
+	xmlFreeDoc(doc);
+	return NULL;
+}
+
+#endif /* ENABLE_TLS */
 
 nc_reply * server_process_rpc(struct nc_session * session, const nc_rpc * rpc)
 {

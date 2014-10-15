@@ -39,9 +39,15 @@ make doc
 make DESTDIR=$RPM_BUILD_ROOT install
 
 %post
-chown @USER@:@GROUP@ @DBUSCONF@/org.liberouter.netopeer.conf
-chown @USER@:@GROUP@ @DBUSSERVICES@/org.liberouter.netopeer.server.service
-chown -R @USER@:@GROUP@ %{_sysconfdir}/netopeer/
+#SSHD config
+if test -f /etc/ssh/sshd_config; then \
+        grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > %{_sysconfdir}/netopeer/sshd_config; \
+else \
+        touch %{_sysconfdir}/netopeer/sshd_config; \
+fi; \
+echo "" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "# NETCONF SSH Subsystem settings" >> %{_sysconfdir}/netopeer/sshd_config; \
+echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/sshd_config; \
 
 %postun
 
@@ -49,8 +55,11 @@ chown -R @USER@:@GROUP@ %{_sysconfdir}/netopeer/
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
 %{_bindir}/netopeer-manager
-@DBUSCONF@/org.liberouter.netopeer.conf
-@DBUSSERVICES@/org.liberouter.netopeer.server.service
 %{_sysconfdir}/netopeer/*
 %{_sysconfdir}/init.d/netopeer.rc
+%{_mandir}/man1/*
+%{_mandir}/man8/*
+%{_datadir}/netopeer/*.html
+@DBUSCONFFILE@
+@DBUSSERVICESFILE@
 

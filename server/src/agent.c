@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <alloca.h>
 
 #include <libxml/tree.h>
 
@@ -52,6 +53,14 @@
 
 #include "common.c"
 #include "comm.h"
+
+/* Define libnetconf submodules necessary for the NETCONF agent */
+#define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING | NC_INIT_WD | NC_INIT_SINGLELAYER)
+
+/**
+ * Environment variabe with settings for verbose level
+ */
+#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
 
 volatile int done = 0;
 
@@ -161,6 +170,7 @@ int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
 				xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
 			clb_print(NC_VERB_ERROR, "Corrupted RPC message.");
 			reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
+			xmlFreeNodeList(op);
 			goto send_reply;
 		}
 		if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
@@ -168,10 +178,12 @@ int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
 			err = nc_err_new(NC_ERR_MISSING_ELEM);
 			nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
 			reply = nc_reply_error(err);
+			xmlFreeNodeList(op);
 			goto send_reply;
 		}
 		sid = (char *)xmlNodeGetContent(op->children);
 		reply = comm_kill_session(conn, sid);
+		xmlFreeNodeList(op);
 		free(sid);
 		break;
 	case NC_OP_CREATESUBSCRIPTION:
@@ -231,51 +243,121 @@ send_reply:
 }
 
 #ifdef ENABLE_TLS
-char *get_tls_username(void)
+char *get_tls_username(conn_t* conn)
 {
-#ifndef PATCHED_STUNNEL
-	char *subj, *cn, *aux;
-	int len;
+	int i, args_len;
+	char* hash_env, *san_env = NULL, *starti, *arg = NULL, *subj_env;
+	char** args;
 
-	/* try to get information from environment variable commonly provided by stunnel(1) */
-	subj = getenv("SSL_CLIENT_DN");
-	if (!subj) {
-		/* we are not able to get correct username */
-		clb_print(NC_VERB_ERROR, "Missing \'SSL_CLIENT_DN\' enviornment variable, unable to get username.");
-		return (NULL);
-	}
-	/* parse subject to get CN */
-	cn = strstr(subj, "CN=");
-	if (!cn) {
-		clb_print(NC_VERB_ERROR, "Client certificate does not include commonName, unable to get username.");
-		return (NULL);
-	}
-	cn = cn + 3;
-	/* detect if the CN is followed by another item */
-	aux = strchr(cn, '/');
-	/* get the length of the CN value */
-	if (aux != NULL) {
-		len = aux - cn;
-	} else {
-		len = strlen(cn);
-	}
-	/* store (only) the CN value into the resulting string */
-	aux = malloc(len * sizeof(char));
-	strncpy(aux, cn, len);
-	aux[len] = '\0';
+	/* parse certificate hashes */
+	args_len = 6;
+	args = calloc(args_len, sizeof(char*));
 
-	return (aux);
-#else
-	/*
-	 * we are running with patched stunnel(1) which provides much more info
-	 * from the client certificate
-	 */
-#endif
+	hash_env = getenv("SSL_CLIENT_MD5");
+	if (hash_env == NULL) {
+		/* nothing we can do */
+		goto cleanup;
+	}
+	args[0] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[0], "01:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA1");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[1] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[1], "02:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA256");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[2] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[2], "03:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA256");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[3] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[3], "04:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA384");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[4] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[4], "05:%s", hash_env);
+
+	hash_env = getenv("SSL_CLIENT_SHA512");
+	if (hash_env == NULL) {
+		goto cleanup;
+	}
+	args[5] = malloc(3+strlen(hash_env)+1);
+	sprintf(args[5], "06:%s", hash_env);
+
+	/* parse SubjectAltName values */
+	san_env = getenv("SSL_CLIENT_SAN");
+	if (san_env != NULL) {
+		san_env = strdup(san_env);
+		arg = strtok(san_env, "/");
+		while (arg != NULL) {
+			++args_len;
+			args = realloc(args, args_len*sizeof(char*));
+			args[args_len-1] = arg;
+			arg = strtok(NULL, "/");
+		}
+	}
+
+	/* parse commonName */
+	subj_env = getenv("SSL_CLIENT_DN");
+	if (subj_env != NULL && (starti = strstr(subj_env, "CN=")) != NULL) {
+		/* detect if the CN is followed by another item */
+		arg = strchr(starti, '/');
+		/* get the length of the CN value */
+		if (arg != NULL) {
+			i = arg - starti;
+			arg = NULL;
+		} else {
+			i = strlen(starti);
+		}
+		/* store "CN=<value>" into the resulting string */
+		++args_len;
+		args = realloc(args, args_len*sizeof(char*));
+		args[args_len-1] = alloca(i+1);
+		strncpy(args[args_len-1], starti, i);
+		args[args_len-1][i+1] = '\0';
+	}
+
+	arg = comm_cert_to_name(conn, args, args_len);
+
+cleanup:
+	for (i = 0; i < 6; ++i) {
+		if (args[i] != NULL) {
+			free(args[i]);
+		}
+	}
+	free(args);
+	if (san_env != NULL) {
+		free(san_env);
+	}
+
+	return arg;
 }
 
 #endif /* ENABLE_TLS */
 
-int main()
+static void print_usage (char * progname)
+{
+	fprintf(stdout, "This program is not supposed for manual use, it should be\n");
+	fprintf(stdout, "started automatically as an SSH Subsystem by an SSH daemon.\n\n");
+	fprintf(stdout, "Usage: %s [-h] [-v level]\n", progname);
+	fprintf(stdout, " -h                  display help\n");
+	fprintf(stdout, " -v level            verbose output level\n");
+	exit (0);
+}
+
+int main (int argc, char** argv)
 {
 	conn_t *con;
 	struct nc_session * netconf_con;
@@ -286,11 +368,34 @@ int main()
 	int timeout = 500; /* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
+	int next_option;
+	int verbose;
+	char *aux_string = NULL;
 
 #ifdef ENABLE_TLS
 	struct passwd *pw;
 	char* username;
 #endif
+
+	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
+		verbose = NC_VERB_ERROR;
+	} else {
+		verbose = atoi(aux_string);
+	}
+
+	while ((next_option = getopt(argc, argv, "hv:")) != -1) {
+		switch (next_option) {
+		case 'h':
+			print_usage(argv[0]);
+			break;
+		case 'v':
+			verbose = atoi(optarg);
+			break;
+		default:
+			print_usage(argv[0]);
+			break;
+		}
+	}
 
 	/* set signal handler */
 	sigfillset(&action.sa_mask);
@@ -302,14 +407,20 @@ int main()
 	sigaction(SIGTERM, &action, NULL );
 	sigaction(SIGKILL, &action, NULL );
 
-#ifdef DEBUG
-	nc_verbosity(NC_VERB_DEBUG);
-#endif
 	openlog("netopeer-agent", LOG_PID, LOG_DAEMON);
 	nc_callback_print(clb_print);
 
+	/* normalize value if not from the enum */
+	if (verbose < NC_VERB_ERROR) {
+		nc_verbosity(NC_VERB_ERROR);
+	} else if (verbose > NC_VERB_DEBUG) {
+		nc_verbosity(NC_VERB_DEBUG);
+	} else {
+		nc_verbosity(verbose);
+	}
+
 	/* initialize library */
-	if (nc_init(NC_INIT_ALL) < 0) {
+	if (nc_init(NC_INIT_AGENT) < 0) {
 		clb_print(NC_VERB_ERROR, "Library initialization failed");
 		return EXIT_FAILURE;
 	}
@@ -334,7 +445,12 @@ int main()
 	 */
 	if (getenv("SSL_CLIENT_DN")) {
 		/* try to get client certificate from stunnel */
-		username = get_tls_username();
+		username = get_tls_username(con);
+
+		if (username == NULL) {
+			clb_print(NC_VERB_ERROR, "cert-to-name was unsuccessful.");
+			return EXIT_FAILURE;
+		}
 
 		/* accept client session and handle capabilities */
 		netconf_con = nc_session_accept_username(capabilities, username);
@@ -377,6 +493,7 @@ int main()
 	/* monitor this session and build statistics */
 	nc_session_monitor(netconf_con);
 
+	/* create the session */
 	if (comm_session_info(con, netconf_con)) {
 		clb_print(NC_VERB_ERROR, "Failed to comunicate with server.");
 		return EXIT_FAILURE;
@@ -438,7 +555,7 @@ int main()
 cleanup:
 	nc_rpc_free(rpc);
 	nc_session_free(netconf_con);
-	nc_close(0);
+	nc_close();
 
 	return (EXIT_SUCCESS);
 }

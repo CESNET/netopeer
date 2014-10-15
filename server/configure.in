@@ -40,6 +40,7 @@
 AC_INIT([netopeer-server], m4_esyscmd([cut -f1 ./VERSION | tr -d '\n']))
 
 m4_include([m4/ax_pthread.m4])
+m4_include([m4/ax_python_module.m4])
 
 PACKAGE_VERSION=`cut -f1 ./VERSION | tr -d '\n'`
 AC_SUBST(PACKAGE_VERSION)
@@ -61,12 +62,31 @@ if test "x$PKG_CONFIG" = "xno"; then
 	AC_MSG_ERROR(['pkgconfig' not found.])
 fi
 
-# Check for sshd (OpenSSH).
-AC_PATH_PROG(SSHD_EXEC, [sshd], [no])
-if test "x$SSHD_EXEC" = "xno"; then
-	AC_MSG_ERROR(['sshd' not found.])
-fi
+# check for roff2html from groff
+AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
+# Check for sshd (OpenSSH).
+AC_ARG_WITH([sshd],
+	AC_HELP_STRING([--with-sshd=PATH],[Set absolute path to the SSH daemon (searched in PATH by default)]),
+	if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
+		SSHD_EXEC="";
+	else
+		AC_MSG_CHECKING([for sshd])
+		SSHD_EXEC="$with_sshd";
+		AC_MSG_RESULT([$SSHD_EXEC])
+	fi,
+	SSHD_EXEC="";
+)
+
+if test -z "$SSHD_EXEC"; then
+	AC_PATH_PROG([SSHD_EXEC], [sshd], [no])
+fi
+if test "x$SSHD_EXEC" = "xno"; then
+	AC_MSG_ERROR([\"sshd\" not found.])
+fi
+if test ! -x "$SSHD_EXEC"; then
+	AC_MSG_ERROR([SSH daemon \"$SSHD_EXEC\" is not executable file.])
+fi
 
 # check for Linux distribution
 AC_ARG_WITH([distro],
@@ -74,9 +94,9 @@ AC_ARG_WITH([distro],
 	DISTRO=`echo $withval | tr A-Z a-z`,
 	if test -n "`cat /proc/version | grep 'Red Hat'`"; then
 		DISTRO=redhat;
-	else		
+	else
 		DISTRO=`cat /etc/*release | grep ^ID= | sed 's/.*=//'`;
-	fi	
+	fi
 )
 AC_MSG_CHECKING([for distro])
 AC_MSG_RESULT([$DISTRO])
@@ -101,22 +121,21 @@ AC_ARG_ENABLE([debug],
 # Add --with-group parameter
 AC_MSG_CHECKING([for group])
 AC_ARG_WITH([group],
-	AC_HELP_STRING([--with-group=GROUP],[Group of users with enabled access to Netopeer server (root by default)]),
-	GROUP="$with_group",
-	GROUP="root"
+	AC_HELP_STRING([--with-group=GROUP],[Limit access to Netopeer server only to the specified group of users]),
+	[
+		GROUP="$with_group"
+		GROUPDEFINE="#define GROUP \"$with_group\""
+		DBUSPOLICY="group=\"$with_group\""
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
+	],
+	GROUP=""
+	GROUPDEFINE="#undef GROUP"
+	DBUSPOLICY="context=\"default\""
 )
 AC_MSG_RESULT([$GROUP])
-
-AC_MSG_CHECKING([for user])
-AC_ARG_WITH([user],
-	AC_HELP_STRING([--with-user=USER],[User to be allowed to start Netopeer server (root by default)]),
-	USER="$with_user",
-	USER="root"
-)
-AC_MSG_RESULT([$USER])
-
-AC_SUBST(USER)
 AC_SUBST(GROUP)
+AC_SUBST(GROUPDEFINE)
+AC_SUBST(DBUSPOLICY)
 
 AC_ARG_ENABLE([dbus],
 	AC_HELP_STRING([--disable-dbus], [Use UNIX sockets instead of DBus.]),
@@ -126,6 +145,7 @@ AC_ARG_ENABLE([dbus],
 	else
 		dbus="yes"
 	fi
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-dbus"
 	,
 	# use DBus by default
 	dbus="yes"
@@ -139,7 +159,7 @@ else
 	HDRS_AGENT_COMM="comm_socket.h"
 	SRCS_AGENT_COMM="comm_socket.c"
 fi
-	
+
 tls="no"
 NCSERVER_FEATURES=""
 AC_ARG_ENABLE([tls],
@@ -147,25 +167,36 @@ AC_ARG_ENABLE([tls],
 	if test "$enableval" = "yes"; then
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature>"
+		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
 	fi
 	TLS="yes"
 	AC_SUBST(TLS)
 )
 
+AC_ARG_WITH([stunnel],
+	AC_HELP_STRING([--with-stunnel=PATH],[Set absolute path to the stunnel (TLS daemon). Makes sense only with --enable-tls option, by default it is searched in PATH.]),
+	if test -z "$with_stunnel" -o "x$with_stunnel" = "xyes"; then
+		STUNNEL_EXEC="";
+	else
+		STUNNEL_EXEC="$with_stunnel";
+	fi,
+	STUNNEL_EXEC=""
+)
+
 if test "$tls" = "yes"; then
 	# check stunnel
-	AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
+	if test -z "$STUNNEL_EXEC"; then
+		AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
+	else
+		AC_MSG_CHECKING([for stunnel])
+		AC_MSG_RESULT([$STUNNEL_EXEC])
+	fi
 	if test "x$STUNNEL_EXEC" = "xno"; then
 		AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
-	else
-		AC_MSG_CHECKING([for NETCONF support in stunnel])
-		if test ! -z "`$STUNNEL_EXEC -version 2>&1 | grep NETCONF`"; then
-			AC_MSG_RESULT([yes])
-			CPPFLAGS="$CPPFLAGS -DPATCHED_STUNNEL"
-		else
-			AC_MSG_RESULT([no])
-		fi
+	elif test ! -x "$STUNNEL_EXEC"; then
+		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" is not executable file.])
+	elif ! $STUNNEL_EXEC -version 2>&1 | grep netopeer &>/dev/null; then
+		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" not patched, read README in \"server/stunnel\".])
 	fi
 fi
 
@@ -208,9 +239,29 @@ case $target_cpu in
         ;;
 esac
 
+#check for c_rehash
+if test "$tls" = "yes"; then
+	AC_PATH_PROG([C_REHASH], [c_rehash], [no])
+	if test "$C_REHASH" = "no"; then
+		AC_MSG_ERROR(["c_rehash not found!"])
+	fi
+	AC_SUBST(C_REHASH)
+fi
 
-# Check for doxygen
-AC_CHECK_PROG(DOXYGEN, doxygen, doxygen)
+# Check python for manager and configurator
+AX_PYTHON_MODULE(os, fatal)
+AX_PYTHON_MODULE(curses, fatal)
+AX_PYTHON_MODULE(libxml2, fatal)
+AX_PYTHON_MODULE(subprocess, fatal)
+AX_PYTHON_MODULE(re, fatal)
+AX_PYTHON_MODULE(string, fatal)
+AX_PYTHON_MODULE(argparse, fatal)
+AX_PYTHON_MODULE(xml, fatal)
+if test "$tls" = "yes"; then
+	AX_PYTHON_MODULE(M2Crypto, fatal)
+	AX_PYTHON_MODULE(shutil, fatal)
+	AX_PYTHON_MODULE(signal, fatal)
+fi
 
 # Check for rpmbuil
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
@@ -249,11 +300,13 @@ AC_ARG_WITH([libnetconf],
 	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
 	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
 	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
+	LIBNETCONF_DATADIR="$withval/share/"
 	],[
 	# get info from pkg-config about installed package
 	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
 	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
-	LIBS="$LIBNETCONF_LIBS $LIBS"]
+	LIBS="$LIBNETCONF_LIBS $LIBS"
+	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
 )
 AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found.]))
 AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [], AC_MSG_ERROR([libnetconf does not support notifications.]))
@@ -266,7 +319,7 @@ if test "$dbus" = "yes"; then
 	AGENT_SRCS_COMM="src/agent_comm_dbus.c"
 	SERVER_SRCS_COMM="src/server_comm_dbus.c"
 	AGENT_HDRS_COMM="src/netopeer_dbus.h"
-	SERVER_HDRS_COMM="src/netopeer-dbus.h"
+	SERVER_HDRS_COMM="src/netopeer_dbus.h"
 
 	# - library
 	AC_ARG_WITH([libdbus],
@@ -295,7 +348,9 @@ if test "$dbus" = "yes"; then
 		AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
 	else
 		AC_MSG_RESULT([ok])
+		DBUSCONFFILE="$DBUSCONF/org.liberouter.netopeer.conf"
 		AC_SUBST(DBUSCONF)
+		AC_SUBST(DBUSCONFFILE)
 	fi
 
 	# - services directory
@@ -317,6 +372,9 @@ if test "$dbus" = "yes"; then
 				AC_SUBST(DBUSSERVICES)
 			fi
 			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
+			DBUSSERVICESFILE="$DBUSSERVICES/org.liberouter.netopeer.server.service"
+			AC_SUBST(DBUSSERVICES)
+			AC_SUBST(DBUSSERVICESFILE)
 			,
 			# do not install DBus service file anywhere
 			DBUSSERVICES=""
@@ -335,10 +393,10 @@ if test "$dbus" = "yes"; then
 			;;
 	esac
 else
-	AGENT_SRCS_COMM="src/agent_comm_socket.c"
-	SERVER_SRCS_COMM="src/server_comm_socket.c"
+	AGENT_SRCS_COMM="src/agent_comm_socket.c src/comm_socket.c"
+	SERVER_SRCS_COMM="src/server_comm_socket.c src/comm_socket.c"
 	AGENT_HDRS_COMM="src/netopeer_socket.h"
-	SERVER_HDRS_COMM="src/netopeer-socket.h"
+	SERVER_HDRS_COMM="src/netopeer_socket.h"
 fi
 
 SERVER_LIBS=$LIBS
@@ -350,6 +408,21 @@ AX_PTHREAD([
 	CC="$PTHREAD_CC"],
 	AC_MSG_ERROR([Missing POSIX threads support.])
 )
+
+# specify netopeer modules location
+AC_ARG_WITH([modules-dir],
+	AC_HELP_STRING([--with-modules-dir=DIR],
+		[path to directory where netopeer modules configuration will be stored
+		($(sysconfdir)/netopeer/modules.conf.d/ by default)])
+	,
+	MODULESDIR="$withval"
+	,
+	MODULESDIR="${sysconfdir}/netopeer/modules.conf.d/"
+)
+
+# remove backup files
+rm -f config/Netopeer.xml.orig
+rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 
@@ -368,9 +441,11 @@ AC_CHECK_FUNCS([select strdup strerror])
 ############################### Set output #####################################
 AC_SUBST(SSHD_EXEC)
 AC_SUBST(STUNNEL_EXEC)
+AC_SUBST(ROFF2HTML)
 AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
+AC_SUBST(LIBNETCONF_DATADIR)
 AC_SUBST(DISTRO)
 AC_SUBST(AGENT_SRCS_COMM)
 AC_SUBST(SERVER_SRCS_COMM)
@@ -379,11 +454,7 @@ AC_SUBST(SERVER_HDRS_COMM)
 AC_SUBST(SERVER_LIBS)
 AC_SUBST(AGENT_LIBS)
 AC_SUBST(NCSERVER_FEATURES)
-
-AC_SUBST(DOXYGEN)
-if test -z "$DOXYGEN"; then
-	AC_MSG_WARN([Due to missing doxygen you will not able to generate Doxygen documentation.])
-fi
+AC_SUBST(MODULESDIR)
 
 AC_SUBST(RPMBUILD)
 if test -z "$RPMBUILD"; then
@@ -391,15 +462,17 @@ if test -z "$RPMBUILD"; then
 fi
 
 AC_CONFIG_FILES(Makefile)
-AC_CONFIG_FILES(manager/Makefile)
+AC_CONFIG_FILES(manager/netopeer-manager.tmp:manager/netopeer-manager.in)
 AC_CONFIG_FILES(config/org.liberouter.netopeer.conf)
 AC_CONFIG_FILES(config/org.liberouter.netopeer.server.service)
-AC_CONFIG_FILES(config/Netopeer.xml)
-AC_CONFIG_FILES(config/NETCONF-server.xml)
+AC_CONFIG_FILES(config/Netopeer.xml.tmp:config/Netopeer.xml.in)
+AC_CONFIG_FILES(config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in)
+AC_CONFIG_FILES(config/ietf-netconf-server-data.rng)
+AC_CONFIG_FILES(config/netopeer-cfgnetopeer-data.rng)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
 AC_CONFIG_FILES(src/config.h)
-AC_CONFIG_FILES(stunnel/stunnel.conf)
+AC_CONFIG_FILES(configurator/netopeer/config.py)
 
 AC_CONFIG_FILES(src/openwrt/ietf-system.xml)
 AC_CONFIG_FILES(src/openwrt/Makefile.ietf-system)

@@ -49,7 +49,7 @@
 
 #define BUS_FLAGS DBUS_NAME_FLAG_DO_NOT_QUEUE
 
-conn_t* comm_init()
+conn_t* comm_init(int __attribute__((unused)) crashed)
 {
 	int i;
 	DBusConnection *ret = NULL;
@@ -430,6 +430,7 @@ static void kill_session (DBusConnection *conn, DBusMessage *msg)
 	dbus_bool_t boolean;
 	nc_reply * reply;
 
+	boolean = 0;
 
 	if (msg) {
 		if (!dbus_message_iter_init(msg, &args)) {
@@ -509,6 +510,75 @@ send_reply:
 	dbus_connection_flush (conn);
 	dbus_message_unref(dbus_reply);
 }
+
+#ifdef ENABLE_TLS
+
+/**
+ * @brief Translate a certificate from a client connected to Netopeer agent to
+ * a username. The function sends reply to the Netopeer agent.
+ *
+ * @param conn DBus connection to the Netopeer agent
+ * @param msg CertToName DBus message from the Netopeer agent
+ */
+static void cert_to_name (DBusConnection *conn, DBusMessage *msg)
+{
+	DBusMessageIter args;
+	char* aux_string, *str_msg = NULL, *username, **strs = NULL;
+	int strs_len;
+	DBusMessage* dbus_reply;
+	dbus_bool_t boolean;
+
+	if (!dbus_message_iter_init (msg, &args)) {
+		nc_verb_error("%s: DBus message has no arguments.", NTPR_SRV_CERT_TO_NAME);
+		_dbus_error_reply(msg, conn, DBUS_ERROR_FAILED, "DBus communication error.");
+		return;
+	} else {
+		do {
+			dbus_message_iter_get_basic(&args, &aux_string);
+
+			if (strs == NULL) {
+				strs_len = 1;
+				strs = malloc(sizeof(char*));
+			} else {
+				++strs_len;
+				strs = realloc(strs, strs_len * sizeof(char*));
+			}
+			strs[strs_len-1] = aux_string;
+		} while (dbus_message_iter_next(&args));
+		strs = realloc(strs, (strs_len+1) * sizeof(char*));
+		strs[strs_len] = NULL;
+
+		username = server_cert_to_name((const char**)strs, &str_msg);
+
+		free(strs);
+
+		if (username == NULL) {
+			aux_string = str_msg;
+			boolean = 0;
+		} else {
+			aux_string = username;
+			boolean = 1;
+		}
+
+		/* send D-Bus reply */
+		dbus_reply = dbus_message_new_method_return(msg);
+		if (dbus_reply == NULL) {
+			nc_verb_error("cert_to_name(): Failed to create dbus reply message (%s:%d).", __FILE__, __LINE__);
+			return;
+		}
+
+		dbus_message_iter_init_append(dbus_reply, &args);
+		dbus_message_iter_append_basic(&args, DBUS_TYPE_BOOLEAN, &boolean);
+		dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &aux_string);
+		free(aux_string);
+
+		dbus_connection_send(conn, dbus_reply, NULL);
+		dbus_connection_flush(conn);
+		dbus_message_unref(dbus_reply);
+	}
+}
+
+#endif /* ENABLE_TLS */
 
 /**
  * @brief Take care of all others NETCONF operation. Based on namespace
@@ -623,6 +693,11 @@ int comm_loop(conn_t* conn, int timeout)
 			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_KILL_SESSION) == TRUE) {
 				/* KillSession request */
 				kill_session(conn, msg);
+#ifdef ENABLE_TLS
+			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_CERT_TO_NAME) == TRUE) {
+				/* CertToName request */
+				cert_to_name(conn, msg);
+#endif
 			} else if (dbus_message_is_method_call(msg, NTPR_DBUS_SRV_IF, NTPR_SRV_PROCESS_OP) == TRUE) {
 				/* All other requests */
 				process_operation(conn, msg);

@@ -14,34 +14,38 @@ char some_msg[4096];
 #  define UNUSED(x) UNUSED_ ## x
 #endif
 
-int cmd_connect(char* arg);
-int cmd_listen(char* arg);
-int cmd_disconnect(char* arg);
-int cmd_copyconfig (char *arg);
-int cmd_deleteconfig (char *arg);
-int cmd_editconfig (char *arg);
-int cmd_get(char *arg);
-int cmd_getconfig(char *arg);
-int cmd_help(char* arg);
-int cmd_killsession(char *arg);
-int cmd_lock(char *arg);
-int cmd_subscribe(char *arg);
-int cmd_unlock(char *arg);
-int cmd_validate(char *arg);
-int cmd_status(char* arg);
-int cmd_quit(char* arg);
-int cmd_debug(char *arg);
-int cmd_verbose(char *arg);
-int cmd_userrpc(char *arg);
-int cmd_commit(char* arg);
-int cmd_getschema(char* arg);
-int cmd_discardchanges(char* arg);
-int cmd_capability(char *arg);
+int cmd_connect(const char* arg);
+int cmd_listen(const char* arg);
+int cmd_disconnect(const char* arg);
+int cmd_copyconfig (const char *arg);
+int cmd_deleteconfig (const char *arg);
+int cmd_editconfig (const char *arg);
+int cmd_get(const char *arg);
+int cmd_getconfig(const char *arg);
+int cmd_help(const char* arg);
+int cmd_killsession(const char *arg);
+int cmd_lock(const char *arg);
+int cmd_subscribe(const char *arg);
+int cmd_unlock(const char *arg);
+int cmd_validate(const char *arg);
+int cmd_status(const char* arg);
+#ifdef ENABLE_TLS
+int cmd_cert(const char* arg);
+int cmd_crl(const char* arg);
+#endif
+int cmd_quit(const char* arg);
+int cmd_debug(const char *arg);
+int cmd_verbose(const char *arg);
+int cmd_userrpc(const char *arg);
+int cmd_commit(const char* arg);
+int cmd_getschema(const char* arg);
+int cmd_discardchanges(const char* arg);
+int cmd_capability(const char *arg);
 
 typedef struct
 {
 	char *name; /* User printable name of the function. */
-	int (*func)(char*); /* Function to call to do the command. */
+	int (*func)(const char*); /* Function to call to do the command. */
 	char *helpstring; /* Documentation for this function.  */
 } COMMAND;
 

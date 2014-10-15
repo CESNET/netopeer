@@ -58,6 +58,8 @@
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
+int server_start = 0;
+
 /**
  * \brief Print program version
  *
@@ -77,7 +79,7 @@ static void print_version (char *progname)
  */
 static void print_usage (char * progname)
 {
-	fprintf (stdout, "Usage: %s [-hV] [-v level]\n", progname);
+	fprintf (stdout, "Usage: %s [-dhV] [-v level]\n", progname);
 	fprintf (stdout, " -d                  daemonize server\n");
 	fprintf (stdout, " -h                  display help\n");
 	fprintf (stdout, " -v level            verbose output level\n");
@@ -96,7 +98,7 @@ static void print_usage (char * progname)
  */
 void signal_handler (int sig)
 {
-	nc_verb_verbose("Signal %d received.", sig);
+//	nc_verb_verbose("Signal %d received.", sig);
 
 	switch (sig) {
 	case SIGINT:
@@ -109,12 +111,17 @@ void signal_handler (int sig)
 			done = 1;
 		} else {
 			/* second attempt */
-			nc_verb_error("Hey! I need some time to stop, be patient next time!");
+//			nc_verb_error("Hey! I need some time to stop, be patient next time!");
 			exit (EXIT_FAILURE);
 		}
 		break;
+	case SIGHUP:
+		/* restart the daemon */
+		restart_soft = 1;
+		done = 1;
+		break;
 	default:
-		nc_verb_error("exiting on signal: %d", sig);
+//		nc_verb_error("exiting on signal: %d", sig);
 		exit (EXIT_FAILURE);
 		break;
 	}
@@ -128,7 +135,7 @@ int main (int argc, char** argv)
 	sigset_t block_mask;
 
 	char *aux_string = NULL, path[PATH_MAX];
-	int next_option;
+	int next_option, ret;
 	int daemonize = 0, len;
 	int verbose = 0;
 	struct module * netopeer_module = NULL, *server_module = NULL;
@@ -173,6 +180,7 @@ int main (int argc, char** argv)
 	sigaction (SIGABRT, &action, NULL);
 	sigaction (SIGTERM, &action, NULL);
 	sigaction (SIGKILL, &action, NULL);
+	sigaction (SIGHUP, &action, NULL);
 
 	nc_callback_print (clb_print);
 
@@ -196,10 +204,9 @@ int main (int argc, char** argv)
 		openlog("netopeer-server", LOG_PID|LOG_PERROR, LOG_DAEMON);
 	}
 
-	/* Initiate communication subsystem for communicate with agents */
-	conn = comm_init();
-	if (conn == NULL) {
-		nc_verb_error("Communication subsystem not initiated.");
+	/* make sure we were executed by root */
+	if (geteuid() != 0) {
+		nc_verb_error("Failed to start, must have root privileges.");
 		return (EXIT_FAILURE);
 	}
 
@@ -211,15 +218,25 @@ int main (int argc, char** argv)
 	LIBXML_TEST_VERSION
 
 	/* initialize library including internal datastores and maybee something more */
-	if (nc_init (NC_INIT_ALL) < 0) {
+	if ((ret = nc_init (NC_INIT_ALL | NC_INIT_MULTILAYER)) < 0) {
 		nc_verb_error("Library initialization failed.");
 		return (EXIT_FAILURE);
 	}
+
+	/* Initiate communication subsystem for communicate with agents */
+	conn = comm_init(ret & NC_INITRET_RECOVERY);
+	if (conn == NULL) {
+		nc_verb_error("Communication subsystem not initiated.");
+		return (EXIT_FAILURE);
+	}
+
+	server_start = 1;
 
 restart:
 	/* start NETCONF server module */
 	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary NETCONF server plugin failed!");
+		comm_destroy(conn);
 		return(EXIT_FAILURE);
 	}
 	server_module->name = strdup(NCSERVER_MODULE_NAME);
@@ -227,6 +244,7 @@ restart:
 		nc_verb_error("Starting necessary NETCONF server plugin failed!");
 		free(server_module->name);
 		free(server_module);
+		comm_destroy(conn);
 		return EXIT_FAILURE;
 	}
 
@@ -235,6 +253,7 @@ restart:
 	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary Netopeer plugin failed!");
 		module_disable(server_module, 1);
+		comm_destroy(conn);
 		return(EXIT_FAILURE);
 	}
 	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
@@ -243,9 +262,11 @@ restart:
 		module_disable(server_module, 1);
 		free(netopeer_module->name);
 		free(netopeer_module);
+		comm_destroy(conn);
 		return EXIT_FAILURE;
 	}
 
+	server_start = 0;
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
@@ -262,7 +283,7 @@ restart:
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
 		comm_destroy(conn);
 		server_sessions_destroy_all ();
-		nc_close (1);
+		nc_close ();
 	}
 
 	/*
