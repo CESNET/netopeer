@@ -1,3 +1,12 @@
+cfginterfaces
+-------------
+
+Only interfaces with existing ifcfg configuration files are
+managed by cfginterfaces module, the rest is ignored.
+Nevertheless, even unmanaged interfaces are displayed in
+the inetrfaces-state tree.
+
+
 Model node semantics
 --------------------
 
