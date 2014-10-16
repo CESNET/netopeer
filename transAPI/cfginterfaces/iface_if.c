@@ -189,7 +189,7 @@ static char* read_from_sys_net(const char* if_name, const char* variable) {
 /* variables ending with the "x" suffix get a unique suffix instead,
  * other variables are rewritten if found in the file
  */
-static int write_ifcfg_var(const char* if_name, const char* variable, const char* value) {
+static int write_ifcfg_var(const char* if_name, const char* variable, const char* value, char** suffix) {
 #if defined(REDHAT) || defined(SUSE)
 	int fd = -1, i;
 	unsigned int size;
@@ -231,6 +231,9 @@ static int write_ifcfg_var(const char* if_name, const char* variable, const char
 			++i;
 			ptr = strstr(content, new_var);
 		} while (ptr != NULL);
+		if (suffix != NULL) {
+			asprintf(suffix, "%d", i-1);
+		}
 	} else {
 		ptr = content;
 		while ((ptr = strstr(ptr, variable)) != NULL) {
@@ -765,10 +768,10 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg) {
 
 	/* permanent */
 #ifdef REDHAT
-	if (write_ifcfg_var(if_name, "ONBOOT", (boolean ? "yes" : "no")) != EXIT_SUCCESS)
+	if (write_ifcfg_var(if_name, "ONBOOT", (boolean ? "yes" : "no"), NULL) != EXIT_SUCCESS)
 #endif
 #ifdef SUSE
-	if (write_ifcfg_var(if_name, "STARTMODE", (boolean ? "auto" : "off")) != EXIT_SUCCESS)
+	if (write_ifcfg_var(if_name, "STARTMODE", (boolean ? "auto" : "off"), NULL) != EXIT_SUCCESS)
 #endif
 	{
 		asprintf(msg, "%s: failed to write to ifcfg file of %s.", __func__, if_name);
@@ -811,7 +814,7 @@ int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
 	}
 
 	/* permanent */
-	if (write_ifcfg_var(if_name, "MTU", str_mtu) != EXIT_SUCCESS) {
+	if (write_ifcfg_var(if_name, "MTU", str_mtu, NULL) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
@@ -850,17 +853,17 @@ int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 #ifdef REDHAT
 	sprintf(str_prefix, "%d", prefix);
 	if (op & XMLDIFF_ADD) {
-		if (write_ifcfg_var(if_name, "IPADDRx", ip) != EXIT_SUCCESS) {
+		if (write_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			return EXIT_FAILURE;
 		}
-		/* let's assume the suffix will be equal to that of IPADDR, should normally be */
-		if (write_ifcfg_var(if_name, "PREFIXx", str_prefix) != EXIT_SUCCESS) {
+		asprintf(&value, "PREFIX%s", suffix);
+		free(suffix);
+		if (write_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			free(value);
 			return EXIT_FAILURE;
 		}
-		free(value);
 	} else {
 		if (remove_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
 			free(suffix);
@@ -868,18 +871,23 @@ int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 			return EXIT_FAILURE;
 		}
 		asprintf(&value, "PREFIX%s", suffix);
-		free(suffix);
 		if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
 			free(value);
-			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
+			asprintf(&value, "NETMASK%s", suffix);
+			if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
+				free(value);
+				free(suffix);
+				asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
 		}
+		free(suffix);
 	}
 #endif
 #ifdef SUSE
 	asprintf(&value, "%s/%d", ip, prefix);
 	if (op & XMLDIFF_ADD) {
-		if (write_ifcfg_var(if_name, "IPADDRx", value) != EXIT_SUCCESS) {
+		if (write_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
 			free(value);
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			return EXIT_FAILURE;
@@ -957,7 +965,7 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 
 	if (op & XMLDIFF_ADD) {
 #ifdef SUSE
-		if (write_ifcfg_var(if_name, "POST_UP_SCRIPT", path) != EXIT_SUCCESS) {
+		if (write_ifcfg_var(if_name, "POST_UP_SCRIPT", path, NULL) != EXIT_SUCCESS) {
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			goto fail;
 		}
@@ -1198,10 +1206,10 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 	/* permanent */
 	if (!is_loopback) {
 #ifdef REDHAT
-		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none")) != EXIT_SUCCESS)
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none"), NULL) != EXIT_SUCCESS)
 #endif
 #ifdef SUSE
-		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static")) != EXIT_SUCCESS)
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static"), NULL) != EXIT_SUCCESS)
 #endif
 		{
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
@@ -1238,7 +1246,7 @@ int iface_ipv6_mtu(const char* if_name, unsigned short mtu, char** msg) {
 
 	/* permanent */
 #ifdef REDHAT
-	if (write_ifcfg_var(if_name, "IPV6_MTU", str_mtu) != EXIT_SUCCESS) {
+	if (write_ifcfg_var(if_name, "IPV6_MTU", str_mtu, NULL) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
@@ -1287,7 +1295,7 @@ int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 		var = read_ifcfg_var(if_name, "IPV6ADDR");
 		if (var == NULL) {
 			/* no IPV6ADDR entry, add it */
-			if (write_ifcfg_var(if_name, "IPV6ADDR", value) != EXIT_SUCCESS) {
+			if (write_ifcfg_var(if_name, "IPV6ADDR", value, NULL) != EXIT_SUCCESS) {
 				free(value);
 				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 				return EXIT_FAILURE;
@@ -1317,7 +1325,7 @@ int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 					asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
 					return EXIT_FAILURE;
 				}
-				if (write_ifcfg_var(if_name, "IPV6ADDR", var) != EXIT_SUCCESS) {
+				if (write_ifcfg_var(if_name, "IPV6ADDR", var, NULL) != EXIT_SUCCESS) {
 					free(var);
 					free(value);
 					asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
@@ -1395,7 +1403,7 @@ int iface_ipv6_creat_glob_addr(const char* if_name, unsigned char boolean, char*
 
 	/* permanent */
 #ifdef REDHAT
-	if (write_ifcfg_var(if_name, "IPV6_AUTOCONF", (boolean ? "yes" : "no")) != EXIT_SUCCESS) {
+	if (write_ifcfg_var(if_name, "IPV6_AUTOCONF", (boolean ? "yes" : "no"), NULL) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
@@ -1493,7 +1501,7 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 
 	/* permanent */
 #ifdef REDHAT
-	if (write_ifcfg_var(if_name, "IPV6INIT", (boolean ? "yes" : "no")) != EXIT_SUCCESS) {
+	if (write_ifcfg_var(if_name, "IPV6INIT", (boolean ? "yes" : "no"), NULL) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
