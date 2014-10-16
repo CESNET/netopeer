@@ -938,8 +938,8 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 		return EXIT_SUCCESS;
 	}
 
-	iface_ipv4addr_ignore = 1;
 	ret = iface_ipv4_enabled(iface_name, enabled, node, loopback, &msg);
+	iface_ipv4addr_ignore = 1;
 	return finish(msg, ret, error);
 }
 
