@@ -400,9 +400,13 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 		new_var = strndup(variable, strlen(variable)-1);
 		/* find the variable with the exact same value */
 		ptr = strstr(content, new_var);
-		while (strncmp(strchr(ptr, '=')+1, value, strlen(value)) != 0) {
+		if (strchr(ptr, '=') == NULL) {
+			/* should never happen */
+			goto fail;
+		}
+		while (ptr != NULL && strncmp(strchr(ptr, '=')+1, value, strlen(value)) != 0) {
 			ptr = strstr(ptr+1, new_var);
-			if (ptr == NULL) {
+			if (strchr(ptr, '=') == NULL) {
 				break;
 			}
 		}
