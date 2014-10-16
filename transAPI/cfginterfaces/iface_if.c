@@ -193,7 +193,7 @@ static int write_ifcfg_var(const char* if_name, const char* variable, const char
 #if defined(REDHAT) || defined(SUSE)
 	int fd = -1, i;
 	unsigned int size;
-	char* path, *content = NULL, *ptr, *tmp = NULL, *new_var = NULL;
+	char* path, *content = NULL, *ptr, *ptr2, *tmp = NULL, *new_var = NULL;
 
 	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
 
@@ -224,9 +224,10 @@ static int write_ifcfg_var(const char* if_name, const char* variable, const char
 		/* generate a unique suffix */
 		i = 0;
 		new_var = malloc(strlen(variable)+5);
+		ptr2 = new_var+strlen(variable)-1;
 		do {
 			strncpy(new_var, variable, strlen(variable)-1);
-			sprintf(new_var+strlen(new_var), "%d", i);
+			sprintf(ptr2, "%d", i);
 			++i;
 			ptr = strstr(content, new_var);
 		} while (ptr != NULL);
