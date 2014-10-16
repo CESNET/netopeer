@@ -1081,7 +1081,7 @@ fail:
 }
 
 /* enabled - 0 (disable), 1 (enable DHCP), 2 (enable static) */
-int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, char** msg) {
+int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg) {
 	xmlNodePtr cur;
 	char* cmd, *line = NULL;
 	FILE* output;
@@ -1089,25 +1089,27 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 
 	/* kill DHCP daemon and flush IPv4 addresses */
 	if (enabled == 0 || enabled == 2) {
-		asprintf(&cmd, DHCP_CLIENT_RELEASE " %s 2>&1", if_name);
-		output = popen(cmd, "r");
-		free(cmd);
+		if (!is_loopback) {
+			asprintf(&cmd, DHCP_CLIENT_RELEASE " %s 2>&1", if_name);
+			output = popen(cmd, "r");
+			free(cmd);
 
-		if (output == NULL) {
-			asprintf(msg, "%s: failed to execute a command.", __func__);
-			return EXIT_FAILURE;
-		}
+			if (output == NULL) {
+				asprintf(msg, "%s: failed to execute a command.", __func__);
+				return EXIT_FAILURE;
+			}
 
-		if (getline(&line, &len, output) != -1 && strstr(line, "dhcpcd not running") == NULL) {
-			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+			if (getline(&line, &len, output) != -1 && strstr(line, "dhcpcd not running") == NULL) {
+				asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+				free(line);
+				pclose(output);
+				return EXIT_FAILURE;
+			}
+
 			free(line);
+			line = NULL;
 			pclose(output);
-			return EXIT_FAILURE;
 		}
-
-		free(line);
-		line = NULL;
-		pclose(output);
 
 		asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", if_name);
 		output = popen(cmd, "r");
@@ -1150,24 +1152,26 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 		line = NULL;
 		pclose(output);
 
-		asprintf(&cmd, DHCP_CLIENT_RENEW " %s 2>&1", if_name);
-		output = popen(cmd, "r");
-		free(cmd);
+		if (!is_loopback) {
+			asprintf(&cmd, DHCP_CLIENT_RENEW " %s 2>&1", if_name);
+			output = popen(cmd, "r");
+			free(cmd);
 
-		if (output == NULL) {
-			asprintf(msg, "%s: failed to execute a command.", __func__);
-			return EXIT_FAILURE;
-		}
+			if (output == NULL) {
+				asprintf(msg, "%s: failed to execute a command.", __func__);
+				return EXIT_FAILURE;
+			}
 
-		if (getline(&line, &len, output) != -1) {
-			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+			if (getline(&line, &len, output) != -1) {
+				asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+				free(line);
+				pclose(output);
+				return EXIT_FAILURE;
+			}
+
 			free(line);
 			pclose(output);
-			return EXIT_FAILURE;
 		}
-
-		free(line);
-		pclose(output);
 	}
 
 	/* add all the configured static addresses */
@@ -1192,15 +1196,17 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 	}
 
 	/* permanent */
+	if (!is_loopback) {
 #ifdef REDHAT
-	if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none")) != EXIT_SUCCESS)
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none")) != EXIT_SUCCESS)
 #endif
 #ifdef SUSE
-	if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static")) != EXIT_SUCCESS)
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static")) != EXIT_SUCCESS)
 #endif
-	{
-		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-		return EXIT_FAILURE;
+		{
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
 	}
 
 	return EXIT_SUCCESS;

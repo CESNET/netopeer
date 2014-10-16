@@ -827,13 +827,33 @@ int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
-	char* msg = NULL;
+	xmlNodePtr cur;
+	char* msg = NULL, *ptr;
+	unsigned char loopback = 0;
 
 	if (iface_ignore) {
 		return EXIT_SUCCESS;
 	}
 
 	iface_ipv4addr_ignore = 0;
+
+	/* learn the interface type */
+	for (cur = node->parent->children; cur != NULL; cur=cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
+
+		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
+			ptr = (char*)cur->children->content;
+			if (strchr(ptr, ':') != NULL) {
+				ptr = strchr(ptr, ':')+1;
+			}
+			if (strcmp(ptr, "softwareLoopback") == 0) {
+				loopback = 1;
+			}
+			break;
+		}
+	}
 
 	if (op & XMLDIFF_ADD) {
 		/* set default values of the leaf children (enabled, forwarding)
@@ -843,12 +863,12 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 			return finish(msg, EXIT_FAILURE, error);
 		}
 		/* enable static IPv4 */
-		if (iface_ipv4_enabled(iface_name, 2, NULL, &msg) != EXIT_SUCCESS) {
+		if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
 			return finish(msg, EXIT_FAILURE, error);
 		}
 	} else if (op & XMLDIFF_REM) {
 		/* "disable" */
-		if (iface_ipv4_enabled(iface_name, 0, NULL, &msg) != EXIT_SUCCESS) {
+		if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
 			return finish(msg, EXIT_FAILURE, error);
 		}
 	}
@@ -900,7 +920,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 	}
 
 	iface_ipv4addr_ignore = 1;
-	ret = iface_ipv4_enabled(iface_name, enabled, node, &msg);
+	ret = iface_ipv4_enabled(iface_name, enabled, node, 0, &msg);
 	return finish(msg, ret, error);
 }
 

@@ -30,11 +30,13 @@ configuration. If there are none set, this configuration
 equals having IPv4 disabled on this interface (missing
 "ipv4" container).
 
-Having "ipv4" container and "enabled" set on "false", DHCP
+Having "ipv4" container and "enabled" set to "false", DHCP
 client is started and manages this interface. Nevertheless,
 note that any "address" nodes are still valid and these IPv4
 addresses are assigned to the interface in addition to any
-addresses received by DHCP.
+addresses received by DHCP. Specially for loopback
+interfaces, this equals to the situation with "enabled" set
+to "true".
 
 /interfaces-state/interface/higher-layer-if
 /interfaces-state/interface/lower-layer-if
