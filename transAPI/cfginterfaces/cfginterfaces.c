@@ -890,8 +890,9 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	int ret;
-	char* msg = NULL;
-	unsigned char enabled = 3;
+	xmlNodePtr cur;
+	char* msg = NULL, *ptr;
+	unsigned char enabled = 3, loopback = 0;
 
 	if (iface_ignore) {
 		return EXIT_SUCCESS;
@@ -900,6 +901,24 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 	if (node->children == NULL || node->children->content == NULL) {
 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
 		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	/* learn the interface type */
+	for (cur = node->parent->parent->children; cur != NULL; cur=cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
+
+		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
+			ptr = (char*)cur->children->content;
+			if (strchr(ptr, ':') != NULL) {
+				ptr = strchr(ptr, ':')+1;
+			}
+			if (strcmp(ptr, "softwareLoopback") == 0) {
+				loopback = 1;
+			}
+			break;
+		}
 	}
 
 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
@@ -920,7 +939,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 	}
 
 	iface_ipv4addr_ignore = 1;
-	ret = iface_ipv4_enabled(iface_name, enabled, node, 0, &msg);
+	ret = iface_ipv4_enabled(iface_name, enabled, node, loopback, &msg);
 	return finish(msg, ret, error);
 }
 
