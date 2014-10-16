@@ -1517,7 +1517,8 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char** msg) {
 	DIR* dir;
 	struct dirent* dent;
-	char** ret = NULL, *path;
+	char** ret = NULL, *path, *value, *variable, *suffix = NULL;
+	unsigned char normalized;
 
 	if ((dir = opendir("/sys/class/net")) == NULL) {
 		asprintf(msg, "%s: failed to open \"/sys/class/net\" (%s).", __func__, strerror(errno));
@@ -1537,6 +1538,42 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 				continue;
 			}
 			free(path);
+
+			/* "normalize" the ifcfg file */
+			normalized = 1;
+			if ((value = read_ifcfg_var(dent->d_name, "IPADDR")) != NULL) {
+				if (remove_ifcfg_var(dent->d_name, "IPADDR", value, NULL) != EXIT_SUCCESS ||
+						write_ifcfg_var(dent->d_name, "IPADDRx", value, &suffix) != EXIT_SUCCESS) {
+					normalized = 0;
+				}
+				free(value);
+
+				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "PREFIX")) != NULL) {
+					asprintf(&variable, "PREFIX%s", suffix);
+					if (remove_ifcfg_var(dent->d_name, "PREFIX", value, NULL) != EXIT_SUCCESS ||
+							write_ifcfg_var(dent->d_name, variable, value, NULL) != EXIT_SUCCESS) {
+						normalized = 0;
+					}
+					free(value);
+					free(variable);
+				}
+
+				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "NETMASK")) != NULL) {
+					asprintf(&variable, "NETMASK%s", suffix);
+					if (remove_ifcfg_var(dent->d_name, "NETMASK", value, NULL) != EXIT_SUCCESS ||
+							write_ifcfg_var(dent->d_name, variable, value, NULL) != EXIT_SUCCESS) {
+						normalized = 0;
+					}
+					free(value);
+					free(variable);
+				}
+				free(suffix);
+				suffix = NULL;
+			}
+
+			if (!normalized) {
+				asprintf(&value, "%s: failed to normalize ifcfg-%s, some configuration problems may occur.", __func__, dent->d_name);
+			}
 		}
 
 		/* add a device */
