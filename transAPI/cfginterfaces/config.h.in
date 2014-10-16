@@ -1,0 +1,26 @@
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
+
+#define @DISTRO@
+
+/* avahi SW presence */
+#define @AVAHI_DAEMON@
+#define @AVAHI_AUTOIPD@
+
+/* installed DHCP client (the command followed by the interface) */
+#define DHCP_CLIENT_RENEW "@DHCP_CLIENT_RENEW@"
+#define DHCP_CLIENT_RELEASE "@DHCP_CLIENT_RELEASE@"
+
+/* path to the device statistics file */
+#define DEV_STATS_PATH "/proc/net/dev"
+
+/* directory with ifcfg scripts (on Debian a single file) */
+#define IFCFG_FILES_PATH "@IFCFG_FILES@"
+
+/* directory with additional bash scripts (executed by if(up/down)) */
+#define IFCFG_SCRIPTS_PATH "@IFCFG_SCRIPTS@"
+
+/* sysctl script */
+#define SYSCTL_CONF_PATH "@SYSCTL_CONF@"
+
+#endif /* _CONFIG_H_ */
