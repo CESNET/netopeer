@@ -18,7 +18,7 @@
 
 extern int callback_if_interfaces_if_interface_ip_ipv4_ip_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error);
 
-/* /proc/sys/net/(ipv4,ipv6)/conf/(if_name)/(variable) = value */
+/* /proc/sys/net/(ipv4,ipv6)/conf/(if_name)/(variable) = (value) */
 static int write_to_proc_net(unsigned char ipv4, const char* if_name, const char* variable, const char* value) {
 	int fd;
 	char* full_path;
@@ -141,7 +141,7 @@ fail:
 	return EXIT_FAILURE;
 }
 
-/* /sys/class/net/(if_name)/(variable) */
+/* /sys/class/net/(if_name)/(variable) = (value) */
 static int write_to_sys_net(const char* if_name, const char* variable, const char* value) {
 	int fd;
 	char* full_path;
