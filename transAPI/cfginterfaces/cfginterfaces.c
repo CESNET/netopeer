@@ -168,7 +168,7 @@ static int get_running_neighbors(char* if_name, struct ip_addrs* neighs, char** 
 }
 
 static int finish(char* msg, int ret, struct nc_err** error) {
-	if (error != NULL) {
+	if (ret != EXIT_SUCCESS && error != NULL) {
 		*error = nc_err_new(NC_ERR_OP_FAILED);
 		if (msg != NULL) {
 			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
