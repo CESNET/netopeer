@@ -1,10 +1,15 @@
 cfginterfaces
 -------------
 
-Only interfaces with existing ifcfg configuration files are
-managed by cfginterfaces module, the rest is ignored.
-Nevertheless, even unmanaged interfaces are displayed in
-the inetrfaces-state tree.
+Currently supported distributions: SUSE-based, RedHat-based
+Planned to be supported in future: Debian-based
+
+Since NetworkManager is not used for configuration, but
+traditional ifcfg-* scripts, only interfaces with an
+existing ifcfg configuration file are managed by
+cfginterfaces module, the rest is ignored. Nevertheless,
+even unmanaged interfaces are displayed in the
+"interfaces-state" tree.
 
 
 Model node semantics
