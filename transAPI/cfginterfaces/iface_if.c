@@ -844,13 +844,13 @@ int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 
 	/* permanent */
 #ifdef REDHAT
+	sprintf(str_prefix, "%d", prefix);
 	if (op & XMLDIFF_ADD) {
 		if (write_ifcfg_var(if_name, "IPADDRx", ip) != EXIT_SUCCESS) {
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			return EXIT_FAILURE;
 		}
 		/* let's assume the suffix will be equal to that of IPADDR, should normally be */
-		sprintf(str_prefix, "%d", prefix);
 		if (write_ifcfg_var(if_name, "PREFIXx", str_prefix) != EXIT_SUCCESS) {
 			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
 			free(value);
