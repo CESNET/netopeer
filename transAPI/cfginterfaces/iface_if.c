@@ -1506,12 +1506,10 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 		return EXIT_FAILURE;
 	}
 #endif
-#ifdef SUSE
 	if (write_sysctl_proc_net(0, if_name, "disable_ipv6", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
-#endif
 
 	return EXIT_SUCCESS;
 }
