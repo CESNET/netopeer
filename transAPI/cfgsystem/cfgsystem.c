@@ -1221,11 +1221,11 @@ PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
 
 	/* start with timezone due to simpler rollback */
 	timezone = strchr(get_node_content(current_datetime), 'T') + 9;
-	if (strcmp(timezone, "Z") == 0) {
-		offset = 0;
-	} else if (((timezone[0] != '+') && (timezone[0] != '-')) || (strlen(timezone) != 6)) {
-		asprintf(&msg, "Invalid timezone format (%s).", timezone);
+	if (timezone == (char*)9 || (timezone[0] != '+' && timezone[0] != '-') || strlen(timezone) != 6) {
+		asprintf(&msg, "Invalid timezone format (%s).", get_node_content(current_datetime));
 		goto error;
+	} else if (strcmp(timezone, "Z") == 0) {
+		offset = 0;
 	} else {
 		offset = strtol(timezone + 1, &ptr, 10);
 		if (*ptr != ':') {
