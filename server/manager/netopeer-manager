@@ -55,6 +55,10 @@ def getText(nodelist):
             rc.append(node.data)
     return ''.join(rc)
 
+def getNetopeerDatastore(config):
+	repo = config.getElementsByTagName('repo')[0]
+	return getText(repo.getElementsByTagName('path')[0].childNodes)
+
 def listModules(config):
 	list = []
 	startup = config.getElementsByTagName('startup')[0]
@@ -69,7 +73,7 @@ def listModules(config):
 		list.append(item)
 	return list
 
-def getModule(config, name):	
+def getModule(config, name):
 	startup = config.getElementsByTagName('startup')[0]
 	modules = startup.getElementsByTagName('module')
 	for module in modules:
@@ -102,183 +106,206 @@ def listAugments(config):
 # "main" starts here
 # create argument parser
 parser = argparse.ArgumentParser(description="Manage Netopeer's modules", formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('--netopeer', help='Specify Netopeer\'s configuration directory (by default /etc/netopeer/).')
 subparsers = parser.add_subparsers(dest='subcommand')
 parser_add = subparsers.add_parser('add', help='Add a new module.')
-parser_list = subparsers.add_parser('list', help='List all existing modules.')
-parser_rm = subparsers.add_parser('rm', help='Remove an existing module.')
-parser_add_augment = subparsers.add_parser('add-augment', help='Add a new augment model.')
-parser_list_augment = subparsers.add_parser('list-augment', help='List all existing augment models.')
-parser_rm_augment = subparsers.add_parser('rm-augment', help='Remove an existing augment model.')
+parser_list = subparsers.add_parser('list', help='List modules.')
+parser_rm = subparsers.add_parser('rm', help='Remove a module.')
 
 parser_add.add_argument('--name', required=True, help='Name (ID) of the module.')
-parser_add.add_argument('--model', required=True, type=argparse.FileType('r'), help='File holding the main data model (YIN format).')
+model_group = parser_add.add_mutually_exclusive_group(required=True)
+model_group.add_argument('--model', type=argparse.FileType('r'), help='File holding the main data model (YIN format).')
+model_group.add_argument('--augment', type=argparse.FileType('r'), help='File holding an augment model (YIN format).')
+model_group.add_argument('--import', type=argparse.FileType('r'), help='File holding an imported model (YIN format).')
 parser_add.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the main data model.')
-parser_add.add_argument('--features', nargs='*', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+parser_add.add_argument('--features', nargs='+', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\' character.')
 parser_add.add_argument('--datastore', help='File path to the datastore location. If not set, datastore will not be able to store configuration data')
 
-parser_rm.add_argument('--name', required=True, help='Name of the module to remove.')
+parser_list.add_argument('--name', help='If listing augment modules, the name of the main module.')
 
-parser_add_augment.add_argument('--name', required=True, help='Name (ID) of the module to edit.')
-parser_add_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
-parser_add_augment.add_argument('--transapi', type=argparse.FileType('r'), help='File holding the transAPI module (.so) for the augment model.')
-parser_add_augment.add_argument('--features', nargs='*', action='append', help='List of enabled features. By default, all features are disabled. To enable all features, use \'*\ character.')
+parser_rm.add_argument('--name', required=True, help='Name of the main module to remove.')
+parser_rm.add_argument('--model', type=argparse.FileType('r'), help='Specify augment or import model file of the main module to be removed instead.')
 
-parser_list_augment.add_argument('--name', required=True, help='Name of the module.')
-
-parser_rm_augment.add_argument('--name', required=True, help='Name of the module of the augment model to remove.')
-parser_rm_augment.add_argument('--model', required=True, type=argparse.FileType('r'), help='Specify augment model file (YIN format).')
-
-modules_path = '/etc/netopeer/modules.conf.d'
+modules_path = '/usr/local/etc/netopeer/modules.conf.d/'
 netopeer_config = '/etc/netopeer/cfgnetopeer/datastore.xml'
 
 try:
 	args = parser.parse_args()
 
-	if args.netopeer:
-		netopeer_config = args.netopeer+'/cfgnetopeer/datastore.xml'
-		modules_path =  args.netopeer+'/modules.conf.d/'
-	
+	# get Netopeer configuration datastore
+	if not os.path.exists(modules_path+'/Netopeer.xml'):
+		print('Missing Netopeer module description ('+modules_path+'/Netopeer.xml)')
+		exit(1)
+
+	netopeer_config = getNetopeerDatastore(minidom.parse(modules_path+'/Netopeer.xml'))
 	if not os.path.exists(netopeer_config):
-		print('Missing Netopeer configuration ('+netopeer_config+')')
+		print('Missing Netopeer configuration datastore ('+netopeer_config+')')
 		exit(1)
 
 	if args.subcommand == 'list':
-		list = listModules(minidom.parse(netopeer_config))
-		if list == []:
-			print('No module installed.')
+		if args.name:
+			module_config = modules_path+'/'+args.name+'.xml'
+			if not os.path.exists(module_config):
+				print('Missing module configuration file ('+module_config+')')
+			list = listAugments(minidom.parse(module_config))
+
+			if list == []:
+				print('No augment models for '+args.name+' model')
+			else:
+				print('List of '+args.name+'\'s augment models:')
+				for item in list:
+					print(item[0]+' ('+item[1]+')')
 		else:
-			print('List of startup Netopeer modules:')
-			for item in list:
-				print(item[0]+' ('+item[1]+')')
-				
-	elif args.subcommand == 'list-augment':
-		module_config = modules_path+'/'+args.name+'.xml'
-		if not os.path.exists(module_config):
-			print('Missing module configuration file ('+module_config+')')
-		list = listAugments(minidom.parse(module_config))
-		if list == []:
-			print('No augment models for '+args.name+' model')
-		else:
-			print('List of '+args.name+'\'s augment models:')
-			for item in list:
-				print(item[0]+' ('+item[1]+')')
-				
+			try:
+				config = minidom.parse(netopeer_config)
+				list = listModules(minidom.parse(netopeer_config))
+			except xml.parsers.expat.ExpatError:
+				list = []
+
+			if list == []:
+				print('No module installed.')
+			else:
+				print('List of startup Netopeer modules:')
+				for item in list:
+					print(item[0]+' ('+item[1]+')')
+
 	elif args.subcommand == 'add':
-		try:
-			config = minidom.parse(netopeer_config)
-		except xml.parsers.expat.ExpatError:
+		if args.model:
+			try:
+				config = minidom.parse(netopeer_config)
+			except xml.parsers.expat.ExpatError:
+				impl = getDOMImplementation()
+				config = impl.createDocument(None, None, None)
+				datastores = config.appendChild(config.createElementNS('urn:cesnet:tmc:datastores:file', 'datastores'))
+				datastores.setAttribute('xmlns', 'urn:cesnet:tmc:datastores:file')
+				candidate = datastores.appendChild(config.createElement('candidate'))
+				candidate.setAttribute('lock', '')
+				candidate.setAttribute('modified', 'false')
+				running = datastores.appendChild(config.createElement('running'))
+				running.setAttribute('lock', '')
+				startup = datastores.appendChild(config.createElement('startup'))
+				startup.setAttribute('lock', '')
+
+			list = listModules(config)
+			for i in list:
+				if i[0] == args.name:
+					print('The module you are trying to add already exists.')
+					exit(1)
+
+			startup = config.getElementsByTagName('startup')[0]
+			try:
+				modules = startup.getElementsByTagName('modules')[0]
+			except IndexError:
+				netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
+				netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
+				modules = netopeer.appendChild(config.createElement('modules'))
+
+			module = modules.appendChild(config.createElement('module'))
+
+			node = module.appendChild(config.createElement('name'))
+			node.appendChild(config.createTextNode(args.name))
+			node = module.appendChild(config.createElement('enabled'))
+			node.appendChild(config.createTextNode('true'))
+			config.writexml(open(netopeer_config, 'w'))
+
 			impl = getDOMImplementation()
-			config = impl.createDocument(None, None, None)
-			datastores = config.appendChild(config.createElementNS('urn:cesnet:tmc:datastores:file', 'datastores'))
-			datastores.setAttribute('xmlns', 'urn:cesnet:tmc:datastores:file')
-			candidate = datastores.appendChild(config.createElement('candidate'))
-			candidate.setAttribute('lock', '')
-			candidate.setAttribute('modified', 'false')
-			running = datastores.appendChild(config.createElement('running'))
-			running.setAttribute('lock', '')
-			startup = datastores.appendChild(config.createElement('startup'))
-			startup.setAttribute('lock', '')
-			netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
-			netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
-			modules = netopeer.appendChild(config.createElement('modules'))
-			
-		list = listModules(config)
-		for i in list:
-			if i[0] == args.name:
-				print('The module you are tryng to add already exists.')
+			config = impl.createDocument(None, 'device', None)
+			root = config.firstChild
+
+			node = root.appendChild(config.createElement('name'))
+			node.appendChild(config.createTextNode(args.name))
+			models = root.appendChild(config.createElement('data-models'))
+			model = models.appendChild(config.createElement('model-main'))
+
+		else:
+			import_arg = getattr(args, 'import')
+			try:
+				config = minidom.parse(netopeer_config)
+			except xml.parsers.expat.ExpatError:
+				print('Netopeer module configuration could not be parsed.')
 				exit(1)
-		
-		startup = config.getElementsByTagName('startup')[0]
-		modules = startup.getElementsByTagName('modules')[0]
-		module = modules.appendChild(config.createElement('module'))
-		
-		node = module.appendChild(config.createElement('name'))
-		node.appendChild(config.createTextNode(args.name))
-		node = module.appendChild(config.createElement('enabled'))
-		node.appendChild(config.createTextNode('true'))
-		config.writexml(open(netopeer_config, 'w'))
-		
-		impl = getDOMImplementation()
-		config = impl.createDocument(None, 'device', None)
-		root = config.firstChild
-		
-		node = root.appendChild(config.createElement('name'))
-		node.appendChild(config.createTextNode(args.name))
-		models = root.appendChild(config.createElement('data-models'))
-		model = models.appendChild(config.createElement('model-main'))
+
+			list = listModules(config)
+			exists = False
+			for i in list:
+				if i[0] == args.name:
+					exists = True
+
+			if not exists:
+				print('The main module you are trying to add models to does not exist.')
+				exit(1)
+
+			config = minidom.parse(modules_path+'/'+args.name+'.xml')
+			model = getModel(config, os.path.abspath(args.augment.name if args.augment else import_arg.name))
+			if not model is None:
+				print('Such model already exists in \''+args.name+'\' module.')
+				exit(1)
+
+			models = config.getElementsByTagName('data-models')[0]
+			if args.augment:
+				model = models.appendChild(config.createElement('model'))
+			else:
+				model = models.insertBefore(config.createElement('model'), models.firstChild)
+
 		node = model.appendChild(config.createElement('path'))
-		node.appendChild(config.createTextNode(os.path.abspath(args.model.name)))
+		node.appendChild(config.createTextNode(os.path.abspath(\
+			args.model.name if args.model else args.augment.name if args.augment else import_arg.name)))
 		if args.transapi:
 			node = model.appendChild(config.createElement('transapi'))
 			node.appendChild(config.createTextNode(os.path.abspath(args.transapi.name)))
-		
+
 		if args.features:
 			for l in args.features:
 				for f in l:
 					node = model.appendChild(config.createElement('feature'))
 					node.appendChild(config.createTextNode(f))
-		
-		repo = root.appendChild(config.createElement('repo'))
-		node = repo.appendChild(config.createElement('type'))
-		if args.datastore:
-			node.appendChild(config.createTextNode('file'))
-			node = repo.appendChild(config.createElement('path'))
-			node.appendChild(config.createTextNode(os.path.abspath(args.datastore)))			
-		else:
-			node.appendChild(config.createTextNode('empty'))
-		
-		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
-		
-	elif args.subcommand == 'rm':
-		config = minidom.parse(netopeer_config)
-		module = getModule(config, args.name)
-		
-		if not module:
-			print('No \''+args.name+'\' module found.')
-			exit(1)		
 
-		module.parentNode.removeChild(module)
-		module.unlink
-		config.writexml(open(netopeer_config, 'w'))
-		os.remove(modules_path+'/'+args.name+'.xml')
-		
-	elif args.subcommand == 'rm-augment':
-		config = minidom.parse(modules_path+'/'+args.name+'.xml')
-		
-		model = getModel(config, os.path.abspath(args.model.name))
-		if model is None:
-			print('No such model in \''+args.name+'\' module found.')
-			exit(1)
-		else:
+		if args.model:
+			repo = root.appendChild(config.createElement('repo'))
+			node = repo.appendChild(config.createElement('type'))
+			if args.datastore:
+				node.appendChild(config.createTextNode('file'))
+				node = repo.appendChild(config.createElement('path'))
+				node.appendChild(config.createTextNode(os.path.abspath(args.datastore)))
+			else:
+				node.appendChild(config.createTextNode('empty'))
+
+		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
+
+	elif args.subcommand == 'rm':
+		if args.model:
+			try:
+				config = minidom.parse(modules_path+'/'+args.name+'.xml')
+				model = getModel(config, os.path.abspath(args.model.name))
+			except xml.parsers.expat.ExpatError:
+				model = None
+
+			if model is None:
+				print('No such model in \''+args.name+'\' module found.')
+				exit(1)
+
 			model.parentNode.removeChild(model)
 			model.unlink
+			config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
 
-		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
-		
-	elif args.subcommand == 'add-augment':
-		config = minidom.parse(modules_path+'/'+args.name+'.xml')
-		model = getModel(config, os.path.abspath(args.model.name))
-		if not model is None:
-			print('Such model already exists in \''+args.name+'\' module.')
-			exit(1)
-		
-		models = config.getElementsByTagName('data-models')[0]
-		model = models.appendChild(config.createElement('model'))
-		node = model.appendChild(config.createElement('path'))
-		node.appendChild(config.createTextNode(os.path.abspath(args.model.name)))
-		if args.transapi:
-			node = model.appendChild(config.createElement('transapi'))
-			node.appendChild(config.createTextNode(os.path.abspath(args.transapi.name)))
-		
-		if args.features:
-			for l in args.features:
-				for f in l:
-					node = model.appendChild(config.createElement('feature'))
-					node.appendChild(config.createTextNode(f))
-			
-		config.writexml(open(modules_path+'/'+args.name+'.xml', 'w'))
-			
+		else:
+			try:
+				config = minidom.parse(netopeer_config)
+				module = getModule(config, args.name)
+			except xml.parsers.expat.ExpatError:
+				module = None
+
+			if module is None:
+				print('No \''+args.name+'\' module found.')
+				exit(1)
+
+			module.parentNode.removeChild(module)
+			module.unlink
+			config.writexml(open(netopeer_config, 'w'))
+			try:
+				os.remove(modules_path+'/'+args.name+'.xml')
+			except OSError:
+				pass
+
 except ValueError as e:
 	print (e)
 except IOError as e:

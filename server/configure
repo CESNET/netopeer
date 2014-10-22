@@ -6504,13 +6504,9 @@ do
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
-<<<<<<< HEAD
-    "stunnel/stunnel.conf") CONFIG_FILES="$CONFIG_FILES stunnel/stunnel.conf" ;;
+    "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
     "src/openwrt/ietf-system.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system.xml" ;;
     "src/openwrt/Makefile.ietf-system") CONFIG_FILES="$CONFIG_FILES src/openwrt/Makefile.ietf-system" ;;
-=======
-    "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
->>>>>>> master
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

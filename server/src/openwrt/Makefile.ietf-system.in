@@ -52,9 +52,6 @@ CC = @CC@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL@ -m 600
-ifeq ($(shell id -u $(USER)),0)
-  INSTALL_OWNER = -o @USER@ -g @GROUP@
-endif
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
@@ -89,10 +86,9 @@ install: $(NAME).so $(CFGS)
 	$(INSTALL) -d $(CFGDIR)/$(NAME);
 	$(INSTALL_PROGRAM) $(NAME).so $(CFGDIR)/$(NAME)/;
 	for i in $(CFGS); do \
-		$(INSTALL_DATA) $(INSTALL_OWNER) $$i $(CFGDIR)/$(NAME)/; \
+		$(INSTALL_DATA) $$i $(CFGDIR)/$(NAME)/; \
 	done
-	$(MANAGER) --netopeer $(DESTDIR)/$(sysconfdir)/netopeer/ \
-		add --name $(NAME) \
+	$(MANAGER) add --name $(NAME) \
 		--model $(CFGDIR)/$(NAME)/ietf-system.yin \
 		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
 		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
