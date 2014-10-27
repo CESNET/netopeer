@@ -194,18 +194,23 @@ def create_windows(stdscr):
 
 def cli(stdscr, config):
 	# use default terminal colors
-	curses.use_default_colors()
-	curses.init_pair(1, curses.COLOR_RED, -1)
-	curses.init_pair(2, curses.COLOR_YELLOW, -1)
+	try:
+		curses.use_default_colors()
+		curses.init_pair(1, curses.COLOR_RED, -1)
+		curses.init_pair(2, curses.COLOR_YELLOW, -1)
+
+		# cursor invsible
+		curses.curs_set(0)
+	except curses.error:
+		# This call can fail with misconfigured terminals, for example
+		# TERM=xterm-color. This is harmless
+		pass
 
 	colors = {
 			'error' : curses.color_pair(1),\
 			'warning' : curses.color_pair(2),\
 			'note' : curses.color_pair(0),\
 		}
-
-	# cursor invsible
-	curses.curs_set(0)
 
 	(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
 
