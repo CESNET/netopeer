@@ -122,7 +122,7 @@ int main(int argc, char** argv)
 	}
 
 	/* init libnetconf for messages  from transAPI function */
-	if (nc_init(NC_INIT_MULTILAYER) == -1) {
+	if (nc_init(NC_INIT_ALL | NC_INIT_MULTILAYER) == -1) {
 		my_print(NC_VERB_ERROR, "Could not initialize libnetconf.");
 		return 1;
 	}
