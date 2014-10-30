@@ -17,6 +17,7 @@
 #include "config.h"
 
 extern int callback_if_interfaces_if_interface_ip_ipv4_ip_address(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error);
+extern int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error);
 
 /* /proc/sys/net/(ipv4,ipv6)/conf/(if_name)/(variable) = (value) */
 static int write_to_proc_net(unsigned char ipv4, const char* if_name, const char* variable, const char* value) {
@@ -186,11 +187,11 @@ static char* read_from_sys_net(const char* if_name, const char* variable) {
 	return strdup(ret);
 }
 
+#if defined(REDHAT) || defined(SUSE)
 /* variables ending with the "x" suffix get a unique suffix instead,
  * other variables are rewritten if found in the file
  */
 static int write_ifcfg_var(const char* if_name, const char* variable, const char* value, char** suffix) {
-#if defined(REDHAT) || defined(SUSE)
 	int fd = -1, i;
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *ptr2, *tmp = NULL, *new_var = NULL;
@@ -208,7 +209,7 @@ static int write_ifcfg_var(const char* if_name, const char* variable, const char
 		goto fail;
 	}
 
-	content = malloc(size+10+strlen(value)+1+1);
+	content = malloc(size+1);
 
 	/* we store the whole file content */
 	if (read(fd, content, size) != size) {
@@ -285,11 +286,9 @@ fail:
 	free(tmp);
 	free(new_var);
 	return EXIT_FAILURE;
-#endif
 }
 
 static char* read_ifcfg_var(const char* if_name, const char* variable) {
-#if defined(REDHAT) || defined(SUSE)
 	int fd = -1;
 	unsigned int size;
 	char* path, *ptr, *ptr2, *values = NULL, *content = NULL;
@@ -369,12 +368,10 @@ finish:
 	free(path);
 	free(content);
 	return values;
-#endif
 }
 
 /* variables ending with the "x" suffix are interpreted as a regexp "*" instead of the "x" */
 static int remove_ifcfg_var(const char* if_name, const char* variable, const char* value, char** suffix) {
-#if defined(REDHAT) || defined(SUSE)
 	int fd = -1;
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *ptr2, *new_var = NULL;
@@ -392,7 +389,7 @@ static int remove_ifcfg_var(const char* if_name, const char* variable, const cha
 		goto fail;
 	}
 
-	content = malloc(size+10+strlen(value)+1+1);
+	content = malloc(size+1);
 
 	/* we store the whole file content */
 	if (read(fd, content, size) != size) {
@@ -471,8 +468,8 @@ fail:
 	free(new_var);
 
 	return EXIT_FAILURE;
-#endif
 }
+#endif
 
 #ifdef REDHAT
 static int write_ifcfg_multival_var(const char* if_name, const char* variable, const char* value) {
@@ -498,7 +495,7 @@ static int write_ifcfg_multival_var(const char* if_name, const char* variable, c
 		goto fail;
 	}
 
-	content = malloc(size+10+strlen(value)+1+1);
+	content = malloc(size+1);
 
 	/* we store the whole file content */
 	if (read(fd, content, size) != size) {
@@ -642,7 +639,7 @@ static int remove_ifcfg_multival_var(const char* if_name, const char* variable, 
 		goto fail;
 	}
 
-	content = malloc(size+10+strlen(value)+1+1);
+	content = malloc(size+1);
 
 	/* we store the whole file content */
 	if (read(fd, content, size) != size) {
@@ -737,6 +734,782 @@ fail:
 }
 #endif
 
+#ifdef DEBIAN
+/* post-up variable is treated specially since there can be several of them */
+static int write_iface_subs_var(unsigned char ipv4, const char* if_name, const char* variable, const char* value) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *ptr2, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	/* find our section */
+	asprintf(&tmp, "iface %s %s ", if_name, (ipv4 ? "inet" : "inet6"));
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		goto fail;
+	}
+	free(tmp);
+	tmp = NULL;
+
+	/* find our variable */
+	for (ptr2 = strchr(ptr, '\n'); ptr2 != NULL; ptr2 = strchr(ptr2, '\n')) {
+		++ptr2;
+
+		if (ptr2[0] == '\0') {
+			ptr2 = NULL;
+			break;
+		}
+
+		/* only one-line comments are supported, no backslash!! */
+		if (ptr2[0] == '#') {
+			continue;
+		}
+
+		if (strncmp(ptr2+1, variable, strlen(variable)) == 0 &&
+				(strcmp(variable, "post-up") != 0 || strncmp(ptr2+1+strlen(variable)+1, value, strlen(value)) == 0)) {
+			break;
+		}
+
+		/* new section, we didn't find it */
+		if (strncmp(ptr2, "iface", 5) == 0) {
+			ptr2 = NULL;
+			break;
+		}
+	}
+
+	/* adjust pointers */
+	if (ptr2 == NULL) {
+		/* prepare ptr, so we can write there directly */
+		if (strchr(ptr, '\n') == NULL) {
+			ptr += strlen(ptr);
+		} else {
+			ptr = strchr(ptr, '\n');
+		}
+	} else {
+		ptr2 += 1+strlen(variable)+1;
+	}
+
+	/* write the new content */
+	if (ptr2 == NULL) {
+		asprintf(&tmp, "\n\t%s %s", variable, value);
+		if (write(fd, content, ptr-content) != ptr-content) {
+			goto fail;
+		}
+		if (write(fd, tmp, strlen(tmp)) != strlen(tmp)) {
+			goto fail;
+		}
+		if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+			goto fail;
+		}
+	} else {
+		if (write(fd, content, ptr2-content) != ptr2-content) {
+			goto fail;
+		}
+		if (write(fd, value, strlen(value)) != strlen(value)) {
+			goto fail;
+		}
+		if (strchr(ptr2, '\n') == NULL) {
+			if (write(fd, "\n", 1) != 1) {
+				goto fail;
+			}
+			ptr2 += strlen(ptr2);
+		} else {
+			ptr2 = strchr(ptr2, '\n');
+		}
+		if (write(fd, ptr2, strlen(ptr2)) != strlen(ptr2)) {
+			goto fail;
+		}
+	}
+
+	close(fd);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+
+static char* read_iface_subs_var(unsigned char ipv4, const char* if_name, const char* variable) {
+	int fd = -1;
+	unsigned int size, ret_len = 1, val_len;
+	char* content = NULL, *ptr, *ret = NULL, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	close(fd);
+	fd = -1;
+
+	/* find our section */
+	asprintf(&tmp, "iface %s %s ", if_name, (ipv4 ? "inet" : "inet6"));
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		goto fail;
+	}
+	free(tmp);
+	tmp = NULL;
+
+	/* find our variable */
+	for (ptr = strchr(ptr, '\n'); ptr != NULL; ptr = strchr(ptr, '\n')) {
+		++ptr;
+
+		if (ptr[0] == '\0') {
+			break;
+		}
+
+		/* only one-line comments are supported, no backslash!! */
+		if (ptr[0] == '#') {
+			continue;
+		}
+
+		if (strncmp(ptr+1, variable, strlen(variable)) == 0) {
+			ptr += 1+strlen(variable)+1;
+
+			if (strchr(ptr, '\n') != NULL) {
+				val_len = strchr(ptr, '\n')-ptr;
+			} else {
+				val_len = strlen(ptr);
+			}
+
+			ret_len += val_len+1;
+			if (ret_len-1 == val_len+1) {
+				ret = malloc(ret_len*sizeof(char));
+				ret[0] = '\0';
+			} else {
+				ret = realloc(ret, ret_len*sizeof(char));
+			}
+
+			strncat(ret, ptr, val_len);
+			strcat(ret, ";");
+		}
+
+		/* new section, we didn't find it */
+		if (strncmp(ptr, "iface", 5) == 0) {
+			break;
+		}
+	}
+
+	if (ret == NULL) {
+		goto fail;
+	}
+
+	close(fd);
+	free(content);
+	free(tmp);
+	return ret;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return NULL;
+}
+
+static int remove_iface_subs_var(unsigned char ipv4, const char* if_name, const char* variable, const char* value) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	/* find our section */
+	asprintf(&tmp, "iface %s %s ", if_name, (ipv4 ? "inet" : "inet6"));
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		goto fail;
+	}
+
+	/* find our variable */
+	ptr = strchr(ptr, '\n');
+	for (; ptr != NULL; ptr = strchr(ptr, '\n')) {
+		++ptr;
+
+		if (ptr[0] == '\0') {
+			break;
+		}
+
+		/* only one-line comments are supported, no backslash!! */
+		if (ptr[0] == '#') {
+			continue;
+		}
+
+		/* check the variable name, then value */
+		if (strncmp(ptr+1, variable, strlen(variable)) == 0 && strncmp(ptr+1+strlen(variable)+1, value, strlen(value)) == 0) {
+			break;
+		}
+
+		/* new section, we didn't find it */
+		if (strncmp(ptr, "iface", 5) == 0) {
+			ptr = NULL;
+			break;
+		}
+	}
+
+	/* variable not found */
+	if (ptr == NULL) {
+		goto fail;
+	}
+
+	/* write the new content */
+	if (write(fd, content, ptr-content) != ptr-content) {
+		goto fail;
+	}
+	if (strchr(ptr, '\n') == NULL) {
+		if (write(fd, "\n", 1) != 1) {
+			goto fail;
+		}
+		ptr += strlen(ptr);
+	} else {
+		ptr = strchr(ptr, '\n')+1;
+	}
+	if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+		goto fail;
+	}
+
+	close(fd);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+
+static int write_iface_method(unsigned char ipv4, const char* if_name, const char* method) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	/* find our interface */
+	asprintf(&tmp, "iface %s %s ", if_name, (ipv4 ? "inet" : "inet6"));
+	ptr = strstr(content, tmp);
+
+	if (ptr == NULL) {
+		/* it's not there, add it at the end */
+		free(tmp);
+		asprintf(&tmp, "iface %s %s %s\n", if_name, (ipv4 ? "inet" : "inet6"), method);
+		if (write(fd, content, strlen(content)) != strlen(content)) {
+			goto fail;
+		}
+		if (content[strlen(content)-1] != '\n') {
+			if (write(fd, "\n", 1) != 1) {
+				goto fail;
+			}
+		}
+		if (write(fd, tmp, strlen(tmp)) != strlen(tmp)) {
+			goto fail;
+		}
+	} else {
+		ptr += strlen(tmp);
+		if (write(fd, content, ptr-content) != ptr-content) {
+			goto fail;
+		}
+		if (write(fd, method, strlen(method)) != strlen(method)) {
+			goto fail;
+		}
+		if (strchr(ptr, '\n') == NULL) {
+			ptr += strlen(ptr);
+		} else {
+			ptr = strchr(ptr, '\n');
+		}
+		if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+			goto fail;
+		}
+	}
+
+	close(fd);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+
+static char* read_iface_method(unsigned char ipv4, const char* if_name) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDONLY)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	close(fd);
+	fd = -1;
+
+	/* find our interface */
+	asprintf(&tmp, "iface %s %s ", if_name, (ipv4 ? "inet" : "inet6"));
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		goto fail;
+	}
+
+	ptr += strlen(tmp);
+	if (strchr(ptr, '\n') != NULL) {
+		*strchr(ptr, '\n') = '\0';
+	}
+	ptr = strdup(ptr);
+
+	close(fd);
+	free(content);
+	free(tmp);
+	return ptr;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return NULL;
+}
+
+static int add_iface_auto(const char* if_name) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	/* find our interface */
+	asprintf(&tmp, "iface %s", if_name);
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		goto fail;
+	}
+	free(tmp);
+
+	asprintf(&tmp, "auto %s\n", if_name);
+	if (strstr(content, tmp) != NULL) {
+		/* it's already there, tolerate this */
+		goto success;
+	}
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	if (write(fd, content, ptr-content) != ptr-content) {
+		goto fail;
+	}
+	if (write(fd, tmp, strlen(tmp)) != strlen(tmp)) {
+		goto fail;
+	}
+	if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+		goto fail;
+	}
+
+success:
+	close(fd);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+
+static int remove_iface_auto(const char* if_name) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *ptr, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDWR)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	content[size] = '\0';
+
+	asprintf(&tmp, "auto %s", if_name);
+	if ((ptr = strstr(content, tmp)) == NULL) {
+		/* it's not even there, tolerate this */
+		goto success;
+	}
+
+	if (ftruncate(fd, 0) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	if (write(fd, content, ptr-content) != ptr-content) {
+		goto fail;
+	}
+	if (strchr(ptr, '\n') != NULL) {
+		ptr = strchr(ptr, '\n')+1;
+		if (write(fd, ptr, strlen(ptr)) != strlen(ptr)) {
+			goto fail;
+		}
+	}
+
+success:
+	close(fd);
+	free(content);
+	free(tmp);
+	return EXIT_SUCCESS;
+
+fail:
+	if (fd != -1) {
+		close(fd);
+	}
+	free(content);
+	free(tmp);
+	return EXIT_FAILURE;
+}
+#endif
+
+static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
+#ifdef REDHAT
+	char* suffix = NULL, *var = NULL;
+#endif
+#ifdef DEBIAN
+	char* value2, *method;
+#endif
+	char* cmd, *line = NULL, *value = NULL, str_prefix[4];
+	FILE* output;
+	size_t len = 0;
+
+	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
+	output = popen(cmd, "r");
+	free(cmd);
+
+	if (output == NULL) {
+		asprintf(msg, "%s: failed to execute a command.", __func__);
+		return EXIT_FAILURE;
+	}
+
+	/*
+	 * The IPs may not be actually set anymore, for instance on the whole "ipv4/6" node deletion.
+	 * Also, when adding an IP, it may already be set if called during init with some manually-
+	 * -added addresses in addition to some obtained by DHCP.
+	 */
+	if (getline(&line, &len, output) != -1 && op & XMLDIFF_ADD && strstr(line, "File exists") == NULL) {
+		asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+		free(line);
+		pclose(output);
+		return EXIT_FAILURE;
+	}
+	free(line);
+	pclose(output);
+
+	/* permanent */
+	sprintf(str_prefix, "%d", prefix);
+#ifdef REDHAT
+	if (ipv4) {
+		if (op & XMLDIFF_ADD) {
+			if (write_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
+				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
+			asprintf(&value, "PREFIX%s", suffix);
+			free(suffix);
+			if (write_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
+				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+				free(value);
+				return EXIT_FAILURE;
+			}
+		} else {
+			if (remove_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
+				free(suffix);
+				asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+				return EXIT_FAILURE;
+			}
+			asprintf(&value, "PREFIX%s", suffix);
+			if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
+				free(value);
+				asprintf(&value, "NETMASK%s", suffix);
+				if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
+					free(value);
+					free(suffix);
+					asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+			}
+			free(suffix);
+		}
+	} else {
+		asprintf(&value, "%s/%d", ip, prefix);
+		if (op & XMLDIFF_ADD) {
+			var = read_ifcfg_var(if_name, "IPV6ADDR");
+			if (var == NULL) {
+				/* no IPV6ADDR entry, add it */
+				if (write_ifcfg_var(if_name, "IPV6ADDR", value, NULL) != EXIT_SUCCESS) {
+					free(value);
+					asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+			} else if (strcmp(var, value) == 0) {
+				/* already there */
+				free(var);
+			} else {
+				free(var);
+				/* we have an IPV6ADDR entry, add it to secondaries */
+				if (write_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
+					free(value);
+					asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+			}
+		} else {
+			if (remove_ifcfg_var(if_name, "IPV6ADDR", value, NULL) == EXIT_SUCCESS) {
+				/* it was the primary address, make one of the secondaries into primary, if there are any */
+				if ((var = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES")) != NULL) {
+					if (strchr(var, ' ') != NULL) {
+						*strchr(var, ' ') = '\0';
+					}
+					if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", var) != EXIT_SUCCESS) {
+						free(var);
+						free(value);
+						asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+						return EXIT_FAILURE;
+					}
+					if (write_ifcfg_var(if_name, "IPV6ADDR", var, NULL) != EXIT_SUCCESS) {
+						free(var);
+						free(value);
+						asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+						return EXIT_FAILURE;
+					}
+					free(var);
+				}
+			} else {
+				/* it is not a primary address, so just delete it from the secondaries */
+				if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
+					free(value);
+					asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+					return EXIT_FAILURE;
+				}
+			}
+		}
+	}
+#endif
+#ifdef SUSE
+	asprintf(&value, "%s/%s", ip, str_prefix);
+	if (op & XMLDIFF_ADD) {
+		if (write_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
+			free(value);
+			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+	} else {
+		if (remove_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
+			free(value);
+			asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+	}
+#endif
+#ifdef DEBIAN
+	/*
+	 * On Debian, there must be one address with netmask if using static
+	 * method. If there is one, we add others as post-up commands. However,
+	 * for DHCP or loopback method, all the addresses must be post-up.
+	 */
+	asprintf(&value, "ip addr add %s/%d dev %s", ip, prefix, if_name);
+	if (op & XMLDIFF_REM) {
+		if (remove_iface_subs_var(ipv4, if_name, "post-up", value) != EXIT_SUCCESS &&
+				(remove_iface_subs_var(ipv4, if_name, "address", ip) != EXIT_SUCCESS ||
+				remove_iface_subs_var(ipv4, if_name, "netmask", str_prefix) != EXIT_SUCCESS)) {
+			free(value);
+			asprintf(msg, "%s: failed to delete from \"%s\".", __func__, IFCFG_FILES_PATH);
+			return EXIT_FAILURE;
+		}
+	} else {
+		if ((method = read_iface_method(ipv4, if_name)) == NULL) {
+			asprintf(msg, "%s: failed to read from \"%s\" for %s.", __func__, IFCFG_FILES_PATH, if_name);
+			return EXIT_FAILURE;
+		}
+
+		if ((value2 = read_iface_subs_var(ipv4, if_name, "address")) == NULL && strcmp(method, "dhcp") != 0 && strcmp(method, "loopback") != 0) {
+			/* add address and netmask */
+			asprintf(&value2, "%d", prefix);
+			if (write_iface_subs_var(ipv4, if_name, "address", ip) != EXIT_SUCCESS ||
+					write_iface_subs_var(ipv4, if_name, "netmask", value2) != EXIT_SUCCESS) {
+				free(method);
+				free(value);
+				free(value2);
+				asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+				return EXIT_FAILURE;
+			}
+
+			/* it may have previously been in a post-up command (e.g. dhcp -> static) */
+			remove_iface_subs_var(ipv4, if_name, "post-up", value);
+		} else if (value2 == NULL || strstr(value2, ip) == NULL || strcmp(method, "dhcp") == 0) {
+			/*
+			 * It may already be there as an address and a netmask, however,
+			 * with DHCP we have to change it to a post-up command.
+			 */
+			if (value2 != NULL && strstr(value2, ip) != NULL && strcmp(method, "dhcp") == 0) {
+				if (remove_iface_subs_var(ipv4, if_name, "address", ip) != EXIT_SUCCESS ||
+						remove_iface_subs_var(ipv4, if_name, "netmask", str_prefix) != EXIT_SUCCESS) {
+					asprintf(msg, "%s: failed to delete from \"%s\".", __func__, IFCFG_FILES_PATH);
+					free(method);
+					free(value);
+					free(value2);
+					return EXIT_FAILURE;
+				}
+			}
+
+			if (write_iface_subs_var(ipv4, if_name, "post-up", value) != EXIT_SUCCESS) {
+				free(method);
+				free(value);
+				free(value2);
+				asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+				return EXIT_FAILURE;
+			}
+		}
+		free(method);
+		free(value2);
+	}
+#endif
+
+	free(value);
+	return EXIT_SUCCESS;
+}
+
 /*
  * cfginterfaces.h function definitions
  */
@@ -773,8 +1546,11 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg) {
 #ifdef SUSE
 	if (write_ifcfg_var(if_name, "STARTMODE", (boolean ? "auto" : "off"), NULL) != EXIT_SUCCESS)
 #endif
+#ifdef DEBIAN
+	if ((boolean && add_iface_auto(if_name) != EXIT_SUCCESS) || (!boolean && remove_iface_auto(if_name) != EXIT_SUCCESS))
+#endif
 	{
-		asprintf(msg, "%s: failed to write to ifcfg file of %s.", __func__, if_name);
+		asprintf(msg, "%s: failed to write to the ifcfg file (%s).", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
@@ -796,7 +1572,7 @@ int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg
 	return EXIT_SUCCESS;
 }
 
-int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
+int iface_ipv4_mtu(const char* if_name, unsigned int mtu, char** msg) {
 	char str_mtu[15], *ipv6_mtu;
 	unsigned int old_mtu;
 
@@ -814,8 +1590,14 @@ int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
 	}
 
 	/* permanent */
-	if (write_ifcfg_var(if_name, "MTU", str_mtu, NULL) != EXIT_SUCCESS) {
-		asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
+#if defined(REDHAT) || defined(SUSE)
+	if (write_ifcfg_var(if_name, "MTU", str_mtu, NULL) != EXIT_SUCCESS)
+#endif
+#ifdef DEBIAN
+	if (write_iface_subs_var(1, if_name, "mtu", str_mtu) != EXIT_SUCCESS)
+#endif
+	{
+		asprintf(msg, "%s: failed to write to the ifcfg file (%s).", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
@@ -823,93 +1605,17 @@ int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg) {
 }
 
 int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
-#ifdef REDHAT
-	char* suffix = NULL, str_prefix[4];
-#endif
-	char* cmd, *line = NULL, *value = NULL;
-	FILE* output;
-	size_t len = 0;
-
-	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
-
-	/* the IPs may not be actually set anymore, for instance on the whole "ipv4" node deletion */
-	if (getline(&line, &len, output) != -1 && op & XMLDIFF_ADD) {
-		asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
-		free(line);
-		pclose(output);
-		return EXIT_FAILURE;
-	}
-	free(line);
-	pclose(output);
-
-	/* permanent */
-#ifdef REDHAT
-	sprintf(str_prefix, "%d", prefix);
-	if (op & XMLDIFF_ADD) {
-		if (write_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
-			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
-		}
-		asprintf(&value, "PREFIX%s", suffix);
-		free(suffix);
-		if (write_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
-			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-			free(value);
-			return EXIT_FAILURE;
-		}
-	} else {
-		if (remove_ifcfg_var(if_name, "IPADDRx", ip, &suffix) != EXIT_SUCCESS) {
-			free(suffix);
-			asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
-		}
-		asprintf(&value, "PREFIX%s", suffix);
-		if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
-			free(value);
-			asprintf(&value, "NETMASK%s", suffix);
-			if (remove_ifcfg_var(if_name, value, str_prefix, NULL) != EXIT_SUCCESS) {
-				free(value);
-				free(suffix);
-				asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
-				return EXIT_FAILURE;
-			}
-		}
-		free(suffix);
-	}
-#endif
-#ifdef SUSE
-	asprintf(&value, "%s/%d", ip, prefix);
-	if (op & XMLDIFF_ADD) {
-		if (write_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
-			free(value);
-			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
-		}
-	} else {
-		if (remove_ifcfg_var(if_name, "IPADDRx", value, NULL) != EXIT_SUCCESS) {
-			free(value);
-			asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
-		}
-	}
-#endif
-
-	free(value);
-	return EXIT_SUCCESS;
+	return iface_ip(1, if_name, ip, prefix, op, msg);
 }
 
 int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg) {
-	char* cmd = NULL, *line = NULL, *path = NULL, *content = NULL, *ptr;
+	char* cmd = NULL, *line = NULL;
 	FILE* output = NULL;
+#if defined(REDHAT) || defined(SUSE)
+	char* path = NULL, *content = NULL, *ptr;
 	int fd = -1;
 	struct stat st;
+#endif
 	size_t len = 0;
 
 	asprintf(&cmd, "ip neigh %s %s lladdr %s dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, mac, if_name);
@@ -946,7 +1652,7 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 	output = NULL;
 
 	/* permanent */
-
+#if defined(REDHAT) || defined(SUSE)
 #ifdef REDHAT
 	asprintf(&cmd, "if test \"$1\"=\"%s\"; then\n\tip neigh add %s lladdr %s dev %s\nfi\n", if_name, ip, mac, if_name);
 	asprintf(&path, "%s", IFCFG_SCRIPTS_PATH);
@@ -1070,19 +1776,32 @@ delete_script:
 #endif
 
 	free(path);
+#endif
+
+#ifdef DEBAIN
+	free(cmd);
+	asprintf(&cmd, "ip neigh add %s lladdr %s dev %s", ip, mac, if_name);
+	if (write_iface_subs_var(1, if_name, "post-up",  cmd) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		goto fail;
+	}
+	free(cmd);
+#endif
 
 	return EXIT_SUCCESS;
 
 fail:
 	free(cmd);
 	free(line);
+#if defined(REDHAT) || defined(SUSE)
 	free(path);
 	free(content);
-	if (output != NULL) {
-		pclose(output);
-	}
 	if (fd != -1) {
 		close(fd);
+	}
+#endif
+	if (output != NULL) {
+		pclose(output);
 	}
 
 	return EXIT_FAILURE;
@@ -1091,6 +1810,9 @@ fail:
 /* enabled - 0 (disable), 1 (enable DHCP), 2 (enable static) */
 int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg) {
 	xmlNodePtr cur;
+#ifdef DEBIAN
+	char* value, *ptr;
+#endif
 	char* cmd, *line = NULL;
 	FILE* output;
 	size_t len = 0;
@@ -1182,10 +1904,42 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 		}
 	}
 
-	/* add all the configured static addresses */
+	/* permanent */
+	if (!is_loopback) {
+#ifdef REDHAT
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none"), NULL) != EXIT_SUCCESS)
+#endif
+#ifdef SUSE
+		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static"), NULL) != EXIT_SUCCESS)
+#endif
+#ifdef DEBIAN
+		if (enabled == 0 && node != NULL) {
+			value = read_iface_subs_var(1, if_name, "post-up");
+			if (value != NULL) {
+				for (ptr = strtok(value, ";"); ptr != NULL; ptr = strtok(NULL, ";")) {
+					if (remove_iface_subs_var(1, if_name, "post-up", ptr) != EXIT_SUCCESS) {
+						free(value);
+						asprintf(msg, "%s: failed to delete from the interfaces file.", __func__);
+						return EXIT_FAILURE;
+					}
+				}
+			}
+			free(value);
+		}
+
+		if (write_iface_method(1, if_name, (enabled == 1 ? "dhcp" : (enabled == 2 ? "static" : "manual"))) != EXIT_SUCCESS)
+#endif
+		{
+			asprintf(msg, "%s: failed to write to the ifcfg/interfaces file (%s).", __func__, if_name);
+			return EXIT_FAILURE;
+		}
+	}
+
+	/* add all the configured static addresses and neighbors */
 	if (enabled == 1 || enabled == 2) {
-		/* it may be NULL if the whole ipv4 node was added/removed,
-		 * all the ipv4 addresses will be added/removed in their callback
+		/*
+		 * It may be NULL if the whole ipv4 node was added/removed, all the IPv4
+		 * addresses and neighbors will be added/removed in their callback.
 		 */
 		if (node != NULL) {
 			for (cur = node->parent->children; cur != NULL; cur = cur->next) {
@@ -1199,21 +1953,14 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 						return EXIT_FAILURE;
 					}
 				}
-			}
-		}
-	}
 
-	/* permanent */
-	if (!is_loopback) {
-#ifdef REDHAT
-		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp" : "none"), NULL) != EXIT_SUCCESS)
-#endif
-#ifdef SUSE
-		if (write_ifcfg_var(if_name, "BOOTPROTO", (enabled == 1 ? "dhcp4" : "static"), NULL) != EXIT_SUCCESS)
-#endif
-		{
-			asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-			return EXIT_FAILURE;
+				if (xmlStrEqual(cur->name, BAD_CAST "neighbor")) {
+					if (callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor(NULL, XMLDIFF_ADD, cur, NULL) != EXIT_SUCCESS) {
+						asprintf(msg, "%s: interface %s fail.", __func__, if_name);
+						return EXIT_FAILURE;
+					}
+				}
+			}
 		}
 	}
 
@@ -1235,7 +1982,7 @@ int iface_ipv6_forwarding(const char* if_name, unsigned char boolean, char** msg
 	return EXIT_SUCCESS;
 }
 
-int iface_ipv6_mtu(const char* if_name, unsigned short mtu, char** msg) {
+int iface_ipv6_mtu(const char* if_name, unsigned int mtu, char** msg) {
 	char str_mtu[10];
 
 	sprintf(str_mtu, "%d", mtu);
@@ -1257,95 +2004,18 @@ int iface_ipv6_mtu(const char* if_name, unsigned short mtu, char** msg) {
 		return EXIT_FAILURE;
 	}
 #endif
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "mtu", str_mtu) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return EXIT_SUCCESS;
 }
 
 int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
-#ifdef SUSE
-	return iface_ipv4_ip(if_name, ip, prefix, op, msg);
-#endif
-#ifdef REDHAT
-	char* cmd, *line = NULL, *value, *var;
-	FILE* output;
-	size_t len = 0;
-
-	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
-
-	/* the IPs may not be actually set anymore, for instance on the whole "ipv6" node deletion */
-	if (getline(&line, &len, output) != -1 && op & XMLDIFF_ADD) {
-		asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
-		free(line);
-		pclose(output);
-		return EXIT_FAILURE;
-	}
-	free(line);
-	pclose(output);
-
-	/* permanent */
-	asprintf(&value, "%s/%d", ip, prefix);
-	if (op & XMLDIFF_ADD) {
-		var = read_ifcfg_var(if_name, "IPV6ADDR");
-		if (var == NULL) {
-			/* no IPV6ADDR entry, add it */
-			if (write_ifcfg_var(if_name, "IPV6ADDR", value, NULL) != EXIT_SUCCESS) {
-				free(value);
-				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-				return EXIT_FAILURE;
-			}
-		} else if (strcmp(var, value) == 0) {
-			/* already there */
-			free(var);
-		} else {
-			free(var);
-			/* we have an IPV6ADDR entry, add it to secondaries */
-			if (write_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
-				free(value);
-				asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-				return EXIT_FAILURE;
-			}
-		}
-	} else {
-		if (remove_ifcfg_var(if_name, "IPV6ADDR", value, NULL) == EXIT_SUCCESS) {
-			/* it was the primary address, make one of the secondaries into primary, if there are any */
-			if ((var = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES")) != NULL) {
-				if (strchr(var, ' ') != NULL) {
-					*strchr(var, ' ') = '\0';
-				}
-				if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", var) != EXIT_SUCCESS) {
-					free(var);
-					free(value);
-					asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
-					return EXIT_FAILURE;
-				}
-				if (write_ifcfg_var(if_name, "IPV6ADDR", var, NULL) != EXIT_SUCCESS) {
-					free(var);
-					free(value);
-					asprintf(msg, "%s: failed to write to the ifcfg file of %s.", __func__, if_name);
-					return EXIT_FAILURE;
-				}
-				free(var);
-			}
-		} else {
-			/* it is not a primary address, so just delete it from the secondaries */
-			if (remove_ifcfg_multival_var(if_name, "IPV6ADDR_SECONDARIES", value) != EXIT_SUCCESS) {
-				free(value);
-				asprintf(msg, "%s: failed to remove an entry from the ifcfg file of %s.", __func__, if_name);
-				return EXIT_FAILURE;
-			}
-		}
-	}
-
-	free(value);
-	return EXIT_SUCCESS;
-#endif
+	return iface_ip(0, if_name, ip, prefix, op, msg);
 }
 
 int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg) {
@@ -1362,10 +2032,18 @@ int iface_ipv6_dup_addr_det(const char* if_name, unsigned int dup_addr_det, char
 	}
 
 	/* permanent */
+#if defined(REDHAT) || defined(SUSE)
 	if (write_sysctl_proc_net(0, if_name, "dad_transmits", str_dad) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#endif
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "dad-attempts", str_dad) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1414,6 +2092,12 @@ int iface_ipv6_creat_glob_addr(const char* if_name, unsigned char boolean, char*
 		return EXIT_FAILURE;
 	}
 #endif
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "autoconf",  (boolean ? "1" : "0")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1453,6 +2137,12 @@ int iface_ipv6_creat_temp_addr(const char* if_name, unsigned char boolean, char*
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "privext", "1") != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return ret;
 }
@@ -1471,6 +2161,12 @@ int iface_ipv6_temp_val_lft(const char* if_name, unsigned int temp_val_lft, char
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "privext", "1") != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1485,10 +2181,18 @@ int iface_ipv6_temp_pref_lft(const char* if_name, unsigned int temp_pref_lft, ch
 	}
 
 	/* permanent */
+#if defined(REDHAT) || defined(SUSE)
 	if (write_sysctl_proc_net(0, if_name, "temp_prefered_lft", str_tpl) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to save permanently to sysctl.conf.", __func__, if_name);
 		return EXIT_FAILURE;
 	}
+#endif
+#ifdef DEBIAN
+	if (write_iface_subs_var(0, if_name, "privext", "1") != EXIT_SUCCESS || write_iface_subs_var(0, if_name, "preferred-lifetime",  str_tpl) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: failed to write to \"%s\".", __func__, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
+#endif
 
 	return EXIT_SUCCESS;
 }
@@ -1517,8 +2221,14 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char** msg) {
 	DIR* dir;
 	struct dirent* dent;
-	char** ret = NULL, *path, *value, *variable, *suffix = NULL;
+#ifdef DEBIAN
+	char* value2;
+#endif
+	char** ret = NULL, *value;
+#if defined(REDHAT) || defined(SUSE)
+	char* path, *variable, *suffix = NULL;
 	unsigned char normalized;
+#endif
 
 	if ((dir = opendir("/sys/class/net")) == NULL) {
 		asprintf(msg, "%s: failed to open \"/sys/class/net\" (%s).", __func__, strerror(errno));
@@ -1532,6 +2242,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 
 		/* check if the device is managed by ifup/down scripts */
 		if (only_managed) {
+#if defined(REDHAT) || defined(SUSE)
 			asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, dent->d_name);
 			if (access(path, F_OK) == -1 && errno == ENOENT) {
 				free(path);
@@ -1572,8 +2283,29 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 			}
 
 			if (!normalized) {
-				asprintf(&value, "%s: failed to normalize ifcfg-%s, some configuration problems may occur.", __func__, dent->d_name);
+				nc_verb_warning("%s: failed to normalize ifcfg-%s, some configuration problems may occur.", __func__, dent->d_name);
 			}
+#endif
+#ifdef DEBIAN
+			value = read_iface_method(0, dent->d_name);
+			value2 = read_iface_method(1, dent->d_name);
+			if (value == NULL && value2 == NULL) {
+				continue;
+			}
+			if (value == NULL || value2 == NULL) {
+				if (strcmp((value ? value : value2), "loopback") == 0) {
+					if (write_iface_method((value ? 1 : 0), dent->d_name, "loopback") != EXIT_SUCCESS) {
+						nc_verb_warning("%s: failed to normalize \"%s\" for %s, some configuration problems may occur.", __func__, IFCFG_FILES_PATH, dent->d_name);
+					}
+				} else {
+					if (write_iface_method((value ? 1 : 0), dent->d_name, "manual") != EXIT_SUCCESS) {
+						nc_verb_warning("%s: failed to normalize \"%s\" for %s, some configuration problems may occur.", __func__, IFCFG_FILES_PATH, dent->d_name);
+					}
+				}
+			}
+			free(value);
+			free(value2);
+#endif
 		}
 
 		/* add a device */
@@ -1589,7 +2321,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 	closedir(dir);
 
 	if (ret == NULL) {
-		asprintf(msg, "%s: no network interfaces detected.", __func__);
+		asprintf(msg, "%s: no %snetwork interfaces detected.", __func__, (only_managed ? "managed " : ""));
 	}
 
 	return ret;
@@ -1857,25 +2589,23 @@ int iface_get_ipv4_presence(const char* if_name, char** msg) {
 char* iface_get_ipv4_enabled(const char* if_name, char** msg) {
 	char* bootprot, *ret;
 
+#if defined(REDHAT) || defined(SUSE)
 	bootprot = read_ifcfg_var(if_name, "BOOTPROTO");
-
-#ifdef REDHAT
-	if (bootprot == NULL || strcmp(bootprot, "none") == 0) {
-		/* none seems to be the default */
-		ret = strdup("true");
-	} else {
-		ret = strdup("false");
+#endif
+#ifdef DEBIAN
+	if ((bootprot = read_iface_method(1, if_name)) == NULL) {
+		asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
+		return NULL;
 	}
 #endif
-#ifdef SUSE
-	if (bootprot == NULL || strcmp(bootprot, "static") == 0) {
-		/* static is the default */
+
+	if (bootprot == NULL || strcmp(bootprot, "none") == 0 || strcmp(bootprot, "static") == 0 || strcmp(bootprot, "loopback") == 0) {
+		/* none/static seems to be the default */
 		ret = strdup("true");
 	} else {
 		/* all the others are definitely not static */
 		ret = strdup("false");
 	}
-#endif
 
 	free(bootprot);
 	return ret;
@@ -1910,7 +2640,7 @@ char* iface_get_ipv4_mtu(const char* if_name, char** msg) {
 	return ret;
 }
 
-int iface_get_ipv4_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg) {
+int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg) {
 	char* cmd, *line = NULL, *origin, *ip, *prefix;
 	FILE* output;
 	size_t len = 0;
@@ -1924,14 +2654,17 @@ int iface_get_ipv4_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 		return EXIT_FAILURE;
 	}
 
+#if defined(REDHAT) || defined(SUSE)
 	origin = read_ifcfg_var(if_name, "BOOTPROTO");
-#ifdef REDHAT
-	if (origin == NULL || strcmp(origin, "none") == 0)
 #endif
-#ifdef SUSE
-	if (origin == NULL || strcmp(origin, "static") == 0)
+#ifdef DEBIAN
+	if ((origin = read_iface_method(1, if_name)) == NULL) {
+		asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
 #endif
-	{
+
+	if (origin == NULL || strcmp(origin, "none") == 0 || strcmp(origin, "static") == 0 || strcmp(origin, "loopback") == 0) {
 		/* static is the default */
 		free(origin);
 		origin = strdup("static");
@@ -1952,6 +2685,19 @@ int iface_get_ipv4_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 		prefix = strchr(ip, '/')+1;
 		*strchr(ip, '/') = '\0';
 		*strchr(prefix, ' ') = '\0';
+
+		/* ignore addresses that should not be in the configuration */
+		if (config) {
+			if (strncmp(ip, "169.254", 7) == 0) {
+				continue;
+			}
+#ifdef DEBIAN
+			/* on Debian loopback address is not part of the configuration */
+			if (strcmp(ip, "127.0.0.1") == 0) {
+				continue;
+			}
+#endif
+		}
 
 		/* add a new IP */
 		if (ips->count == 0) {
@@ -2083,7 +2829,7 @@ char* iface_get_ipv6_mtu(const char* if_name, char** msg) {
 	return ret;
 }
 
-int iface_get_ipv6_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg) {
+int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg) {
 	char* cmd, *line = NULL, *origin, *ip, *prefix, *rest;
 	FILE* output;
 	size_t len = 0;
@@ -2097,14 +2843,18 @@ int iface_get_ipv6_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 		return EXIT_FAILURE;
 	}
 
+#if defined(REDHAT) || defined(SUSE)
 	origin = read_ifcfg_var(if_name, "BOOTPROTO");
-#ifdef REDHAT
-	if (origin == NULL || strcmp(origin, "none") == 0)
 #endif
-#ifdef SUSE
-	if (origin == NULL || strcmp(origin, "static") == 0)
+
+#ifdef DEBIAN
+	if ((origin = read_iface_method(0, if_name)) == NULL) {
+		asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
+		return EXIT_FAILURE;
+	}
 #endif
-	{
+
+	if (origin == NULL || strcmp(origin, "none") == 0 || strcmp(origin, "static") == 0 || strcmp(origin, "loopback") == 0) {
 		/* static is the default */
 		free(origin);
 		origin = strdup("static");
@@ -2126,6 +2876,19 @@ int iface_get_ipv6_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg
 		rest = strchr(prefix, ' ')+1;
 		*strchr(ip, '/') = '\0';
 		*strchr(prefix, ' ') = '\0';
+
+		/* ignore addresses that should not be in the configuration */
+		if (config) {
+			if (strncmp(ip, "fe80:", 5) == 0 && strstr(ip, "ff:fe") != NULL) {
+				continue;
+			}
+#ifdef DEBIAN
+			/* on Debian loopback address is not part of the configuration */
+			if (strcmp(ip, "::1") == 0) {
+				continue;
+			}
+#endif
+		}
 
 		/* add a new IP */
 		if (ips->count == 0) {

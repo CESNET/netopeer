@@ -7,7 +7,7 @@
 #define @AVAHI_DAEMON@
 #define @AVAHI_AUTOIPD@
 
-/* installed DHCP client (the command followed by the interface) */
+/* installed DHCP client (this command followed by the interface will be executed) */
 #define DHCP_CLIENT_RENEW "@DHCP_CLIENT_RENEW@"
 #define DHCP_CLIENT_RELEASE "@DHCP_CLIENT_RELEASE@"
 
@@ -17,10 +17,10 @@
 /* directory with ifcfg scripts (on Debian a single file) */
 #define IFCFG_FILES_PATH "@IFCFG_FILES@"
 
-/* directory with additional bash scripts (executed by if(up/down)) */
+/* directory with additional bash scripts (executed by if(up/down), not used on Debian) */
 #define IFCFG_SCRIPTS_PATH "@IFCFG_SCRIPTS@"
 
 /* sysctl script */
-#define SYSCTL_CONF_PATH "@SYSCTL_CONF@"
+#define SYSCTL_CONF_PATH "/etc/sysctl.conf"
 
 #endif /* _CONFIG_H_ */
