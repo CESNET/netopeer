@@ -35,13 +35,13 @@ void iface_cleanup(void);
 int iface_enabled(const char* if_name, unsigned char boolean, char** msg);
 
 int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg);
-int iface_ipv4_mtu(const char* if_name, unsigned short mtu, char** msg);
+int iface_ipv4_mtu(const char* if_name, unsigned int mtu, char** msg);
 int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg);
 int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg);
 int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg);
 
 int iface_ipv6_forwarding(const char* if_name, unsigned char boolean, char** msg);
-int iface_ipv6_mtu(const char* if_name, unsigned short mtu, char** msg);
+int iface_ipv6_mtu(const char* if_name, unsigned int mtu, char** msg);
 int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg);
 int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg);
 int iface_ipv6_dup_addr_det(const char* if_name, unsigned int dup_addr_det, char** msg);
@@ -65,13 +65,13 @@ int iface_get_ipv4_presence(const char* if_name, char** msg);
 char* iface_get_ipv4_enabled(const char* if_name, char** msg);
 char* iface_get_ipv4_forwarding(const char* if_name, char** msg);
 char* iface_get_ipv4_mtu(const char* if_name, char** msg);
-int iface_get_ipv4_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg);
+int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg);
 int iface_get_ipv4_neighs(const char* if_name, struct ip_addrs* ips, struct ip_addrs* neighs, char** msg);
 
 int iface_get_ipv6_presence(const char* if_name, char** msg);
 char* iface_get_ipv6_forwarding(const char* if_name, char** msg);
 char* iface_get_ipv6_mtu(const char* if_name, char** msg);
-int iface_get_ipv6_ipaddrs(const char* if_name, struct ip_addrs* ips, char** msg);
+int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg);
 int iface_get_ipv6_neighs(const char* if_name, struct ip_addrs* ips, struct ip_addrs* neighs, char** msg);
 
 /* init (get config functions) */

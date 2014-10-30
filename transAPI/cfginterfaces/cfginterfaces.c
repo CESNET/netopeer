@@ -48,6 +48,9 @@ static char* iface_name = NULL;
 /* flag to indicate interface removal - we stop managing an interface - ignore all other children removals */
 static int iface_ignore = 0;
 
+/* flag to indicate "ipv4" container removal - ignore "enabled" callback */
+static int iface_ipv4enabled_ignore = 0;
+
 /* flag to indicate ipv4-enabled change - we have to reapply the configured addresses -
  * - ignore any changes as they would be applied twice */
 static int iface_ipv4addr_ignore = 0;
@@ -55,10 +58,12 @@ static int iface_ipv4addr_ignore = 0;
 static const char* capabilities[] = {
 	"urn:ietf:params:netconf:base:1.0",
 	"urn:ietf:params:netconf:base:1.1",
-	"urn:ietf:params:netconf:capability:startup:1.0"
+	"urn:ietf:params:netconf:capability:startup:1.0",
+	NULL
 };
 
-static int get_running_neighbors(char* if_name, struct ip_addrs* neighs, char** msg) {
+/* startup - 0 (running cofnig), 1 (startup config) */
+static int get_config_neighbors(unsigned char startup, char* if_name, struct ip_addrs* neighs, char** msg) {
 	xmlDocPtr doc;
 	xmlNodePtr cur, ifaces, if_child, ip_child;
 	char* neighs_xml;
@@ -75,15 +80,15 @@ static int get_running_neighbors(char* if_name, struct ip_addrs* neighs, char** 
 		nc_cpblts_free(capabs);
 		return EXIT_FAILURE;
 	}
-	nc_cpblts_free(capabs);
 
 	/* create a filter */
 	filter = nc_filter_new(NC_FILTER_SUBTREE, "<interfaces><interface><ipv4><neighbor/></ipv4><ipv6><neighbor/></ipv6></interface></interfaces>");
 
 	/* apply copy-config rpc on the datastore */
-	if ((rpc = nc_rpc_getconfig(NC_DATASTORE_RUNNING, filter)) == NULL) {
+	if ((rpc = nc_rpc_getconfig((startup ? NC_DATASTORE_STARTUP : NC_DATASTORE_RUNNING), filter)) == NULL) {
 		asprintf(msg, "Could not create get-config RPC.");
 		nc_session_free(dummy_session);
+		nc_cpblts_free(capabs);
 		nc_filter_free(filter);
 		return EXIT_FAILURE;
 	}
@@ -92,11 +97,13 @@ static int get_running_neighbors(char* if_name, struct ip_addrs* neighs, char** 
 		nc_filter_free(filter);
 		nc_rpc_free(rpc);
 		nc_session_free(dummy_session);
+		nc_cpblts_free(capabs);
 		return EXIT_FAILURE;
 	}
 	nc_filter_free(filter);
 	nc_rpc_free(rpc);
 	nc_session_free(dummy_session);
+	nc_cpblts_free(capabs);
 
 	if (nc_reply_get_type(reply) != NC_REPLY_DATA) {
 		asprintf(msg, "Unexpected reply to RPC get-config.");
@@ -182,6 +189,9 @@ static int finish(char* msg, int ret, struct nc_err** error) {
 
 	return ret;
 }
+
+int callback_if_interfaces_if_interface_ip_ipv4_ip_mtu(void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error);
+int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu(void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error);
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
@@ -299,6 +309,12 @@ int transapi_init(xmlDocPtr * running)
 		xmlNewTextChild(interface, interface->ns, BAD_CAST "enabled", BAD_CAST tmp);
 		free(tmp);
 
+		/* retrieve all the neighbors from the startup config to be able to determine
+		 * the origin of the actual neighbor entries */
+		if (get_config_neighbors(1, devices[i], &neighs, &msg) != EXIT_SUCCESS) {
+			goto next_ifc;
+		}
+
 		/* IPv4 */
 		if ((j = iface_get_ipv4_presence(devices[i], &msg)) == -1) {
 			goto next_ifc;
@@ -328,12 +344,22 @@ int transapi_init(xmlDocPtr * running)
 			if ((tmp = iface_get_ipv4_mtu(devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
-			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
+			if (strcmp("65535", tmp) < 0) {
+				/* ietf-ip cannot handle higher MTU, set it to this max */
+				free(iface_name);
+				iface_name = devices[i];
+				if (callback_if_interfaces_if_interface_ip_ipv4_ip_mtu(NULL, XMLDIFF_MOD, xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST "65535"), NULL) != EXIT_SUCCESS) {
+					nc_verb_warning("%s: failed to normalize the MTU of %s, real MTU: %s, configuration MTU: 65535", __func__, devices[i], tmp);
+				}
+				iface_name = NULL;
+			} else {
+				xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
+			}
 			free(tmp);
 
 			/* with DHCP enabled, these addresses are not a part of the configuration */
 			if (ipv4_enabled) {
-				if (iface_get_ipv4_ipaddrs(devices[i], &ips, &msg) != 0) {
+				if (iface_get_ipv4_ipaddrs(1, devices[i], &ips, &msg) != 0) {
 					goto next_ifc;
 				}
 				for (j = 0; j < ips.count; ++j) {
@@ -393,10 +419,20 @@ int transapi_init(xmlDocPtr * running)
 			if ((tmp = iface_get_ipv6_mtu(devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
-			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
+			if (strcmp("65535", tmp) < 0) {
+				/* ietf-ip cannot handle higher MTU, set it to this max */
+				free(iface_name);
+				iface_name = devices[i];
+				if (callback_if_interfaces_if_interface_ip_ipv6_ip_mtu(NULL, XMLDIFF_MOD, xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST "65535"), NULL) != EXIT_SUCCESS) {
+					nc_verb_warning("%s: failed to normalize the MTU of %s, real MTU: %s, configuration MTU: 65535", __func__, devices[i], tmp);
+				}
+				iface_name = NULL;
+			} else {
+				xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
+			}
 			free(tmp);
 
-			if (iface_get_ipv6_ipaddrs(devices[i], &ips, &msg) != 0) {
+			if (iface_get_ipv6_ipaddrs(1, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -482,6 +518,13 @@ int transapi_init(xmlDocPtr * running)
 			msg = NULL;
 		}
 		free(devices[i]);
+		for (j = 0; j < neighs.count; ++j) {
+			free(neighs.ip[j]);
+			free(neighs.prefix_or_mac[j]);
+		}
+		free(neighs.ip);
+		free(neighs.prefix_or_mac);
+		neighs.count = 0;
 	}
 
 	free(devices);
@@ -592,8 +635,8 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		xmlNewTextChild(stat_node, stat_node->ns, BAD_CAST "out-errors", BAD_CAST stats.out_errors);
 
 		/* retrieve all the neighbors from the running config to be able to determine
-		 * the origin of actual neighbor entries */
-		if (get_running_neighbors(devices[i], &neighs, &msg) != EXIT_SUCCESS) {
+		 * the origin of the actual neighbor entries */
+		if (get_config_neighbors(0, devices[i], &neighs, &msg) != EXIT_SUCCESS) {
 			goto next_ifc;
 		}
 
@@ -618,7 +661,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
 			free(tmp);
 
-			if (iface_get_ipv4_ipaddrs(devices[i], &ips, &msg) != 0) {
+			if (iface_get_ipv4_ipaddrs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -682,7 +725,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
 			free(tmp);
 
-			if (iface_get_ipv6_ipaddrs(devices[i], &ips, &msg) != 0) {
+			if (iface_get_ipv6_ipaddrs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -836,6 +879,7 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 	}
 
 	iface_ipv4addr_ignore = 0;
+	iface_ipv4enabled_ignore = 0;
 
 	/* learn the interface type */
 	for (cur = node->parent->children; cur != NULL; cur=cur->next) {
@@ -871,6 +915,8 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 		if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
 			return finish(msg, EXIT_FAILURE, error);
 		}
+		/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
+		iface_ipv4enabled_ignore = 1;
 	}
 
 	return EXIT_SUCCESS;
@@ -894,7 +940,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 	char* msg = NULL, *ptr;
 	unsigned char enabled = 3, loopback = 0;
 
-	if (iface_ignore) {
+	if (iface_ignore || iface_ipv4enabled_ignore) {
 		return EXIT_SUCCESS;
 	}
 

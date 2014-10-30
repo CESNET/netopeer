@@ -671,7 +671,6 @@ build_vendor
 build_cpu
 build
 LIBTOOL
-SYSCTL_CONF
 IFCFG_SCRIPTS
 IFCFG_FILES
 DISTRO
@@ -3479,19 +3478,16 @@ fi
 if test "$DISTRO" = "REDHAT"; then
 	IFCFG_FILES="/etc/sysconfig/network-scripts"
 	IFCFG_SCRIPTS="/sbin/ifup-local"
-	SYSCTL_CONF="/etc/sysctl.conf"
 elif test "$DISTRO" = "SUSE"; then
 	IFCFG_FILES="/etc/sysconfig/network"
 	IFCFG_SCRIPTS="/etc/sysconfig/network/scripts"
-	SYSCTL_CONF="/etc/sysctl.conf"
 elif test "$DISTRO" = "DEBIAN"; then
 	IFCFG_FILES="/etc/network/interfaces"
-	IFCFG_SCRIPTS=
-	SYSCTL_CONF=
+	IFCFG_SCRIPTS=""
+	CFLAGS="$CFLAGS -Wno-unused-result"
 else
 	as_fn_error $? "Distribution detection error!" "$LINENO" 5
 fi
-
 
 
 

@@ -1,8 +1,10 @@
 cfginterfaces
 -------------
 
-Currently supported distributions: SUSE-based, RedHat-based
-Planned to be supported in future: Debian-based
+Implemented distribution support:
+- SUSE-based	(tested on OpenSUSE)
+- RedHat-based	(tested on Scientific Linux)
+- Debian-based	(tested on Ubuntu)
 
 Since NetworkManager is not used for configuration, but
 traditional ifcfg-* scripts, only interfaces with an
@@ -10,6 +12,14 @@ existing ifcfg configuration file are managed by
 cfginterfaces module, the rest is ignored. Nevertheless,
 even unmanaged interfaces are displayed in the
 "interfaces-state" tree.
+
+Also, even though ifcfg scripts may exist, they are not
+neccessarily used. Make sure that NetworkManager is not
+overriding the configuration.
+
+Lastly, some avahi software (avahi-daemon, avahi-autoipd)
+is interfering with this module configuration and is
+therefore killed during cfginterfaces initialization.
 
 
 Model node semantics
@@ -39,8 +49,8 @@ Having "ipv4" container and "enabled" set to "false", DHCP
 client is started and manages this interface. Nevertheless,
 note that any "address" nodes are still valid and these IPv4
 addresses are assigned to the interface in addition to any
-addresses received by DHCP. Specially for loopback
-interfaces, any DHCP changes are ignored.
+addresses received by DHCP. Specially for loopback interfaces,
+any DHCP changes are ignored.
 
 /interfaces-state/interface/higher-layer-if
 /interfaces-state/interface/lower-layer-if
@@ -87,3 +97,18 @@ overwritten during boot by SuSEfirewall2. If this happens,
 look into the config file "/etc/sysconfig/SuSEfirewall2" or
 simply run either "systemctl restart systemd-sysctl.service"
 or "sysctl -p" after each boot to re-apply these settings.
+
+
+cfginterfaces-init
+------------------
+
+This small utility is able to read the current interface
+configuration and store it as the startup configuration data
+to be used in the netopeer-server.
+
+The tool is automatically used with 'make install' is the
+Netopeer server (netopeer-manager(1)) is already installed,
+so after that you do not need to run it manually.
+
+Usage:
+	./cfginterfaces-init <cfginterfaces's datastore path> <supported feature> ...
