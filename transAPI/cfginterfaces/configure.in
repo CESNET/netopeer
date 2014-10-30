@@ -142,3 +142,19 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 
 AC_CONFIG_FILES([Makefile config.h model/ietf-interfaces-data.rng])
 AC_OUTPUT
+if test "$DISTRO" = "DEBIAN"; then
+	AC_MSG_NOTICE([])
+	AC_MSG_NOTICE([	NOTE: If the network-manager service is running, it may])
+	AC_MSG_NOTICE([	interfere with this module interface configuration.])
+	AC_MSG_NOTICE([	For more details, check the README file.])
+	AC_MSG_NOTICE([])
+else
+	service NetworkManager status | grep running &>/dev/null
+	if test "$?" = 0; then
+		AC_MSG_NOTICE([])
+		AC_MSG_NOTICE([	WARNING: NetworkManager is running, it may interfere with interface])
+		AC_MSG_NOTICE([	configuration and the configuration will not be applied after restart!])
+		AC_MSG_NOTICE([	For more details, check the README file.])
+		AC_MSG_NOTICE([])
+	fi
+fi

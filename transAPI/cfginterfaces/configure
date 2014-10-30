@@ -13627,3 +13627,29 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+if test "$DISTRO" = "DEBIAN"; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
+$as_echo "$as_me: " >&6;}
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: 	NOTE: If the network-manager service is running, it may" >&5
+$as_echo "$as_me: 	NOTE: If the network-manager service is running, it may" >&6;}
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: 	interfere with this module interface configuration." >&5
+$as_echo "$as_me: 	interfere with this module interface configuration." >&6;}
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: 	For more details, check the README file." >&5
+$as_echo "$as_me: 	For more details, check the README file." >&6;}
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
+$as_echo "$as_me: " >&6;}
+else
+	service NetworkManager status | grep running &>/dev/null
+	if test "$?" = 0; then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
+$as_echo "$as_me: " >&6;}
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: 	WARNING: NetworkManager is running, it may interfere with interface" >&5
+$as_echo "$as_me: 	WARNING: NetworkManager is running, it may interfere with interface" >&6;}
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: 	configuration and the configuration will not be applied after restart!" >&5
+$as_echo "$as_me: 	configuration and the configuration will not be applied after restart!" >&6;}
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: 	For more details, check the README file." >&5
+$as_echo "$as_me: 	For more details, check the README file." >&6;}
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: " >&5
+$as_echo "$as_me: " >&6;}
+	fi
+fi
