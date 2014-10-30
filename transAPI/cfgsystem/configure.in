@@ -76,7 +76,7 @@ if test -n "$USERADD" -a -n "$USERDEL"; then
 else
 	OFF_FEATURES="$OFF_FEATURES authentication local-users"
 fi
-if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
+if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd" && test -f "/etc/ntp.conf"; then
 	FEATURES="$FEATURES ntp"
 else
 	OFF_FEATURES="$OFF_FEATURES ntp"
