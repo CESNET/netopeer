@@ -34,7 +34,7 @@
 #define NTP_SERVER_PREFER_DEFAULT false
 
 /* transAPI version which must be compatible with libnetconf */
-PUBLIC int transapi_version = 4;
+PUBLIC int transapi_version = 5;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
