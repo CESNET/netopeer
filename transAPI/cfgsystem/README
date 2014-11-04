@@ -89,6 +89,22 @@ STUNNEL_PID - PID number of the stunnel process
 STUNNEL_CA_PATH - path to stunnel trusted CA directory
 C_REHASH_PATH - path to the c_rehash utility
 
+File monitoring
+~~~~~~~~~~~~~~~
+
+5 files are monitored:
+
+- sshd_config.conf (netopeer's SSHD config file)
+- /etc/passwd
+- /etc/shadow
+- /etc/ntp.conf
+- /etc/resolv.conf
+
+Any changes to these files outside this module are reflected in the running
+configuration. However, no callbacks are called for these changes and it is
+assumed that they were applied outside cfgsystem (some other application,
+a user, e.c.).
+
 nc_cfgsystem.py
 ---------------
 
