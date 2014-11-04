@@ -701,10 +701,12 @@ struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 struct transapi netopeer_transapi = {
 	.init = netopeer_transapi_init,
 	.close = netopeer_transapi_close,
-	.config_modified = &netopeer_config_modified,
+	.get_state = netopeer_get_state_data,
+	.clbks_order = TRANSAPI_CLBCKS_LEAF_TO_ROOT,
 	.data_clbks = &netopeer_clbks,
 	.rpc_clbks = &netopeer_rpc_clbks,
-	.erropt = &netopeer_erropt,
-	.get_state = netopeer_get_state_data,
 	.ns_mapping = netopeer_namespace_mapping,
+	.config_modified = &netopeer_config_modified,
+	.erropt = &netopeer_erropt,
+	.file_clbks = NULL,
 };

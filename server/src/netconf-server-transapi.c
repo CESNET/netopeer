@@ -1204,10 +1204,12 @@ struct transapi_rpc_callbacks server_rpc_clbks = {
 struct transapi server_transapi = {
 	.init = server_transapi_init,
 	.close = server_transapi_close,
-	.config_modified = &server_config_modified,
+	.get_state = server_get_state_data,
+	.clbks_order = TRANSAPI_CLBCKS_LEAF_TO_ROOT,
 	.data_clbks = &server_clbks,
 	.rpc_clbks = &server_rpc_clbks,
-	.erropt = &server_erropt,
-	.get_state = server_get_state_data,
 	.ns_mapping = server_namespace_mapping,
+	.config_modified = &server_config_modified,
+	.erropt = &server_erropt,
+	.file_clbks = NULL,
 };
