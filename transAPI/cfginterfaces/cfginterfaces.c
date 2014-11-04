@@ -62,11 +62,11 @@ static const char* capabilities[] = {
 	NULL
 };
 
-/* startup - 0 (running cofnig), 1 (startup config) */
-static int get_config_neighbors(unsigned char startup, char* if_name, struct ip_addrs* neighs, char** msg) {
+/* startup - 0 (running config), 1 (startup config) */
+static int get_config_neighbors(unsigned char startup, const char* if_name, struct ip_addrs* neighs, char** msg) {
 	xmlDocPtr doc;
 	xmlNodePtr cur, ifaces, if_child, ip_child;
-	char* neighs_xml;
+	char* neighs_xml, *filter_xml;
 	struct nc_session* dummy_session;
 	struct nc_cpblts* capabs;
 	struct nc_filter* filter;
@@ -82,7 +82,9 @@ static int get_config_neighbors(unsigned char startup, char* if_name, struct ip_
 	}
 
 	/* create a filter */
-	filter = nc_filter_new(NC_FILTER_SUBTREE, "<interfaces><interface><ipv4><neighbor/></ipv4><ipv6><neighbor/></ipv6></interface></interfaces>");
+	asprintf(&filter_xml, "<interfaces><interface><name>%s</name><ipv4><neighbor/></ipv4><ipv6><neighbor/></ipv6></interface></interfaces>", if_name);
+	filter = nc_filter_new(NC_FILTER_SUBTREE, filter_xml);
+	free(filter_xml);
 
 	/* apply copy-config rpc on the datastore */
 	if ((rpc = nc_rpc_getconfig((startup ? NC_DATASTORE_STARTUP : NC_DATASTORE_RUNNING), filter)) == NULL) {
