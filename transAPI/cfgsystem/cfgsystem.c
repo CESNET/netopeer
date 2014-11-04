@@ -1314,3 +1314,55 @@ PUBLIC struct transapi_rpc_callbacks rpc_clbks = {
 		}
 };
 
+extern char NETOPEER_SSHD_CONF[];
+
+PUBLIC int cfgsystem_file_change_cb(const char *filepath, xmlDocPtr *edit_config, int *exec)
+{
+	char* msg = NULL;
+	xmlNodePtr root, config = NULL;
+	xmlNsPtr ns;
+
+	augeas_close();
+	if (augeas_init(&msg) != EXIT_SUCCESS) {
+		return fail(NULL, msg, EXIT_FAILURE);
+	}
+
+	*exec = 0;
+
+	*edit_config = xmlNewDoc(BAD_CAST "1.0");
+	root = xmlNewNode(NULL, BAD_CAST "system");
+	xmlDocSetRootElement(*edit_config, root);
+	ns = xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
+	xmlSetNs(root, ns);
+	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", BAD_CAST "ncop");
+
+	if (strcmp(filepath, NETOPEER_SSHD_CONF) == 0 || strcmp(filepath, "/etc/passwd") == 0 || strcmp(filepath, "/etc/shadow") == 0) {
+		config = users_getxml(ns, &msg);
+	} else if (strcmp(filepath, AUGEAS_NTP_CONF) == 0) {
+		config = ntp_getconfig(ns, &msg);
+	} else if (strcmp(filepath, AUGEAS_DNS_CONF) == 0) {
+		config = dns_getconfig(ns, &msg);
+	}
+
+	if (config == NULL) {
+		xmlFreeDoc(*edit_config);
+		*edit_config = NULL;
+		return fail(NULL, msg, EXIT_FAILURE);
+	}
+
+	xmlSetProp(config, BAD_CAST "ncop:operation", BAD_CAST "replace");
+	xmlAddChild(root, config);
+
+	return EXIT_SUCCESS;
+}
+
+PUBLIC struct transapi_file_callbacks file_clbks = {
+	.callbacks_count = 5,
+	.callbacks = {
+		{.path = NETOPEER_SSHD_CONF, .func = cfgsystem_file_change_cb},
+		{.path = "/etc/passwd", .func = cfgsystem_file_change_cb},
+		{.path = "/etc/shadow", .func = cfgsystem_file_change_cb},
+		{.path = AUGEAS_NTP_CONF, .func = cfgsystem_file_change_cb},
+		{.path = AUGEAS_DNS_CONF, .func = cfgsystem_file_change_cb}
+	}
+};
