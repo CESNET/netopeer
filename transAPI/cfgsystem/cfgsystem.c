@@ -1107,7 +1107,8 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
 PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_cert_maps(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
 	/* just to have a callback, to prevent transAPI from complaining */
-	return fail(NULL, strdup("cert-maps configuration change."), EXIT_SUCCESS);
+	nc_verb_verbose("cert-maps configuration change.");
+	return EXIT_SUCCESS;
 }
 #endif /* ENABLE_TLS */
 
