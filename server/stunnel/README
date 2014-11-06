@@ -15,7 +15,7 @@ stunnel_netopeer.patch	- patch for stunnel (v5.03)
 Patching stunnel:
 ~~~~~~~~~~~~~~~~
 
-wget https://www.stunnel.org/downloads/stunnel-5.03.tar.gz
+wget http://www.usenix.org.uk/mirrors/stunnel/archive/5.x/stunnel-5.03.tar.gz
 tar -xzf stunnel-5.03.tar.gz
 cd stunnel-5.03/src
 patch -p0 -i ../../stunnel_netopeer.patch
