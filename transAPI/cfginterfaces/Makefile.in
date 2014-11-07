@@ -74,7 +74,7 @@ install: $(MODULE) $(TARGET)-init
 
 .PHONY: uninstall
 uninstall:
-	$(LIBTOOL) --mode=uninstall rm -rf q$(DESTDIR)/$(libdir)/$(MODULE);
+	$(LIBTOOL) --mode=uninstall rm -rf $(DESTDIR)/$(libdir)/$(MODULE);
 	rm -rf $(NETOPEER_DIR)/ietf-interfaces/
 	if test -n "$(NETOPEER_MANAGER)"; then \
 		if test -n "`$(NETOPEER_MANAGER) list | grep "^ietf-interfaces ("`"; then \
