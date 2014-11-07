@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<turing-machine xmlns="http://example.net/turing-machine">
+  <transition-function>
+    <delta>
+      <label>0</label>
+      <input>
+        <state>0</state>
+        <symbol>0</symbol>
+      </input>
+      <output>
+        <state>0</state>
+        <symbol>1</symbol>
+      </output>
+    </delta>
+    <delta>
+      <label>1</label>
+      <input>
+        <state>0</state>
+        <symbol>1</symbol>
+      </input>
+      <output>
+        <state>0</state>
+        <symbol>0</symbol>
+      </output>
+    </delta>
+    <delta>
+      <label>end</label>
+      <input>
+        <state>0</state>
+        <symbol/>
+      </input>
+      <output>
+        <state>1</state>
+      </output>
+    </delta>
+  </transition-function>
+</turing-machine>

@@ -1,0 +1,23 @@
+turing-machine transAPI module
+==============================
+
+Implementation of the turing-machine YANG module available from [1].
+
+
+Installation
+------------
+
+$ ./configure
+$ make
+# make install
+
+
+Examples
+--------
+
+Example transition function are placed in the 'examples' directory in the
+format accepted by the <copy-config> operation.
+
+
+[1] - https://code.google.com/p/pyang/wiki/Tutorial
+
