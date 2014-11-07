@@ -13,13 +13,21 @@ cfginterfaces module, the rest is ignored. Nevertheless,
 even unmanaged interfaces are displayed in the
 "interfaces-state" tree.
 
-Also, even though ifcfg scripts may exist, they are not
+Note that even though ifcfg scripts may exist, they are not
 neccessarily used. Make sure that NetworkManager is not
-overriding the configuration.
+overriding the configuration. Morover, some avahi software
+(avahi-daemon, avahi-autoipd) is interfering with this module
+onfiguration and is therefore killed during cfginterfaces
+initialization.
 
-Lastly, some avahi software (avahi-daemon, avahi-autoipd)
-is interfering with this module configuration and is
-therefore killed during cfginterfaces initialization.
+Lastly, configuration files "/etc/sysctl.conf/" and the ifcfg
+file for every network interface are monitored. This means
+that if there are any changes made to these files,
+the running configuration is updated to reflect the changes.
+However, they are considered applied and the corresponding
+callbacks are NOT called. Also, some monitored files may
+not exist, if those interfaces do not have their ifcfg files,
+so the warning messages are safe to be ignored.
 
 
 Model node semantics
