@@ -592,7 +592,7 @@ PACKAGE_STRING='cfginterfaces 1.0'
 PACKAGE_BUGREPORT=''
 PACKAGE_URL=''
 
-ac_unique_file="cfginterfaces.c"
+ac_unique_file="cfginterfaces.c.in"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>
@@ -631,6 +631,8 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+CB_CODE
+COUNT
 LIBNETCONF_DATADIR
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
@@ -671,6 +673,7 @@ build_vendor
 build_cpu
 build
 LIBTOOL
+SYSCTL_CONF
 IFCFG_SCRIPTS
 IFCFG_FILES
 DISTRO
@@ -3475,6 +3478,7 @@ if test "$DISTRO" = "unknown"; then
 $as_echo "$as_me: WARNING: Failed to detect the Linux distribution, assuming RedHat base!" >&2;}
 fi
 
+SYSCTL_CONF="/etc/sysctl.conf"
 if test "$DISTRO" = "REDHAT"; then
 	IFCFG_FILES="/etc/sysconfig/network-scripts"
 	IFCFG_SCRIPTS="/sbin/ifup-local"
@@ -3488,6 +3492,7 @@ elif test "$DISTRO" = "DEBIAN"; then
 else
 	as_fn_error $? "Distribution detection error!" "$LINENO" 5
 fi
+
 
 
 
@@ -11538,7 +11543,24 @@ done
 # Checks for library functions.
 #AC_CHECK_FUNCS([strdup])
 
-ac_config_files="$ac_config_files Makefile config.h model/ietf-interfaces-data.rng"
+# Set monitoring callback for all the network devices.
+COUNT=1
+CB_CODE="{.path = \"${SYSCTL_CONF}\", .func = cfginterfaces_file_change_cb},"
+if test "$DISTRO" = "DEBIAN"; then
+	COUNT=$((COUNT + 1))
+	CB_CODE="${CB_CODE}
+		{.path = \"${IFCFG_FILES}\", .func = cfginterfaces_file_change_cb}"
+else
+	for dev in `ls /sys/class/net`; do
+		COUNT=$((COUNT + 1))
+		CB_CODE="${CB_CODE}
+		{.path = \"${IFCFG_FILES}/ifcfg-${dev}\", .func = cfginterfaces_file_change_cb},"
+	done
+fi
+
+
+
+ac_config_files="$ac_config_files Makefile config.h cfginterfaces.c model/ietf-interfaces-data.rng"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12535,6 +12557,7 @@ do
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "config.h") CONFIG_FILES="$CONFIG_FILES config.h" ;;
+    "cfginterfaces.c") CONFIG_FILES="$CONFIG_FILES cfginterfaces.c" ;;
     "model/ietf-interfaces-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-interfaces-data.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

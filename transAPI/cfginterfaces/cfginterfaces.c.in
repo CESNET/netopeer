@@ -55,127 +55,6 @@ static int iface_ipv4enabled_ignore = 0;
  * - ignore any changes as they would be applied twice */
 static int iface_ipv4addr_ignore = 0;
 
-static const char* capabilities[] = {
-	"urn:ietf:params:netconf:base:1.0",
-	"urn:ietf:params:netconf:base:1.1",
-	"urn:ietf:params:netconf:capability:startup:1.0",
-	NULL
-};
-
-/* startup - 0 (running config), 1 (startup config) */
-static int get_config_neighbors(unsigned char startup, const char* if_name, struct ip_addrs* neighs, char** msg) {
-	xmlDocPtr doc;
-	xmlNodePtr cur, ifaces, if_child, ip_child;
-	char* neighs_xml, *filter_xml;
-	struct nc_session* dummy_session;
-	struct nc_cpblts* capabs;
-	struct nc_filter* filter;
-	nc_rpc* rpc;
-	nc_reply* reply;
-
-	/* create the dummy session */
-	capabs = nc_cpblts_new(capabilities);
-	if ((dummy_session = nc_session_dummy("neighssession", "root", NULL, capabs)) == NULL) {
-		asprintf(msg, "Could not create a dummy session.");
-		nc_cpblts_free(capabs);
-		return EXIT_FAILURE;
-	}
-
-	/* create a filter */
-	asprintf(&filter_xml, "<interfaces><interface><name>%s</name><ipv4><neighbor/></ipv4><ipv6><neighbor/></ipv6></interface></interfaces>", if_name);
-	filter = nc_filter_new(NC_FILTER_SUBTREE, filter_xml);
-	free(filter_xml);
-
-	/* apply copy-config rpc on the datastore */
-	if ((rpc = nc_rpc_getconfig((startup ? NC_DATASTORE_STARTUP : NC_DATASTORE_RUNNING), filter)) == NULL) {
-		asprintf(msg, "Could not create get-config RPC.");
-		nc_session_free(dummy_session);
-		nc_cpblts_free(capabs);
-		nc_filter_free(filter);
-		return EXIT_FAILURE;
-	}
-	if ((reply = ncds_apply_rpc2all(dummy_session, rpc, NULL)) == NULL) {
-		asprintf(msg, "Get-config RPC failed.");
-		nc_filter_free(filter);
-		nc_rpc_free(rpc);
-		nc_session_free(dummy_session);
-		nc_cpblts_free(capabs);
-		return EXIT_FAILURE;
-	}
-	nc_filter_free(filter);
-	nc_rpc_free(rpc);
-	nc_session_free(dummy_session);
-	nc_cpblts_free(capabs);
-
-	if (nc_reply_get_type(reply) != NC_REPLY_DATA) {
-		asprintf(msg, "Unexpected reply to RPC get-config.");
-		nc_reply_free(reply);
-		return EXIT_FAILURE;
-	}
-	neighs_xml = nc_reply_get_data(reply);
-	nc_reply_free(reply);
-
-	if (strcmp(neighs_xml, "") == 0) {
-		/* no neighbors configured */
-		free(neighs_xml);
-		return EXIT_SUCCESS;
-	}
-
-	if ((doc = xmlReadDoc(BAD_CAST neighs_xml, NULL, NULL, 0)) == NULL) {
-		asprintf(msg, "Failed to parse cert-maps.");
-		free(neighs_xml);
-		return EXIT_FAILURE;
-	}
-	free(neighs_xml);
-
-	if ((ifaces = xmlDocGetRootElement(doc)) == NULL) {
-		asprintf(msg, "Empty/invalid config structure.");
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
-
-	for (ifaces = ifaces->children; ifaces != NULL; ifaces = ifaces->next) {
-		for (if_child = ifaces->children; if_child != NULL; if_child = if_child->next) {
-			if (xmlStrncmp(if_child->name, BAD_CAST "ipv", 3) == 0) {
-				for (ip_child = if_child->children; ip_child != NULL; ip_child = ip_child->next) {
-					if (xmlStrEqual(ip_child->name, BAD_CAST "neighbor")) {
-
-						/* new neighbor */
-						if (neighs->count == 0) {
-							neighs->ip = malloc(sizeof(char*));
-							neighs->prefix_or_mac = malloc(sizeof(char*));
-						} else {
-							neighs->ip = realloc(neighs->ip, (neighs->count+1)*sizeof(char*));
-							neighs->prefix_or_mac = realloc(neighs->prefix_or_mac, (neighs->count+1)*sizeof(char*));
-						}
-
-						neighs->ip[neighs->count] = NULL;
-						neighs->prefix_or_mac[neighs->count] = NULL;
-
-						for (cur = ip_child->children; cur != NULL; cur = cur->next) {
-							if (cur->children == NULL || cur->children->content == NULL) {
-								continue;
-							}
-
-							if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
-								neighs->ip[neighs->count] = strdup((char*)cur->children->content);
-							}
-							if (xmlStrEqual(cur->name, BAD_CAST "link-layer-address")) {
-								neighs->prefix_or_mac[neighs->count] = strdup((char*)cur->children->content);
-							}
-						}
-
-						++neighs->count;
-					}
-				}
-			}
-		}
-	}
-
-	xmlFreeDoc(doc);
-	return EXIT_SUCCESS;
-}
-
 static int finish(char* msg, int ret, struct nc_err** error) {
 	if (ret != EXIT_SUCCESS && error != NULL) {
 		*error = nc_err_new(NC_ERR_OP_FAILED);
@@ -201,17 +80,15 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 	xmlNodePtr interface, ip, addr, autoconf, type;
 	xmlNsPtr ipns;
 	char* tmp, *tmp2;
-	struct ip_addrs ips, neighs;
+	struct ip_addrs ips;
 
 	ips.count = 0;
-	neighs.count = 0;
-	neighs.ip = NULL;
-	neighs.prefix_or_mac = NULL;
 
 	interface = xmlNewNode(ns, BAD_CAST "interface");
 	xmlNewTextChild(interface, interface->ns, BAD_CAST "name", BAD_CAST if_name);
 
-	if ((tmp2 = iface_get_type(if_name, msg)) == NULL) {
+	/* it hypothetically can be 1 from the file change callback */
+	if (if_name < (char*)2 || (tmp2 = iface_get_type(if_name, msg)) == NULL) {
 		goto fail;
 	}
 	tmp = (char*)xmlBuildQName((xmlChar*)tmp2, BAD_CAST "ianaift", NULL, 0);
@@ -220,20 +97,14 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 	xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
 	free(tmp);
 
-	if ((tmp = iface_get_enabled(if_name, msg)) == NULL) {
+	if ((tmp = iface_get_enabled(1, if_name, msg)) == NULL) {
 		goto fail;
 	}
 	xmlNewTextChild(interface, interface->ns, BAD_CAST "enabled", BAD_CAST tmp);
 	free(tmp);
 
-	/* retrieve all the neighbors from the startup config to be able to determine
-	 * the origin of the actual neighbor entries */
-	if (get_config_neighbors(1, if_name, &neighs, msg) != EXIT_SUCCESS) {
-		goto fail;
-	}
-
 	/* IPv4 */
-	if ((j = iface_get_ipv4_presence(if_name, msg)) == -1) {
+	if ((j = iface_get_ipv4_presence(1, if_name, msg)) == -1) {
 		goto fail;
 	}
 	if (j) {
@@ -252,16 +123,16 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "enabled", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv4_forwarding(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv4_forwarding(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv4_mtu(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv4_mtu(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
-		if (strcmp("65535", tmp) < 0) {
+		if (65535 < atoi(tmp)) {
 			/* ietf-ip cannot handle higher MTU, set it to this max */
 			free(iface_name);
 			/* it's just for the callback, we can discard const, no change is taking place */
@@ -287,17 +158,15 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 				free(ips.ip[j]);
 				free(ips.prefix_or_mac[j]);
-				free(ips.origin[j]);
 			}
 			if (ips.count != 0) {
 				free(ips.ip);
 				free(ips.prefix_or_mac);
-				free(ips.origin);
 				ips.count = 0;
 			}
 		}
 
-		if (iface_get_ipv4_neighs(if_name, &ips, &neighs, msg) != 0) {
+		if (iface_get_ipv4_neighs(1, if_name, &ips, msg) != 0) {
 			goto fail;
 		}
 		for (j = 0; j < ips.count; ++j) {
@@ -307,18 +176,16 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 			free(ips.ip[j]);
 			free(ips.prefix_or_mac[j]);
-			free(ips.origin[j]);
 		}
 		if (ips.count != 0) {
 			free(ips.ip);
 			free(ips.prefix_or_mac);
-			free(ips.origin);
 			ips.count = 0;
 		}
 	}
 
 	/* IPv6 */
-	if ((j = iface_get_ipv6_presence(if_name, msg)) == -1) {
+	if ((j = iface_get_ipv6_presence(1, if_name, msg)) == -1) {
 		goto fail;
 	}
 	if (j) {
@@ -328,13 +195,13 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "enabled", BAD_CAST "true");
 
-		if ((tmp = iface_get_ipv6_forwarding(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_forwarding(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_mtu(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_mtu(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		if (strcmp("65535", tmp) < 0) {
@@ -361,20 +228,16 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 			free(ips.ip[j]);
 			free(ips.prefix_or_mac[j]);
-			free(ips.origin[j]);
-			free(ips.status_or_state[j]);
 
 			/* \todo: add gateway as an extension to the model */
 		}
 		if (ips.count != 0) {
 			free(ips.ip);
 			free(ips.prefix_or_mac);
-			free(ips.origin);
-			free(ips.status_or_state);
 			ips.count = 0;
 		}
 
-		if (iface_get_ipv6_neighs(if_name, &ips, &neighs, msg) != 0) {
+		if (iface_get_ipv6_neighs(1, if_name, &ips, msg) != 0) {
 			goto fail;
 		}
 		for (j = 0; j < ips.count; ++j) {
@@ -384,18 +247,13 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 			free(ips.ip[j]);
 			free(ips.prefix_or_mac[j]);
-			free(ips.origin[j]);
-			free(ips.status_or_state[j]);
 		}
 		if (ips.count != 0) {
 			free(ips.ip);
 			free(ips.prefix_or_mac);
-			free(ips.origin);
-			free(ips.is_router);
-			free(ips.status_or_state);
 		}
 
-		if ((tmp = iface_get_ipv6_dup_addr_det(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_dup_addr_det(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "dup-addr-detect-transmits", BAD_CAST tmp);
@@ -403,47 +261,34 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg) {
 
 		autoconf = xmlNewChild(ip, ip->ns, BAD_CAST "autoconf", NULL);
 
-		if ((tmp = iface_get_ipv6_creat_glob_addr(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_creat_glob_addr(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "create-global-addresses", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_creat_temp_addr(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_creat_temp_addr(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "create-temporary-addresses", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_temp_val_lft(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_temp_val_lft(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "temporary-valid-lifetime", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_temp_pref_lft(if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_temp_pref_lft(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "temporary-preferred-lifetime", BAD_CAST tmp);
 		free(tmp);
 	}
 
-	for (j = 0; j < neighs.count; ++j) {
-		free(neighs.ip[j]);
-		free(neighs.prefix_or_mac[j]);
-	}
-	free(neighs.ip);
-	free(neighs.prefix_or_mac);
-
 	return interface;
 
 fail:
-	for (j = 0; j < neighs.count; ++j) {
-		free(neighs.ip[j]);
-		free(neighs.prefix_or_mac[j]);
-	}
-	free(neighs.ip);
-	free(neighs.prefix_or_mac);
 	xmlFreeNode(interface);
 
 	return NULL;
@@ -585,10 +430,9 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	xmlNsPtr ns, ipns;
 	char** devices, *msg = NULL, *tmp, *tmp2;
 	struct device_stats stats;
-	struct ip_addrs ips, neighs;
+	struct ip_addrs ips;
 
 	ips.count = 0;
-	neighs.count = 0;
 
 	devices = iface_get_ifcs(0, &dev_count, &msg);
 	if (devices == NULL) {
@@ -598,16 +442,13 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 
 	doc = xmlNewDoc(BAD_CAST "1.0");
 	root = xmlNewNode(NULL, BAD_CAST "interfaces-state");
-	xmlDocSetRootElement(doc, root);
 	ns = xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-interfaces", NULL);
 	xmlSetNs(root, ns);
-	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
+
+	xmlDocSetRootElement(doc, root);
 
 	/* Go through the array and process all devices */
 	for (i = 0; i < dev_count; i++) {
-		neighs.ip = NULL;
-		neighs.prefix_or_mac = NULL;
-
 		interface = xmlNewChild(root, root->ns, BAD_CAST "interface", NULL);
 		xmlNewTextChild(interface, interface->ns, BAD_CAST "name", BAD_CAST devices[i]);
 
@@ -661,14 +502,8 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		xmlNewTextChild(stat_node, stat_node->ns, BAD_CAST "out-discards", BAD_CAST stats.out_discards);
 		xmlNewTextChild(stat_node, stat_node->ns, BAD_CAST "out-errors", BAD_CAST stats.out_errors);
 
-		/* retrieve all the neighbors from the running config to be able to determine
-		 * the origin of the actual neighbor entries */
-		if (get_config_neighbors(0, devices[i], &neighs, &msg) != EXIT_SUCCESS) {
-			goto next_ifc;
-		}
-
 		/* IPv4 */
-		if ((j = iface_get_ipv4_presence(devices[i], &msg)) == -1) {
+		if ((j = iface_get_ipv4_presence(0, devices[i], &msg)) == -1) {
 			goto next_ifc;
 		}
 		if (j) {
@@ -676,13 +511,13 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			ipns = xmlNewNs(ip, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-ip", NULL);
 			xmlSetNs(ip, ipns);
 
-			if ((tmp = iface_get_ipv4_forwarding(devices[i], &msg)) == NULL) {
+			if ((tmp = iface_get_ipv4_forwarding(0, devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
 			free(tmp);
 
-			if ((tmp = iface_get_ipv4_mtu(devices[i], &msg)) == NULL) {
+			if ((tmp = iface_get_ipv4_mtu(0, devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
@@ -710,7 +545,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				ips.count = 0;
 			}
 
-			if (iface_get_ipv4_neighs(devices[i], &ips, &neighs, &msg) != 0) {
+			if (iface_get_ipv4_neighs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -732,7 +567,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		}
 
 		/* IPv6 */
-		if ((j = iface_get_ipv6_presence(devices[i], &msg)) == -1) {
+		if ((j = iface_get_ipv6_presence(0, devices[i], &msg)) == -1) {
 			goto next_ifc;
 		}
 		if (j) {
@@ -740,13 +575,13 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			ipns = xmlNewNs(ip, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-ip", NULL);
 			xmlSetNs(ip, ipns);
 
-			if ((tmp = iface_get_ipv6_forwarding(devices[i], &msg)) == NULL) {
+			if ((tmp = iface_get_ipv6_forwarding(0, devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
 			free(tmp);
 
-			if ((tmp = iface_get_ipv6_mtu(devices[i], &msg)) == NULL) {
+			if ((tmp = iface_get_ipv6_mtu(0, devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "mtu", BAD_CAST tmp);
@@ -777,7 +612,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				ips.count = 0;
 			}
 
-			if (iface_get_ipv6_neighs(devices[i], &ips, &neighs, &msg) != 0) {
+			if (iface_get_ipv6_neighs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -813,13 +648,6 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			msg = NULL;
 		}
 		free(devices[i]);
-		for (j = 0; j < neighs.count; ++j) {
-			free(neighs.ip[j]);
-			free(neighs.prefix_or_mac[j]);
-		}
-		free(neighs.ip);
-		free(neighs.prefix_or_mac);
-		neighs.count = 0;
 	}
 
 	free(devices);
@@ -1785,3 +1613,26 @@ struct transapi_rpc_callbacks rpc_clbks = {
 	}
 };
 
+int cfginterfaces_file_change_cb(const char *filepath, xmlDocPtr *edit_config, int *exec)
+{
+	xmlNodePtr root;
+
+	*exec = 0;
+
+	if (transapi_init(edit_config) != EXIT_SUCCESS || (root = xmlDocGetRootElement(*edit_config)) == NULL) {
+		*edit_config = NULL;
+		return EXIT_FAILURE;
+	}
+
+	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", BAD_CAST "ncop");
+	xmlSetProp(root, BAD_CAST "ncop:operation", BAD_CAST "replace");
+
+	return EXIT_SUCCESS;
+}
+
+struct transapi_file_callbacks file_clbks = {
+	.callbacks_count = @COUNT@,
+	.callbacks = {
+		@CB_CODE@
+	}
+};

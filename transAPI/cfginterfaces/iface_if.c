@@ -142,6 +142,73 @@ fail:
 	return EXIT_FAILURE;
 }
 
+static char* read_sysctl_proc_net(unsigned char ipv4, const char* if_name, const char* variable) {
+	char* content = NULL, *ptr, *var_dot;
+	unsigned int size;
+	int fd = -1;
+
+	asprintf(&var_dot, "net.%s.conf.%s.%s", (ipv4 ? "ipv4" : "ipv6"), if_name, variable);
+
+	if ((fd = open(SYSCTL_CONF_PATH, O_RDONLY)) == -1) {
+		goto fail;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		goto fail;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		goto fail;
+	}
+
+	content = malloc((size+1)*sizeof(char));
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		goto fail;
+	}
+	close(fd);
+	fd = -1;
+	content[size] = '\0';
+
+	for (ptr = strstr(content, var_dot); ptr != NULL; ptr = strstr(ptr, var_dot)) {
+		/* it has to start at the beginning of a line */
+		if (ptr == content || *(ptr-1) == '\n') {
+			break;
+		}
+		++ptr;
+	}
+	if (ptr == NULL) {
+		goto fail;
+	}
+
+	if (strchr(ptr, '\n') != NULL) {
+		*strchr(ptr, '\n') = '\0';
+	}
+
+	if (strchr(ptr, '=') == NULL) {
+		goto fail;
+	}
+	ptr = strchr(ptr, '=')+1;
+	while (*ptr == ' ') {
+		++ptr;
+	}
+
+	ptr = strdup(ptr);
+	free(var_dot);
+	free(content);
+
+	return ptr;
+
+fail:
+	free(var_dot);
+	free(content);
+	if (fd != -1) {
+		close(fd);
+	}
+
+	return NULL;
+}
+
 /* /sys/class/net/(if_name)/(variable) = (value) */
 static int write_to_sys_net(const char* if_name, const char* variable, const char* value) {
 	int fd;
@@ -288,9 +355,17 @@ fail:
 	return EXIT_FAILURE;
 }
 
-static char* read_ifcfg_var(const char* if_name, const char* variable) {
+/*
+ * suffix == NULL - variables ending with the "x" suffix has this suffix replaced by
+ * the first found variable with some number index
+ *
+ * suffix != NULL - it holds the last suffix found, returns the next found and updates
+ * suffix or returns NULL and FREES (*suffix)
+ */
+static char* read_ifcfg_var(const char* if_name, const char* variable, char** suffix) {
 	int fd = -1;
 	unsigned int size;
+	unsigned char with_index = 0;
 	char* path, *ptr, *ptr2, *values = NULL, *content = NULL;
 
 	asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, if_name);
@@ -316,9 +391,44 @@ static char* read_ifcfg_var(const char* if_name, const char* variable) {
 	fd = -1;
 	content[size] = '\0';
 
+	/* nasty business, but const holds */
+	if (variable[strlen(variable)-1] == 'x') {
+		variable = strndup(variable, strlen(variable)-1);
+		with_index = 1;
+	}
+
 	ptr = content;
 	while ((ptr = strstr(ptr, variable)) != NULL) {
 		if (ptr[strlen(variable)] == '=' || ptr[strlen(variable)] == ' ') {
+			ptr = strchr(ptr, '=');
+			break;
+		}
+		if (with_index && ptr[strlen(variable)] >= '0' && ptr[strlen(variable)] <= '9') {
+
+			/* fill in the found suffix */
+			if (suffix != NULL) {
+				ptr += strlen(variable);
+
+				/* first found */
+				if (*suffix == NULL) {
+					*suffix = ptr;
+					while (*ptr >= '0' && *ptr <= '9') {
+						++ptr;
+					}
+					*suffix = strndup(*suffix, ptr-(*suffix));
+
+				/* check if it is the previously returned one */
+				} else {
+					if (strncmp(ptr, *suffix, strlen(*suffix)) == 0) {
+						/* pretend it's the first one, we have skipped all the returned ones */
+						free(*suffix);
+						*suffix = NULL;
+					}
+					continue;
+				}
+			}
+
+			ptr = strchr(ptr, '=');
 			break;
 		}
 		++ptr;
@@ -327,9 +437,6 @@ static char* read_ifcfg_var(const char* if_name, const char* variable) {
 		goto finish;
 	}
 
-	if ((ptr = strchr(ptr, '=')) == NULL) {
-		goto finish;
-	}
 	++ptr;
 	while (*ptr == ' ') {
 		++ptr;
@@ -367,6 +474,10 @@ finish:
 	}
 	free(path);
 	free(content);
+	if (with_index) {
+		/* not cool */
+		free((char*)variable);
+	}
 	return values;
 }
 
@@ -477,7 +588,7 @@ static int write_ifcfg_multival_var(const char* if_name, const char* variable, c
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *ptr2, *tmp = NULL;
 
-	if ((ptr = read_ifcfg_var(if_name, variable)) != NULL && strstr(ptr, value) != NULL) {
+	if ((ptr = read_ifcfg_var(if_name, variable, NULL)) != NULL && strstr(ptr, value) != NULL) {
 		free(ptr);
 		return EXIT_SUCCESS;
 	}
@@ -624,7 +735,7 @@ static int remove_ifcfg_multival_var(const char* if_name, const char* variable, 
 	unsigned int size;
 	char* path, *content = NULL, *ptr, *ptr2, *values = NULL;
 
-	if ((values = read_ifcfg_var(if_name, variable)) == NULL || strstr(values, value) == NULL) {
+	if ((values = read_ifcfg_var(if_name, variable, NULL)) == NULL || strstr(values, value) == NULL) {
 		goto fail;
 	}
 
@@ -934,6 +1045,8 @@ static char* read_iface_subs_var(unsigned char ipv4, const char* if_name, const 
 	if (ret == NULL) {
 		goto fail;
 	}
+
+	ret[strlen(ret)-1] = '\0';
 
 	close(fd);
 	free(content);
@@ -1300,6 +1413,47 @@ fail:
 	free(tmp);
 	return EXIT_FAILURE;
 }
+
+static int present_iface_auto(const char* if_name) {
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL, *tmp = NULL;
+
+	if ((fd = open(IFCFG_FILES_PATH, O_RDONLY)) == -1) {
+		return 0;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1) {
+		close(fd);
+		return 0;
+	}
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		close(fd);
+		return 0;
+	}
+
+	content = malloc(size+1);
+
+	/* we store the whole file content */
+	if (read(fd, content, size) != size) {
+		free(content);
+		close(fd);
+		return 0;
+	}
+	close(fd);
+	content[size] = '\0';
+
+	asprintf(&tmp, "auto %s", if_name);
+	if (strstr(content, tmp) != NULL) {
+		free(content);
+		free(tmp);
+		return 1;
+	}
+	free(content);
+	free(tmp);
+
+	return 0;
+}
 #endif
 
 static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
@@ -1374,7 +1528,7 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	} else {
 		asprintf(&value, "%s/%d", ip, prefix);
 		if (op & XMLDIFF_ADD) {
-			var = read_ifcfg_var(if_name, "IPV6ADDR");
+			var = read_ifcfg_var(if_name, "IPV6ADDR", NULL);
 			if (var == NULL) {
 				/* no IPV6ADDR entry, add it */
 				if (write_ifcfg_var(if_name, "IPV6ADDR", value, NULL) != EXIT_SUCCESS) {
@@ -1397,7 +1551,7 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 		} else {
 			if (remove_ifcfg_var(if_name, "IPV6ADDR", value, NULL) == EXIT_SUCCESS) {
 				/* it was the primary address, make one of the secondaries into primary, if there are any */
-				if ((var = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES")) != NULL) {
+				if ((var = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES", NULL)) != NULL) {
 					if (strchr(var, ' ') != NULL) {
 						*strchr(var, ' ') = '\0';
 					}
@@ -1510,6 +1664,358 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	return EXIT_SUCCESS;
 }
 
+static int iface_get_neighs(unsigned char ipv4, unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg) {
+	int i;
+	char* cmd, *ptr, *line = NULL, *ip, *mac;
+	FILE* output;
+	size_t len = 0;
+#if defined(REDHAT) || defined(SUSE)
+	int fd = -1;
+	unsigned int size;
+	char* content = NULL;
+#endif
+#ifdef SUSE
+	char* path;
+#endif
+
+#ifdef REDHAT
+	errno = 0;
+	if ((fd = open(IFCFG_SCRIPTS_PATH, O_RDONLY)) == -1 && errno != ENOENT) {
+		asprintf(msg, "%s: failed to open \"%s\" (%s).", __func__, IFCFG_SCRIPTS_PATH, strerror(errno));
+		return EXIT_FAILURE;
+	}
+	if (errno == ENOENT) {
+		goto dynamic_neighs;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		asprintf(msg, "%s: failed to seek in \"%s\" (%s).", __func__, IFCFG_SCRIPTS_PATH, strerror(errno));
+		close(fd);
+		return EXIT_FAILURE;
+	}
+
+	content = malloc((size+1)*sizeof(char));
+
+	if (read(fd, content, size) != size) {
+		asprintf(msg, "%s: failed to read from \"%s\" (%s).", __func__, IFCFG_SCRIPTS_PATH, strerror(errno));
+		free(content);
+		close(fd);
+		return EXIT_FAILURE;
+	}
+	close(fd);
+	content[size] = '\0';
+
+	for (ptr = strstr(content, if_name); ptr != NULL; ptr = strstr(ptr, if_name)) {
+		if ((ptr = strchr(ptr, '\n')) == NULL) {
+			break;
+		}
+		if (strncmp(ptr, "ip neigh add ", strlen("ip neigh add ")) != 0) {
+			ptr = strchr(ptr, '\n');
+			continue;
+		}
+		ptr += strlen("ip neigh add ");
+		ip = ptr;
+		if ((ipv4 && strchr(ip, ':') != NULL) || (!ipv4 && strchr(ip, '.') != NULL)) {
+			ptr = strchr(ptr, '\n');
+			continue;
+		}
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			ptr = strchr(ptr, '\n');
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+		if (strncmp(ptr, "lladdr ", strlen("lladdr ")) != 0) {
+			ptr = strchr(ptr, '\n');
+			continue;
+		}
+		ptr += strlen("lladdr ");
+		mac = ptr;
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			ptr = strchr(ptr, '\n');
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+		ptr = strchr(ptr, '\n');
+#endif
+#ifdef SUSE
+	asprintf(&path, "%s/ifup-%s-neigh", IFCFG_SCRIPTS_PATH, if_name);
+	errno = 0;
+	if ((fd = open(path, O_RDONLY)) == -1 && errno != ENOENT) {
+		asprintf(msg, "%s: failed to open \"%s\" (%s).", __func__, path, strerror(errno));
+		free(path);
+		return EXIT_FAILURE;
+	}
+	if (errno == ENOENT) {
+		free(path);
+		goto dynamic_neighs;
+	}
+
+	if ((size = lseek(fd, 0, SEEK_END)) == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+		asprintf(msg, "%s: failed to seek in \"%s\" (%s).", __func__, path, strerror(errno));
+		free(path);
+		close(fd);
+		return EXIT_FAILURE;
+	}
+
+	content = malloc((size+1)*sizeof(char));
+
+	if (read(fd, content, size) != size) {
+		asprintf(msg, "%s: failed to read from \"%s\" (%s).", __func__, path, strerror(errno));
+		free(path);
+		free(content);
+		close(fd);
+		return EXIT_FAILURE;
+	}
+	close(fd);
+	content[size] = '\0';
+
+	for (ptr = content; ptr != NULL; ptr = strchr(ptr, '\n')) {
+		if (strncmp(ptr, "ip neigh add ", strlen("ip neigh add ")) != 0) {
+			continue;
+		}
+		ptr += strlen("ip neigh add ");
+		ip = ptr;
+		if ((ipv4 && strchr(ip, ':') != NULL) || (!ipv4 && strchr(ip, '.') != NULL)) {
+			continue;
+		}
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+		if (strncmp(ptr, "lladdr ", strlen("lladdr ")) != 0) {
+			continue;
+		}
+		ptr += strlen("lladdr ");
+		mac = ptr;
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+#endif
+#ifdef DEBIAN
+	if ((line = read_iface_subs_var(1, if_name, "post-up")) == NULL) {
+		goto dynamic_neighs;
+	}
+	ptr = strtok(line, ";");
+	for (; ptr != NULL; ptr = strtok(NULL, ";")) {
+		if (strncmp(ptr, "ip neigh add ", strlen("ip neigh add ")) != 0) {
+			continue;
+		}
+		ptr += strlen("ip neigh add ");
+		ip = ptr;
+		if ((ipv4 && strchr(ip, ':') != NULL) || (!ipv4 && strchr(ip, '.') != NULL)) {
+			continue;
+		}
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+		if (strncmp(ptr, "lladdr ", strlen("lladdr ")) != 0) {
+			continue;
+		}
+		ptr += strlen("lladdr ");
+		mac = ptr;
+		if ((ptr = strchr(ptr, ' ')) == NULL) {
+			continue;
+		}
+		*ptr = '\0';
+		++ptr;
+#endif
+		/* add a new neighbor */
+		if (neighs->count == 0) {
+			neighs->ip = malloc(sizeof(char*));
+			neighs->prefix_or_mac = malloc(sizeof(char*));
+		} else {
+			neighs->ip = realloc(neighs->ip, (neighs->count+1)*sizeof(char*));
+			neighs->prefix_or_mac = realloc(neighs->prefix_or_mac, (neighs->count+1)*sizeof(char*));
+		}
+
+		neighs->ip[neighs->count] = strdup(ip);
+		neighs->prefix_or_mac[neighs->count] = strdup(mac);
+
+		++neighs->count;
+#ifdef DEBIAN
+	}
+	free(line);
+#endif
+#ifdef SUSE
+	}
+	free(path);
+	free(content);
+#endif
+#ifdef REDHAT
+	}
+	free(content);
+#endif
+
+dynamic_neighs:
+
+	/* static neighbors are stored, now the dynamic ones */
+	if (!config && ipv4) {
+		asprintf(&cmd, "ip -4 neigh show dev %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return EXIT_FAILURE;
+		}
+
+		while (getline(&line, &len, output) != -1) {
+			ip = strtok(line, " \n");
+			mac = strtok(NULL, " \n");
+			if (strcmp(mac, "lladdr") == 0) {
+				mac = strtok(NULL, " \n");
+			} else {
+				/* FAILED neighbor, ignore */
+				continue;
+			}
+
+			for (i = 0; i < neighs->count; ++i) {
+				if (strcmp(neighs->ip[i], ip) == 0 && strcmp(neighs->prefix_or_mac[i], mac) == 0) {
+					break;
+				}
+			}
+			/* it is a static neighbor */
+			if (i < neighs->count) {
+				continue;
+			}
+
+			/* add a new neighbor */
+			if (neighs->count == 0) {
+				neighs->ip = malloc(sizeof(char*));
+				neighs->prefix_or_mac = malloc(sizeof(char*));
+				neighs->origin = malloc(sizeof(char*));
+			} else {
+				neighs->ip = realloc(neighs->ip, (neighs->count+1)*sizeof(char*));
+				neighs->prefix_or_mac = realloc(neighs->prefix_or_mac, (neighs->count+1)*sizeof(char*));
+				neighs->origin = realloc(neighs->origin, (neighs->count+1)*sizeof(char*));
+			}
+
+			neighs->ip[neighs->count] = strdup(ip);
+			neighs->prefix_or_mac[neighs->count] = strdup(mac);
+			neighs->origin[neighs->count] = strdup("dynamic");
+
+			++neighs->count;
+		}
+
+		free(line);
+		pclose(output);
+	}
+	if (!config && !ipv4) {
+		asprintf(&cmd, "ip -6 neigh show dev %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return EXIT_FAILURE;
+		}
+
+		while (getline(&line, &len, output) != -1) {
+			ip = strtok(line, " \n");
+			ptr = strtok(NULL, " \n");
+			if (strcmp(ptr, "lladdr") == 0) {
+				mac = strtok(NULL, " \n");
+				ptr = strtok(NULL, " \n");
+			} else {
+				/* FAILED neighbor, ignore */
+				continue;
+			}
+
+			for (i = 0; i < neighs->count; ++i) {
+				if (strcmp(neighs->ip[i], ip) == 0 && strcmp(neighs->prefix_or_mac[i], mac) == 0) {
+					break;
+				}
+			}
+			/* it is a static neighbor */
+			if (i < neighs->count) {
+				continue;
+			}
+
+			/* add a new neighbor */
+			if (neighs->count == 0) {
+				neighs->ip = malloc(sizeof(char*));
+				neighs->prefix_or_mac = malloc(sizeof(char*));
+				neighs->status_or_state = malloc(sizeof(char*));
+				neighs->origin = malloc(sizeof(char*));
+				neighs->is_router = malloc(sizeof(char));
+			} else {
+				neighs->ip = realloc(neighs->ip, (neighs->count+1)*sizeof(char*));
+				neighs->prefix_or_mac = realloc(neighs->prefix_or_mac, (neighs->count+1)*sizeof(char*));
+				neighs->status_or_state = realloc(neighs->status_or_state, (neighs->count+1)*sizeof(char*));
+				neighs->origin = realloc(neighs->origin, (neighs->count+1)*sizeof(char*));
+				neighs->is_router = realloc(neighs->is_router, (neighs->count+1)*sizeof(char));
+			}
+
+			neighs->ip[neighs->count] = strdup(ip);
+			neighs->prefix_or_mac[neighs->count] = strdup(mac);
+			if (strcmp(ptr, "router") == 0) {
+				neighs->is_router[neighs->count] = 1;
+				ptr = strtok(NULL, " \n");
+			} else {
+				neighs->is_router[neighs->count] = 0;
+			}
+			if (strcmp(ptr, "REACHABLE") == 0 || strcmp(ptr, "NOARP") == 0 || strcmp(ptr, "PERMANENT") == 0) {
+				neighs->status_or_state[neighs->count] = strdup("reachable");
+			} else if (strcmp(ptr, "STALE") == 0) {
+				neighs->status_or_state[neighs->count] = strdup("stale");
+			} else if (strcmp(ptr, "DELAY") == 0) {
+				neighs->status_or_state[neighs->count] = strdup("delay");
+			} else if (strcmp(ptr, "PROBE") == 0) {
+				neighs->status_or_state[neighs->count] = strdup("probe");
+			} else {
+				neighs->status_or_state[neighs->count] = strdup("incomplete");
+			}
+			neighs->origin[neighs->count] = strdup("dynamic");
+			++neighs->count;
+		}
+
+		free(line);
+		pclose(output);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static void convert_netmask_to_prefix(char* netmask) {
+	int i;
+	unsigned char prefix_len, mask, octet;
+	char* ptr;
+
+	/* invalid argument or already prefix */
+	if (netmask == NULL || strchr(netmask, '.') == NULL) {
+		return;
+	}
+
+	prefix_len = 0;
+	mask = 0x80;
+	octet = (unsigned)strtol(netmask, &ptr, 10);
+	i = 0;
+	while (mask & octet) {
+		++prefix_len;
+		mask >>= 1;
+		++i;
+		if (i == 32) {
+			break;
+		}
+		if (i % 8 == 0) {
+			/* format error */
+			if (*ptr != '.') {
+				return;
+			}
+			octet = (unsigned)strtol(ptr, &ptr, 10);
+			mask = 0x80;
+		}
+	}
+	sprintf(netmask, "%u", prefix_len);
+}
+
 /*
  * cfginterfaces.h function definitions
  */
@@ -1574,18 +2080,16 @@ int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg
 
 int iface_ipv4_mtu(const char* if_name, unsigned int mtu, char** msg) {
 	char str_mtu[15], *ipv6_mtu;
-	unsigned int old_mtu;
 
-	if ((ipv6_mtu = iface_get_ipv6_mtu(if_name, msg)) == NULL) {
+	if ((ipv6_mtu = iface_get_ipv6_mtu(0, if_name, msg)) == NULL) {
 		return EXIT_FAILURE;
 	}
-	old_mtu = atoi(ipv6_mtu);
-	free(ipv6_mtu);
 
 	sprintf(str_mtu, "%d", mtu);
 	/* this adjusts the IPv6 MTU as well, that is why we save it first and set it afterwards */
 	if (write_to_sys_net(if_name, "mtu", str_mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/sys/class/net/...\"", __func__, if_name);
+		free(ipv6_mtu);
 		return EXIT_FAILURE;
 	}
 
@@ -1598,10 +2102,18 @@ int iface_ipv4_mtu(const char* if_name, unsigned int mtu, char** msg) {
 #endif
 	{
 		asprintf(msg, "%s: failed to write to the ifcfg file (%s).", __func__, if_name);
+		free(ipv6_mtu);
 		return EXIT_FAILURE;
 	}
 
-	return iface_ipv6_mtu(if_name, old_mtu, msg);
+	if (write_to_proc_net(0, if_name, "mtu", ipv6_mtu) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		free(ipv6_mtu);
+		return EXIT_FAILURE;
+	}
+	free(ipv6_mtu);
+
+	return EXIT_SUCCESS;
 }
 
 int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg) {
@@ -2218,7 +2730,7 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg) {
 	return EXIT_SUCCESS;
 }
 
-char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char** msg) {
+char** iface_get_ifcs(unsigned char config, unsigned int* dev_count, char** msg) {
 	DIR* dir;
 	struct dirent* dent;
 #ifdef DEBIAN
@@ -2241,7 +2753,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 		}
 
 		/* check if the device is managed by ifup/down scripts */
-		if (only_managed) {
+		if (config) {
 #if defined(REDHAT) || defined(SUSE)
 			asprintf(&path, "%s/ifcfg-%s", IFCFG_FILES_PATH, dent->d_name);
 			if (access(path, F_OK) == -1 && errno == ENOENT) {
@@ -2252,14 +2764,14 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 
 			/* "normalize" the ifcfg file */
 			normalized = 1;
-			if ((value = read_ifcfg_var(dent->d_name, "IPADDR")) != NULL) {
+			if ((value = read_ifcfg_var(dent->d_name, "IPADDR", NULL)) != NULL) {
 				if (remove_ifcfg_var(dent->d_name, "IPADDR", value, NULL) != EXIT_SUCCESS ||
 						write_ifcfg_var(dent->d_name, "IPADDRx", value, &suffix) != EXIT_SUCCESS) {
 					normalized = 0;
 				}
 				free(value);
 
-				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "PREFIX")) != NULL) {
+				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "PREFIX", NULL)) != NULL) {
 					asprintf(&variable, "PREFIX%s", suffix);
 					if (remove_ifcfg_var(dent->d_name, "PREFIX", value, NULL) != EXIT_SUCCESS ||
 							write_ifcfg_var(dent->d_name, variable, value, NULL) != EXIT_SUCCESS) {
@@ -2269,7 +2781,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 					free(variable);
 				}
 
-				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "NETMASK")) != NULL) {
+				if (suffix != NULL && (value = read_ifcfg_var(dent->d_name, "NETMASK", NULL)) != NULL) {
 					asprintf(&variable, "NETMASK%s", suffix);
 					if (remove_ifcfg_var(dent->d_name, "NETMASK", value, NULL) != EXIT_SUCCESS ||
 							write_ifcfg_var(dent->d_name, variable, value, NULL) != EXIT_SUCCESS) {
@@ -2321,7 +2833,7 @@ char** iface_get_ifcs(unsigned char only_managed, unsigned int* dev_count, char*
 	closedir(dir);
 
 	if (ret == NULL) {
-		asprintf(msg, "%s: no %snetwork interfaces detected.", __func__, (only_managed ? "managed " : ""));
+		asprintf(msg, "%s: no %snetwork interfaces detected.", __func__, (config ? "managed " : ""));
 	}
 
 	return ret;
@@ -2560,37 +3072,72 @@ int iface_get_stats(const char* if_name, struct device_stats* stats, char** msg)
 	return EXIT_FAILURE;
 }
 
-int iface_get_ipv4_presence(const char* if_name, char** msg) {
+int iface_get_ipv4_presence(unsigned char config, const char* if_name, char** msg) {
 	int ret;
-	char* cmd, *line = NULL;
+	char* cmd, *line = NULL, *tmp;
 	size_t len = 0;
 	FILE* output;
 
-	asprintf(&cmd, "ip -4 addr show dev %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
-
-	if (getline(&line, &len, output) == -1) {
-		ret = 0;
-	} else {
+	if (config) {
 		ret = 1;
+#if defined(REDHAT) || defined(SUSE)
+#	ifdef REDHAT
+		if ((tmp = read_ifcfg_var(if_name, "BOOTPROTO", NULL)) == NULL || strcmp(tmp, "none") == 0)
+#	endif
+#	ifdef SUSE
+		if ((tmp = read_ifcfg_var(if_name, "BOOTPROTO", NULL)) == NULL || strcmp(tmp, "static") == 0)
+#	endif
+		{
+			free(tmp);
+			if ((tmp = read_ifcfg_var(if_name, "IPADDRx", NULL)) == NULL) {
+				ret = 0;
+			}
+		}
+		free(tmp);
+#endif
+#ifdef DEBIAN
+		/* either it's not there at all or it has manual method and no post-ups */
+		if ((tmp = read_iface_method(1, if_name)) == NULL) {
+			ret = 0;
+		} else if (strcmp(tmp, "manual") == 0) {
+			free(tmp);
+			if ((tmp = read_iface_subs_var(1, if_name, "post-up")) == NULL) {
+				ret = 0;
+			}
+		}
+		free(tmp);
+#endif
+	} else {
+		asprintf(&cmd, "ip -4 addr show dev %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL || getline(&line, &len, output) == -1) {
+			ret = 0;
+		} else {
+			ret = 1;
+		}
+
+		free(line);
+		if (output != NULL) {
+			pclose(output);
+		}
 	}
 
-	free(line);
-	pclose(output);
 	return ret;
 }
 
+/*
+ * we know IPv4 is present if this is called, so IPv4 is enabled,
+ * we are trying to determine whether DHCP was used or not and
+ * this can be done only by looking into configuration, not runtime
+ * settings
+ */
 char* iface_get_ipv4_enabled(const char* if_name, char** msg) {
-	char* bootprot, *ret;
+	char* bootprot = NULL, *ret;
 
 #if defined(REDHAT) || defined(SUSE)
-	bootprot = read_ifcfg_var(if_name, "BOOTPROTO");
+	bootprot = read_ifcfg_var(if_name, "BOOTPROTO", NULL);
 #endif
 #ifdef DEBIAN
 	if ((bootprot = read_iface_method(1, if_name)) == NULL) {
@@ -2611,15 +3158,20 @@ char* iface_get_ipv4_enabled(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv4_forwarding(const char* if_name, char** msg) {
-	char* procval, *ret;
+char* iface_get_ipv4_forwarding(unsigned char config, const char* if_name, char** msg) {
+	char* procval = NULL, *ret;
 
-	if ((procval = read_from_proc_net(1, if_name, "forwarding")) == NULL) {
-		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
-		return NULL;
+	if (config) {
+		procval = read_sysctl_proc_net(1, if_name, "forwarding");
+	} else {
+		if ((procval = read_from_proc_net(1, if_name, "forwarding")) == NULL) {
+			asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
+			return NULL;
+		}
 	}
 
-	if (strcmp(procval, "0") == 0) {
+	/* the default */
+	if (procval == NULL || strcmp(procval, "0") == 0) {
 		ret = strdup("false");
 	} else {
 		ret = strdup("true");
@@ -2629,10 +3181,19 @@ char* iface_get_ipv4_forwarding(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv4_mtu(const char* if_name, char** msg) {
-	char* ret;
+char* iface_get_ipv4_mtu(unsigned char config, const char* if_name, char** msg) {
+	char* ret = NULL;
 
-	if ((ret = read_from_sys_net(if_name, "mtu")) == NULL) {
+	if (config) {
+#if defined(REDHAT) || defined(SUSE)
+		ret = read_ifcfg_var(if_name, "MTU", NULL);
+#endif
+#ifdef DEBIAN
+		ret = read_iface_subs_var(1, if_name, "mtu");
+#endif
+	}
+
+	if (ret == NULL && (ret = read_from_sys_net(if_name, "mtu")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
 		return NULL;
 	}
@@ -2641,156 +3202,249 @@ char* iface_get_ipv4_mtu(const char* if_name, char** msg) {
 }
 
 int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg) {
+	int i;
 	char* cmd, *line = NULL, *origin, *ip, *prefix;
+	struct ip_addrs static_ips;
 	FILE* output;
 	size_t len = 0;
+#if defined(REDHAT) || defined(SUSE)
+	char* suffix = NULL, *netmask_var, *prefix_var;
+#endif
 
-	asprintf(&cmd, "ip -4 addr show dev %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
+	if (config) {
+#ifdef REDHAT
+		while ((ip = read_ifcfg_var(if_name, "IPADDRx", &suffix)) != NULL) {
+			asprintf(&prefix_var, "PREFIX%s", suffix);
+			asprintf(&netmask_var, "NETMASK%s", suffix);
+			if ((prefix = read_ifcfg_var(if_name, prefix_var, NULL)) == NULL && (prefix = read_ifcfg_var(if_name, netmask_var, NULL)) == NULL) {
+				free(prefix_var);
+				free(netmask_var);
+				free(ip);
+				continue;
+			}
+			free(prefix_var);
+			free(netmask_var);
 
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
+			convert_netmask_to_prefix(prefix);
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = prefix;
+			++ips->count;
+		}
+#endif
+#ifdef SUSE
+		while ((ip = read_ifcfg_var(if_name, "IPADDRx", &suffix)) != NULL) {
+			/* IPv6 address */
+			if (strchr(ip, ':') != NULL) {
+				free(ip);
+				continue;
+			}
+			prefix = strchr(ip, '/');
+			if (prefix == NULL) {
+				asprintf(&prefix_var, "PREFIXLEN%s", suffix);
+				asprintf(&netmask_var, "NETMASK%s", suffix);
+				prefix = read_ifcfg_var(if_name, prefix_var, NULL);
+				if (prefix == NULL) {
+					prefix = read_ifcfg_var(if_name, netmask_var, NULL);
+				}
+				free(prefix_var);
+				free(netmask_var);
+				if (prefix == NULL) {
+					free(ip);
+					continue;
+				}
+				convert_netmask_to_prefix(prefix);
+			} else {
+				*prefix = '\0';
+				++prefix;
+				prefix = strdup(prefix);
+			}
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = prefix;
+			++ips->count;
+		}
+#endif
+#ifdef DEBIAN
+		if ((ip = read_iface_subs_var(1, if_name, "address")) != NULL && (prefix = read_iface_subs_var(1, if_name, "netmask")) != NULL) {
+			ips->ip = malloc(sizeof(char*));
+			ips->prefix_or_mac = malloc(sizeof(char*));
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = prefix;
+			++ips->count;
+
+			ip = NULL;
+		}
+
+		if ((line = read_iface_subs_var(1, if_name, "post-up")) != NULL) {
+			ip = strtok(line, ";");
+		}
+
+		for (; ip != NULL; ip = strtok(NULL, ";")) {
+			if (strncmp(ip, "ip addr add ", strlen("ip addr add ")) != 0) {
+				continue;
+			}
+
+			ip += strlen("ip addr add ");
+			prefix = strchr(ip, '/');
+			if (prefix == NULL) {
+				continue;
+			}
+			++prefix;
+			if (strchr(prefix, ' ') == NULL) {
+				continue;
+			}
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = strndup(ip, strchr(ip, '/')-ip);
+			ips->prefix_or_mac[ips->count] = strndup(prefix, strchr(prefix, ' ')-prefix);
+			++ips->count;
+		}
+
+		free(line);
+#endif
+	} else {
+		/* first learn the static addresses, to correctly determine the origin */
+		static_ips.count = 0;
+		static_ips.ip = NULL;
+		static_ips.prefix_or_mac = NULL;
+
+		if (iface_get_ipv4_ipaddrs(1, if_name, &static_ips, msg) != EXIT_SUCCESS) {
+			return EXIT_FAILURE;
+		}
 
 #if defined(REDHAT) || defined(SUSE)
-	origin = read_ifcfg_var(if_name, "BOOTPROTO");
+		origin = read_ifcfg_var(if_name, "BOOTPROTO", NULL);
 #endif
 #ifdef DEBIAN
-	if ((origin = read_iface_method(1, if_name)) == NULL) {
-		asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
-		return EXIT_FAILURE;
-	}
+		if ((origin = read_iface_method(1, if_name)) == NULL) {
+			asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
+			return EXIT_FAILURE;
+		}
 #endif
 
-	if (origin == NULL || strcmp(origin, "none") == 0 || strcmp(origin, "static") == 0 || strcmp(origin, "loopback") == 0) {
-		/* static is the default */
-		free(origin);
-		origin = strdup("static");
-	} else if (strncmp(origin, "dhcp", 4) == 0) {
-		free(origin);
-		origin = strdup("dhcp");
-	} else {
-		free(origin);
-		origin = strdup("other");
-	}
-
-	while (getline(&line, &len, output) != -1) {
-		if ((ip = strstr(line, "inet")) == NULL) {
-			continue;
+		/* static is learned from the static_ips struct,
+		 * so the only valid information we can get is
+		 * whether it is from DHCP
+		 */
+		if (origin == NULL || strncmp(origin, "dhcp", 4) != 0) {
+			free(origin);
+			origin = strdup("other");
 		}
 
-		ip += 5;
-		prefix = strchr(ip, '/')+1;
-		*strchr(ip, '/') = '\0';
-		*strchr(prefix, ' ') = '\0';
+		asprintf(&cmd, "ip -4 addr show dev %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
 
-		/* ignore addresses that should not be in the configuration */
-		if (config) {
-			if (strncmp(ip, "169.254", 7) == 0) {
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			free(origin);
+			return EXIT_FAILURE;
+		}
+
+		while (getline(&line, &len, output) != -1) {
+			if ((ip = strstr(line, "inet")) == NULL) {
 				continue;
 			}
-#ifdef DEBIAN
-			/* on Debian loopback address is not part of the configuration */
-			if (strcmp(ip, "127.0.0.1") == 0) {
-				continue;
+
+			ip += 5;
+			prefix = strchr(ip, '/')+1;
+			*strchr(ip, '/') = '\0';
+			*strchr(prefix, ' ') = '\0';
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+				ips->origin = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+				ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
 			}
-#endif
+
+			ips->ip[ips->count] = strdup(ip);
+			ips->prefix_or_mac[ips->count] = strdup(prefix);
+			ips->origin[ips->count] = NULL;
+
+			for (i = 0; i < static_ips.count; ++i) {
+				if (strcmp(ip, static_ips.ip[i]) == 0 && strcmp(prefix, static_ips.prefix_or_mac[i]) == 0) {
+					ips->origin[ips->count] = strdup("static");
+					break;
+				}
+			}
+
+			if (ips->origin[ips->count] == NULL) {
+				if (strncmp(ip, "169.254", 7) == 0) {
+					ips->origin[ips->count] = strdup("random");
+				} else if (strcmp(ip, "127.0.0.1") == 0) {
+					ips->origin[ips->count] = strdup("static");
+				} else {
+					ips->origin[ips->count] = strdup(origin);
+				}
+			}
+			++ips->count;
 		}
 
-		/* add a new IP */
-		if (ips->count == 0) {
-			ips->ip = malloc(sizeof(char*));
-			ips->prefix_or_mac = malloc(sizeof(char*));
-			ips->origin = malloc(sizeof(char*));
-		} else {
-			ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
-			ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
-			ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
+		for (i = 0; i < static_ips.count; ++i) {
+			free(static_ips.ip[i]);
+			free(static_ips.prefix_or_mac[i]);
 		}
+		free(static_ips.ip);
+		free(static_ips.prefix_or_mac);
 
-		ips->ip[ips->count] = strdup(ip);
-		ips->prefix_or_mac[ips->count] = strdup(prefix);
-		if (strncmp(ip, "169.254", 7) == 0) {
-			ips->origin[ips->count] = strdup("random");
-		} else {
-			ips->origin[ips->count] = strdup(origin);
-		}
-		++ips->count;
+		pclose(output);
+		free(line);
+		free(origin);
 	}
 
-	free(origin);
-	free(line);
-	pclose(output);
 	return EXIT_SUCCESS;
 }
 
-int iface_get_ipv4_neighs(const char* if_name, struct ip_addrs* ips, struct ip_addrs* neighs, char** msg) {
-	int i;
-	char* cmd, *line = NULL, *ip, *mac;
-	FILE* output;
-	size_t len = 0;
-
-	asprintf(&cmd, "ip -4 neigh show dev %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
-
-	while (getline(&line, &len, output) != -1) {
-		ip = strtok(line, " \n");
-		mac = strtok(NULL, " \n");
-		if (strcmp(mac, "lladdr") == 0) {
-			mac = strtok(NULL, " \n");
-		} else {
-			/* FAILED neighbor, ignore */
-			continue;
-		}
-
-		/* add a new IP */
-		if (ips->count == 0) {
-			ips->ip = malloc(sizeof(char*));
-			ips->prefix_or_mac = malloc(sizeof(char*));
-			ips->origin = malloc(sizeof(char*));
-		} else {
-			ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
-			ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
-			ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
-		}
-
-		ips->ip[ips->count] = strdup(ip);
-		ips->prefix_or_mac[ips->count] = strdup(mac);
-		ips->origin[ips->count] = NULL;
-		for (i = 0; i < neighs->count; ++i) {
-			if (strcmp(ip, neighs->ip[i]) == 0 && strcmp(mac, neighs->prefix_or_mac[i]) == 0) {
-				ips->origin[ips->count] = strdup("static");
-			}
-		}
-		if (ips->origin[ips->count] == NULL) {
-			ips->origin[ips->count] = strdup("dynamic");
-		}
-		++ips->count;
-	}
-
-	free(line);
-	pclose(output);
-	return EXIT_SUCCESS;
+int iface_get_ipv4_neighs(unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg) {
+	return iface_get_neighs(1, config, if_name, neighs, msg);
 }
 
-int iface_get_ipv6_presence(const char* if_name, char** msg) {
+int iface_get_ipv6_presence(unsigned char config, const char* if_name, char** msg) {
 	int ret;
 	char* procval;
 
-	if ((procval = read_from_proc_net(0, if_name, "disable_ipv6")) == NULL) {
+	if (config) {
+		procval = read_sysctl_proc_net(0, if_name, "disable_ipv6");
+	} else if ((procval = read_from_proc_net(0, if_name, "disable_ipv6")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return -1;
 	}
 
-	if (strcmp(procval, "0") == 0) {
+	/* the default */
+	if (procval == NULL || strcmp(procval, "0") == 0) {
 		ret = 1;
 	} else {
 		ret = 0;
@@ -2800,15 +3454,18 @@ int iface_get_ipv6_presence(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_forwarding(const char* if_name, char** msg) {
+char* iface_get_ipv6_forwarding(unsigned char config, const char* if_name, char** msg) {
 	char* procval, *ret;
 
-	if ((procval = read_from_proc_net(0, if_name, "forwarding")) == NULL) {
+	if (config) {
+		procval = read_from_proc_net(0, if_name, "forwarding");
+	} else if ((procval = read_from_proc_net(0, if_name, "forwarding")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
-	if (strcmp(procval, "0") == 0) {
+	/* the default */
+	if (procval == NULL || strcmp(procval, "0") == 0) {
 		ret = strdup("false");
 	} else {
 		ret = strdup("true");
@@ -2818,10 +3475,22 @@ char* iface_get_ipv6_forwarding(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_mtu(const char* if_name, char** msg) {
-	char* ret;
+char* iface_get_ipv6_mtu(unsigned char config, const char* if_name, char** msg) {
+	char* ret = NULL;
 
-	if ((ret = read_from_proc_net(0, if_name, "mtu")) == NULL) {
+	if (config) {
+#ifdef REDHAT
+		ret = read_ifcfg_var(if_name, "IPV6_MTU", NULL);
+#endif
+#ifdef SUSE
+		ret = read_sysctl_proc_net(0, if_name, "mtu");
+#endif
+#ifdef DEBIAN
+		ret = read_iface_subs_var(0, if_name, "mtu");
+#endif
+	}
+
+	if (ret == NULL && (ret = read_from_proc_net(0, if_name, "mtu")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
@@ -2830,225 +3499,343 @@ char* iface_get_ipv6_mtu(const char* if_name, char** msg) {
 }
 
 int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg) {
+	int i;
 	char* cmd, *line = NULL, *origin, *ip, *prefix, *rest;
 	FILE* output;
+	struct ip_addrs static_ips;
 	size_t len = 0;
+#ifdef SUSE
+	char* suffix = NULL, *netmask_var, *prefix_var;
+#endif
 
-	asprintf(&cmd, "ip -6 addr show dev %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
+	if (config) {
+#ifdef REDHAT
+		if ((ip = read_ifcfg_var(if_name, "IPV6_ADDR", NULL)) != NULL && (prefix = strchr(ip, '/')) != NULL) {
+			prefix = strchr(ip, '/');
+			*prefix = '\0';
+			++prefix;
 
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
+			ips->ip = malloc(sizeof(char*));
+			ips->prefix_or_mac = malloc(sizeof(char*));
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = strdup(prefix);
+			++ips->count;
+
+			ip = NULL;
+		}
+
+		line = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES", NULL);
+		for (ip = strtok(line, ";"); ip != NULL; ip = strtok(NULL, ";")) {
+			if (strchr(ip, '/') == NULL) {
+				continue;
+			}
+
+			prefix = strchr(ip, '/')+1;
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = strndup(ip, strchr(ip, '/')-ip);
+			ips->prefix_or_mac[ips->count] = strdup(prefix);
+			++ips->count;
+		}
+#endif
+#ifdef SUSE
+		while ((ip = read_ifcfg_var(if_name, "IPADDRx", &suffix)) != NULL) {
+			/* IPv4 address */
+			if (strchr(ip, '.') != NULL) {
+				free(ip);
+				continue;
+			}
+			prefix = strchr(ip, '/');
+			if (prefix == NULL) {
+				asprintf(&prefix_var, "PREFIXLEN%s", suffix);
+				asprintf(&netmask_var, "NETMASK%s", suffix);
+				prefix = read_ifcfg_var(if_name, prefix_var, NULL);
+				if (prefix == NULL) {
+					prefix = read_ifcfg_var(if_name, netmask_var, NULL);
+				}
+				free(prefix_var);
+				free(netmask_var);
+				if (prefix == NULL) {
+					free(ip);
+					continue;
+				}
+				convert_netmask_to_prefix(prefix);
+			} else {
+				*prefix = '\0';
+				++prefix;
+				prefix = strdup(prefix);
+			}
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = prefix;
+			++ips->count;
+		}
+#endif
+#ifdef DEBIAN
+		if ((ip = read_iface_subs_var(0, if_name, "address")) != NULL && (prefix = read_iface_subs_var(0, if_name, "netmask")) != NULL) {
+			convert_netmask_to_prefix(prefix);
+
+			ips->ip = malloc(sizeof(char*));
+			ips->prefix_or_mac = malloc(sizeof(char*));
+
+			ips->ip[ips->count] = ip;
+			ips->prefix_or_mac[ips->count] = prefix;
+			++ips->count;
+
+			ip = NULL;
+		}
+
+		if ((line = read_iface_subs_var(0, if_name, "post-up")) != NULL) {
+			ip = strtok(line, ";");
+		}
+
+		for (; ip != NULL; ip = strtok(NULL, ";")) {
+			if (strncmp(ip, "ip addr add ", strlen("ip addr add ")) != 0) {
+				continue;
+			}
+
+			ip += strlen("ip addr add ");
+			prefix = strchr(ip, '/');
+			if (prefix == NULL) {
+				continue;
+			}
+			++prefix;
+			if (strchr(prefix, ' ') == NULL) {
+				continue;
+			}
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+			}
+
+			ips->ip[ips->count] = strndup(ip, strchr(ip, '/')-ip);
+			ips->prefix_or_mac[ips->count] = strndup(prefix, strchr(prefix, ' ')-prefix);
+			++ips->count;
+		}
+
+		free(line);
+#endif
+	} else {
+		/* first learn the static addresses */
+		static_ips.count = 0;
+		static_ips.ip = NULL;
+		static_ips.prefix_or_mac = NULL;
+
+		if (iface_get_ipv6_ipaddrs(1, if_name, &static_ips, msg) != EXIT_SUCCESS) {
+			return EXIT_FAILURE;
+		}
 
 #if defined(REDHAT) || defined(SUSE)
-	origin = read_ifcfg_var(if_name, "BOOTPROTO");
+		origin = read_ifcfg_var(if_name, "BOOTPROTO", NULL);
 #endif
 
 #ifdef DEBIAN
-	if ((origin = read_iface_method(0, if_name)) == NULL) {
-		asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
-		return EXIT_FAILURE;
-	}
+		if ((origin = read_iface_method(0, if_name)) == NULL) {
+			asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
+			return EXIT_FAILURE;
+		}
 #endif
 
-	if (origin == NULL || strcmp(origin, "none") == 0 || strcmp(origin, "static") == 0 || strcmp(origin, "loopback") == 0) {
-		/* static is the default */
-		free(origin);
-		origin = strdup("static");
-	} else if (strncmp(origin, "dhcp", 4) == 0) {
-		free(origin);
-		origin = strdup("dhcp");
-	} else {
-		free(origin);
-		origin = strdup("other");
-	}
-
-	while (getline(&line, &len, output) != -1) {
-		if ((ip = strstr(line, "inet6")) == NULL) {
-			continue;
+		/* static learned from static_ips */
+		if (origin != NULL && strncmp(origin, "dhcp", 4) == 0) {
+			free(origin);
+			origin = strdup("dhcp");
+		} else {
+			free(origin);
+			origin = strdup("other");
 		}
 
-		ip += 6;
-		prefix = strchr(ip, '/')+1;
-		rest = strchr(prefix, ' ')+1;
-		*strchr(ip, '/') = '\0';
-		*strchr(prefix, ' ') = '\0';
+		asprintf(&cmd, "ip -6 addr show dev %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
 
-		/* ignore addresses that should not be in the configuration */
-		if (config) {
-			if (strncmp(ip, "fe80:", 5) == 0 && strstr(ip, "ff:fe") != NULL) {
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return EXIT_FAILURE;
+		}
+
+		while (getline(&line, &len, output) != -1) {
+			if ((ip = strstr(line, "inet6")) == NULL) {
 				continue;
 			}
-#ifdef DEBIAN
-			/* on Debian loopback address is not part of the configuration */
-			if (strcmp(ip, "::1") == 0) {
-				continue;
+
+			ip += 6;
+			prefix = strchr(ip, '/')+1;
+			rest = strchr(prefix, ' ')+1;
+			*strchr(ip, '/') = '\0';
+			*strchr(prefix, ' ') = '\0';
+
+			/* add a new IP */
+			if (ips->count == 0) {
+				ips->ip = malloc(sizeof(char*));
+				ips->prefix_or_mac = malloc(sizeof(char*));
+				ips->origin = malloc(sizeof(char*));
+				ips->status_or_state = malloc(sizeof(char*));
+			} else {
+				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+				ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
+				ips->status_or_state = realloc(ips->status_or_state, (ips->count+1)*sizeof(char*));
 			}
-#endif
+
+			ips->ip[ips->count] = strdup(ip);
+			ips->prefix_or_mac[ips->count] = strdup(prefix);
+			ips->origin[ips->count] = NULL;
+
+			for (i = 0; i < static_ips.count; ++i) {
+				if (strcmp(ip, static_ips.ip[i]) == 0 && strcmp(prefix, static_ips.prefix_or_mac[i]) == 0) {
+					ips->origin[ips->count] = strdup("static");
+					break;
+				}
+			}
+
+			if (ips->origin[ips->count] == NULL) {
+				if (strncmp(ip, "fe80:", 5) == 0 && strstr(ip, "ff:fe") != NULL) {
+					ips->origin[ips->count] = strdup("link-layer");
+				} else if (strstr(rest, "temporary") != NULL || strstr(rest, "dynamic") != NULL) {
+					ips->origin[ips->count] = strdup("other");
+				} else {
+					ips->origin[ips->count] = strdup(origin);
+				}
+			}
+
+			if (strstr(rest, "deprecated") != NULL) {
+				ips->status_or_state[ips->count] = strdup("deprecated");
+			} else if (strstr(rest, "tentative") != NULL) {
+				ips->status_or_state[ips->count] = strdup("tentative");
+			} else if (strstr(rest, "dadfailed") != NULL) {
+				ips->status_or_state[ips->count] = strdup("invalid");
+			} else if (strstr(rest, "primary") != NULL) {
+				ips->status_or_state[ips->count] = strdup("preferred");
+			} else {
+				ips->status_or_state[ips->count] = strdup("unknown");
+			}
+			++ips->count;
 		}
 
-		/* add a new IP */
-		if (ips->count == 0) {
-			ips->ip = malloc(sizeof(char*));
-			ips->prefix_or_mac = malloc(sizeof(char*));
-			ips->origin = malloc(sizeof(char*));
-			ips->status_or_state = malloc(sizeof(char*));
-		} else {
-			ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
-			ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
-			ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
-			ips->status_or_state = realloc(ips->status_or_state, (ips->count+1)*sizeof(char*));
+		for (i = 0; i < static_ips.count; ++i) {
+			free(static_ips.ip[i]);
+			free(static_ips.prefix_or_mac[i]);
 		}
+		free(static_ips.ip);
+		free(static_ips.prefix_or_mac);
 
-		ips->ip[ips->count] = strdup(ip);
-		ips->prefix_or_mac[ips->count] = strdup(prefix);
-		if (strncmp(ip, "fe80:", 5) == 0 && strstr(ip, "ff:fe") != NULL) {
-			ips->origin[ips->count] = strdup("link-layer");
-		} else if (strstr(rest, "temporary") != NULL || strstr(rest, "dynamic") != NULL) {
-			ips->origin[ips->count] = strdup("random");
-		} else {
-			ips->origin[ips->count] = strdup(origin);
-		}
-		if (strstr(rest, "deprecated") != NULL) {
-			ips->status_or_state[ips->count] = strdup("deprecated");
-		} else if (strstr(rest, "tentative") != NULL) {
-			ips->status_or_state[ips->count] = strdup("tentative");
-		} else if (strstr(rest, "dadfailed") != NULL) {
-			ips->status_or_state[ips->count] = strdup("invalid");
-		} else if (strstr(rest, "primary") != NULL) {
-			ips->status_or_state[ips->count] = strdup("preferred");
-		} else {
-			ips->status_or_state[ips->count] = strdup("unknown");
-		}
-		++ips->count;
+		pclose(output);
+		free(line);
+		free(origin);
 	}
 
-	free(origin);
-	free(line);
-	pclose(output);
 	return EXIT_SUCCESS;
 }
 
-int iface_get_ipv6_neighs(const char* if_name, struct ip_addrs* ips, struct ip_addrs* neighs, char** msg) {
-	int i;
-	char* cmd, *line = NULL, *ip, *mac, *ptr;
-	FILE* output;
-	size_t len = 0;
-
-	asprintf(&cmd, "ip -6 neigh show dev %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return EXIT_FAILURE;
-	}
-
-	while (getline(&line, &len, output) != -1) {
-		ip = strtok(line, " \n");
-		ptr = strtok(NULL, " \n");
-		if (strcmp(ptr, "lladdr") == 0) {
-			mac = strtok(NULL, " \n");
-			ptr = strtok(NULL, " \n");
-		} else {
-			/* FAILED neighbor, ignore */
-			continue;
-		}
-
-		/* add a new IP */
-		if (ips->count == 0) {
-			ips->ip = malloc(sizeof(char*));
-			ips->prefix_or_mac = malloc(sizeof(char*));
-			ips->status_or_state = malloc(sizeof(char*));
-			ips->origin = malloc(sizeof(char*));
-			ips->is_router = malloc(sizeof(char));
-		} else {
-			ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
-			ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
-			ips->status_or_state = realloc(ips->status_or_state, (ips->count+1)*sizeof(char*));
-			ips->origin = realloc(ips->origin, (ips->count+1)*sizeof(char*));
-			ips->is_router = realloc(ips->is_router, (ips->count+1)*sizeof(char));
-		}
-
-		ips->ip[ips->count] = strdup(ip);
-		ips->prefix_or_mac[ips->count] = strdup(mac);
-		if (strcmp(ptr, "router") == 0) {
-			ips->is_router[ips->count] = 1;
-			ptr = strtok(NULL, " \n");
-		} else {
-			ips->is_router[ips->count] = 0;
-		}
-		if (strcmp(ptr, "REACHABLE") == 0 || strcmp(ptr, "NOARP") == 0 || strcmp(ptr, "PERMANENT") == 0) {
-			ips->status_or_state[ips->count] = strdup("reachable");
-		} else if (strcmp(ptr, "STALE") == 0) {
-			ips->status_or_state[ips->count] = strdup("stale");
-		} else if (strcmp(ptr, "DELAY") == 0) {
-			ips->status_or_state[ips->count] = strdup("delay");
-		} else if (strcmp(ptr, "PROBE") == 0) {
-			ips->status_or_state[ips->count] = strdup("probe");
-		} else {
-			ips->status_or_state[ips->count] = strdup("incomplete");
-		}
-		ips->origin[ips->count] = NULL;
-		for (i = 0; i < neighs->count; ++i) {
-			if (strcmp(ip, neighs->ip[i]) == 0 && strcmp(mac, neighs->prefix_or_mac[i]) == 0) {
-				ips->origin[ips->count] = strdup("static");
-			}
-		}
-		if (ips->origin[ips->count] == NULL) {
-			ips->origin[ips->count] = strdup("dynamic");
-		}
-		++ips->count;
-	}
-
-	free(line);
-	pclose(output);
-	return EXIT_SUCCESS;
+int iface_get_ipv6_neighs(unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg) {
+	return iface_get_neighs(0, config, if_name, neighs, msg);
 }
 
-char* iface_get_enabled(const char* if_name, char** msg) {
+char* iface_get_enabled(unsigned char config, const char* if_name, char** msg) {
 	char* cmd, *line = NULL, *ptr = NULL;
 	FILE* output;
 	size_t len = 0;
 
-	asprintf(&cmd, "ip link show %s 2>&1", if_name);
-	output = popen(cmd, "r");
-	free(cmd);
-
-	if (output == NULL) {
-		asprintf(msg, "%s: failed to execute a command.", __func__);
-		return NULL;
-	}
-
-	if (getline(&line, &len, output) != -1 && (ptr = strstr(line, "state")) != NULL) {
-		ptr += 6;
-		*strchr(ptr, ' ') = '\0';
-		if (strcmp(ptr, "UP") == 0) {
-			ptr = strdup("true");
-		} else if (strcmp(ptr, "DOWN") == 0) {
+	if (config) {
+#ifdef REDHAT
+		line = read_ifcfg_var(if_name, "ONBOOT", NULL);
+		if (line == NULL) {
 			ptr = strdup("false");
-		} else if (strcmp(ptr, "UNKNOWN") == 0 && strncmp(if_name, "lo", 2) == 0) {
+		} else if (strcmp(line, "yes") == 0) {
 			ptr = strdup("true");
 		} else {
-			asprintf(msg, "%s: unknown interface %s state \"%s\".", __func__, if_name, ptr);
-			ptr = NULL;
+			ptr = strdup("false");
 		}
+#endif
+#ifdef SUSE
+		line = read_ifcfg_var(if_name, "STARTMODE", NULL);
+		if (line == NULL) {
+			ptr = strdup("false");
+		} else if (strcmp(line, "auto") == 0 || strcmp(line, "onboot") == 0 || strcmp(line, "on") == 0 || strcmp(line, "boot") == 0) {
+			ptr = strdup("true");
+		} else {
+			ptr = strdup("false");
+		}
+#endif
+#ifdef DEBIAN
+		if (present_iface_auto(if_name)) {
+			ptr = strdup("true");
+		} else {
+			ptr = strdup("false");
+		}
+#endif
 	} else {
-		asprintf(msg, "%s: could not retrieve interface %s state.", __func__, if_name);
+		asprintf(&cmd, "ip link show %s 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return NULL;
+		}
+
+		if (getline(&line, &len, output) != -1 && (ptr = strstr(line, "state")) != NULL) {
+			ptr += 6;
+			*strchr(ptr, ' ') = '\0';
+			if (strcmp(ptr, "UP") == 0) {
+				ptr = strdup("true");
+			} else if (strcmp(ptr, "DOWN") == 0) {
+				ptr = strdup("false");
+			} else if (strcmp(ptr, "UNKNOWN") == 0 && strncmp(if_name, "lo", 2) == 0) {
+				ptr = strdup("true");
+			} else {
+				asprintf(msg, "%s: unknown interface %s state \"%s\".", __func__, if_name, ptr);
+				ptr = NULL;
+			}
+		} else {
+			asprintf(msg, "%s: could not retrieve interface %s state.", __func__, if_name);
+		}
+		pclose(output);
 	}
 
 	free(line);
-	pclose(output);
 	return ptr;
 }
 
-char* iface_get_ipv6_dup_addr_det(const char* if_name, char** msg) {
+char* iface_get_ipv6_dup_addr_det(unsigned char config, const char* if_name, char** msg) {
 	char *ret;
 
-	if ((ret = read_from_proc_net(0, if_name, "dad_transmits")) == NULL) {
+	if (config) {
+#if defined(REDHAT) || defined(SUSE)
+		ret = read_sysctl_proc_net(0, if_name, "dad_transmits");
+#endif
+#ifdef DEBIAN
+		ret = read_iface_subs_var(0, if_name, "dad-attempts");
+#endif
+		/* the default */
+		if (ret == NULL) {
+			ret = strdup("1");
+		}
+	} else if ((ret = read_from_proc_net(0, if_name, "dad_transmits")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
@@ -3056,17 +3843,28 @@ char* iface_get_ipv6_dup_addr_det(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_creat_glob_addr(const char* if_name, char** msg) {
-	char* glob_addr, *ret;
+char* iface_get_ipv6_creat_glob_addr(unsigned char config, const char* if_name, char** msg) {
+	char* glob_addr = NULL, *ret;
 
-	if ((glob_addr = read_from_proc_net(0, if_name, "autoconf")) == NULL) {
+	if (config) {
+#ifdef REDHAT
+		glob_addr = read_ifcfg_var(if_name, "IPV6_AUTOCONF", NULL);
+#endif
+#ifdef SUSE
+		glob_addr = read_sysctl_proc_net(0, if_name, "autoconf");
+#endif
+#ifdef DEBIAN
+		glob_addr = read_iface_subs_var(0, if_name, "autoconf");
+#endif
+	} else if ((glob_addr = read_from_proc_net(0, if_name, "autoconf")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
-	if (strcmp(glob_addr, "0") == 0) {
+	if (glob_addr != NULL && strcmp(glob_addr, "0") == 0) {
 		ret = strdup("false");
 	} else {
+		/* the default */
 		ret = strdup("true");
 	}
 	free(glob_addr);
@@ -3074,17 +3872,20 @@ char* iface_get_ipv6_creat_glob_addr(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_creat_temp_addr(const char* if_name, char** msg) {
-	char* temp_addr, *ret;
+char* iface_get_ipv6_creat_temp_addr(unsigned char config, const char* if_name, char** msg) {
+	char* temp_addr = NULL, *ret;
 
-	if ((temp_addr = read_from_proc_net(0, if_name, "use_tempaddr")) == NULL) {
+	if (config) {
+		temp_addr = read_sysctl_proc_net(0, if_name, "use_tempaddr");
+	} else if ((temp_addr = read_from_proc_net(0, if_name, "use_tempaddr")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
 
-	if (strcmp(temp_addr, "0") == 0) {
+	if (temp_addr != NULL && strcmp(temp_addr, "0") == 0) {
 		ret = strdup("false");
 	} else {
+		/* the default */
 		ret = strdup("true");
 	}
 	free(temp_addr);
@@ -3092,10 +3893,15 @@ char* iface_get_ipv6_creat_temp_addr(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_temp_val_lft(const char* if_name, char** msg) {
-	char *ret;
+char* iface_get_ipv6_temp_val_lft(unsigned char config, const char* if_name, char** msg) {
+	char *ret = NULL;
 
-	if ((ret = read_from_proc_net(0, if_name, "temp_valid_lft")) == NULL) {
+	if (config) {
+		if ((ret = read_sysctl_proc_net(0, if_name, "temp_valid_lft")) == NULL) {
+			/* the default */
+			ret = strdup("604800");
+		}
+	} else if ((ret = read_from_proc_net(0, if_name, "temp_valid_lft")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}
@@ -3103,10 +3909,21 @@ char* iface_get_ipv6_temp_val_lft(const char* if_name, char** msg) {
 	return ret;
 }
 
-char* iface_get_ipv6_temp_pref_lft(const char* if_name, char** msg) {
-	char *ret;
+char* iface_get_ipv6_temp_pref_lft(unsigned char config, const char* if_name, char** msg) {
+	char *ret = NULL;
 
-	if ((ret = read_from_proc_net(0, if_name, "temp_prefered_lft")) == NULL) {
+	if (config) {
+#if defined(REDHAT) || defined(SUSE)
+		ret = read_sysctl_proc_net(0, if_name, "temp_prefered_lft");
+#endif
+#ifdef DEBIAN
+		ret = read_iface_subs_var(0, if_name, "preferred-lifetime");
+#endif
+		/* the default */
+		if (ret == NULL) {
+			ret = strdup("86400");
+		}
+	} else if ((ret = read_from_proc_net(0, if_name, "temp_prefered_lft")) == NULL) {
 		asprintf(msg, "%s: failed to read from \"/proc/sys/net/...\".", __func__);
 		return NULL;
 	}

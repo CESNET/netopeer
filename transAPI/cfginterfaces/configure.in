@@ -1,6 +1,6 @@
 AC_PREREQ([2.63])
 AC_INIT([cfginterfaces], [1.0])
-AC_CONFIG_SRCDIR([cfginterfaces.c])
+AC_CONFIG_SRCDIR([cfginterfaces.c.in])
 
 PROJECTNAME=cfginterfaces
 AC_SUBST(PROJECTNAME)
@@ -86,6 +86,7 @@ if test "$DISTRO" = "unknown"; then
 	AC_MSG_WARN([Failed to detect the Linux distribution, assuming RedHat base!])
 fi
 
+SYSCTL_CONF="/etc/sysctl.conf"
 if test "$DISTRO" = "REDHAT"; then
 	IFCFG_FILES="/etc/sysconfig/network-scripts"
 	IFCFG_SCRIPTS="/sbin/ifup-local"
@@ -102,6 +103,7 @@ fi
 AC_SUBST(DISTRO)
 AC_SUBST(IFCFG_FILES)
 AC_SUBST(IFCFG_SCRIPTS)
+AC_SUBST(SYSCTL_CONF)
 
 # Use libtool
 AC_PROG_LIBTOOL
@@ -140,7 +142,24 @@ AC_CHECK_HEADERS([stdlib.h libnetconf.h])
 # Checks for library functions.
 #AC_CHECK_FUNCS([strdup])
 
-AC_CONFIG_FILES([Makefile config.h model/ietf-interfaces-data.rng])
+# Set monitoring callback for all the network devices.
+COUNT=1
+CB_CODE="{.path = \"${SYSCTL_CONF}\", .func = cfginterfaces_file_change_cb},"
+if test "$DISTRO" = "DEBIAN"; then
+	COUNT=$((COUNT + 1))
+	CB_CODE="${CB_CODE}
+		{.path = \"${IFCFG_FILES}\", .func = cfginterfaces_file_change_cb}"
+else
+	for dev in `ls /sys/class/net`; do
+		COUNT=$((COUNT + 1))
+		CB_CODE="${CB_CODE}
+		{.path = \"${IFCFG_FILES}/ifcfg-${dev}\", .func = cfginterfaces_file_change_cb},"
+	done
+fi
+AC_SUBST(COUNT)
+AC_SUBST(CB_CODE)
+
+AC_CONFIG_FILES([Makefile config.h cfginterfaces.c model/ietf-interfaces-data.rng])
 AC_OUTPUT
 if test "$DISTRO" = "DEBIAN"; then
 	AC_MSG_NOTICE([])

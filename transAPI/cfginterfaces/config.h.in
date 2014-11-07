@@ -21,6 +21,6 @@
 #define IFCFG_SCRIPTS_PATH "@IFCFG_SCRIPTS@"
 
 /* sysctl script */
-#define SYSCTL_CONF_PATH "/etc/sysctl.conf"
+#define SYSCTL_CONF_PATH "@SYSCTL_CONF@"
 
 #endif /* _CONFIG_H_ */
