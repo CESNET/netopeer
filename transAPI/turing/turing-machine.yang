@@ -163,13 +163,13 @@ module turing-machine {
     description
       "Initialize the Turing Machine as follows:
 
-       1. Put the control unit into the initial state (0).
+       1. Put the control unit into the initial state (0).
 
        2. Move the read/write head to the tape cell with coordinate
           zero.
 
        3. Write the string from the 'tape-content' input parameter to
-          the tape, character by character, starting at cell 0. The
+          the tape, character by character, starting at cell 0. The
           tape is othewise empty.";
     input {
       leaf tape-content {
@@ -177,7 +177,7 @@ module turing-machine {
         default "";
         description
           "The string with which the tape shall be initialized. The
-           leftmost symbol will be at tape coordinate 0.";
+           leftmost symbol will be at tape coordinate 0.";
       }
     }
   }
