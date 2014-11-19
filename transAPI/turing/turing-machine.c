@@ -161,7 +161,7 @@ xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_err **err
 		return doc;
 	}
 
-	for (i = 0, symbol[1] = '\0'; i < tm_tape_len; i++) {
+	for (i = 0, symbol[1] = '\0'; i < tm_tape_len - 1; i++) {
 		/* add <cell/> list items */
 		cell = xmlNewChild(tape, tape->ns, BAD_CAST "cell", NULL);
 
