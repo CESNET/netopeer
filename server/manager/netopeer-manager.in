@@ -142,6 +142,7 @@ try:
 		exit(1)
 
 	if args.subcommand == 'list':
+		print('Reading the configuration from '+modules_path)
 		if args.name:
 			module_config = modules_path+'/'+args.name+'.xml'
 			if not os.path.exists(module_config):
