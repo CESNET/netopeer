@@ -129,7 +129,9 @@ void signal_handler (int sig)
 
 int main (int argc, char** argv)
 {
-	conn_t* conn = NULL;
+	ssh_bind sshbind;
+	struct pollfd pollsock;
+	pthread_t cl1;
 
 	struct sigaction action;
 	sigset_t block_mask;
@@ -223,12 +225,29 @@ int main (int argc, char** argv)
 		return (EXIT_FAILURE);
 	}
 
-	/* Initiate communication subsystem for communicate with agents */
-	conn = comm_init(ret & NC_INITRET_RECOVERY);
+	/* Initiate SSH */
+	/*conn = comm_init(ret & NC_INITRET_RECOVERY);
 	if (conn == NULL) {
 		nc_verb_error("Communication subsystem not initiated.");
 		return (EXIT_FAILURE);
-	}
+	}*/
+	ssh_threads_set_callbacks(ssh_threads_get_pthread());
+	ssh_init();
+	sshbind = ssh_bind_new();
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDADDR, ADDRESS);
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT_STR, PORT);
+
+	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_HOSTKEY, "ssh_host_key");
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, KEYS_DIR "ssh_host_rsa_key");
+	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_DSAKEY, "ssh_host_dsa_key");
+	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_ECDSAKEY, "ssh_host_ecdsa_key");
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
+
+	pollsock.fd = ssh_bind_get_fd(sshbind);
+	pollsock.events = POLLIN;
+	pollsock.revents = 0;
 
 	server_start = 1;
 
@@ -236,15 +255,17 @@ restart:
 	/* start NETCONF server module */
 	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary NETCONF server plugin failed!");
-		comm_destroy(conn);
-		return(EXIT_FAILURE);
+		ssh_bind_free(sshbind);
+		ssh_finalize();
+		return EXIT_FAILURE;
 	}
 	server_module->name = strdup(NCSERVER_MODULE_NAME);
 	if (module_enable(server_module, 0)) {
 		nc_verb_error("Starting necessary NETCONF server plugin failed!");
 		free(server_module->name);
 		free(server_module);
-		comm_destroy(conn);
+		ssh_bind_free(sshbind);
+		ssh_finalize();
 		return EXIT_FAILURE;
 	}
 
@@ -253,8 +274,9 @@ restart:
 	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
 		nc_verb_error("Creating necessary Netopeer plugin failed!");
 		module_disable(server_module, 1);
-		comm_destroy(conn);
-		return(EXIT_FAILURE);
+		ssh_bind_free(sshbind);
+		ssh_finalize();
+		return EXIT_FAILURE;
 	}
 	netopeer_module->name = strdup(NETOPEER_MODULE_NAME);
 	if (module_enable(netopeer_module, 0)) {
@@ -262,7 +284,8 @@ restart:
 		module_disable(server_module, 1);
 		free(netopeer_module->name);
 		free(netopeer_module);
-		comm_destroy(conn);
+		ssh_bind_free(sshbind);
+		ssh_finalize();
 		return EXIT_FAILURE;
 	}
 
@@ -270,7 +293,9 @@ restart:
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
 	while (!done) {
-		comm_loop(conn, 500);
+		if (comm_loop(pollsock, sshbind, 500) != EXIT_SUCCESS) {
+			break;
+		}
 	}
 
 	/* unload Netopeer module -> unload all modules */
@@ -281,16 +306,17 @@ restart:
 
 	if (!restart_soft) {
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		comm_destroy(conn);
-		server_sessions_destroy_all ();
-		nc_close ();
+		server_sessions_destroy_all();
+		nc_close();
+		ssh_bind_free(sshbind);
+		ssh_finalize();
 	}
 
 	/*
 	 *Free the global variables that may
 	 *have been allocated by the parser.
 	 */
-	xmlCleanupParser ();
+	xmlCleanupParser();
 
 	if (restart_soft) {
 		nc_verb_verbose("Server is going to soft restart.");
