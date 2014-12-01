@@ -94,7 +94,9 @@ struct nc_session* session = NULL;
 COMMAND commands[] = {
 		{"help", cmd_help, "Display this text"},
 		{"connect", cmd_connect, "Connect to a NETCONF server"},
+#ifndef DISABLE_CALLHOME
 		{"listen", cmd_listen, "Listen for a NETCONF Call Home"},
+#endif
 		{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
 		{"commit", cmd_commit, "NETCONF <commit> operation"},
 		{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
@@ -2370,7 +2372,10 @@ void cmd_listen_help ()
 static int cmd_connect_listen (const char* arg, int is_connect)
 {
 	char* func_name = (is_connect ? strdupa("connect") : strdupa("listen"));
+#ifndef DISABLE_CALLHOME
 	static unsigned short listening = 0;
+	int timeout = ACCEPT_TIMEOUT;
+#endif
 	char *host = NULL, *user = NULL;
 #ifdef ENABLE_TLS
 	DIR* dir = NULL;
@@ -2381,7 +2386,6 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 	int hostfree = 0;
 	unsigned short port = 0;
 	int c;
-	int timeout = ACCEPT_TIMEOUT;
 	struct arglist cmd;
 	struct option long_options[] = {
 			{"help", 0, 0, 'h'},
@@ -2430,10 +2434,12 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 			break;
 		case 'p':
 			port = (unsigned short) atoi (optarg);
+#ifndef DISABLE_CALLHOME
 			if (!is_connect && listening != 0 && listening != port) {
 				nc_callhome_listen_stop();
 				listening = 0;
 			}
+#endif
 			break;
 		case 'l':
 			user = optarg;
@@ -2561,6 +2567,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 			free (host);
 		}
 	} else {
+#ifndef DISABLE_CALLHOME
 		/* create the session */
 		if (!listening) {
 			if (nc_callhome_listen(port) == EXIT_FAILURE) {
@@ -2581,6 +2588,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 				ERROR(func_name, "receiving call Home failed.");
 			}
 		}
+#endif
 	}
 
 #ifdef ENABLE_TLS
@@ -2625,10 +2633,12 @@ int cmd_connect (const char* arg)
 	return cmd_connect_listen(arg, 1);
 }
 
+#ifndef DISABLE_CALLHOME
 int cmd_listen (const char* arg)
 {
 	return cmd_connect_listen(arg, 0);
 }
+#endif
 
 int cmd_disconnect (const char* UNUSED(arg))
 {

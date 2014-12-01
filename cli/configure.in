@@ -211,6 +211,10 @@ AC_ARG_WITH([libnetconf],
 	BUILDREQS="$BUILDREQS libnetconf-devel"]
 )
 REQS="$REQS libnetconf"
+AC_SEARCH_LIBS([nc_callhome_listen], [netconf],
+	[],
+	[AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]); CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME"]
+)
 if test "$notif" = "yes"; then
 	AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf],
 		[],
