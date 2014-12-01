@@ -165,6 +165,6 @@ uninstall:
 clean:
 	rm -rf $(NAME) .obj $(OBJS);
 
-.PHONY: clean doc
-clean doc:
+.PHONY: cleandoc
+cleandoc:
 	rm -rf $(MANHTMLS);
