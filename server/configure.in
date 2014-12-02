@@ -295,6 +295,10 @@ BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
 # libnetconf
+AC_SEARCH_LIBS([nc_callhome_listen], [netconf],
+	[],
+	[AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]); CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME"]
+)
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
 	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"

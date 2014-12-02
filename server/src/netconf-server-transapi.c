@@ -81,6 +81,8 @@
 #	define CREHASH_ENV "C_REHASH_PATH"
 #endif
 
+#ifndef DISABLE_CALLHOME
+
 struct ch_app {
 	char* name;
 	NC_TRANSPORT transport;
@@ -96,6 +98,8 @@ struct ch_app {
 	struct ch_app *prev;
 };
 static struct ch_app *callhome_apps = NULL;
+
+#endif
 
 /* transAPI version which must be compatible with libnetconf */
 /* int transapi_version = 4; */
@@ -355,6 +359,8 @@ err_return:
 	nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error - unable to start SSH server.");
 	return (EXIT_FAILURE);
 }
+
+#ifndef DISABLE_CALLHOME
 
 static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name)
 {
@@ -672,6 +678,8 @@ static int app_rm(const char* name, NC_TRANSPORT transport)
 	return(EXIT_SUCCESS);
 }
 
+#endif
+
 /**
  * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application changes
  *
@@ -685,6 +693,8 @@ static int app_rm(const char* name, NC_TRANSPORT transport)
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
 {
+
+#ifndef DISABLE_CALLHOME
 	char* name;
 
 	switch (op) {
@@ -705,6 +715,14 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application 
 	default:
 		;/* do nothing */
 	}
+#else
+	(void)op;
+	(void)node;
+	(void)error;
+
+	nc_verb_warning("Callhome is not supported in libnetconf!.");
+#endif
+
 	return EXIT_SUCCESS;
 }
 
