@@ -34,7 +34,7 @@
 #define NTP_SERVER_PREFER_DEFAULT false
 
 /* transAPI version which must be compatible with libnetconf */
-PUBLIC int transapi_version = 5;
+PUBLIC int transapi_version = 6;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -269,13 +269,13 @@ PUBLIC struct ns_pair namespace_mapping[] = {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	const char* hostname;
 	char* msg;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		hostname = get_node_content(node);
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		hostname = get_node_content(new_node);
 
 		if (sethostname(hostname, strlen(hostname)) == -1) {
 			asprintf(&msg, "Failed to set the hostname (%s).", strerror(errno));
@@ -302,12 +302,12 @@ PUBLIC int callback_systemns_system_systemns_hostname(void** data, XMLDIFF_OP op
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg = NULL;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		if (tz_set(get_node_content(node), &msg) != 0) {
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		if (tz_set(get_node_content(new_node), &msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -331,12 +331,12 @@ PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_name(void**
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		if (set_gmt_offset(atoi(get_node_content(node)), &msg) != 0) {
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		if (set_gmt_offset(atoi(get_node_content(new_node)), &msg) != 0) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -362,12 +362,12 @@ static bool ntp_restart_flag = false;
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg = NULL;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-		if (strcmp(get_node_content(node), "true") == 0) {
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		if (strcmp(get_node_content(new_node), "true") == 0) {
 			if (ntp_start() == EXIT_SUCCESS) {
 				/* flag for parent callback */
 				ntp_restart_flag = false;
@@ -375,13 +375,13 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, X
 				asprintf(&msg, "Failed to start NTP.");
 				return fail(error, msg, EXIT_FAILURE);
 			}
-		} else if (strcmp(get_node_content(node), "false") == 0) {
+		} else if (strcmp(get_node_content(new_node), "false") == 0) {
 			if (ntp_stop() != EXIT_SUCCESS) {
 				asprintf(&msg, "Failed to stop NTP.");
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		} else {
-			asprintf(&msg, "Unkown value \"%s\" in the NTP enabled field.", get_node_content(node));
+			asprintf(&msg, "Unkown value \"%s\" in the NTP enabled field.", get_node_content(new_node));
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
@@ -405,9 +405,9 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_enabled(void** data, X
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
-	xmlNodePtr cur, child;
+	xmlNodePtr cur, child, node;
 	int i;
 	char* msg = NULL, **resolved = NULL;
 	const char* udp_address = NULL;
@@ -415,7 +415,9 @@ PUBLIC int callback_systemns_system_systemns_ntp_systemns_server(void** data, XM
 	bool iburst = NTP_SERVER_IBURST_DEFAULT;
 	bool prefer = NTP_SERVER_PREFER_DEFAULT;
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_REM) || (op & XMLDIFF_MOD)) {
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_REM | XMLDIFF_MOD)) {
 		for (child = node->children; child != NULL; child = child->next) {
 			if (child->type != XML_ELEMENT_NODE) {
 				continue;
@@ -540,7 +542,7 @@ error:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg;
 
@@ -584,7 +586,7 @@ PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xml
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	int i;
@@ -600,7 +602,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 		dns_rm_search_domain_all();
 
 		/* and then add them all in current order */
-		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+		for (i = 1, cur = new_node->parent->children; cur != NULL; cur = cur->next) {
 			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
 				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 					return fail(error, msg, EXIT_FAILURE);
@@ -614,20 +616,20 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 	} else if (op & XMLDIFF_ADD) {
 		/* Get the index of this node */
 		/* search<-dns-resolver->first children */
-		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+		for (i = 1, cur = new_node->parent->children; cur != NULL; cur = cur->next) {
 			if (cur->type != XML_ELEMENT_NODE) {
 				continue;
-			} else if (cur == node) {
+			} else if (cur == new_node) {
 				break;
 			} else if (xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
 				i++;
 			}
 		}
-		if (dns_add_search_domain(get_node_content(node), i, &msg) != EXIT_SUCCESS) {
+		if (dns_add_search_domain(get_node_content(new_node), i, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_rm_search_domain(get_node_content(node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_search_domain(get_node_content(new_node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -649,9 +651,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
-	xmlNodePtr cur, addr;
+	xmlNodePtr cur, addr, node;
 	char* msg = NULL;
 	int i;
 
@@ -661,7 +663,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 		dns_rm_nameserver_all();
 
 		/* and add them again in current order */
-		for (i = 1, cur = node->parent->children; cur != NULL; i++, cur = cur->next) {
+		for (i = 1, cur = new_node->parent->children; cur != NULL; i++, cur = cur->next) {
 			if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "server")) {
 				continue;
 			}
@@ -686,6 +688,8 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 
 		dns_server_reorder_done = true;
 	} else {
+		node = (op & XMLDIFF_REM ? old_node : new_node);
+
 		/* Get the index of this nameserver */
 		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
 			if (cur->type != XML_ELEMENT_NODE) {
@@ -745,9 +749,12 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg, *ptr;
+	xmlNodePtr node;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	/* Check the timeout value */
 	strtol(get_node_content(node), &ptr, 10);
@@ -756,7 +763,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
-	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
 		if (dns_set_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -781,9 +788,12 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg, *ptr;
+	xmlNodePtr node;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	/* Check the attempts value */
 	strtol(get_node_content(node), &ptr, 10);
@@ -817,7 +827,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_options_syste
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg = NULL;
 
@@ -844,12 +854,13 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver(void** data, XMLDIFF_O
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
-	xmlNodePtr node_aux;
+	xmlNodePtr node_aux, node;
 	const char *name = NULL, *passwd = NULL, *new_passwd;
 	char *msg;
 
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	/* get name */
 	for(node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
@@ -925,11 +936,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user(void**
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char *msg;
-	xmlNodePtr aux_node;
+	xmlNodePtr aux_node, node;
 	const char* username = NULL, *id = NULL, *alg = NULL, *pem = NULL;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	/* get username for this key */
 	for (aux_node = node->parent->children; aux_node != NULL; aux_node = aux_node->next) {
@@ -1008,10 +1021,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_user_system
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	const char* value;
 	char *msg = NULL;
+	xmlNodePtr node;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	value = (const char*)(get_node_content(node));
 	if (strcmp(value, "local-users") != 0) {
@@ -1044,16 +1060,16 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg = NULL;
 
 	if (op & XMLDIFF_ADD) {
-		if (export_cert(node, 1, &msg) != EXIT_SUCCESS) {
+		if (export_cert(new_node, 1, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(node, 1, &msg) != EXIT_SUCCESS) {
+		if (remove_cert(old_node, 1, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -1074,16 +1090,16 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
  *
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg = NULL;
 
 	if (op & XMLDIFF_ADD) {
-		if (export_cert(node, 0, &msg) != EXIT_SUCCESS) {
+		if (export_cert(new_node, 0, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(node, 0, &msg) != EXIT_SUCCESS) {
+		if (remove_cert(old_node, 0, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
@@ -1104,7 +1120,7 @@ PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trus
  *
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_cert_maps(void** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_cert_maps(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	/* just to have a callback, to prevent transAPI from complaining */
 	nc_verb_verbose("cert-maps configuration change.");
