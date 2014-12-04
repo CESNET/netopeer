@@ -202,7 +202,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDI
 	if (op != XMLDIFF_REM) {
 		port = (char*) xmlNodeGetContent(node);
 		nc_verb_verbose("%s: port %s", __func__, port);
-		if (asprintf(&sshd_listen, "ListenAddress 0.0.0.0:%s", port) == -1) {
+		if (asprintf(&sshd_listen, "Port %s\nListenAddress 0.0.0.0\nListenAddress ::", port) == -1) {
 			sshd_listen = NULL;
 			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
