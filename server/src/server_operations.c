@@ -108,16 +108,9 @@ const struct session_info* server_sessions_get_by_agentid(const char* id)
  *
  * @param session Session information structure to add.
  */
-void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id)
+void server_sessions_add(const struct session_info* session)
 {
-	struct session_info *session, *session_iter = sessions;
-	session = calloc(1, sizeof(struct session_info));
-	/* create dummy session */
-	session->session = nc_session_dummy(session_id, username, NULL, cpblts);
-	/* add to monitored session list, library will connect this dummy session with real session in agent */
-	nc_session_monitor(session->session);
-	/* agent id */
-	session->id = strdup(id);
+	struct session_info* session_iter = sessions;
 
 	if (sessions == NULL) {
 		/* first session */
