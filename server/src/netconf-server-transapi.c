@@ -81,6 +81,9 @@
 #	define CREHASH_ENV "C_REHASH_PATH"
 #endif
 
+#define NETCONF_DEFAULT_PORT 830
+#define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
+
 #ifndef DISABLE_CALLHOME
 
 struct ch_app {
@@ -100,6 +103,154 @@ struct ch_app {
 static struct ch_app *callhome_apps = NULL;
 
 #endif
+
+struct bind_addr {
+	char* addr;
+	unsigned int* ports;
+	unsigned int port_count;
+	struct bind_addr* next;
+}
+
+void free_bind_addr(struct bind_addr** list) {
+	struct bind_addr* prev;
+
+	if (list == NULL) {
+		return;
+	}
+
+	for (; *list != NULL;) {
+		prev = *list;
+		*list = *list->next;
+		free(prev->addr);
+		free(prev->ports);
+		free(prev);
+	}
+}
+
+void add_bind_addr(struct bind_addr** root, char* addr, unsigned int port) {
+	struct bind_addr* cur;
+	int i;
+
+	if (root == NULL) {
+		return;
+	}
+
+	if (*root == NULL) {
+		*root = node;
+		return;
+	}
+
+	if ((cur = find_bind_addr(*root, addr)) != NULL) {
+		/* the list member iwth the address already exists, add a new port */
+		for (i = 0; i < cur->port_count; ++i) {
+			if (cur->ports[i] == port) {
+				/* the addr with the port already exist, consider this situation OK */
+				return;
+			}
+		}
+		++cur->port_count;
+		cur->ports = realloc(cur->ports, cur->port_count*sizeof(unsigned int));
+		cur->ports[cur->port_count-1] = port;
+
+	} else {
+		/* addr member is not in the list yet, add it */
+		for (cur = *root; cur->next != NULL; cur = cur->next);
+		cur->next = malloc(sizeof(struct bind_addr));
+		cur->next->addr = addr;
+		cur->next->ports = malloc(sizeof(unsigned int));
+		cur->netx->ports[0] = port;
+		cur->next->port_count = 1;
+		cur->next->next = NULL;
+	}
+}
+
+struct bind_addr* find_bind_addr(struct bind_addr* root, const char* addr) {
+	struct bind_addr* cur = NULL;
+
+	if (root == NULL || addr == NULL) {
+		return NULL;
+	}
+
+	for (cur = root; cur != NULL; cur = cur->next) {
+		if (strcmp(cur->addr, addr) == 0) {
+			break;
+		}
+	}
+
+	return cur;
+}
+
+void del_bind_addr(struct bind_addr** root, const char* addr, unsigned int port) {
+	struct bind_addr* cur, *prev = NULL;
+	int i;
+
+	if (root == NULL || addr == NULL) {
+		return;
+	}
+
+	for (cur = *root; cur != NULL; cur = cur->next) {
+		if (strcmp(cur->addr, addr) == 0) {
+			for (i = 0; i < cur->port_count; ++i) {
+				if (cur->ports[i] == port) {
+					break;
+				}
+			}
+
+			if (i < cur->port_count) {
+				/* address and port match */
+				if (cur->port_count == 1) {
+					/* delete the whole list member */
+					if (prev == NULL) {
+						/* we're deleting the root */
+						*root = cur->next;
+						free(cur->addr);
+						free(cur->ports);
+						free(cur);
+					} else {
+						/* standard list member deletion */
+						prev->next = cur->next;
+						free(cur->addr);
+						free(cur->ports);
+						free(cur);
+					}
+				} else {
+					/* we are deleting only one port from the array */
+					if (i != cur->post_count-1) {
+						/* the found port is not the last */
+						memmove(cur->ports+i+1, cur->ports+i, cur->port_count-i-1);
+					}
+					--cur->port_count;
+					cur->ports = realloc(cur->ports, cur->port_count*sizeof(unsigned int));
+				}
+				return;
+			}
+		}
+		prev = cur;
+	}
+}
+
+struct bind_addr* deep_copy_bind_addr(struct bind_addr* root) {
+	struct bind_addr* ret = NULL, *cur, *new_cur;
+
+	if (root == NULL) {
+		return NULL;
+	}
+
+	ret = malloc(sizeof(struct bind_addr));
+	memcpy(ret, root, sizeof(struct bind_addr));
+	ret->addr = strdup(root->addr);
+	ret->ports = malloc(root->port_count*sizeof(unsigned int));
+	memcpy(ret->ports, root->ports, root->port_count*sizeof(unsigned int));
+
+	// TODO check
+	for (cur = root, new_cur = ret; cur->next != NULL; cur = cur->next, new_cur = new_cur->next) {
+		new_cur->next = malloc(sizeof(struct bind_addr));
+		memcpy(new_cur->next, cur->next, sizeof(struct bind_addr));
+		new_cur->next->addr = strdup(cur->next->addr);
+		new_cur->next->ports = malloc(cur->next->port_count*sizeof(unsigned int));
+		memcpy(new_cur->netx->ports, cur->next->ports, cur->next->port_count*sizeof(unsigned int));
+	}
+}
 
 /* transAPI version which must be compatible with libnetconf */
 /* int transapi_version = 4; */
@@ -129,6 +280,11 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE server_erropt = NC_EDIT_ERROPT_NOTSET;
 
+static struct bind_addr* ssh_binds = NULL;
+
+static thread_t ssh_listen_thread = 0;
+static volatile int ssh_listen_thread_finish = 0;
+
 static u_int16_t sshd_pid = 0;
 static char *sshd_listen = NULL;
 
@@ -139,6 +295,25 @@ static void kill_sshd(void)
 		sshd_pid = 0;
 		unsetenv(SSHDPID_ENV);
 	}
+}
+
+static char* get_nodes_content(xmlNodePtr old_node, xmlNodePtr new_node) {
+	if (new_node != NULL) {
+		if (new_node->children != NULL && new_node->children->content != NULL) {
+			return (char*)new_node->children->content;
+		}
+		return NULL;
+	}
+	if (old_node != NULL && old_node->children != NULL && old_node->children->content != NULL) {
+		return (char*)old_node->children->content;
+	}
+	return NULL;
+}
+
+static void* ssh_listen_thread(void* arg) {
+	struct bind_addr* bind = (struct bind_addr*)arg;
+
+	//TODO
 }
 
 #ifdef ENABLE_TLS
@@ -159,16 +334,7 @@ static void kill_tlsd(void)
 
 #endif /* ENABLE_TLS */
 
-/**
- * @brief Retrieve state data from device and return them as XML document
- *
- * @param model	Device data model. libxml2 xmlDocPtr.
- * @param running	Running datastore content. libxml2 xmlDocPtr.
- * @param[out] err  Double pointer to error structure. Fill error when some occurs.
- * @return State data as libxml2 xmlDocPtr or NULL in case of error.
- */
-xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **UNUSED(err))
-{
+xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **UNUSED(err)) {
 	/* model doesn't contain any status data */
 	return(NULL);
 }
@@ -184,180 +350,133 @@ struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yan
 * You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
 */
 
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:listen/srv:port changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	char *port;
+int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	unsigned int port;
+	char* content;
 
-	if (op != XMLDIFF_REM) {
-		port = (char*) xmlNodeGetContent(node);
-		nc_verb_verbose("%s: port %s", __func__, port);
-		if (asprintf(&sshd_listen, "ListenAddress 0.0.0.0:%s", port) == -1) {
-			sshd_listen = NULL;
-			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
+	content = get_nodes_content(old_node, new_node);
+	if (content == NULL) {
+		nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
+		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
+		return EXIT_FAILURE;
+	}
+	port = atoi(content);
+
+	if (op & XMLDIFF_REM) {
+		del_bind_addr(&ssh_binds, "0.0.0.0", port);
+		del_bind_addr(&ssh_binds, "::", port);
+	} else if (op & XMLDIFF_MOD) {
+		/* there must be only 2 localhosts in the global structure */
+		if (ssh_binds == NULL || ssh_binds->next == NULL || ssh_binds->next->next != NULL ||
+				strcmp(ssh_binds->addr, "0.0.0.0") != 0 || strcmp(ssh_binds->next->addr, "::") != 0 ||
+				ssh_binds->port_count != 1 || ssh_binds->next->port_count != 1) {
+			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
-			return (EXIT_FAILURE);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
+			return EXIT_FAILURE;
 		}
-		free(port);
-	}
+		ssh_binds->ports[0] = port;
+		ssh_binds->next->ports[0] = port;
 
-	return (EXIT_SUCCESS);
-}
+	} else if (op & XMLDIFF_ADD) {
+		nc_verb_verbose("%s: port %d", __func__, port);
 
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:listen/srv:interface changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	xmlNodePtr n;
-	char *addr = NULL, *port = NULL, *result = NULL;
-	int ret = EXIT_SUCCESS;
-
-	if (op != XMLDIFF_REM) {
-		for (n = node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
-			if (n->type != XML_ELEMENT_NODE) {
-				continue;
-			}
-
-			if (addr == NULL && xmlStrcmp(n->name, BAD_CAST "address") == 0) {
-				addr = (char*)xmlNodeGetContent(n);
-			} else if (port == NULL && xmlStrcmp(n->name, BAD_CAST "port") == 0) {
-				port = (char*)xmlNodeGetContent(n);
-			}
-		}
-		nc_verb_verbose("%s: addr %s, port %s", __func__, addr, port);
-		if (asprintf(&result, "%sListenAddress %s:%s\n",
-				(sshd_listen == NULL) ? "" : sshd_listen,
-				addr,
-				port) == -1) {
-			result = NULL;
-			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
-			ret = EXIT_FAILURE;
-		}
-		free(addr);
-		free(port);
-		free(sshd_listen);
-		sshd_listen = result;
-	}
-
-	return (ret);
-}
-
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:listen changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
-{
-	int cfgfile, running_cfgfile;
-	int pid;
-	char pidbuf[10];
-	struct stat stbuf;
-
-	if (op == XMLDIFF_REM) {
-		/* stop currently running sshd */
-		kill_sshd();
-		/* and exit */
-		return (EXIT_SUCCESS);
-	}
-
-	/*
-	 * settings were modified or created
-	 */
-
-	/* prepare sshd_config */
-	if ((cfgfile = open(CFG_DIR"/sshd_config", O_RDONLY)) == -1) {
-		nc_verb_error("Unable to open SSH server configuration template (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	if ((running_cfgfile = open(CFG_DIR"/sshd_config.running", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
-		nc_verb_error("Unable to prepare SSH server configuration (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	if (fstat(cfgfile, &stbuf) == -1) {
-		nc_verb_error("Unable to get info about SSH server configuration template file (%s)", strerror(errno));
-		goto err_return;
-	}
-	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
-		nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	/* append listening settings */
-	dprintf(running_cfgfile, "\n# NETCONF listening settings\n%s", sshd_listen);
-	free(sshd_listen);
-	sshd_listen = NULL;
-
-	/* close config files */
-	close(running_cfgfile);
-	close(cfgfile);
-
-	if (sshd_pid != 0) {
-		/* tell sshd to reconfigure */
-		kill(sshd_pid, SIGHUP);
-		/* give him some time to restart */
-		usleep(500000);
-	} else {
-		/* start sshd */
-		pid = fork();
-		if (pid < 0) {
-			nc_verb_error("fork() for SSH server failed (%s)", strerror(errno));
-			goto err_return;
-		} else if (pid == 0) {
-			/* child */
-			execl(SSHD_EXEC, SSHD_EXEC, "-D", "-f", CFG_DIR"/sshd_config.running", NULL);
-
-			/* wtf ?!? */
-			nc_verb_error("%s; starting \"%s\" failed (%s).", strerror(errno));
-			exit(1);
-		} else {
-			nc_verb_verbose("%s: started sshd (PID %d)", __func__, pid);
-			/* store sshd's PID */
-			sshd_pid = pid;
-
-			/* store it for other modules into environ */
-			snprintf(pidbuf, 10, "%u", sshd_pid);
-			setenv(SSHDPID_ENV, pidbuf, 1);
-		}
+		add_bind_addr(&ssh_binds, "0.0.0.0", port);
+		add_bind_addr(&ssh_binds, "::", port);
 	}
 
 	return EXIT_SUCCESS;
+}
 
-err_return:
+int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	xmlNodePtr cur;
+	struct bind_addr* bind;
+	char* addr = NULL, *content;
+	unsigned int port = 0, old_port, i;
 
-	*error = nc_err_new(NC_ERR_OP_FAILED);
-	nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error - unable to start SSH server.");
-	return (EXIT_FAILURE);
+	for (cur = (op & XMLDIFF_REM ? old_node->children : new_node->children); cur != NULL; cur = cur->next) {
+		if (cur->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+
+		if (xmlStrequal(cur->name, BAD_CAST "address")) {
+			addr = get_nodes_content(cur, NULL);
+		}
+		if (xmlStrequal(cur->name, BAD_CAST "port")) {
+			content = get_nodes_content(cur, NULL);
+			if (content != NULL) {
+				port = atoi(content);
+			}
+		}
+	}
+
+	if (addr == NULL || port == 0) {
+		nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
+		return EXIT_FAILURE;
+	}
+
+	if (op & XMLDIFF_REM) {
+		del_bind_addr(&ssh_binds, addr, port);
+	} else if (op & XMLDIFF_MOD) {
+		bind = find_bind_add(ssh_binds, addr);
+		content = get_nodes_content(old_node, NULL);
+		if (content == NULL || bind == NULL) {
+			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
+			return EXIT_FAILURE;
+		}
+		old_port = atoi(content);
+
+		for (i = 0; i < bind->port_count; ++i) {
+			if (bind->ports[i] == old_port) {
+				bind->port[i] = port;
+				break;
+			}
+		}
+
+		if (i == bind->port_count) {
+			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
+			return EXIT_FAILURE;
+		}
+	} else if (op & XMLDIFF_ADD) {
+		add_bind_addr(&ssh_binds, addr, port);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+int callback_srv_netconf_srv_ssh_srv_listen(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** error) {
+	struct timespect ts;
+
+	if (ssh_listen_thread_id != 0) {
+		ssh_listen_thread_finish = 1;
+		ts.tv_sec = 0;
+		ts.tv.nsec = LISTEN_THREAD_CANCEL_TIMEOUT*1000000;
+		/* cancel the listening thread */
+		if (pthread_timedjoin_np(ssh_listen_thread_id, NULL, &ts) != 0) {
+			nc_verb_warning("%s: failed to cancel the listening thread (%s), abandoning it.", __func__, strerror(errno));
+		}
+	}
+
+	if (pthread_create(&ssh_listen_thread_id, NULL, ssh_listen_thread, deep_copy_bind_addr(ssh_binds)) != 0) {
+		nc_verb_error("%s: failed to create the listen thread (%s)", __func__, strerror(errno));
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, "Failed to create the listening thread.");
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }
 
 #ifndef DISABLE_CALLHOME
