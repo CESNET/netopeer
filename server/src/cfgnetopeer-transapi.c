@@ -452,7 +452,7 @@ struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer (void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(node), struct nc_err** UNUSED(error))
+int callback_n_netopeer (void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error))
 {
 	return EXIT_SUCCESS;
 }
@@ -468,11 +468,13 @@ int callback_n_netopeer (void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
-	xmlNodePtr tmp;
+	xmlNodePtr tmp, node;
 	char * module_name = NULL, * module_allowed;
 	struct module * module = modules;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	if (node == NULL) {
 		return(EXIT_FAILURE);
@@ -562,11 +564,13 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** UNUSED(error))
+int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** UNUSED(error))
 {
-	xmlNodePtr tmp;
+	xmlNodePtr tmp, node;
 	char *module_name = NULL;
 	struct module * module = modules;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	if (node == NULL) {
 		return(EXIT_FAILURE);

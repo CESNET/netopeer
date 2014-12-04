@@ -16,7 +16,7 @@
 #include <sys/shm.h>
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 5;
+int transapi_version = 6;
 
 /*
  * Signal to libnetconf that configuration data were modified by any callback.
@@ -152,7 +152,7 @@ char * namespace_mapping[] = {"toaster", "http://netconfcentral.org/ns/toaster",
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_toaster_toaster (void ** data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_toaster_toaster (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	pthread_mutex_lock(&status->toaster_mutex);
 

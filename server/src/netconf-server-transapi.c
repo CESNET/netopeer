@@ -195,12 +195,12 @@ struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yan
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	char *port;
 
 	if (op != XMLDIFF_REM) {
-		port = (char*) xmlNodeGetContent(node);
+		port = (char*) xmlNodeGetContent(new_node);
 		nc_verb_verbose("%s: port %s", __func__, port);
 		if (asprintf(&sshd_listen, "Port %s\nListenAddress 0.0.0.0\nListenAddress ::", port) == -1) {
 			sshd_listen = NULL;
@@ -226,14 +226,14 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport (void ** UNUSED(data), XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr n;
 	char *addr = NULL, *port = NULL, *result = NULL;
 	int ret = EXIT_SUCCESS;
 
 	if (op != XMLDIFF_REM) {
-		for (n = node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
+		for (n = new_node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
 			if (n->type != XML_ELEMENT_NODE) {
 				continue;
 			}
@@ -275,7 +275,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XML
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
+int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node),struct nc_err** error)
 {
 	int cfgfile, running_cfgfile;
 	int pid;
@@ -691,7 +691,7 @@ static int app_rm(const char* name, NC_TRANSPORT transport)
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 
 #ifndef DISABLE_CALLHOME
@@ -699,25 +699,26 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application 
 
 	switch (op) {
 	case XMLDIFF_ADD:
-		app_create(NC_TRANSPORT_SSH, node, error);
+		app_create(NC_TRANSPORT_SSH, new_node, error);
 		break;
 	case XMLDIFF_REM:
-		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
 		app_rm(name, NC_TRANSPORT_SSH);
 		free(name);
 		break;
 	case XMLDIFF_MOD:
-		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		name = (char*)xmlNodeGetContent(find_node(new_node, BAD_CAST "name"));
 		app_rm(name, NC_TRANSPORT_SSH);
 		free(name);
-		app_create(NC_TRANSPORT_SSH, node, error);
+		app_create(NC_TRANSPORT_SSH, new_node, error);
 		break;
 	default:
 		;/* do nothing */
 	}
 #else
 	(void)op;
-	(void)node;
+	(void)old_node;
+	(void)new_node;
 	(void)error;
 
 	nc_verb_warning("Callhome is not supported in libnetconf!.");
@@ -739,12 +740,12 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char *port;
 
 	if (op != XMLDIFF_REM) {
-		port = (char*) xmlNodeGetContent(node);
+		port = (char*) xmlNodeGetContent(new_node);
 		nc_verb_verbose("%s: port %s", __func__, port);
 		if (asprintf(&tlsd_listen, "\n[netconf%s]\naccept = %s\nexec = %s\nexecargs = %s\npty = no\n",
 				port,
@@ -774,7 +775,7 @@ int callback_srv_netconf_srv_tls_srv_listen_oneport (void ** UNUSED(data), XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr n;
 	char *addr = NULL, *port = NULL, *result = NULL;
@@ -788,7 +789,7 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
 	}
 
 	if (op != XMLDIFF_REM) {
-		for (n = node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
+		for (n = new_node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
 			if (n->type != XML_ELEMENT_NODE) { continue; }
 			if (addr == NULL && xmlStrcmp(n->name, BAD_CAST "address") == 0) {
 				addr = (char*)xmlNodeGetContent(n);
@@ -830,7 +831,7 @@ int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XML
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(node), struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** error)
 {
 	int cfgfile, running_cfgfile, pidfd, cmdfd;
 	int pid, r;
@@ -998,7 +999,7 @@ err_return:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* name;
 
@@ -1013,18 +1014,18 @@ int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application 
 
 	switch (op) {
 	case XMLDIFF_ADD:
-		app_create(NC_TRANSPORT_TLS, node, error);
+		app_create(NC_TRANSPORT_TLS, new_node, error);
 		break;
 	case XMLDIFF_REM:
-		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
 		app_rm(name, NC_TRANSPORT_TLS);
 		free(name);
 		break;
 	case XMLDIFF_MOD:
-		name = (char*)xmlNodeGetContent(find_node(node, BAD_CAST "name"));
+		name = (char*)xmlNodeGetContent(find_node(new_node, BAD_CAST "name"));
 		app_rm(name, NC_TRANSPORT_TLS);
 		free(name);
-		app_create(NC_TRANSPORT_TLS, node, error);
+		app_create(NC_TRANSPORT_TLS, new_node, error);
 		break;
 	default:
 		;/* do nothing */
@@ -1088,7 +1089,7 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 			return (EXIT_FAILURE);
 		}
 
-		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
 			if (error != NULL) {
 				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
 				if (str_err != NULL) {
@@ -1099,7 +1100,7 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 			xmlFreeDoc(doc);
 			return (EXIT_FAILURE);
 		}
-		if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, doc->children->children->children, &error) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_ssh_srv_listen(NULL, XMLDIFF_ADD, NULL, doc->children->children->children, &error) != EXIT_SUCCESS) {
 			if (error != NULL) {
 				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
 				if (str_err != NULL) {

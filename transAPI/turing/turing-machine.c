@@ -18,7 +18,7 @@
 #include <libnetconf_xml.h>
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 5;
+int transapi_version = 6;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -214,7 +214,7 @@ static char* get_delta_key(xmlNodePtr node)
  *
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLDIFF_OP op, xmlNodePtr node, struct nc_err **error)
+int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err **error)
 {
 	char *content = NULL;
 	xmlNodePtr n1, n2;
@@ -229,7 +229,7 @@ int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLD
 		/* Removing an existing rule */
 
 		/* get the key of the delta rule to remove */
-		content = get_delta_key(node->children);
+		content = get_delta_key(old_node->children);
 
 		if (content) {
 			/* find the corresponding rule in the internal list */
@@ -259,7 +259,7 @@ int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLD
 		rule->head_move = DIR_RIGHT; /* default value */
 
 		/* get values from XML */
-		for (n1 = node->children; n1 != NULL; n1 = n1->next) {
+		for (n1 = new_node->children; n1 != NULL; n1 = n1->next) {
 			if (n1->type != XML_ELEMENT_NODE) {
 				continue;
 			}
