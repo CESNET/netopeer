@@ -1357,9 +1357,8 @@ PUBLIC int cfgsystem_file_change_cb(const char *filepath, xmlDocPtr *edit_config
 }
 
 PUBLIC struct transapi_file_callbacks file_clbks = {
-	.callbacks_count = 5,
+	.callbacks_count = 4,
 	.callbacks = {
-		{.path = NETOPEER_SSHD_CONF, .func = cfgsystem_file_change_cb},
 		{.path = "/etc/passwd", .func = cfgsystem_file_change_cb},
 		{.path = "/etc/shadow", .func = cfgsystem_file_change_cb},
 		{.path = AUGEAS_NTP_CONF, .func = cfgsystem_file_change_cb},
