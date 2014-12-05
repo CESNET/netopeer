@@ -138,7 +138,7 @@ const struct session_info* server_sessions_get_by_agentid(const char* id);
  * @param[in] cpblts List of capabilities session supports
  * @param[in] id ID of the agent providing communication for session
  */
-void server_sessions_add(const char * session_id, const char * username, struct nc_cpblts * cpblts, const char* id);
+void server_sessions_add(struct session_info* session);
 
 /**
  * @brief Close and remove session and stop agent

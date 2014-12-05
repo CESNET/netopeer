@@ -108,7 +108,7 @@ const struct session_info* server_sessions_get_by_agentid(const char* id)
  *
  * @param session Session information structure to add.
  */
-void server_sessions_add(const struct session_info* session)
+void server_sessions_add(struct session_info* session)
 {
 	struct session_info* session_iter = sessions;
 
