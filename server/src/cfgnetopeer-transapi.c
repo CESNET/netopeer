@@ -626,6 +626,26 @@ struct transapi_data_callbacks netopeer_clbks =  {
 	}
 };
 
+/**
+ * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
+ * call repeatedly with result->next as the node argument.
+ *
+ * @param name	Name of the node to be retrieved.
+ * @param node	List of nodes that will be searched.
+ * @return Pointer to the matching node or NULL
+ */
+xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
+	xmlNodePtr ret = NULL;
+
+	for (ret = node; ret != NULL; ret = ret->next) {
+		if (xmlStrEqual(BAD_CAST name, ret->name)) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
 /*
 * RPC callbacks
 * Here follows set of callback functions run every time RPC specific for this device arrives.
@@ -634,9 +654,9 @@ struct transapi_data_callbacks netopeer_clbks =  {
 * If input was not set in RPC message argument in set to NULL.
 */
 
-nc_reply * rpc_netopeer_reboot (xmlNodePtr input[])
+nc_reply * rpc_netopeer_reboot (xmlNodePtr input)
 {
-	xmlNodePtr type_node = input[0];
+	xmlNodePtr type_node = get_rpc_node("type", input);
 	char * type_str = NULL;
 
 	if (type_node) {
@@ -659,9 +679,9 @@ nc_reply * rpc_netopeer_reboot (xmlNodePtr input[])
 	return(nc_reply_ok());
 }
 
-nc_reply * rpc_reload_module (xmlNodePtr input[])
+nc_reply * rpc_reload_module (xmlNodePtr input)
 {
-	xmlNodePtr module_node = input[0];
+	xmlNodePtr module_node = get_rpc_node("module", input);
 	char * module_name;
 	struct module * module = modules;
 
@@ -697,8 +717,8 @@ nc_reply * rpc_reload_module (xmlNodePtr input[])
 struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
-		{.name="netopeer-reboot", .func=rpc_netopeer_reboot, .arg_count=1, .arg_order={"type"}},
-		{.name="reload-module", .func=rpc_reload_module, .arg_count=1, .arg_order={"module"}}
+		{.name="netopeer-reboot", .func=rpc_netopeer_reboot},
+		{.name="reload-module", .func=rpc_reload_module}
 	}
 };
 
