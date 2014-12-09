@@ -192,6 +192,26 @@ struct transapi_data_callbacks clbks =  {
 	}
 };
 
+/**
+ * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
+ * call repeatedly with result->next as the node argument.
+ *
+ * @param name	Name of the node to be retrieved.
+ * @param node	List of nodes that will be searched.
+ * @return Pointer to the matching node or NULL
+ */
+xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
+	xmlNodePtr ret = NULL;
+
+	for (ret = node; ret != NULL; ret = ret->next) {
+		if (xmlStrEqual(BAD_CAST name, ret->name)) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
 /*
 * RPC callbacks
 * Here follows set of callback functions run every time RPC specific for this device arrives.
@@ -219,10 +239,10 @@ void * make_toast (void * doneness)
 	return NULL;
 }
 
-nc_reply * rpc_make_toast (xmlNodePtr input[])
+nc_reply * rpc_make_toast (xmlNodePtr input)
 {
-	xmlNodePtr toasterDoneness = input[0];
-	xmlNodePtr toasterToastType = input[1];
+	xmlNodePtr toasterDoneness = get_rpc_node("toasterDoneness", input);
+	xmlNodePtr toasterToastType = get_rpc_node("toasterToastType", input);
 	struct nc_err *e = NULL;
 
 	struct nc_err * err;
@@ -297,7 +317,7 @@ nc_reply * rpc_cancel_toast (xmlNodePtr input[])
 struct transapi_rpc_callbacks rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
-		{.name="make-toast", .func=rpc_make_toast, .arg_count=2, .arg_order={"toasterDoneness", "toasterToastType"}},
-		{.name="cancel-toast", .func=rpc_cancel_toast, .arg_count=0, .arg_order={}}
+		{.name="make-toast", .func=rpc_make_toast},
+		{.name="cancel-toast", .func=rpc_cancel_toast}
 	}
 };
