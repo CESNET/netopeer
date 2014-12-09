@@ -334,6 +334,26 @@ struct transapi_data_callbacks clbks =  {
 	}
 };
 
+/**
+ * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
+ * call repeatedly with result->next as the node argument.
+ *
+ * @param name	Name of the node to be retrieved.
+ * @param node	List of nodes that will be searched.
+ * @return Pointer to the matching node or NULL
+ */
+xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
+	xmlNodePtr ret = NULL;
+
+	for (ret = node; ret != NULL; ret = ret->next) {
+		if (xmlStrEqual(BAD_CAST name, ret->name)) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
 /*
  * RPC callbacks
  * Here follows set of callback functions run every time RPC specific for this device arrives.
@@ -342,9 +362,9 @@ struct transapi_data_callbacks clbks =  {
  * If input was not set in RPC message argument in set to NULL.
  */
 
-nc_reply *rpc_initialize(xmlNodePtr input[])
+nc_reply *rpc_initialize(xmlNodePtr input)
 {
-	xmlNodePtr tape_content = input[0];
+	xmlNodePtr tape_content = get_rpc_node("tape-content", input);
 	struct nc_err* e = NULL;
 
 	if (pthread_mutex_trylock(&tm_run_lock) != 0) {
@@ -360,21 +380,15 @@ nc_reply *rpc_initialize(xmlNodePtr input[])
 	tm_tape = tm_head = (char*)xmlNodeGetContent(tape_content);
 
 	if (tm_tape == NULL) {
-		/* tape is empty */
-		tm_tape_len = 0;
-		pthread_mutex_unlock(&tm_run_lock);
-
-		e = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(e, NC_ERR_PARAM_MSG, "Unable to get \"tape-content\" value from the RPC.");
-		return nc_reply_error(e);
-	} else {
-
-		/* remember the length of the tape */
-		tm_tape_len = strlen(tm_tape) + 1;
-		pthread_mutex_unlock(&tm_run_lock);
-
-		return nc_reply_ok();
+		/* tape is empty, the default value */
+		tm_tape = tm_head = strdup("");
 	}
+
+	/* remember the length of the tape */
+	tm_tape_len = strlen(tm_tape) + 1;
+	pthread_mutex_unlock(&tm_run_lock);
+
+	return nc_reply_ok();
 }
 
 static void* tm_run(void *arg)
@@ -429,7 +443,7 @@ static void* tm_run(void *arg)
 	return (NULL);
 }
 
-nc_reply *rpc_run(xmlNodePtr input[])
+nc_reply *rpc_run(xmlNodePtr input)
 {
 	pthread_t tm_run_thread;
 	struct nc_err *e;
@@ -465,8 +479,8 @@ nc_reply *rpc_run(xmlNodePtr input[])
 struct transapi_rpc_callbacks rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
-		{.name="initialize", .func=rpc_initialize, .arg_count=1, .arg_order={"tape-content"}},
-		{.name="run", .func=rpc_run, .arg_count=0, .arg_order={}}
+		{.name="initialize", .func=rpc_initialize},
+		{.name="run", .func=rpc_run}
 	}
 };
 

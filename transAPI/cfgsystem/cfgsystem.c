@@ -1180,6 +1180,26 @@ PUBLIC struct transapi_data_callbacks clbks = {
 	}
 };
 
+/**
+ * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
+ * call repeatedly with result->next as the node argument.
+ *
+ * @param name	Name of the node to be retrieved.
+ * @param node	List of nodes that will be searched.
+ * @return Pointer to the matching node or NULL
+ */
+xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
+	xmlNodePtr ret = NULL;
+
+	for (ret = node; ret != NULL; ret = ret->next) {
+		if (xmlStrEqual(BAD_CAST name, ret->name)) {
+			break;
+		}
+	}
+
+	return ret;
+}
+
 /*
  * RPC callbacks
  * Here follows set of callback functions run every time RPC specific for this device arrives.
@@ -1188,15 +1208,22 @@ PUBLIC struct transapi_data_callbacks clbks = {
  * If input was not set in RPC message argument in set to NULL.
  */
 
-PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_set_current_datetime(xmlNodePtr input)
 {
 	struct nc_err* err;
-	xmlNodePtr current_datetime = input[0];
+	xmlNodePtr current_datetime = get_rpc_node("current-datetime", input);
 	time_t new_time;
 	const char* timezone = NULL;
 	char *msg = NULL, *ptr;
 	const char *rollback_timezone;
 	int offset;
+
+	if (current_datetime == NULL) {
+		err = nc_err_new(NC_ERR_MISSING_ELEM);
+		nc_err_set(err, NC_ERR_PARAM_MSG, "No datetime specified.");
+		nc_verb_verbose("RPC set-current-datetime without the datetime.");
+		return nc_reply_error(err);
+	}
 
 	switch (ntp_status()) {
 	case 1:
@@ -1306,12 +1333,12 @@ static nc_reply* _rpc_system_shutdown(bool shutdown)
 	return nc_reply_ok();
 }
 
-PUBLIC nc_reply* rpc_system_restart(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_system_restart(xmlNodePtr input)
 {
 	return _rpc_system_shutdown(false);
 }
 
-PUBLIC nc_reply* rpc_system_shutdown(xmlNodePtr input[])
+PUBLIC nc_reply* rpc_system_shutdown(xmlNodePtr input)
 {
 	return _rpc_system_shutdown(true);
 }
@@ -1324,9 +1351,9 @@ PUBLIC nc_reply* rpc_system_shutdown(xmlNodePtr input[])
 PUBLIC struct transapi_rpc_callbacks rpc_clbks = {
 		.callbacks_count = 3,
         .callbacks = {
-        		{.name = "set-current-datetime", .func = rpc_set_current_datetime, .arg_count = 1, .arg_order = {"current-datetime"}},
-                {.name = "system-restart", .func = rpc_system_restart, .arg_count = 0, .arg_order = {}},
-                {.name = "system-shutdown", .func = rpc_system_shutdown, .arg_count = 0, .arg_order = {}}
+        		{.name = "set-current-datetime", .func = rpc_set_current_datetime},
+                {.name = "system-restart", .func = rpc_system_restart},
+                {.name = "system-shutdown", .func = rpc_system_shutdown}
 		}
 };
 
