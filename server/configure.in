@@ -294,6 +294,10 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
+# libssh
+AC_SEARCH_LIBS([ssh_init], [ssh], [], [AC_MSG_ERROR([Missing the libssh library.])])
+AC_SEARCH_LIBS([ssh_threads_get_pthread], [ssh_threads], [], [AC_MSG_ERROR([Missing the libssh_threads library.])])
+
 # libnetconf
 AC_SEARCH_LIBS([nc_callhome_listen], [netconf],
 	[],

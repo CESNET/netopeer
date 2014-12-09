@@ -55,16 +55,8 @@
 #include "comm.h"
 #include "server_operations.h"
 
-struct bind_addr {
-	char* addr;
-	unsigned int* ports;
-	unsigned int port_count;
-	struct bind_addr* next;
-};
-
 /* flag of main loop, it is turned when a signal comes */
-volatile int done = 0, restart_soft = 0, restart_hard = 0, binds_change = 1;
-volatile struct bind_addr* ssh_server_binds = NULL;
+volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
 int server_start = 0;
 
