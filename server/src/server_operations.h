@@ -55,24 +55,6 @@ char err_msg[4096];
 #define NETOPEER_MODULE_NAME "Netopeer"
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
-struct session_info {
-	/**
-	 * String identifying netopeer agent
-	 */
-	char *id;
-	/**
-	 * Pointer to library provided session.
-	 * In our architecture are sessions are dummy
-	 * and can not be used for communication.
-	 * We use dbus instead.
-	 */
-	struct nc_session * session;
-	/**
-	 * Doubly linked list links.
-	 */
-	struct session_info *next, *prev;
-};
-
 struct module {
 	char * name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
 	struct ncds_ds * ds; /**< pointer to datastore returned by libnetconf */
@@ -118,7 +100,7 @@ nc_reply * server_process_rpc(struct nc_session * session, const nc_rpc * rpc);
  *
  * @return Constant pointer to session info structure or NULL on error
  */
-const struct session_info* server_sessions_get_by_ncid(const char* id);
+const struct nc_session* server_sessions_get_by_ncid(const char* id);
 
 /**
  * @brief Get pointer to the NETCONF session information structure in the
@@ -128,7 +110,7 @@ const struct session_info* server_sessions_get_by_ncid(const char* id);
  *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* server_sessions_get_by_agentid(const char* id);
+const struct nc_session* server_sessions_get_by_agentid(const char* id);
 
 /**
  * @brief Add session to server internal list
@@ -138,21 +120,21 @@ const struct session_info* server_sessions_get_by_agentid(const char* id);
  * @param[in] cpblts List of capabilities session supports
  * @param[in] id ID of the agent providing communication for session
  */
-void server_sessions_add(struct session_info* session);
+void server_sessions_add(struct nc_session* session);
 
 /**
  * @brief Close and remove session and stop agent
  *
  * @param session Session to stop.
  */
-void server_sessions_stop(struct session_info *session);
+void server_sessions_stop(struct nc_session *session);
 
 /**
  * @brief Force stopping the agent
  *
  * @param session Session to kill.
  */
-void server_sessions_kill(struct session_info *session);
+void server_sessions_kill(struct nc_session *session);
 
 /**
  * @brief Close and remove all sessions
@@ -166,7 +148,7 @@ void server_sessions_destroy_all(void);
  *
  * @return Constant pointer to session info structure or NULL on error
  */
-const struct session_info* srv_get_session(const char* id);
+const struct nc_session* srv_get_session(const char* id);
 
 /* Datastore */
 

@@ -72,6 +72,13 @@
 #define CLIENT_POLL_TIMEOUT 200
 #define SESSION_END (SSH_CLOSED | SSH_CLOSED_ERROR)
 
+#define BASE_READ_BUFFER_SIZE 2048
+
+#define NC_V10_END_MSG "]]>]]>"
+#define NC_V11_END_MSG "\n##\n"
+#define NC_MAX_END_MSG_LEN 6
+
+
 struct bind_addr {
 	char* addr;
 	unsigned int* ports;
@@ -110,14 +117,16 @@ struct session_data_struct {
 	char* username;			// the SSH username
 };
 
+/* returns how much of the data was processed */
 static int sshcb_data_function(ssh_session session, ssh_channel channel, void* data, uint32_t len, int is_stderr, void* userdata) {
-	char* rcv_data = NULL;
+	char* to_send;
 	nc_rpc* rpc;
 	nc_reply* rpc_reply;
 	NC_MSG_TYPE rpc_type;
 	struct channel_data_struct* cdata = (struct channel_data_struct*) userdata;
 	struct nc_cpblts* capabilities = NULL;
 	struct nc_err* err;
+	int ret, to_send_size, to_send_len;
 
 	(void) channel;
 	(void) session;
@@ -125,24 +134,31 @@ static int sshcb_data_function(ssh_session session, ssh_channel channel, void* d
 
 	if (!cdata->netconf_subsystem) {
 		fprintf(stdout, "data received, but netconf not requested\n");
-		return SSH_OK;
+		return len;
 	}
 
-	rcv_data = malloc(len+1);
-	strncpy(rcv_data, data, len);
-	rcv_data[len] = '\0';
-	fprintf(stdout, "data_function: %s", rcv_data);
+	nc_verb_verbose("%s: raw data received: %.*s", __func__, len, data);
 
-	/* create a session, if there is none */
+	/* check if we received a whole NETCONF message */
+	if (strncmp(data+len-strlen(NC_V10_END_MSG), NC_V10_END_MSG, strlen(NC_V10_END_MSG)) != 0 &&
+			strncmp(data+len-strlen(NC_V11_END_MSG), NC_V11_END_MSG, strlen(NC_V11_END_MSG)) != 0) {
+		return 0;
+	}
+
+	/* pass data from the client to the library */
+	if ((ret = write(cdata->server_out[1], data, len)) != (signed)len) {
+		if (ret == -1) {
+			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
+		} else {
+			nc_verb_error("%s: failed to pass the client data to the library", __func__);
+		}
+		//TODO close session
+	}
+
+	/* if there is no session, we expect a hello message */
 	if (cdata->ncsession == NULL) {
 		/* get server capabilities */
 		capabilities = nc_session_get_cpblts_default();
-
-		/* pipes server <-> library */
-		if (pipe(cdata->server_in) == -1 || pipe(cdata->server_out) == -1) {
-			nc_verb_error("%s: creating pipes failed (%s)", __func__, strerror(errno));
-			return EXIT_FAILURE;
-		}
 
 		cdata->ncsession = nc_session_accept_inout(capabilities, cdata->username, cdata->server_out[0], cdata->server_in[1]);
 		nc_cpblts_free(capabilities);
@@ -157,25 +173,28 @@ static int sshcb_data_function(ssh_session session, ssh_channel channel, void* d
 		nc_session_monitor(cdata->ncsession);
 
 		/* add session to the global list */
-		server_sessions_add((struct session_info*)cdata->ncsession);
+		//server_sessions_add(cdata->ncsession);
+
+		/* hello message was processed, send our hello */
+		goto pass_data;
 	}
 
 	/* receive a new RPC */
 	rpc_type = nc_session_recv_rpc(cdata->ncsession, 0, &rpc);
 	if (rpc_type != NC_MSG_RPC) {
 		switch (rpc_type) {
-		case NC_MSG_NONE:
-			/* weird */
-			break;
 		case NC_MSG_UNKNOWN:
 			if (nc_session_get_status(cdata->ncsession) != NC_SESSION_STATUS_WORKING) {
 				/* something really bad happened, and communication is not possible anymore */
-				nc_verb_error("%s: failed to receive client's message", __func__);
+				nc_verb_error("%s: failed to receive client's message (nc session not working)", __func__);
 				return EXIT_FAILURE;
 			}
 			break;
+		case NC_MSG_WOULDBLOCK:
+			nc_verb_warning("%s: no full message received yet", __func__);
+			return len;
 		default:
-			/* weird as well */
+			/* TODO something weird */
 			break;
 		}
 	}
@@ -275,9 +294,37 @@ send_reply:
 	nc_session_send_reply(cdata->ncsession, rpc, rpc_reply);
 	nc_rpc_free(rpc);
 	nc_reply_free(rpc_reply);
-	//TODO pass data libnetconf -> client (libssh)
 
-	return SSH_OK;
+pass_data:
+	/* pass data from the library to the client */
+	to_send_size = BASE_READ_BUFFER_SIZE;
+	to_send_len = 0;
+	to_send = malloc(to_send_size);
+	while (1) {
+		to_send_len += (ret = read(cdata->server_in[0], to_send+to_send_len, to_send_size-to_send_len));
+		if (ret == -1) {
+			break;
+		}
+
+		if (to_send_len == to_send_size) {
+			to_send_size *= 2;
+			to_send = realloc(to_send, to_send_size);
+		} else {
+			break;
+		}
+	}
+
+	if (ret == -1) {
+		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
+		//TODO close session?
+	} else {
+		ssh_set_fd_towrite(session);
+		ssh_channel_write(channel, to_send, to_send_len);
+	}
+	//TODO always free the buffer, or reuse?
+	free(to_send);
+
+	return len;
 }
 
 static int sshcb_subsystem_request(ssh_session session, ssh_channel channel, const char* subsystem, void* userdata) {
@@ -289,6 +336,12 @@ static int sshcb_subsystem_request(ssh_session session, ssh_channel channel, con
 
 	fprintf(stdout, "subsystem_request %s\n", subsystem);
 	if (strcmp(subsystem, "netconf") == 0) {
+		/* create pipes server <-> library here */
+		if (pipe(cdata->server_in) == -1 || pipe(cdata->server_out) == -1) {
+			nc_verb_error("%s: creating pipes failed (%s)", __func__, strerror(errno));
+			return SSH_OK;
+		}
+
 		cdata->netconf_subsystem = 1;
 	}
 

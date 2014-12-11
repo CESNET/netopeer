@@ -56,7 +56,7 @@
 /**
  * Internal list of NETCONF sessions - agents connected via DBus
  */
-static struct session_info *sessions = NULL;
+static struct nc_session *sessions = NULL;
 
 /**
  * @brief Get pointer to the NETCONF session information structure in the
@@ -66,9 +66,9 @@ static struct session_info *sessions = NULL;
  *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* server_sessions_get_by_ncid(const char* id)
+const struct nc_session* server_sessions_get_by_ncid(const char* id)
 {
-	struct session_info *aux_session = sessions;
+	struct nc_session *aux_session = sessions;
 
 	while (aux_session != NULL) {
 		if (strcmp(id, nc_session_get_id(aux_session->session)) == 0) {
@@ -88,9 +88,9 @@ const struct session_info* server_sessions_get_by_ncid(const char* id)
  *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* server_sessions_get_by_agentid(const char* id)
+const struct nc_session* server_sessions_get_by_agentid(const char* id)
 {
-	struct session_info *aux_session = sessions;
+	struct nc_session *aux_session = sessions;
 
 	while (aux_session != NULL) {
 		if (strcmp(id, aux_session->id) == 0) {
@@ -108,9 +108,9 @@ const struct session_info* server_sessions_get_by_agentid(const char* id)
  *
  * @param session Session information structure to add.
  */
-void server_sessions_add(struct session_info* session)
+void server_sessions_add(struct nc_session* session)
 {
-	struct session_info* session_iter = sessions;
+	struct nc_session* session_iter = sessions;
 
 	if (sessions == NULL) {
 		/* first session */
@@ -135,7 +135,7 @@ void server_sessions_add(struct session_info* session)
  */
 int server_sessions_remove(const char* session_id)
 {
-	struct session_info *session;
+	struct nc_session *session;
 
 	/* get required session */
 	session = (struct session_info *) server_sessions_get_by_ncid(session_id);
@@ -162,7 +162,7 @@ int server_sessions_remove(const char* session_id)
 	return (EXIT_SUCCESS);
 }
 
-void server_sessions_stop(struct session_info *session)
+void server_sessions_stop(struct nc_session *session)
 {
 	const char * sid = NULL;
 
@@ -172,7 +172,7 @@ void server_sessions_stop(struct session_info *session)
 	}
 }
 
-void server_sessions_kill(struct session_info *session)
+void server_sessions_kill(struct nc_session *session)
 {
 	const char * sid = NULL;
 	int agent_pid;
@@ -192,7 +192,7 @@ void server_sessions_kill(struct session_info *session)
  */
 void server_sessions_destroy_all(void)
 {
-	struct session_info * tmp = sessions, *rem;
+	struct nc_session * tmp = sessions, *rem;
 
 	while (tmp != NULL) {
 		rem = tmp;
@@ -208,13 +208,13 @@ void server_sessions_destroy_all(void)
  * @param session_id NETCONF session ID. *
  * @return Session information structure or NULL if no such session exists.
  */
-const struct session_info* srv_get_session(const char* session_id)
+const struct nc_session* srv_get_session(const char* session_id)
 {
 	if (session_id == NULL) {
 		return (NULL);
 	}
 
-	struct session_info *aux_session = sessions;
+	struct nc_session *aux_session = sessions;
 	while (aux_session != NULL) {
 		if ((aux_session->id != NULL) && (strncmp(session_id, aux_session->id, sizeof(session_id) + 1) == 0)) {
 			break;
