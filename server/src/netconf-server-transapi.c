@@ -77,15 +77,12 @@
 #	include <libnetconf_tls.h>
 #endif
 
-#include "config.h"
-
 #ifdef __GNUC__
 #	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
 #else
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
-#define SSHDPID_ENV "SSHD_PID"
 #ifdef ENABLE_TLS
 #	define STUNNELPID_ENV "STUNNEL_PID"
 #	define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
@@ -299,17 +296,6 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE server_erropt = NC_EDIT_ERROPT_NOTSET;
 
-static u_int16_t sshd_pid = 0;
-
-static void kill_sshd(void)
-{
-	if (sshd_pid != 0) {
-		kill(sshd_pid, SIGTERM);
-		sshd_pid = 0;
-		unsetenv(SSHDPID_ENV);
-	}
-}
-
 static char* get_nodes_content(xmlNodePtr old_node, xmlNodePtr new_node) {
 	if (new_node != NULL) {
 		if (new_node->children != NULL && new_node->children->content != NULL) {
@@ -504,7 +490,6 @@ static void* app_loop(void* app_v)
 	int timeout;
 	int sleep_flag;
 	struct epoll_event event_in, event_out;
-	char* const sshd_argv[] = {SSHD_EXEC, "-i", "-f", CFG_DIR"/sshd_config", NULL};
 #ifdef ENABLE_TLS
 	char* const stunnel_argv[] = {TLSD_EXEC, CFG_DIR"/stunnel_config", NULL};
 #endif /* ENABLE_TLS */
@@ -530,7 +515,7 @@ static void* app_loop(void* app_v)
 		sock = -1;
 		pid = -1;
 		if (app->transport == NC_TRANSPORT_SSH) {
-			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+			//pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
 #ifdef ENABLE_TLS
 		} else if (app->transport == NC_TRANSPORT_TLS) {
 			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, stunnel_argv[0], stunnel_argv, &sock);
@@ -541,7 +526,7 @@ static void* app_loop(void* app_v)
 		}
 		pthread_cleanup_push(clh_close, &sock);
 		if (app->transport == NC_TRANSPORT_SSH) {
-			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
+			//nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
 #ifdef ENABLE_TLS
 		} else if (app->transport == NC_TRANSPORT_TLS) {
 			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", stunnel_argv[0], pid);
@@ -1261,8 +1246,6 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
  */
 void server_transapi_close(void)
 {
-	/* kill transport daemons */
-	kill_sshd();
 
 #ifdef ENABLE_TLS
 	kill_tlsd();

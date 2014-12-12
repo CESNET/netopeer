@@ -33,7 +33,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -58,7 +57,7 @@
 /* flag of main loop, it is turned when a signal comes */
 volatile int done = 0, restart_soft = 0, restart_hard = 0;
 
-int server_start = 0;
+int server_start = 0, listen_init = 1;
 
 /**
  * \brief Print program version
@@ -105,14 +104,13 @@ void signal_handler (int sig)
 	case SIGTERM:
 	case SIGQUIT:
 	case SIGABRT:
-	case SIGKILL:
 		if (done == 0) {
 			/* first attempt */
 			done = 1;
 		} else {
 			/* second attempt */
 //			nc_verb_error("Hey! I need some time to stop, be patient next time!");
-			exit (EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 		break;
 	case SIGHUP:
@@ -122,12 +120,12 @@ void signal_handler (int sig)
 		break;
 	default:
 //		nc_verb_error("exiting on signal: %d", sig);
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 		break;
 	}
 }
 
-extern void ssh_listen_loop(void);
+extern void ssh_listen_loop(int);
 
 int main(int argc, char** argv)
 {
@@ -135,7 +133,7 @@ int main(int argc, char** argv)
 	sigset_t block_mask;
 
 	char *aux_string = NULL, path[PATH_MAX];
-	int next_option, ret;
+	int next_option;
 	int daemonize = 0, len;
 	int verbose = 0;
 	struct module * netopeer_module = NULL, *server_module = NULL;
@@ -179,7 +177,6 @@ int main(int argc, char** argv)
 	sigaction (SIGQUIT, &action, NULL);
 	sigaction (SIGABRT, &action, NULL);
 	sigaction (SIGTERM, &action, NULL);
-	sigaction (SIGKILL, &action, NULL);
 	sigaction (SIGHUP, &action, NULL);
 
 	nc_callback_print (clb_print);
@@ -218,7 +215,7 @@ int main(int argc, char** argv)
 	LIBXML_TEST_VERSION
 
 	/* initialize library including internal datastores and maybee something more */
-	if ((ret = nc_init (NC_INIT_ALL | NC_INIT_MULTILAYER)) < 0) {
+	if (nc_init(NC_INIT_ALL | NC_INIT_MULTILAYER) < 0) {
 		nc_verb_error("Library initialization failed.");
 		return (EXIT_FAILURE);
 	}
@@ -258,7 +255,7 @@ restart:
 	server_start = 0;
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
-	ssh_listen_loop();
+	ssh_listen_loop(listen_init);
 
 	/* unload Netopeer module -> unload all modules */
 	module_disable(server_module, 1);
@@ -268,7 +265,7 @@ restart:
 
 	if (!restart_soft) {
 		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		server_sessions_destroy_all();
+		//server_sessions_destroy_all();
 		nc_close();
 	}
 
@@ -280,8 +277,8 @@ restart:
 
 	if (restart_soft) {
 		nc_verb_verbose("Server is going to soft restart.");
-		restart_soft = 0;
 		done = 0;
+		listen_init = 0;
 		goto restart;
 	} else if (restart_hard) {
 		nc_verb_verbose("Server is going to hard restart.");
