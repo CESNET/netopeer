@@ -88,7 +88,7 @@ NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
 static struct module * modules = NULL;
 
-extern int restart_soft, restart_hard, done;
+extern int quit, restart_soft, restart_hard;
 
 extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
@@ -665,10 +665,9 @@ nc_reply * rpc_netopeer_reboot (xmlNodePtr input)
 
 	if (type_str == NULL || strcmp(type_str, "soft") == 0) {
 		restart_soft = 1;
-		done = 1;
 	} else if (strcmp (type_str, "hard")) {
+		quit = 1;
 		restart_hard = 1;
-		done = 1;
 	} else {
 		free(type_str);
 		return(nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE)));

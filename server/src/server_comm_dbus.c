@@ -75,7 +75,8 @@
 #define CLIENT_AUTH_TIMEOUT 10
 
 /* time for the client to close the SSH channel */
-#define CLIENT_CHANNEL_CLOSE_TIMEOUT 2
+/* 1 = 20ms, 5 = 100ms, 50 = 1s */
+#define CLIENT_CHANNEL_CLOSE_TIMEOUT 3
 
 #define CLIENT_POLL_TIMEOUT 200
 
@@ -113,7 +114,7 @@ struct channel_data_struct {
 	char* username;					// the SSH username
 	int server_in[2];				// pipe - server read, libnc write
 	int server_out[2];				// pipe - server write, libnc read
-	volatile int done;				// local done flag for a client
+	volatile int quit;				// local quit flag for a client
 };
 
 /* A userdata struct for session. */
@@ -125,11 +126,16 @@ struct session_data_struct {
 	char* username;			// the SSH username
 };
 
+/* All the clients */
+pthread_mutex_t ssh_clients_mutex;
+pthread_cond_t ssh_clients_cond;
 struct client_struct* ssh_clients;
-extern struct bind_addr* ssh_binds;
-extern int done, restart_soft;
 
-static void _client_free(struct client_struct* client) {
+extern struct bind_addr* ssh_binds;
+extern int quit, restart_soft;
+
+/* TODO thread-safety of all these client_ - whether require locking */
+static inline void _client_free(struct client_struct* client) {
 	if (client->sock != -1) {
 		close(client->sock);
 	}
@@ -183,10 +189,10 @@ static struct client_struct* client_find(struct client_struct* root, pthread_t t
 	return client;
 }
 
-static void client_cleanup(struct client_struct** root) {
+/*static void client_cleanup(struct client_struct** root) {
 	struct client_struct* cur, *prev;
 
-	if (root || *root == NULL) {
+	if (root == NULL || *root == NULL) {
 		return;
 	}
 
@@ -198,7 +204,7 @@ static void client_cleanup(struct client_struct** root) {
 	}
 
 	*root = NULL;
-}
+}*/
 
 static void client_append(struct client_struct** root, struct client_struct* clients) {
 	struct client_struct* cur;
@@ -254,13 +260,15 @@ static void* client_notification_thread(void* arg) {
 }
 
 static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *userdata) {
+	struct channel_data_struct* cdata = (struct channel_data_struct*) userdata;
+
 	(void)session;
 	(void)channel;
-	(void)userdata;
-	nc_verb_verbose("%s call", __func__);
+
+	cdata->quit = 1;
 }
 
-static void sshcb_channel_close(ssh_session session, ssh_channel channel, void *userdata) {
+/*static void sshcb_channel_close(ssh_session session, ssh_channel channel, void *userdata) {
 	(void)session;
 	(void)channel;
 	(void)userdata;
@@ -292,7 +300,7 @@ static void sshcb_channel_exit_signal(ssh_session session, ssh_channel channel, 
 	(void)lang;
 	(void)userdata;
 	nc_verb_verbose("%s call", __func__);
-}
+}*/
 
 /* returns how much of the data was processed */
 static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int is_stderr, void* userdata) {
@@ -330,7 +338,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 			nc_verb_error("%s: failed to pass the client data to the library", __func__);
 		}
 
-		cdata->done = 1;
+		cdata->quit = 1;
 		goto send_reply;
 	}
 
@@ -343,7 +351,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		nc_cpblts_free(capabilities);
 		if (cdata->ncsession == NULL) {
 			nc_verb_error("%s: failed to create nc session", __func__);
-			cdata->done = 1;
+			cdata->quit = 1;
 			goto send_reply;
 		}
 
@@ -364,7 +372,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 			if (nc_session_get_status(cdata->ncsession) != NC_SESSION_STATUS_WORKING) {
 				/* something really bad happened, and communication is not possible anymore */
 				nc_verb_error("%s: failed to receive client's message (nc session not working)", __func__);
-				cdata->done = 1;
+				cdata->quit = 1;
 				goto send_reply;
 			}
 			break;
@@ -380,7 +388,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 	/* process the new RPC */
 	switch (nc_rpc_get_op(rpc)) {
 	case NC_OP_CLOSESESSION:
-		cdata->done = 1;
+		cdata->quit = 1;
 		rpc_reply = nc_reply_ok();
 		break;
 
@@ -551,8 +559,6 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 	(void)session;
 	(void)pubkey;
 
-	nc_verb_verbose("%s call", __func__);
-
 	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
 		/* just accepting the use of a particular (pubkey) key */
 		return SSH_AUTH_SUCCESS;
@@ -572,7 +578,6 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 static ssh_channel sshcb_channel_open(ssh_session session, void* userdata) {
 	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
 
-	nc_verb_verbose("%s call", __func__);
 	sdata->sshchannel = ssh_channel_new(session);
 	return sdata->sshchannel;
 }
@@ -615,10 +620,10 @@ void* ssh_client_thread(void* arg) {
 		.userdata = cdata,
 		.channel_data_function = sshcb_channel_data,
 		.channel_eof_function = sshcb_channel_eof,
-		.channel_close_function = sshcb_channel_close,
+		/*.channel_close_function = sshcb_channel_close,
 		.channel_signal_function = sshcb_channel_signal,
 		.channel_exit_status_function = sshcb_channel_exit_status,
-		.channel_exit_signal_function = sshcb_channel_exit_signal,
+		.channel_exit_signal_function = sshcb_channel_exit_signal,*/
 		.channel_subsystem_request_function = sshcb_channel_subsystem
 	};
 
@@ -645,7 +650,7 @@ void* ssh_client_thread(void* arg) {
 
 	n = 0;
 	while (sdata->authenticated == 0 || sdata->sshchannel == NULL) {
-		if (done || cdata->done) {
+		if (quit || cdata->quit) {
 			goto finish;
 		}
 		if (sdata->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
@@ -673,28 +678,35 @@ void* ssh_client_thread(void* arg) {
 			nc_verb_error("%s: ssh error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(session));
 			ssh_channel_close(sdata->sshchannel);
 		}
-	} while (ssh_channel_is_open(sdata->sshchannel) && !done && !cdata->done);
+	} while (ssh_channel_is_open(sdata->sshchannel) && !quit && !cdata->quit);
 
 	if (ssh_channel_is_open(sdata->sshchannel)) {
 		ssh_channel_close(sdata->sshchannel);
 	}
 
 	/* wait for the client to close the channel */
-	for (n = 0; n < CLIENT_CHANNEL_CLOSE_TIMEOUT*10 && (ssh_get_status(session) & (SSH_CLOSED | SSH_CLOSED_ERROR)) == 0; n++) {
-		ssh_event_dopoll(event, 100);
+	for (n = 0; n < CLIENT_CHANNEL_CLOSE_TIMEOUT && (ssh_get_status(session) & (SSH_CLOSED | SSH_CLOSED_ERROR)) == 0; n++) {
+		ssh_event_dopoll(event, 20);
 	}
-	if (n == CLIENT_CHANNEL_CLOSE_TIMEOUT*10) {
-		nc_verb_verbose("%s: client did not close the channel in time", __func__);
+	if (n == CLIENT_CHANNEL_CLOSE_TIMEOUT) {
+		nc_verb_verbose("%s: waiting for client SSH channel close timeouted", __func__);
 	}
 
 finish:
-	if (!done && !restart_soft) {
-		/* if we're done, we will free all the clients */
-		client_free(&ssh_clients, my_tid);
-	}
 	if (event != NULL) {
 		ssh_event_free(event);
 	}
+
+	pthread_mutex_lock(&ssh_clients_mutex);
+
+	/* if we're done, we will free this client info */
+	client_free(&ssh_clients, my_tid);
+
+	if (ssh_clients == NULL) {
+		pthread_cond_signal(&ssh_clients_cond);
+	}
+	pthread_mutex_unlock(&ssh_clients_mutex);
+
 	return NULL;
 }
 
@@ -863,32 +875,36 @@ void ssh_listen_loop(int do_init) {
 	ssh_session sshsession;
 	int ret;
 	struct client_struct* new_clients, *cur_client;
+	struct pollfd* pollsock;
+	unsigned int pollsock_count;
 
-	static struct pollfd* pollsock;
-	static unsigned int pollsock_count;
-
-	if (do_init) {
-		ssh_threads_set_callbacks(ssh_threads_get_pthread());
-		ssh_init();
-		sshbind = ssh_bind_new();
-
-		ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, KEYS_DIR "ssh_host_rsa_key");
-		//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_DSAKEY, "ssh_host_dsa_key");
-		//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_ECDSAKEY, "ssh_host_ecdsa_key");
-
-		ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
-
-		pollsock = sock_listen(ssh_binds, &pollsock_count);
-		if (pollsock == NULL) {
-			nc_verb_error("%s: failed to listen on any address", __func__);
-			return;
-		}
+	/* Init */
+	pollsock = sock_listen(ssh_binds, &pollsock_count);
+	if (pollsock == NULL) {
+		nc_verb_error("%s: failed to listen on any address", __func__);
+		return;
 	}
 
+	if (do_init) {
+		pthread_cond_init(&ssh_clients_cond, NULL);
+		pthread_mutex_init(&ssh_clients_mutex, NULL);
+
+		ssh_threads_set_callbacks(ssh_threads_get_pthread());
+		ssh_init();
+	}
+	sshbind = ssh_bind_new();
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, KEYS_DIR "ssh_host_rsa_key");
+	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_DSAKEY, "ssh_host_dsa_key");
+	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_ECDSAKEY, "ssh_host_ecdsa_key");
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
+
+	/* Main accept loop */
 	while (1) {
 		new_clients = sock_accept(pollsock, pollsock_count);
 		if (new_clients == NULL) {
-			if (done) {
+			if (quit || restart_soft) {
 				/* signal received wanting us to exit or restart */
 				break;
 			} else {
@@ -902,39 +918,54 @@ void ssh_listen_loop(int do_init) {
 			sshsession = ssh_new();
 			if (sshsession == NULL) {
 				nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
+				quit = 1;
 				break;
 			}
 
 			if (ssh_bind_accept_fd(sshbind, sshsession, cur_client->sock) != SSH_ERROR) {
 				/* add the client into the global ssh_clients structure */
+				pthread_mutex_lock(&ssh_clients_mutex);
 				client_append(&ssh_clients, cur_client);
+				pthread_mutex_unlock(&ssh_clients_mutex);
 
 				if ((ret = pthread_create(&cur_client->thread_id, NULL, ssh_client_thread, (void*)sshsession)) != 0) {
 					nc_verb_error("%s: failed to create a dedicated SSH client thread (%s)", strerror(ret));
 					client_free(&ssh_clients, cur_client->thread_id);
 					ssh_disconnect(sshsession);
 					ssh_free(sshsession);
+					quit = 1;
 					break;
 				}
 				pthread_detach(cur_client->thread_id);
 			} else {
 				nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
 				ssh_free(sshsession);
+				quit = 1;
 				break;
 			}
 		}
 
-		if (cur_client != NULL) {
+		if (quit || restart_soft) {
 			/* propagate break */
-			done = 1;
 			break;
 		}
 	}
 
+	/* Cleanup */
+	sock_cleanup(pollsock, pollsock_count);
+	ssh_bind_free(sshbind);
 	if (!restart_soft) {
-		sock_cleanup(pollsock, pollsock_count);
-		client_cleanup(&ssh_clients);
-		ssh_bind_free(sshbind);
+		/* TODO a total timeout after which we cancel and free clients by force? */
+		/* Wait for all the clients to exit nicely themselves */
+		pthread_mutex_lock(&ssh_clients_mutex);
+		while (ssh_clients != NULL) {
+			pthread_cond_wait(&ssh_clients_cond, &ssh_clients_mutex);
+		}
+		pthread_mutex_unlock(&ssh_clients_mutex);
+
+		pthread_cond_destroy(&ssh_clients_cond);
+		pthread_mutex_destroy(&ssh_clients_mutex);
+
 		ssh_finalize();
 	}
 }

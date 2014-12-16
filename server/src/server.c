@@ -55,9 +55,9 @@
 #include "server_operations.h"
 
 /* flag of main loop, it is turned when a signal comes */
-volatile int done = 0, restart_soft = 0, restart_hard = 0;
+volatile int quit = 0, restart_soft = 0, restart_hard = 0;
 
-int server_start = 0, listen_init = 1;
+int server_start = 0;
 
 /**
  * \brief Print program version
@@ -104,9 +104,9 @@ void signal_handler (int sig)
 	case SIGTERM:
 	case SIGQUIT:
 	case SIGABRT:
-		if (done == 0) {
+		if (quit == 0) {
 			/* first attempt */
-			done = 1;
+			quit = 1;
 		} else {
 			/* second attempt */
 //			nc_verb_error("Hey! I need some time to stop, be patient next time!");
@@ -116,7 +116,6 @@ void signal_handler (int sig)
 	case SIGHUP:
 		/* restart the daemon */
 		restart_soft = 1;
-		done = 1;
 		break;
 	default:
 //		nc_verb_error("exiting on signal: %d", sig);
@@ -127,8 +126,7 @@ void signal_handler (int sig)
 
 extern void ssh_listen_loop(int);
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
 	struct sigaction action;
 	sigset_t block_mask;
 
@@ -136,34 +134,35 @@ int main(int argc, char** argv)
 	int next_option;
 	int daemonize = 0, len;
 	int verbose = 0;
-	struct module * netopeer_module = NULL, *server_module = NULL;
+	int listen_init = 1;
+	struct module* netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
-	if ((aux_string = getenv (ENVIRONMENT_VERBOSE)) == NULL) {
+	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
 		verbose = NC_VERB_ERROR;
 	} else {
-		verbose = atoi (aux_string);
+		verbose = atoi(aux_string);
 	}
 
 	aux_string = NULL; /* for sure to avoid unwanted changes in environment */
 
 	/* parse given options */
-	while ((next_option = getopt (argc, argv, OPTSTRING)) != -1) {
+	while ((next_option = getopt(argc, argv, OPTSTRING)) != -1) {
 		switch (next_option) {
 		case 'd':
 			daemonize = 1;
 			break;
 		case 'h':
-			print_usage (argv[0]);
+			print_usage(argv[0]);
 			break;
 		case 'v':
-			verbose = atoi (optarg);
+			verbose = atoi(optarg);
 			break;
 		case 'V':
-			print_version (argv[0]);
+			print_version(argv[0]);
 			break;
 		default:
-			print_usage (argv[0]);
+			print_usage(argv[0]);
 			break;
 		}
 	}
@@ -173,28 +172,28 @@ int main(int argc, char** argv)
 	action.sa_handler = signal_handler;
 	action.sa_mask = block_mask;
 	action.sa_flags = 0;
-	sigaction (SIGINT, &action, NULL);
-	sigaction (SIGQUIT, &action, NULL);
-	sigaction (SIGABRT, &action, NULL);
-	sigaction (SIGTERM, &action, NULL);
-	sigaction (SIGHUP, &action, NULL);
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGABRT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
+	sigaction(SIGHUP, &action, NULL);
 
-	nc_callback_print (clb_print);
+	nc_callback_print(clb_print);
 
 	/* normalize value if not from the enum */
 	if (verbose < NC_VERB_ERROR) {
-		nc_verbosity (NC_VERB_ERROR);
+		nc_verbosity(NC_VERB_ERROR);
 	} else if (verbose > NC_VERB_DEBUG) {
-		nc_verbosity (NC_VERB_DEBUG);
+		nc_verbosity(NC_VERB_DEBUG);
 	} else {
-		nc_verbosity (verbose);
+		nc_verbosity(verbose);
 	}
 
 	/* go to the background as a daemon */
 	if (daemonize == 1) {
 		if (daemon(0, 0) != 0) {
 			nc_verb_error("Going to background failed (%s)", strerror(errno));
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		openlog("netopeer-server", LOG_PID, LOG_DAEMON);
 	} else {
@@ -204,7 +203,7 @@ int main(int argc, char** argv)
 	/* make sure we were executed by root */
 	if (geteuid() != 0) {
 		nc_verb_error("Failed to start, must have root privileges.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/*
@@ -264,8 +263,7 @@ restart:
 	/* main cleanup */
 
 	if (!restart_soft) {
-		/* close connection and destroy all sessions only when shutting down or hard restarting the server */
-		//server_sessions_destroy_all();
+		/* close libnetconf only when shutting down or hard restarting the server */
 		nc_close();
 	}
 
@@ -277,7 +275,7 @@ restart:
 
 	if (restart_soft) {
 		nc_verb_verbose("Server is going to soft restart.");
-		done = 0;
+		restart_soft = 0;
 		listen_init = 0;
 		goto restart;
 	} else if (restart_hard) {
@@ -287,5 +285,5 @@ restart:
 		execv(path, argv);
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
