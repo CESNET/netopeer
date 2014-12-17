@@ -87,8 +87,8 @@
 #define NC_MAX_END_MSG_LEN 6
 
 struct ntf_thread_config {
-	struct nc_session *session;
-	nc_rpc *subscribe_rpc;
+	struct nc_session* session;
+	nc_rpc* subscribe_rpc;
 };
 
 struct bind_addr {
@@ -177,11 +177,31 @@ static inline void _client_free(struct client_struct* client) {
 	}
 }
 
-static struct client_struct* client_find(struct client_struct* root, pthread_t tid) {
+static struct client_struct* client_find_by_tid(struct client_struct* root, pthread_t tid) {
 	struct client_struct* client;
 
 	for (client = root; client != NULL; client = client->next) {
 		if (client->thread_id == tid) {
+			break;
+		}
+	}
+
+	return client;
+}
+
+static struct client_struct* client_find_by_sid(struct client_struct* root, const char* sid) {
+	struct client_struct* client;
+
+	if (sid == NULL) {
+		return NULL;
+	}
+
+	for (client = root; client != NULL; client = client->next) {
+		if (client->ssh_cdata == NULL || client->ssh_cdata->ncsession == NULL) {
+			continue;
+		}
+
+		if (strcmp(sid, nc_session_get_id(client->ssh_cdata->ncsession)) == 0) {
 			break;
 		}
 	}
@@ -308,6 +328,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 	nc_rpc* rpc = NULL;
 	nc_reply* rpc_reply = NULL;
 	NC_MSG_TYPE rpc_type;
+	xmlNodePtr op;
 	struct channel_data_struct* cdata = (struct channel_data_struct*) userdata;
 	struct nc_cpblts* capabilities = NULL;
 	struct nc_err* err;
@@ -350,15 +371,12 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		cdata->ncsession = nc_session_accept_inout(capabilities, cdata->username, cdata->server_out[0], cdata->server_in[1]);
 		nc_cpblts_free(capabilities);
 		if (cdata->ncsession == NULL) {
-			nc_verb_error("%s: failed to create nc session", __func__);
+			nc_verb_error("%s: failed to create an NC session", __func__);
 			cdata->quit = 1;
 			goto send_reply;
 		}
 
-		// TODO show id, if still used
-		nc_verb_verbose("New server session");
-
-		nc_session_monitor(cdata->ncsession);
+		nc_verb_verbose("New server session for '%s' with ID %s", cdata->username, nc_session_get_id(cdata->ncsession));
 
 		/* hello message was processed, send our hello */
 		goto send_reply;
@@ -375,13 +393,14 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 				cdata->quit = 1;
 				goto send_reply;
 			}
-			break;
+			return len;
+		case NC_MSG_NONE:
 		case NC_MSG_WOULDBLOCK:
 			nc_verb_warning("%s: internal error: no full message received yet", __func__);
 			return len;
 		default:
-			/* TODO something weird */
-			break;
+			/* NC_MSG_HELLO, NC_MSG_REPLY, NC_MSG_NOTIFICATION - weird, but pretend we processed it */
+			return len;
 		}
 	}
 
@@ -393,26 +412,70 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		break;
 
 	case NC_OP_KILLSESSION:
-		/*if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
+		if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
 				xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
 			nc_verb_error("%s: corrupted RPC message", __func__);
-			reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
+			rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
 			xmlFreeNodeList(op);
 			goto send_reply;
 		}
 		if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
-			nc_verb_error("%s: no session id found");
+			nc_verb_error("%s: no session ID found");
 			err = nc_err_new(NC_ERR_MISSING_ELEM);
 			nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
-			reply = nc_reply_error(err);
+			rpc_reply = nc_reply_error(err);
 			xmlFreeNodeList(op);
 			goto send_reply;
 		}
-		sid = (char *)xmlNodeGetContent(op->children);
-		reply = comm_kill_session(conn, sid);
+
+		struct client_struct* client;
+		pthread_t tid;
+		char* sid, *username;
+
+		sid = (char*)xmlNodeGetContent(op->children);
 		xmlFreeNodeList(op);
-		frre(sid);*/
+
+		/* find the requested session */
+		pthread_mutex_lock(&ssh_clients_mutex);
+		client = client_find_by_sid(ssh_clients, sid);
+		pthread_mutex_unlock(&ssh_clients_mutex);
+		if (client == NULL) {
+			nc_verb_error("%s: no session with ID %s found", sid);
+			free(sid);
+			err = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(err, NC_ERR_PARAM_MSG, "No session with the requested ID found.");
+			rpc_reply = nc_reply_error(err);
+			goto send_reply;
+		}
+
+		if (client->ssh_cdata == NULL) {
+			/* channel data should never be NULL, if ncsession is clearly not NULL */
+			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+			free(sid);
+			rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
+			goto send_reply;
+		}
+
+		/* make the session (thread) quit */
+		username = strdup(client->ssh_cdata->username);
+		tid = client->thread_id;
+		client->ssh_cdata->quit = 1;
+		usleep((CLIENT_CHANNEL_CLOSE_TIMEOUT+1)*20000);
+		if (pthread_kill(tid, 0) != 0) {
+			nc_verb_warning("%s: thread quit timeout expired", __func__);
+			err = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(err, NC_ERR_PARAM_SEVERITY, "warning");
+			nc_err_set(err, NC_ERR_PARAM_MSG, "Session kill timeout expired.");
+			rpc_reply = nc_reply_error(err);
+		} else {
+			nc_verb_verbose("Session for the user '%s' with the ID %s killed.", username, sid);
+			rpc_reply = nc_reply_ok();
+		}
+
+		free(username);
+		free(sid);
 		break;
+
 	case NC_OP_CREATESUBSCRIPTION:
 		/* create-subscription message */
 		if (nc_cpblts_enabled(cdata->ncsession, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
@@ -449,7 +512,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		ntf_config->session = cdata->ncsession;
 		ntf_config->subscribe_rpc = nc_rpc_dup(rpc);
 
-		/* perform notification sending TODO do we need another thread? */
+		/* perform notification sending */
 		if ((pthread_create(&thread, NULL, client_notification_thread, ntf_config)) != 0) {
 			nc_reply_free(rpc_reply);
 			err = nc_err_new(NC_ERR_OP_FAILED);
@@ -578,7 +641,11 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 static ssh_channel sshcb_channel_open(ssh_session session, void* userdata) {
 	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
 
-	sdata->sshchannel = ssh_channel_new(session);
+	if (sdata->sshchannel != NULL) {
+		nc_verb_warning("%s: channel already opened", __func__);
+	} else {
+		sdata->sshchannel = ssh_channel_new(session);
+	}
 	return sdata->sshchannel;
 }
 
@@ -608,7 +675,7 @@ void* ssh_client_thread(void* arg) {
 
 	/* remember these structures for global access */
 	my_tid = pthread_self();
-	client = client_find(ssh_clients, my_tid);
+	client = client_find_by_tid(ssh_clients, my_tid);
 	if (client == NULL) {
 		nc_verb_error("%s: internal error: could not find our global client structure (%s:%d)", __func__, __FILE__, __LINE__);
 		goto finish;
