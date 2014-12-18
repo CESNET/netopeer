@@ -98,82 +98,38 @@ struct bind_addr {
 	struct bind_addr* next;
 };
 
-/* how the complete global structure looks
-
-struct settings_struct {
-	pthread_t ssh_data_tid;
-	pthread_t netconf_rpc_tid;
-	pthread_t netconf_notif_tid;
-	int ssh_in[2];
-	int ssh_out[2];
-	struct client_struct {
-		int sock;
-		struct sockaddr_storage saddr;
-		struct session_data_struct {
-			ssh_session sshsession;
-			struct nc_session* ncsession;
-			int auth_attempts;
-			int authenticated;
-			char* username;
-		} *ssh_cdata;
-		struct ssh_channels {
-			ssh_channel ssh_chan;
-			struct channel_data_struct {
-				int netconf_subsystem;
-				char* username;
-			} *ssh_cdata;
-			struct ssh_channels* next;
-		} ssh_chans;
-		struct client_struct* next;
-	} clients;
-};
-
-*/
-
-/* for each SSH channel of each SSH session */
-struct ssh_channels {
-	ssh_channel ssh_chan;
-	channel_data_struct* ssh_cdata;
-	struct ssh_channels* next;
-};
-
-/* for each client */
 struct client_struct {
+	pthread_t thread_id;
 	int sock;
 	struct sockaddr_storage saddr;
 	struct session_data_struct* ssh_sdata;
-	struct ssh_channels* ssh_chans;
+	struct channel_data_struct* ssh_cdata;
 	struct client_struct* next;
-};
-
-/* one global structure */
-struct state_struct {
-	pthread_t ssh_data_tid;
-	pthread_t netconf_rpc_tid;
-	pthread_t netconf_notif_tid;
-	int ssh_in[2];				// pipe - libssh read, libnetconf write
-	int ssh_out[2];				// pipe - libssh write, libnetconf read
-	struct client_struct* clients;
 };
 
 /* A userdata struct for channel. */
 struct channel_data_struct {
 	int netconf_subsystem;			// was netconf subsystem requested?
+	struct nc_session* ncsession;	// the netconf session
 	char* username;					// the SSH username
+	int server_in[2];				// pipe - server read, libnc write
+	int server_out[2];				// pipe - server write, libnc read
+	volatile int quit;				// local quit flag for a client
 };
 
 /* A userdata struct for session. */
 struct session_data_struct {
 	ssh_session sshsession;	// the SSH session
-	struct nc_session* ncsession;	// the netconf session
-	int auth_attempts;		// number of failed auth attempts
-	int authenticated;		// is the user authenticated?
+    ssh_channel sshchannel;	// the SSH channel
+    int auth_attempts;		// number of failed auth attempts
+    int authenticated;		// is the user authenticated?
 	char* username;			// the SSH username
 };
 
+/* All the clients */
 pthread_mutex_t ssh_clients_mutex;
 pthread_cond_t ssh_clients_cond;
-struct state_struct ssh_state;
+struct client_struct* ssh_clients;
 
 extern struct bind_addr* ssh_binds;
 extern int quit, restart_soft;
@@ -407,109 +363,6 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		goto send_reply;
 	}
 
-	/* pass data from the library to the client */
-	to_send_size = BASE_READ_BUFFER_SIZE;
-	to_send_len = 0;
-	to_send = malloc(to_send_size);
-	while (1) {
-		to_send_len += (ret = read(cdata->server_in[0], to_send+to_send_len, to_send_size-to_send_len));
-		if (ret == -1) {
-			break;
-		}
-
-		if (to_send_len == to_send_size) {
-			to_send_size *= 2;
-			to_send = realloc(to_send, to_send_size);
-		} else {
-			break;
-		}
-	}
-
-	if (ret == -1) {
-		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-	} else {
-		/* TODO libssh bug */
-		ssh_set_fd_towrite(session);
-		ssh_channel_write(channel, to_send, to_send_len);
-	}
-	//TODO always free the buffer, or reuse?
-	free(to_send);
-
-	return len;
-}
-
-static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, const char* subsystem, void* userdata) {
-	struct channel_data_struct *cdata = (struct channel_data_struct*) userdata;
-
-	(void) cdata;
-	(void) session;
-	(void) channel;
-
-	if (strcmp(subsystem, "netconf") == 0) {
-		/* create pipes server <-> library here */
-		if (pipe(cdata->server_in) == -1 || pipe(cdata->server_out) == -1) {
-			nc_verb_error("%s: creating pipes failed (%s)", __func__, strerror(errno));
-			return SSH_OK;
-		}
-
-		cdata->netconf_subsystem = 1;
-	}
-
-	return SSH_OK;
-}
-
-static int sshcb_auth_password(ssh_session session, const char* user, const char* pass, void* userdata) {
-	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
-
-	(void) session;
-
-	if (strcmp(user, USER) == 0 && strcmp(pass, PASS) == 0) {
-		sdata->username = strdup(user);
-		sdata->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated", user);
-		return SSH_AUTH_SUCCESS;
-	}
-
-	nc_verb_verbose("Failed user '%s' authentication attempt", user);
-	sdata->auth_attempts++;
-	return SSH_AUTH_DENIED;
-}
-
-static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* pubkey, char signature_state, void* userdata) {
-	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
-
-	(void)session;
-	(void)pubkey;
-
-	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		/* just accepting the use of a particular (pubkey) key */
-		return SSH_AUTH_SUCCESS;
-
-	} else if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
-		sdata->username = strdup(user);
-		sdata->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated", user);
-		return SSH_AUTH_SUCCESS;
-	}
-
-	nc_verb_verbose("Failed user '%s' authentication attempt", user);
-	sdata->auth_attempts++;
-	return SSH_AUTH_DENIED;
-}
-
-static ssh_channel sshcb_channel_open(ssh_session session, void* userdata) {
-	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
-
-	if (sdata->sshchannel != NULL) {
-		nc_verb_warning("%s: channel already opened", __func__);
-	} else {
-		sdata->sshchannel = ssh_channel_new(session);
-	}
-	return sdata->sshchannel;
-}
-
-void* netconf_data_thread(void* arg) {
-
 	/* if there is no session, we expect a hello message */
 	if (cdata->ncsession == NULL) {
 		/* get server capabilities */
@@ -694,9 +547,109 @@ send_reply:
 	if (rpc != NULL) {
 		nc_rpc_free(rpc);
 	}
+
+	/* pass data from the library to the client */
+	to_send_size = BASE_READ_BUFFER_SIZE;
+	to_send_len = 0;
+	to_send = malloc(to_send_size);
+	while (1) {
+		to_send_len += (ret = read(cdata->server_in[0], to_send+to_send_len, to_send_size-to_send_len));
+		if (ret == -1) {
+			break;
+		}
+
+		if (to_send_len == to_send_size) {
+			to_send_size *= 2;
+			to_send = realloc(to_send, to_send_size);
+		} else {
+			break;
+		}
+	}
+
+	if (ret == -1) {
+		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
+	} else {
+		/* TODO libssh bug */
+		ssh_set_fd_towrite(session);
+		ssh_channel_write(channel, to_send, to_send_len);
+	}
+	//TODO always free the buffer, or reuse?
+	free(to_send);
+
+	return len;
 }
 
-void* ssh_data_thread(void* arg) {
+static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, const char* subsystem, void* userdata) {
+	struct channel_data_struct *cdata = (struct channel_data_struct*) userdata;
+
+	(void) cdata;
+	(void) session;
+	(void) channel;
+
+	if (strcmp(subsystem, "netconf") == 0) {
+		/* create pipes server <-> library here */
+		if (pipe(cdata->server_in) == -1 || pipe(cdata->server_out) == -1) {
+			nc_verb_error("%s: creating pipes failed (%s)", __func__, strerror(errno));
+			return SSH_OK;
+		}
+
+		cdata->netconf_subsystem = 1;
+	}
+
+	return SSH_OK;
+}
+
+static int sshcb_auth_password(ssh_session session, const char* user, const char* pass, void* userdata) {
+	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
+
+	(void) session;
+
+	if (strcmp(user, USER) == 0 && strcmp(pass, PASS) == 0) {
+		sdata->username = strdup(user);
+		sdata->authenticated = 1;
+		nc_verb_verbose("User '%s' authenticated", user);
+		return SSH_AUTH_SUCCESS;
+	}
+
+	nc_verb_verbose("Failed user '%s' authentication attempt", user);
+	sdata->auth_attempts++;
+	return SSH_AUTH_DENIED;
+}
+
+static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* pubkey, char signature_state, void* userdata) {
+	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
+
+	(void)session;
+	(void)pubkey;
+
+	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
+		/* just accepting the use of a particular (pubkey) key */
+		return SSH_AUTH_SUCCESS;
+
+	} else if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
+		sdata->username = strdup(user);
+		sdata->authenticated = 1;
+		nc_verb_verbose("User '%s' authenticated", user);
+		return SSH_AUTH_SUCCESS;
+	}
+
+	nc_verb_verbose("Failed user '%s' authentication attempt", user);
+	sdata->auth_attempts++;
+	return SSH_AUTH_DENIED;
+}
+
+static ssh_channel sshcb_channel_open(ssh_session session, void* userdata) {
+	struct session_data_struct* sdata = (struct session_data_struct*) userdata;
+
+	if (sdata->sshchannel != NULL) {
+		nc_verb_warning("%s: channel already opened", __func__);
+	} else {
+		sdata->sshchannel = ssh_channel_new(session);
+	}
+	return sdata->sshchannel;
+}
+
+void* ssh_client_thread(void* arg) {
 	int n;
 	ssh_event event;
 	pthread_t my_tid;
@@ -1039,8 +992,7 @@ void ssh_listen_loop(int do_init) {
 			if (ssh_bind_accept_fd(sshbind, sshsession, cur_client->sock) != SSH_ERROR) {
 				/* add the client into the global ssh_clients structure */
 				pthread_mutex_lock(&ssh_clients_mutex);
-				/* TODO BUG this appends them all, multiple times */
-				client_append(&ssh_state->clients, cur_client);
+				client_append(&ssh_clients, cur_client);
 				pthread_mutex_unlock(&ssh_clients_mutex);
 
 				if ((ret = pthread_create(&cur_client->thread_id, NULL, ssh_client_thread, (void*)sshsession)) != 0) {
