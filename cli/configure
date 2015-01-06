@@ -704,6 +704,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+with_distro
 with_libxml2
 enable_notifications
 enable_debug
@@ -1344,6 +1345,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-distro=DISTRO    Compile for specific Linux distribution
   --with-libxml2          specific libxml2 location
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
@@ -2424,6 +2426,53 @@ fi
 if test "x$PKG_CONFIG" = "xno"; then
 	as_fn_error $? "'pkgconfig' not found." "$LINENO" 5
 fi
+
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
+# check for Linux distribution
+
+# Check whether --with-distro was given.
+if test "${with_distro+set}" = set; then :
+  withval=$with_distro; DISTRO=`echo $withval | tr A-Z a-z`
+else
+  if test -n "`cat /proc/version | grep 'Red Hat'`"; then
+		DISTRO=redhat;
+	else
+		DISTRO=`cat /etc/*release | grep ^ID= | sed 's/.*=//'`;
+	fi
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for distro" >&5
+$as_echo_n "checking for distro... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $DISTRO" >&5
+$as_echo "$DISTRO" >&6; }
+case $DISTRO in
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
+		# ok, supported distros
+		;;
+	* )
+		# unknown
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Unsupported Linux distro \"$DISTRO\", only RHEL and SUSE are fully supported." >&5
+$as_echo "$as_me: WARNING: Unsupported Linux distro \"$DISTRO\", only RHEL and SUSE are fully supported." >&2;}
+		;;
+esac
 
 # check for roff2html from groff
 # Extract the first word of "roff2html", so it can be a program name with args.

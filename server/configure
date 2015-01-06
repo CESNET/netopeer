@@ -1358,8 +1358,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-distro=DISTRO    Compile for specific Linux distribution (RHEL based
-                          by default)
+  --with-distro=DISTRO    Compile for specific Linux distribution
   --with-group=GROUP      Limit access to Netopeer server only to the
                           specified group of users
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
@@ -2573,7 +2572,12 @@ $as_echo_n "checking for distro... " >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $DISTRO" >&5
 $as_echo "$DISTRO" >&6; }
 case $DISTRO in
-	opensuse | suse | rhel | redhat )
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
 		# ok, supported distros
 		;;
 	* )
