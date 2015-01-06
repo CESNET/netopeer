@@ -1377,8 +1377,7 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-sshd=PATH        Set absolute path to the SSH daemon (searched in
                           PATH by default)
-  --with-distro=DISTRO    Compile for specific Linux distribution (RHEL based
-                          by default)
+  --with-distro=DISTRO    Compile for specific Linux distribution
   --with-group=GROUP      Limit access to Netopeer server only to the
                           specified group of users
   --with-stunnel=PATH     Set absolute path to the stunnel (TLS daemon). Makes
@@ -2659,6 +2658,19 @@ if test ! -x "$SSHD_EXEC"; then
 	as_fn_error $? "SSH daemon \"$SSHD_EXEC\" is not executable file." "$LINENO" 5
 fi
 
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
 # check for Linux distribution
 
 # Check whether --with-distro was given.
@@ -2678,7 +2690,12 @@ $as_echo_n "checking for distro... " >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $DISTRO" >&5
 $as_echo "$DISTRO" >&6; }
 case $DISTRO in
-	opensuse | suse | rhel | redhat )
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
 		# ok, supported distros
 		;;
 	* )

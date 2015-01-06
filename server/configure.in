@@ -88,9 +88,22 @@ if test ! -x "$SSHD_EXEC"; then
 	AC_MSG_ERROR([SSH daemon \"$SSHD_EXEC\" is not executable file.])
 fi
 
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
 # check for Linux distribution
 AC_ARG_WITH([distro],
-	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution (RHEL based by default)]),
+	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),
 	DISTRO=`echo $withval | tr A-Z a-z`,
 	if test -n "`cat /proc/version | grep 'Red Hat'`"; then
 		DISTRO=redhat;
@@ -101,7 +114,12 @@ AC_ARG_WITH([distro],
 AC_MSG_CHECKING([for distro])
 AC_MSG_RESULT([$DISTRO])
 case $DISTRO in
-	opensuse | suse | rhel | redhat )
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
 		# ok, supported distros
 		;;
 	* )
