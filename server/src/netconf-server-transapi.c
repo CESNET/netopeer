@@ -358,13 +358,11 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 	port = atoi(content);
 
 	if (op & XMLDIFF_REM) {
-		del_bind_addr(&ssh_binds, "0.0.0.0", port);
-		del_bind_addr(&ssh_binds, "::", port);
+		del_bind_addr(&ssh_binds, "::0", port);
 	} else if (op & XMLDIFF_MOD) {
 		/* there must be only 2 localhosts in the global structure */
-		if (ssh_binds == NULL || ssh_binds->next == NULL || ssh_binds->next->next != NULL ||
-				strcmp(ssh_binds->addr, "0.0.0.0") != 0 || strcmp(ssh_binds->next->addr, "::") != 0 ||
-				ssh_binds->port_count != 1 || ssh_binds->next->port_count != 1) {
+		if (ssh_binds == NULL || ssh_binds->next != NULL || strcmp(ssh_binds->addr, "::") != 0 ||
+				ssh_binds->port_count != 1) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
@@ -372,13 +370,12 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 			return EXIT_FAILURE;
 		}
 		ssh_binds->ports[0] = port;
-		ssh_binds->next->ports[0] = port;
 
 	} else if (op & XMLDIFF_ADD) {
 		nc_verb_verbose("%s: port %d", __func__, port);
 
-		add_bind_addr(&ssh_binds, "0.0.0.0", port);
-		add_bind_addr(&ssh_binds, "::", port);
+		/* listens on any IPv4 and IPv6 address */
+		add_bind_addr(&ssh_binds, "::0", port);
 	}
 
 	return EXIT_SUCCESS;

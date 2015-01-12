@@ -73,8 +73,6 @@
 #endif
 
 #define KEYS_DIR "/etc/ssh/"
-#define USER "myuser"
-#define PASS "mypass"
 /* SSH_AUTH_METHOD_UNKNOWN SSH_AUTH_METHOD_NONE SSH_AUTH_METHOD_PASSWORD SSH_AUTH_METHOD_PUBLICKEY SSH_AUTH_METHOD_HOSTBASED SSH_AUTH_METHOD_INTERACTIVE SSH_AUTH_METHOD_GSSAPI_MIC */
 #define SSH_AUTH_METHODS (SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY)
 
@@ -83,7 +81,7 @@
 #define CLIENT_AUTH_TIMEOUT 10
 
 /* time in msec the threads are going to rest for (maximum response time) */
-#define CLIENT_POLL_TIMEOUT 100
+#define CLIENT_SLEEP_TIME 50
 
 /* time in msec the data thread can additionally wait, in order to remove an invalid client */
 #define CLIENT_REMOVAL_LOCK_TIMEOUT 10
@@ -119,6 +117,9 @@ struct chan_struct {
 
 /* for each client */
 struct client_struct {
+	/*
+	 * when accessing or adding/removing ssh_chans
+	 */
 	pthread_mutex_t client_lock;
 	int sock;
 	struct sockaddr_storage saddr;
@@ -128,6 +129,7 @@ struct client_struct {
 	char* username;						// the SSH username
 	struct chan_struct* ssh_chans;
 	ssh_session ssh_sess;
+	ssh_event ssh_evt;
 	volatile int to_free;
 	struct client_struct* next;
 };
@@ -136,8 +138,11 @@ struct client_struct {
 struct state_struct {
 	pthread_t ssh_data_tid;
 	pthread_t netconf_rpc_tid;
-	ssh_event ssh_evt;
-	pthread_mutex_t global_lock;
+	/*
+	 * READ - when accessing clients
+	 * WRITE - when adding/removing clients
+	 */
+	pthread_rwlock_t global_lock;
 	struct client_struct* clients;
 };
 
@@ -164,22 +169,14 @@ static inline void _chan_free(struct chan_struct* chan) {
 }
 
 static inline void _client_free(struct client_struct* client) {
-	struct chan_struct* chan, *prev = NULL;
+	if (!client->to_free) {
+		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
+	}
 
-	/* close and free channels */
-	for (chan = client->ssh_chans; chan != NULL;) {
-		prev = chan;
-		chan = chan->next;
+	ssh_event_free(client->ssh_evt);
 
-		if (chan->nc_sess != NULL) {
-			nc_session_free(chan->nc_sess);
-		}
-		if (ssh_channel_is_open(chan->ssh_chan)) {
-			ssh_channel_close(chan->ssh_chan);
-		}
-
-		_chan_free(prev);
-		free(prev);
+	if (client->ssh_chans != NULL) {
+		nc_verb_error("%s: internal error: freeing a client with some channels", __func__);
 	}
 
 	if (client->ssh_sess != NULL) {
@@ -223,6 +220,11 @@ static void client_mark_all_channels_for_cleanup(struct client_struct** root) {
 	for (client = *root; client != NULL; client = client->next) {
 		/* CLIENT LOCK */
 		pthread_mutex_lock(&client->client_lock);
+
+		if (client->ssh_chans == NULL) {
+			client->to_free = 1;
+			continue;
+		}
 
 		for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
 			chan->to_free = 1;
@@ -477,12 +479,16 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 		return SSH_AUTH_DENIED;
 	}
 
+	if (client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+		return SSH_AUTH_DENIED;
+	}
+
 	if (client->authenticated) {
 		nc_verb_warning("User '%s' authenticated, but requested password authentication", client->username);
 		return SSH_AUTH_DENIED;
 	}
 
-	if (strcmp(user, USER) == 0 && strcmp(pass, PASS) == 0) {
+	if (strcmp("", pass) != 0) {
 		client->username = strdup(user);
 		client->authenticated = 1;
 		nc_verb_verbose("User '%s' authenticated", user);
@@ -492,15 +498,10 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	nc_verb_verbose("Failed user '%s' authentication attempt", user);
 	client->auth_attempts++;
 
-	if (client->auth_attempts == CLIENT_MAX_AUTH_ATTEMPTS) {
-		nc_verb_error("Too many failed authentication attempts, dropping client '%s'", user);
-		client_remove(&ssh_state.clients, client);
-	}
-
 	return SSH_AUTH_DENIED;
 }
 
-static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* UNUSED(pubkey), char signature_state, void* UNUSED(userdata)) {
+static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* pubkey, char signature_state, void* UNUSED(userdata)) {
 	struct client_struct* client;
 
 	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
@@ -513,8 +514,12 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 		return SSH_AUTH_DENIED;
 	}
 
+	if (client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+		return SSH_AUTH_DENIED;
+	}
+
 	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested password authentication", client->username);
+		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication", client->username);
 		return SSH_AUTH_DENIED;
 	}
 
@@ -527,11 +532,6 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 
 	nc_verb_verbose("Failed user '%s' authentication attempt", user);
 	client->auth_attempts++;
-
-	if (client->auth_attempts == CLIENT_MAX_AUTH_ATTEMPTS) {
-		nc_verb_error("Too many failed authentication attempts, dropping client '%s'", user);
-		client_remove(&ssh_state.clients, client);
-	}
 
 	return SSH_AUTH_DENIED;
 }
@@ -597,18 +597,16 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 	struct chan_struct* chan;
 
 	do {
-		/* GLBOAL LOCK */
-		pthread_mutex_lock(&ssh_state.global_lock);
+		/* GLOBAL READ LOCK */
+		pthread_rwlock_rdlock(&ssh_state.global_lock);
 
 		for (client = ssh_state.clients; client != NULL; client = client->next) {
-			/* CLIENT LOCK */
-			pthread_mutex_lock(&client->client_lock);
-
 			if (client->to_free) {
-				/* CLIENT UNLOCK */
-				pthread_mutex_unlock(&client->client_lock);
 				continue;
 			}
+
+			/* CLIENT LOCK */
+			pthread_mutex_lock(&client->client_lock);
 
 			for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
 				if (chan->to_free) {
@@ -753,7 +751,6 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 							break;
 						}
 
-						/* TODO remember the thread and terminate it if needed? */
 						pthread_t thread;
 						struct ntf_thread_config* ntf_config;
 
@@ -806,10 +803,10 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 			pthread_mutex_unlock(&client->client_lock);
 		}
 
-		/* GLOBAL UNLOCK */
-		pthread_mutex_unlock(&ssh_state.global_lock);
+		/* GLOBAL READ UNLOCK */
+		pthread_rwlock_unlock(&ssh_state.global_lock);
 
-		usleep(CLIENT_POLL_TIMEOUT*1000);
+		usleep(CLIENT_SLEEP_TIME*1000);
 	} while (!quit);
 
 	return NULL;
@@ -821,125 +818,152 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 	struct timeval cur_time;
 	struct timespec ts;
 	char* to_send;
-	int ret, to_send_size, to_send_len, some_data_sent;
+	int ret, to_send_size, to_send_len, skip_sleep = 0;
 
 	to_send_size = BASE_READ_BUFFER_SIZE;
 	to_send = malloc(to_send_size);
 
 	do {
-		/* poll the clients for events */
-		if (ssh_event_dopoll(ssh_state.ssh_evt, CLIENT_POLL_TIMEOUT) == SSH_ERROR) {
-			/* there may not be any session to poll yet */
-			usleep(CLIENT_POLL_TIMEOUT*1000);
-			continue;
-		}
+		/* GLOBAL READ LOCK */
+		pthread_rwlock_rdlock(&ssh_state.global_lock);
 
-		/* keep going until there are no pending data */
-		some_data_sent = 1;
-		while (some_data_sent) {
-			some_data_sent = 0;
-
-			/* go through all the clients */
-			for (cur_client = ssh_state.clients; cur_client != NULL; cur_client = cur_client->next) {
-				if (cur_client->to_free) {
-					clock_gettime(CLOCK_REALTIME, &ts);
-					ts.tv_nsec += CLIENT_REMOVAL_LOCK_TIMEOUT*1000000;
-					/* GLOBAL LOCK */
-					if ((ret = pthread_mutex_timedlock(&ssh_state.global_lock, &ts)) != 0) {
-						if (ret != ETIMEDOUT) {
-							nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
-						}
-						continue;
+		/* go through all the clients */
+		for (cur_client = ssh_state.clients; cur_client != NULL; cur_client = cur_client->next) {
+			/* check whether the client shouldn't be freed */
+			if (cur_client->to_free) {
+				clock_gettime(CLOCK_REALTIME, &ts);
+				ts.tv_nsec += CLIENT_REMOVAL_LOCK_TIMEOUT*1000000;
+				/* GLOBAL READ UNLOCK */
+				pthread_rwlock_unlock(&ssh_state.global_lock);
+				/* GLOBAL WRITE LOCK */
+				if ((ret = pthread_rwlock_timedwrlock(&ssh_state.global_lock, &ts)) != 0) {
+					if (ret != ETIMEDOUT) {
+						nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
 					}
-
-					client_remove(&ssh_state.clients, cur_client);
-					/* GLOBAL UNLOCK */
-					pthread_mutex_unlock(&ssh_state.global_lock);
-
-					/* restart the whole loop, we do not know what we actually removed */
-					some_data_sent = 1;
-					break;
+					/* GLOBAL READ LOCK */
+					pthread_rwlock_rdlock(&ssh_state.global_lock);
+					/* continue with the next client again holding the read lock */
+					continue;
 				}
 
-				/* check clients for authentication timeout */
-				if (!cur_client->authenticated) {
-					gettimeofday(&cur_time, NULL);
-					if (timeval_diff(cur_time, cur_client->conn_time) >= CLIENT_AUTH_TIMEOUT) {
-						nc_verb_error("Failed to authenticate for too long, dropping a client");
+				client_remove(&ssh_state.clients, cur_client);
+				/* GLOBAL WRITE UNLOCK */
+				pthread_rwlock_unlock(&ssh_state.global_lock);
+				/* GLOBAL READ LOCK */
+				pthread_rwlock_rdlock(&ssh_state.global_lock);
 
-						/* mark client for deletion */
-						/* CLIENT LOCK */
-						pthread_mutex_lock(&cur_client->client_lock);
-						ssh_event_remove_session(ssh_state.ssh_evt, cur_client->ssh_sess);
-						cur_client->to_free = 1;
-						/* CLIENT UNLOCK */
-						pthread_mutex_unlock(&cur_client->client_lock);
-						continue;
-					}
-				}
+				/* do not sleep, we may be exiting based on a signal received,
+				 * so remove all the clients without wasting time */
+				skip_sleep = 1;
 
-				/* check every channel for pending data */
-				for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
+				/* we do not know what we actually removed, maybe the last client, so quit the loop */
+				break;
+			}
 
-					to_send_len = 0;
-					while (1) {
-						to_send_len += (ret = read(cur_chan->chan_in[0], to_send+to_send_len, to_send_size-to_send_len));
-						if (ret == -1) {
-							break;
-						}
-
-						if (to_send_len == to_send_size) {
-							to_send_size *= 2;
-							to_send = realloc(to_send, to_send_size);
-						} else {
-							break;
-						}
-					}
-
-					if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-						continue;
-					} else if (ret == -1) {
-						nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-
-						/* CLIENT LOCK */
-						pthread_mutex_lock(&cur_client->client_lock);
-						ssh_event_remove_session(ssh_state.ssh_evt, cur_client->ssh_sess);
+			/* poll the client for SSH events, the callbacks are called accordingly */
+			if (ssh_event_dopoll(cur_client->ssh_evt, 0) == SSH_ERROR) {
+				nc_verb_warning("Failed to poll a client, it has probably disconnected.");
+				/* this invalid socket may have been reused and we would close
+				 * it during cleanup */
+				cur_client->sock = -1;
+				if (cur_client->ssh_chans != NULL) {
+					for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
 						cur_chan->to_free = 1;
-						/* CLIENT UNLOCK */
-						pthread_mutex_unlock(&cur_client->client_lock);
-					} else {
-						/* TODO libssh bug */
-						/* TODO probably channel locks are needed */
-						ssh_set_fd_towrite(cur_client->ssh_sess);
-						ssh_channel_write(cur_chan->ssh_chan, to_send, to_send_len);
-						some_data_sent = 1;
+					}
+				} else {
+					cur_client->to_free = 1;
+					continue;
+				}
+			}
+
+			/* check the client for authentication timeout and failed attempts */
+			if (!cur_client->authenticated) {
+				gettimeofday(&cur_time, NULL);
+				if (timeval_diff(cur_time, cur_client->conn_time) >= CLIENT_AUTH_TIMEOUT) {
+					nc_verb_warning("Failed to authenticate for too long, dropping a client.");
+
+					/* mark client for deletion */
+					cur_client->to_free = 1;
+					continue;
+				}
+
+				if (cur_client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+					nc_verb_warning("Reached the number of failed authentication attempts, dropping a client.");
+					cur_client->to_free = 1;
+					continue;
+				}
+			}
+
+			/* check every channel of the client for pending data */
+			for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
+
+				to_send_len = 0;
+				while (1) {
+					to_send_len += (ret = read(cur_chan->chan_in[0], to_send+to_send_len, to_send_size-to_send_len));
+					if (ret == -1) {
+						break;
 					}
 
-					/* free the channel here, if requested */
+					/* double the buffer size if too small */
+					if (to_send_len == to_send_size) {
+						to_send_size *= 2;
+						to_send = realloc(to_send, to_send_size);
+					} else {
+						break;
+					}
+				}
+
+				if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+					nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
+					cur_chan->to_free = 1;
+				} else if (ret != -1) {
+
+					/* we had some data, there may be more, sleeping may be a waste of response time */
+					skip_sleep = 1;
+
+					/* TODO libssh bug */
+					ssh_set_fd_towrite(cur_client->ssh_sess);
+					ssh_channel_write(cur_chan->ssh_chan, to_send, to_send_len);
+				}
+
+				/* free the channel here, if requested */
+				if (cur_chan->to_free) {
+
 					/* CLIENT LOCK */
 					pthread_mutex_lock(&cur_client->client_lock);
-					if (cur_chan->to_free) {
-						nc_session_free(cur_chan->nc_sess);
-						cur_chan->nc_sess = NULL;
 
-						/* make sure the channel iteration continues correctly */
-						cur_chan = client_free_channel(cur_client, cur_chan);
-						if (cur_chan == NULL) {
-							/* last channel removed, remove client */
-							if (cur_client->ssh_chans == NULL) {
-								ssh_event_remove_session(ssh_state.ssh_evt, cur_client->ssh_sess);
-								cur_client->to_free = 1;
-							}
+					/* again, don't sleep, we may have been asked to quit */
+					skip_sleep = 1;
+					nc_session_free(cur_chan->nc_sess);
+					cur_chan->nc_sess = NULL;
 
-							/* CLIENT UNLOCK */
-							pthread_mutex_unlock(&cur_client->client_lock);
-							break;
+					/* make sure the channel iteration continues correctly */
+					cur_chan = client_free_channel(cur_client, cur_chan);
+					if (cur_chan == NULL) {
+						/* last channel removed, remove client */
+						if (cur_client->ssh_chans == NULL) {
+							cur_client->to_free = 1;
 						}
+
+						/* CLIENT UNLOCK */
+						pthread_mutex_unlock(&cur_client->client_lock);
+						break;
 					}
+
 					/* CLIENT UNLOCK */
 					pthread_mutex_unlock(&cur_client->client_lock);
 				}
 			}
+		}
+
+		/* GLOBAL READ UNLOCK */
+		pthread_rwlock_unlock(&ssh_state.global_lock);
+
+		if (skip_sleep) {
+			skip_sleep = 0;
+		} else {
+			/* we did not do anything productive, so let the thread sleep */
+			usleep(CLIENT_SLEEP_TIME*1000);
 		}
 	} while (!quit || ssh_state.clients != NULL);
 
@@ -1116,14 +1140,8 @@ void ssh_listen_loop(int do_init) {
 	}
 
 	if (do_init) {
-		if ((ret = pthread_mutex_init(&ssh_state.global_lock, NULL)) != 0) {
+		if ((ret = pthread_rwlock_init(&ssh_state.global_lock, NULL)) != 0) {
 			nc_verb_error("%s: failed to init mutex (%s)", __func__, strerror(ret));
-			return;
-		}
-
-		ssh_state.ssh_evt = ssh_event_new();
-		if (ssh_state.ssh_evt == NULL) {
-			nc_verb_error("%s: could not create SSH polling context (%s:%d)", __func__, __FILE__, __LINE__);
 			return;
 		}
 
@@ -1174,33 +1192,42 @@ void ssh_listen_loop(int do_init) {
 			continue;
 		}
 
-		if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) != SSH_ERROR) {
-			gettimeofday((struct timeval*)&new_client->conn_time, NULL);
-
-			if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
-				nc_verb_error("%s: ssh error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
-				_client_free(new_client);
-				continue;
-			}
-
-			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
-			ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHODS);
-
-			if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
-				nc_verb_error("%s: mutex init: %s", __func__, strerror(ret));
-				_client_free(new_client);
-				continue;
-			}
-
-			/* add the client into the global ssh_clients structure */
-			/* TODO GLOBAL LOCK */
-			client_append(&ssh_state.clients, new_client);
-			ssh_event_add_session(ssh_state.ssh_evt, new_client->ssh_sess);
-		} else {
+		if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) == SSH_ERROR) {
 			nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
 			_client_free(new_client);
 			continue;
 		}
+
+		gettimeofday((struct timeval*)&new_client->conn_time, NULL);
+
+		if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
+			nc_verb_error("%s: ssh error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
+			_client_free(new_client);
+			continue;
+		}
+
+		ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
+		ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHODS);
+
+		if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
+			nc_verb_error("%s: failed to init mutex: %s", __func__, strerror(ret));
+			_client_free(new_client);
+			continue;
+		}
+
+		new_client->ssh_evt = ssh_event_new();
+		if (new_client->ssh_evt == NULL) {
+			nc_verb_error("%s: could not create SSH event (%s:%d)", __func__, __FILE__, __LINE__);
+			return;
+		}
+		ssh_event_add_session(new_client->ssh_evt, new_client->ssh_sess);
+
+		/* add the client into the global clients structure */
+		/* GLOBAL WRITE LOCK */
+		pthread_rwlock_wrlock(&ssh_state.global_lock);
+		client_append(&ssh_state.clients, new_client);
+		/* GLOBAL WRITE UNLOCK */
+		pthread_rwlock_unlock(&ssh_state.global_lock);
 	} while (!quit && !restart_soft);
 
 	/* Cleanup */
@@ -1219,8 +1246,8 @@ void ssh_listen_loop(int do_init) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
 
-		ssh_event_free(ssh_state.ssh_evt);
-
 		ssh_finalize();
+
+		pthread_rwlock_destroy(&ssh_state.global_lock);
 	}
 }
