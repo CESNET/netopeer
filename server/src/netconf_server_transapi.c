@@ -43,6 +43,12 @@
  * Do NOT alter function signatures or any structures unless you know exactly what you are doing.
  */
 
+#ifdef __GNUC__
+#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#	define UNUSED(x) UNUSED_ ## x
+#endif
+
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -63,31 +69,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <libssh/libssh.h>
-#include <libssh/callbacks.h>
-#include <libssh/server.h>
-
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
 
-#include "server_operations.h"
-
-#ifdef ENABLE_TLS
-#	include <libnetconf_tls.h>
-#endif
-
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
-#ifdef ENABLE_TLS
-#	define STUNNELPID_ENV "STUNNEL_PID"
-#	define STUNNELCAPATH_ENV "STUNNEL_CA_PATH"
-#	define CREHASH_ENV "C_REHASH_PATH"
-#endif
+#include "server_ssh.h"
 
 #define NETCONF_DEFAULT_PORT 830
 #define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
@@ -96,7 +82,6 @@
 
 struct ch_app {
 	char* name;
-	NC_TRANSPORT transport;
 	struct nc_mngmt_server* servers;
 	uint8_t start_server; /* 0 first-listed, 1 last-connected */
 	uint8_t rec_interval;       /* reconnect-strategy/interval-secs */
@@ -111,13 +96,6 @@ struct ch_app {
 static struct ch_app *callhome_apps = NULL;
 
 #endif
-
-struct bind_addr {
-	char* addr;
-	unsigned int* ports;
-	unsigned int port_count;
-	struct bind_addr* next;
-};
 
 void free_bind_addr(struct bind_addr** list) {
 	struct bind_addr* prev;
@@ -309,24 +287,6 @@ static char* get_nodes_content(xmlNodePtr old_node, xmlNodePtr new_node) {
 	return NULL;
 }
 
-#ifdef ENABLE_TLS
-
-static u_int16_t tlsd_pid = 0;
-static char *tlsd_listen = NULL;
-
-static void kill_tlsd(void)
-{
-	if (tlsd_pid != 0) {
-		kill(tlsd_pid, SIGTERM);
-		tlsd_pid = 0;
-		unsetenv(STUNNELPID_ENV);
-		unsetenv(STUNNELCAPATH_ENV);
-		unsetenv(CREHASH_ENV);
-	}
-}
-
-#endif /* ENABLE_TLS */
-
 xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **UNUSED(err)) {
 	/* model doesn't contain any status data */
 	return(NULL);
@@ -446,17 +406,9 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 	return EXIT_SUCCESS;
 }
 
-extern int binds_change;
-
-int callback_srv_netconf_srv_ssh_srv_listen(void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error)) {
-
-	return EXIT_SUCCESS;
-}
-
 #ifndef DISABLE_CALLHOME
 
-static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name)
-{
+static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name) {
 	xmlNodePtr child;
 
 	for (child = parent->children; child != NULL; child= child->next) {
@@ -472,14 +424,13 @@ static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name)
 }
 
 /* close() cleanup handler */
-static void clh_close(void* arg)
-{
+static void clh_close(void* arg) {
 	close(*((int*)(arg)));
 }
 
+/* each app has its own thread */
 __attribute__((noreturn))
-static void* app_loop(void* app_v)
-{
+static void* app_loop(void* app_v) {
 	struct ch_app *app = (struct ch_app*)app_v;
 	struct nc_mngmt_server *start_server = NULL;
 	int pid, sock;
@@ -487,15 +438,12 @@ static void* app_loop(void* app_v)
 	int timeout;
 	int sleep_flag;
 	struct epoll_event event_in, event_out;
-#ifdef ENABLE_TLS
-	char* const stunnel_argv[] = {TLSD_EXEC, CFG_DIR"/stunnel_config", NULL};
-#endif /* ENABLE_TLS */
 
 	/* TODO sigmask for the thread? */
 
 	nc_verb_verbose("Starting Call Home thread (%s).", app->name);
 
-	nc_session_transport(app->transport);
+	nc_session_transport(NC_TRANSPORT_SSH);
 
 	for (;;) {
 		pthread_testcancel();
@@ -511,24 +459,13 @@ static void* app_loop(void* app_v)
 
 		sock = -1;
 		pid = -1;
-		if (app->transport == NC_TRANSPORT_SSH) {
-			//pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
-#ifdef ENABLE_TLS
-		} else if (app->transport == NC_TRANSPORT_TLS) {
-			pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, stunnel_argv[0], stunnel_argv, &sock);
-#endif
-		}
+		//pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+
 		if (pid == -1) {
 			continue;
 		}
 		pthread_cleanup_push(clh_close, &sock);
-		if (app->transport == NC_TRANSPORT_SSH) {
-			//nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
-#ifdef ENABLE_TLS
-		} else if (app->transport == NC_TRANSPORT_TLS) {
-			nc_verb_verbose("Call Home transport server (%s) started (PID %d)", stunnel_argv[0], pid);
-#endif
-		}
+		//nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
 
 		/* check sock to get information about the connection */
 		/* we have to use epoll API since we need event (not the level) triggering */
@@ -589,14 +526,12 @@ static void* app_loop(void* app_v)
 	}
 }
 
-static int app_create(NC_TRANSPORT transport, xmlNodePtr node, struct nc_err** error)
-{
+static int app_create(xmlNodePtr node, struct nc_err** error) {
 	struct ch_app *new;
 	xmlNodePtr auxnode, servernode, childnode;
 	xmlChar *port, *host, *auxstr;
 
 	new = malloc(sizeof(struct ch_app));
-	new->transport = transport;
 
 	/* get name */
 	auxnode = find_node(node, BAD_CAST "name");
@@ -724,8 +659,7 @@ static int app_create(NC_TRANSPORT transport, xmlNodePtr node, struct nc_err** e
 	return (EXIT_SUCCESS);
 }
 
-static struct ch_app *app_get(const char* name, NC_TRANSPORT transport)
-{
+static struct ch_app* app_get(const char* name) {
 	struct ch_app *iter;
 
 	if (name == NULL) {
@@ -733,7 +667,7 @@ static struct ch_app *app_get(const char* name, NC_TRANSPORT transport)
 	}
 
 	for (iter = callhome_apps; iter != NULL; iter = iter->next) {
-		if (iter->transport == transport && strcmp(iter->name, name) == 0) {
+		if (strcmp(iter->name, name) == 0) {
 			break;
 		}
 	}
@@ -741,11 +675,10 @@ static struct ch_app *app_get(const char* name, NC_TRANSPORT transport)
 	return (iter);
 }
 
-static int app_rm(const char* name, NC_TRANSPORT transport)
-{
+static int app_rm(const char* name) {
 	struct ch_app* app;
 
-	if ((app = app_get(name, transport)) == NULL) {
+	if ((app = app_get(name)) == NULL) {
 		return (EXIT_FAILURE);
 	}
 
@@ -783,26 +716,25 @@ static int app_rm(const char* name, NC_TRANSPORT transport)
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
+int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 
 #ifndef DISABLE_CALLHOME
 	char* name;
 
 	switch (op) {
 	case XMLDIFF_ADD:
-		app_create(NC_TRANSPORT_SSH, new_node, error);
+		app_create(new_node, error);
 		break;
 	case XMLDIFF_REM:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, NC_TRANSPORT_SSH);
+		app_rm(name);
 		free(name);
 		break;
 	case XMLDIFF_MOD:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, NC_TRANSPORT_SSH);
+		app_rm(name);
 		free(name);
-		app_create(NC_TRANSPORT_SSH, new_node, error);
+		app_create(new_node, error);
 		break;
 	default:
 		;/* do nothing */
@@ -818,332 +750,6 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application 
 
 	return EXIT_SUCCESS;
 }
-
-#ifdef ENABLE_TLS
-
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:listen/srv:port changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen_oneport (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	char *port;
-
-	if (op != XMLDIFF_REM) {
-		port = (char*) xmlNodeGetContent(new_node);
-		nc_verb_verbose("%s: port %s", __func__, port);
-		if (asprintf(&tlsd_listen, "\n[netconf%s]\naccept = %s\nexec = %s\nexecargs = %s\npty = no\n",
-				port,
-				port,
-				BINDIR"/"AGENT,
-				AGENT) == -1) {
-			tlsd_listen = NULL;
-			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
-			return (EXIT_FAILURE);
-		}
-		free(port);
-	}
-
-	return (EXIT_SUCCESS);
-}
-
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:listen/srv:interface changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen_manyports (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	xmlNodePtr n;
-	char *addr = NULL, *port = NULL, *result = NULL;
-	static int counter = 0;
-	int ret = EXIT_SUCCESS;
-
-	if (tlsd_listen == NULL) {
-		counter = 0;
-	} else {
-		counter++;
-	}
-
-	if (op != XMLDIFF_REM) {
-		for (n = new_node->children; n != NULL && (addr == NULL || port == NULL); n = n->next) {
-			if (n->type != XML_ELEMENT_NODE) { continue; }
-			if (addr == NULL && xmlStrcmp(n->name, BAD_CAST "address") == 0) {
-				addr = (char*)xmlNodeGetContent(n);
-			} else if (port == NULL && xmlStrcmp(n->name, BAD_CAST "port") == 0) {
-				port = (char*)xmlNodeGetContent(n);
-			}
-		}
-		nc_verb_verbose("%s: addr %s, port %s", __func__, addr, port);
-		if (asprintf(&result, "%s\n[netconf%d]\naccept = %s:%s\nexec = %s\nexecargs = %s\npty = no\n",
-				(tlsd_listen == NULL) ? "" : tlsd_listen,
-				counter,
-				addr,
-				port,
-				BINDIR"/"AGENT,
-				AGENT) == -1) {
-			result = NULL;
-			nc_verb_error("asprintf() failed (%s at %s:%d).", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error");
-			ret = EXIT_FAILURE;
-		}
-		free(addr);
-		free(port);
-		free(tlsd_listen);
-		tlsd_listen = result;
-	}
-
-	return (ret);
-}
-
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:listen changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** error)
-{
-	int cfgfile, running_cfgfile, pidfd, cmdfd;
-	int pid, r;
-	char pidbuf[16], str[64], *buf, *ptr;
-	ssize_t str_len = 64;
-	struct stat stbuf;
-
-	if (op == XMLDIFF_REM) {
-		/* stop currently running stunnel */
-		kill_tlsd();
-		/* and exit */
-		return (EXIT_SUCCESS);
-	}
-
-	/*
-	 * settings were modified or created
-	 */
-
-	/* prepare stunnel_config */
-	if ((cfgfile = open(CFG_DIR"/stunnel_config", O_RDONLY)) == -1) {
-		nc_verb_error("Unable to open TLS server configuration template (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	if ((running_cfgfile = open(CFG_DIR"/stunnel_config.running", O_RDWR | O_TRUNC | O_CREAT, S_IRUSR)) == -1) {
-		nc_verb_error("Unable to prepare TLS server configuration (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	if (fstat(cfgfile, &stbuf) == -1) {
-		nc_verb_error("Unable to get info about TLS server configuration template file (%s)", strerror(errno));
-		goto err_return;
-	}
-	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
-		nc_verb_error("Duplicating TLS server configuration template failed (%s)", strerror(errno));
-		goto err_return;
-	}
-
-	/* append listening settings */
-	dprintf(running_cfgfile, "%s", tlsd_listen);
-	free(tlsd_listen);
-	tlsd_listen = NULL;
-
-	/* having the configuration file open, export CApath for cfgsystem */
-	r = 0;
-	lseek(running_cfgfile, 0, SEEK_SET);
-	if ((buf = malloc(stbuf.st_size)) != NULL) {
-		if (read(running_cfgfile, buf, stbuf.st_size) == stbuf.st_size && (ptr = strstr(buf, "CApath")) != NULL) {
-			if (ptr - buf == 0 || *(ptr-1) == '\n') {
-				ptr += 6;
-				/* get to the actual path */
-				while (*ptr == ' ' || *ptr == '=') {
-					++ptr;
-				}
-
-				/* create fake separate path */
-				*strchr(ptr, '\n') = '\0';
-				setenv(STUNNELCAPATH_ENV, ptr, 1);
-			} else {
-				r = 1;
-			}
-		} else {
-			r = 1;
-		}
-		free(buf);
-	} else {
-		r = 1;
-	}
-	if (r) {
-		nc_verb_verbose("Failed to export stunnel CApath for cfgsystem module.");
-	}
-
-	/* close config files */
-	close(running_cfgfile);
-	close(cfgfile);
-
-	if (tlsd_pid != 0) {
-		/* tell stunnel to reconfigure */
-		kill(tlsd_pid, SIGHUP);
-		/* give him some time to restart */
-		usleep(500000);
-	} else {
-		/* remove possible leftover pid file and kill it, if it really is stunnel process */
-		if (access(CFG_DIR"/stunnel/stunnel.pid", F_OK) == 0) {
-			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) != -1) {
-				if ((r = read(pidfd, pidbuf, sizeof(pidbuf))) != -1 && r <= (int)sizeof(pidbuf)) {
-					pidbuf[r] = '\0';
-					if (pidbuf[strlen(pidbuf)-1] == '\n') {
-						pidbuf[strlen(pidbuf)-1] = '\0';
-					}
-
-					sprintf(str, "/proc/%s/cmdline", pidbuf);
-					if ((tlsd_pid = atoi(pidbuf)) != 0 && (cmdfd = open(str, O_RDONLY)) != -1) {
-						if ((str_len = read(cmdfd, &str, str_len-1)) != -1) {
-							str[str_len] = '\0';
-							if (strstr(str, "stunnel") != NULL) {
-								kill(tlsd_pid, SIGTERM);
-							}
-						}
-						close(cmdfd);
-					}
-					tlsd_pid = 0;
-				}
-				close(pidfd);
-			}
-			remove(CFG_DIR"/stunnel/stunnel.pid");
-		}
-
-		/* start stunnel */
-		pid = fork();
-		if (pid < 0) {
-			nc_verb_error("fork() for TLS server failed (%s)", strerror(errno));
-			goto err_return;
-		} else if (pid == 0) {
-			/* child */
-			execl(TLSD_EXEC, TLSD_EXEC, CFG_DIR"/stunnel_config.running", NULL);
-
-			/* wtf ?!? */
-			nc_verb_error("Starting \"%s\" failed (%s).", TLSD_EXEC, strerror(errno));
-			exit(1);
-		} else {
-			/*
-			 * stunnel daemonize killing itself, so we have to get its real PID
-			 * from the PID file, not from the fork()
-			 */
-			waitpid(pid, NULL, 0);
-			usleep(500000);
-
-			if ((pidfd = open(CFG_DIR"/stunnel/stunnel.pid", O_RDONLY)) < 0 || (r = read(pidfd, pidbuf, sizeof(pidbuf))) < 0) {
-				nc_verb_error("Unable to get stunnel's PID from %s (%s)", CFG_DIR"/stunnel/stunnel.pid", strerror(errno));
-				nc_verb_warning("stunnel not started or it is out of control");
-				goto err_return;
-			}
-
-			if (r > (int) sizeof(pidbuf)) {
-				nc_verb_error("Content of the %s is too big.", CFG_DIR"/stunnel/stunnel.pid");
-				goto err_return;
-			}
-			pidbuf[r] = 0;
-			tlsd_pid = atoi(pidbuf);
-			nc_verb_verbose("TLS server (%s) started (PID %d)", TLSD_EXEC, tlsd_pid);
-
-			/* export stunnel PID and c_rehash path for cfgsystem module */
-			setenv(STUNNELPID_ENV, pidbuf, 1);
-			setenv(CREHASH_ENV, C_REHASH, 1);
-		}
-	}
-	return EXIT_SUCCESS;
-
-err_return:
-
-	*error = nc_err_new(NC_ERR_OP_FAILED);
-	nc_err_set(*error, NC_ERR_PARAM_MSG, "ietf-netconf-server module internal error - unable to start TLS server.");
-	return (EXIT_FAILURE);
-}
-
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	char* name;
-
-	/* TODO
-	 * Somehow use environment variables to informa netopeer-agent that it is
-	 * started for NETCONF over TLS. I next step, netopeer-agent will probably
-	 * also need information about certificates and their mapping to usernames.
-	 *
-	 * Just now, netopeer-agent, started by stunnel, is totally blind, and
-	 * starts NETCONF session with username of stunnel's UID (probably root).
-	 */
-
-	switch (op) {
-	case XMLDIFF_ADD:
-		app_create(NC_TRANSPORT_TLS, new_node, error);
-		break;
-	case XMLDIFF_REM:
-		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, NC_TRANSPORT_TLS);
-		free(name);
-		break;
-	case XMLDIFF_MOD:
-		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, NC_TRANSPORT_TLS);
-		free(name);
-		app_create(NC_TRANSPORT_TLS, new_node, error);
-		break;
-	default:
-		;/* do nothing */
-	}
-	return EXIT_SUCCESS;
-}
-
-#if 0
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:cert-maps changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_cert_maps (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
-{
-	return EXIT_SUCCESS;
-}
-#endif
-
-#endif /* ENABLE_TLS */
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
@@ -1162,8 +768,7 @@ int callback_srv_netconf_srv_tls_srv_cert_maps (void ** UNUSED(data), XMLDIFF_OP
 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int server_transapi_init(xmlDocPtr * UNUSED(running))
-{
+int server_transapi_init(xmlDocPtr * UNUSED(running)) {
 	xmlDocPtr doc;
 	struct nc_err* error = NULL;
 	const char* str_err;
@@ -1241,13 +846,7 @@ int server_transapi_init(xmlDocPtr * UNUSED(running))
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void server_transapi_close(void)
-{
-
-#ifdef ENABLE_TLS
-	kill_tlsd();
-#endif
-
+void server_transapi_close(void) {
 	return;
 }
 
@@ -1257,25 +856,11 @@ void server_transapi_close(void)
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks server_clbks =  {
-#ifdef ENABLE_TLS
-	.callbacks_count = 8, /* WARNING - change to 9 with cert-maps callback !!! */
-#else
-	.callbacks_count = 4,
-#endif
+	.callbacks_count = 3,
 	.data = NULL,
 	.callbacks = {
-#ifdef ENABLE_TLS
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_oneport},
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_manyports},
-		{.path = "/srv:netconf/srv:tls/srv:listen", .func = callback_srv_netconf_srv_tls_srv_listen},
-		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
-#if 0
-		{.path = "/srv:netconf/srv:tls/srv:cert-maps", .func = callback_srv_netconf_srv_tls_srv_cert_maps},
-#endif
-#endif /* ENABLE_TLS */
 		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = callback_srv_netconf_srv_ssh_srv_listen_oneport},
 		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = callback_srv_netconf_srv_ssh_srv_listen_manyports},
-		{.path = "/srv:netconf/srv:ssh/srv:listen", .func = callback_srv_netconf_srv_ssh_srv_listen},
 		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application},
 	}
 };

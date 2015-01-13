@@ -1,43 +1,6 @@
-/**
- * \file netopeer_dbus.h
- * \author Michal Vaško <mvasko@cesnet.cz>
- * \brief Netopeer's DBus communication macros.
- *
- * Copyright (C) 2014 CESNET, z.s.p.o.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name of the Company nor the names of its contributors
- *    may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * ALTERNATIVELY, provided that this notice is retained in full, this
- * product may be distributed under the terms of the GNU General Public
- * License (GPL) version 2 or later, in which case the provisions
- * of the GPL apply INSTEAD OF those given above.
- *
- * This software is provided ``as is, and any express or implied
- * warranties, including, but not limited to, the implied warranties of
- * merchantability and fitness for a particular purpose are disclaimed.
- * In no event shall the company or contributors be liable for any
- * direct, indirect, incidental, special, exemplary, or consequential
- * damages (including, but not limited to, procurement of substitute
- * goods or services; loss of use, data, or profits; or business
- * interruption) however caused and on any theory of liability, whether
- * in contract, strict liability, or tort (including negligence or
- * otherwise) arising in any way out of the use of this software, even
- * if advised of the possibility of such damage.
- *
- */
-
 #define _GNU_SOURCE
+#define _XOPEN_SOURCE
+
 #include <libnetconf_xml.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -59,97 +22,22 @@
 #include <netinet/in.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <shadow.h>
+#include <pwd.h>
 
 #include <libssh/libssh.h>
 #include <libssh/callbacks.h>
 #include <libssh/server.h>
 
-#include "comm.h"
+#include "server_ssh.h"
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
+extern int quit, restart_soft;
 
-#define KEYS_DIR "/etc/ssh/"
-/* SSH_AUTH_METHOD_UNKNOWN SSH_AUTH_METHOD_NONE SSH_AUTH_METHOD_PASSWORD SSH_AUTH_METHOD_PUBLICKEY SSH_AUTH_METHOD_HOSTBASED SSH_AUTH_METHOD_INTERACTIVE SSH_AUTH_METHOD_GSSAPI_MIC */
-#define SSH_AUTH_METHODS (SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY)
-
-#define CLIENT_MAX_AUTH_ATTEMPTS 3
-/* time for the users to authenticate themselves, in seconds */
-#define CLIENT_AUTH_TIMEOUT 10
-
-/* time in msec the threads are going to rest for (maximum response time) */
-#define CLIENT_SLEEP_TIME 50
-
-/* time in msec the data thread can additionally wait, in order to remove an invalid client */
-#define CLIENT_REMOVAL_LOCK_TIMEOUT 10
-
-#define BASE_READ_BUFFER_SIZE 2048
-
-#define NC_V10_END_MSG "]]>]]>"
-#define NC_V11_END_MSG "\n##\n"
-#define NC_MAX_END_MSG_LEN 6
-
-struct ntf_thread_config {
-	struct nc_session* session;
-	nc_rpc* subscribe_rpc;
-};
-
-struct bind_addr {
-	char* addr;
-	unsigned int* ports;
-	unsigned int port_count;
-	struct bind_addr* next;
-};
-
-/* for each SSH channel of each SSH session */
-struct chan_struct {
-	ssh_channel ssh_chan;
-	int chan_in[2];				// pipe - libssh channel read, libnetconf write
-	int chan_out[2];			// pipe - libssh channel write, libnetconf read
-	int netconf_subsystem;
-	struct nc_session* nc_sess;
-	volatile int to_free;		// is this channel valid?
-	struct chan_struct* next;
-};
-
-/* for each client */
-struct client_struct {
-	/*
-	 * when accessing or adding/removing ssh_chans
-	 */
-	pthread_mutex_t client_lock;
-	int sock;
-	struct sockaddr_storage saddr;
-	volatile struct timeval conn_time;	// timestamp of the new connection
-	int auth_attempts;					// number of failed auth attempts
-	volatile int authenticated;			// is the user authenticated?
-	char* username;						// the SSH username
-	struct chan_struct* ssh_chans;
-	ssh_session ssh_sess;
-	ssh_event ssh_evt;
-	volatile int to_free;
-	struct client_struct* next;
-};
-
-/* one global structure */
-struct state_struct {
-	pthread_t ssh_data_tid;
-	pthread_t netconf_rpc_tid;
-	/*
-	 * READ - when accessing clients
-	 * WRITE - when adding/removing clients
-	 */
-	pthread_rwlock_t global_lock;
-	struct client_struct* clients;
-};
-
+/* one global structure holding all the client information */
 struct state_struct ssh_state;
 
+/* TODO concurrent access */
 extern struct bind_addr* ssh_binds;
-extern int quit, restart_soft;
 
 static inline void _chan_free(struct chan_struct* chan) {
 	if (chan->nc_sess != NULL) {
@@ -471,8 +359,68 @@ static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, con
 	return SSH_OK;
 }
 
+static char* auth_password_get_pwd_hash(const char* username) {
+	struct passwd* pwd;
+	struct spwd* spwd;
+	char* pass_hash = NULL;
+
+	pwd = getpwnam(username);
+	if (pwd == NULL) {
+		nc_verb_verbose("User '%s' not found locally.", username);
+		return NULL;
+	}
+
+	if (strcmp(pwd->pw_passwd, "x") == 0) {
+		spwd = getspnam(username);
+		if (spwd == NULL) {
+			nc_verb_verbose("Failed to retrieve the shadow entry for '%s'.", username);
+			return NULL;
+		}
+
+		pass_hash = spwd->sp_pwdp;
+	} else {
+		pass_hash = pwd->pw_passwd;
+	}
+
+	if (pass_hash == NULL) {
+		nc_verb_error("%s: no password could be retrieved for '%s'", __func__, username);
+		return NULL;
+	}
+
+	/* check the hash structure for special meaning */
+	if (strcmp(pass_hash, "*") == 0 || strcmp(pass_hash, "!") == 0) {
+		nc_verb_verbose("User '%s' is not allowed to authenticate using a password.", username);
+		return NULL;
+	}
+	if (strcmp(pass_hash, "*NP*") == 0) {
+		nc_verb_verbose("Retrieving password for '%s' from a NIS+ server not supported.", username);
+		return NULL;
+	}
+
+	return pass_hash;
+}
+
+static int auth_password_compare_pwd(const char* pass_hash, const char* pass_clear) {
+	char* new_pass_hash;
+
+	if (strcmp(pass_hash, "") == 0) {
+		if (strcmp(pass_clear, "") == 0) {
+			nc_verb_verbose("User authentication successful with an empty password!");
+			return 0;
+		} else {
+			/* the user did now know he does not need any password,
+			 * (which should not be used) so deny authentication */
+			return 1;
+		}
+	}
+
+	new_pass_hash = crypt(pass_clear, pass_hash);
+	return strcmp(new_pass_hash, pass_hash);
+}
+
 static int sshcb_auth_password(ssh_session session, const char* user, const char* pass, void* UNUSED(userdata)) {
 	struct client_struct* client;
+	char* pass_hash;
 
 	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
@@ -484,18 +432,19 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	}
 
 	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested password authentication", client->username);
+		nc_verb_warning("User '%s' authenticated, but requested password authentication.", client->username);
 		return SSH_AUTH_DENIED;
 	}
 
-	if (strcmp("", pass) != 0) {
+	pass_hash = auth_password_get_pwd_hash(user);
+	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, pass) == 0) {
 		client->username = strdup(user);
 		client->authenticated = 1;
 		nc_verb_verbose("User '%s' authenticated", user);
 		return SSH_AUTH_SUCCESS;
 	}
 
-	nc_verb_verbose("Failed user '%s' authentication attempt", user);
+	nc_verb_verbose("Failed user '%s' authentication attempt.", user);
 	client->auth_attempts++;
 
 	return SSH_AUTH_DENIED;
@@ -503,9 +452,25 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 
 static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* pubkey, char signature_state, void* UNUSED(userdata)) {
 	struct client_struct* client;
+	ssh_key pkey;
 
 	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		/* just accepting the use of a particular (pubkey) key */
+		if (ssh_pki_import_pubkey_file(PUBKEY_FILE, &pkey) != SSH_OK) {
+			nc_verb_verbose("%s: failed to import a public key", __func__);
+			return SSH_AUTH_DENIED;
+		}
+
+		if (ssh_key_cmp(pubkey, pkey, SSH_KEY_CMP_PUBLIC) != 0) {
+			nc_verb_verbose("User '%s' tried to use an unknown public key.", user);
+			return SSH_AUTH_DENIED;
+		}
+
+		if (strcmp(user, PUBKEY_USER) != 0) {
+			nc_verb_verbose("User '%s' not the owner of the presented public key.", user);
+			return SSH_AUTH_DENIED;
+		}
+
+		/* accepting only the use of a public key */
 		return SSH_AUTH_SUCCESS;
 	}
 
@@ -1156,6 +1121,7 @@ void ssh_listen_loop(int do_init) {
 
 		ssh_threads_set_callbacks(ssh_threads_get_pthread());
 		ssh_init();
+		ssh_set_log_level(3);
 		ssh_callbacks_init(&ssh_server_cb);
 		ssh_callbacks_init(&ssh_channel_cb);
 	}

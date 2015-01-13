@@ -36,6 +36,7 @@
  */
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -50,34 +51,49 @@
 
 #include <libnetconf_xml.h>
 
-#include "common.c"
-#include "comm.h"
-#include "server_operations.h"
+#include "cfgnetopeer_transapi.h"
+#include "server_ssh.h"
 
-/* flag of main loop, it is turned when a signal comes */
+/* flags of main server loop, they are turned when a signal comes */
 volatile int quit = 0, restart_soft = 0, restart_hard = 0;
 
-int server_start = 0;
+volatile int server_start = 0;
 
-/**
- * \brief Print program version
- *
- * \return              none
- */
-static void print_version (char *progname)
-{
+void clb_print(NC_VERB_LEVEL level, const char* msg) {
+	switch (level) {
+	case NC_VERB_ERROR:
+		syslog(LOG_ERR, "%s", msg);
+		break;
+	case NC_VERB_WARNING:
+		syslog(LOG_WARNING, "%s", msg);
+		break;
+	case NC_VERB_VERBOSE:
+		syslog(LOG_INFO, "%s", msg);
+		break;
+	case NC_VERB_DEBUG:
+		syslog(LOG_DEBUG, "%s", msg);
+		break;
+	}
+}
+
+void print_debug(const char * format, ...) {
+#define MAX_DEBUG_LEN 4096
+	char msg[MAX_DEBUG_LEN];
+	va_list ap;
+
+	va_start(ap, format);
+	vsnprintf(msg, MAX_DEBUG_LEN, format, ap);
+	va_end(ap);
+
+	clb_print(NC_VERB_DEBUG, msg);
+}
+
+static void print_version (char *progname) {
 	fprintf (stdout, "%s version: %s\n", progname, VERSION);
 	exit (0);
 }
 
-/**
- * \brief Print usage help
- * prints usage help. Used when -h parameter found
- *
- * \return               none
- */
-static void print_usage (char * progname)
-{
+static void print_usage (char * progname) {
 	fprintf (stdout, "Usage: %s [-dhV] [-v level]\n", progname);
 	fprintf (stdout, " -d                  daemonize server\n");
 	fprintf (stdout, " -h                  display help\n");
@@ -95,9 +111,7 @@ static void print_usage (char * progname)
  *
  * \param sig 	signal number
  */
-void signal_handler (int sig)
-{
-//	nc_verb_verbose("Signal %d received.", sig);
+void signal_handler (int sig) {
 
 	switch (sig) {
 	case SIGINT:
@@ -109,7 +123,6 @@ void signal_handler (int sig)
 			quit = 1;
 		} else {
 			/* second attempt */
-//			nc_verb_error("Hey! I need some time to stop, be patient next time!");
 			exit(EXIT_FAILURE);
 		}
 		break;
@@ -118,7 +131,6 @@ void signal_handler (int sig)
 		restart_soft = 1;
 		break;
 	default:
-//		nc_verb_error("exiting on signal: %d", sig);
 		exit(EXIT_FAILURE);
 		break;
 	}

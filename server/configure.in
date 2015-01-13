@@ -298,6 +298,9 @@ REQS="$REQS libxml2"
 AC_SEARCH_LIBS([ssh_init], [ssh], [], [AC_MSG_ERROR([Missing the libssh library.])])
 AC_SEARCH_LIBS([ssh_threads_get_pthread], [ssh_threads], [], [AC_MSG_ERROR([Missing the libssh_threads library.])])
 
+# crypt
+AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the crypt library.])])
+
 # libnetconf
 AC_SEARCH_LIBS([nc_callhome_listen], [netconf],
 	[],

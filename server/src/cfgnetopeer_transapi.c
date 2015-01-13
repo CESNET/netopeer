@@ -1,5 +1,5 @@
 /**
- * \file cfgnetopeer-transapi.c
+ * \file cfgnetopeer_transapi.c
  * \author David Kupka <xkupka01@stud.fit.vutbr.cz>
  * @brief NETCONF device module to configure netconf server
  *
@@ -49,13 +49,8 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 #include <string.h>
-#include "server_operations.h"
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
+#include "cfgnetopeer_transapi.h"
 
 #ifndef MODULES_CFG_DIR
 #	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
@@ -63,7 +58,7 @@
 
 #define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
 
-/* from server.c */
+extern int quit, restart_soft, restart_hard;
 extern int server_start;
 
 /* transAPI version which must be compatible with libnetconf */
@@ -86,15 +81,12 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
-static struct module * modules = NULL;
-
-extern int quit, restart_soft, restart_hard;
+static struct module* modules = NULL;
 
 extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
 
-void module_free(struct module * module)
-{
+void module_free(struct module * module) {
 	if (module->ds) {
 		module_disable(module, 1);
 	} else {
