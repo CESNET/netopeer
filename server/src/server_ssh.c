@@ -33,6 +33,9 @@
 
 extern int quit, restart_soft;
 
+extern int callhome_check;
+extern struct client_struct* callhome_client;
+
 /* one global structure holding all the client information */
 struct state_struct ssh_state;
 
@@ -440,7 +443,7 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, pass) == 0) {
 		client->username = strdup(user);
 		client->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated", user);
+		nc_verb_verbose("User '%s' authenticated.", user);
 		return SSH_AUTH_SUCCESS;
 	}
 
@@ -484,18 +487,18 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 	}
 
 	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication", client->username);
+		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication.", client->username);
 		return SSH_AUTH_DENIED;
 	}
 
 	if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
 		client->username = strdup(user);
 		client->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated", user);
+		nc_verb_verbose("User '%s' authenticated.", user);
 		return SSH_AUTH_SUCCESS;
 	}
 
-	nc_verb_verbose("Failed user '%s' authentication attempt", user);
+	nc_verb_verbose("Failed user '%s' authentication attempt.", user);
 	client->auth_attempts++;
 
 	return SSH_AUTH_DENIED;
@@ -1042,17 +1045,15 @@ static struct client_struct* sock_accept(struct pollfd* pollsock, unsigned int p
 
 	/* poll for a new connection */
 	errno = 0;
-	do {
-		r = poll(pollsock, pollsock_count, -1);
-		if (r == -1 && errno == EINTR) {
-			/* we are likely going to exit or restart */
-			return NULL;
-		}
-		if (r == -1) {
-			nc_verb_error("%s: poll failed (%s), trying again", __func__, strerror(errno));
-			continue;
-		}
-	} while (r == 0);
+	r = poll(pollsock, pollsock_count, CLIENT_SLEEP_TIME);
+	if (r == 0 || (r == -1 && errno == EINTR)) {
+		/* we either timeouted or going to exit or restart */
+		return NULL;
+	}
+	if (r == -1) {
+		nc_verb_error("%s: poll failed (%s)", __func__, strerror(errno));
+		return NULL;
+	}
 
 	ret = calloc(1, sizeof(struct client_struct));
 	client_saddr_len = sizeof(struct sockaddr_storage);
@@ -1139,61 +1140,71 @@ void ssh_listen_loop(int do_init) {
 
 	/* Main accept loop */
 	do {
-		new_client = sock_accept(pollsock, pollsock_count);
+		new_client = NULL;
+
+		/* Callhome client check */
+		if (callhome_check == 1 && callhome_client != NULL) {
+			new_client = callhome_client;
+			callhome_client = NULL;
+			callhome_check = 0;
+		}
+
+		/* Listen client check */
 		if (new_client == NULL) {
-			if (quit || restart_soft) {
-				/* signal received wanting us to exit or restart */
-				break;
-			} else {
-				/* quite weird, but let it slide */
-				nc_verb_verbose("%s: sock_accept returned NULL, should not happen", __func__);
+			new_client = sock_accept(pollsock, pollsock_count);
+		}
+
+		/* New client SSH session creation */
+		if (new_client != NULL) {
+			new_client->ssh_sess = ssh_new();
+			if (new_client->ssh_sess == NULL) {
+				nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
+				new_client->to_free = 1;
+				_client_free(new_client);
 				continue;
 			}
+
+			if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) == SSH_ERROR) {
+				nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+
+			gettimeofday((struct timeval*)&new_client->conn_time, NULL);
+
+			if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
+				nc_verb_error("%s: SSH key exchange error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+
+			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
+			ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHODS);
+
+			if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
+				nc_verb_error("%s: failed to init mutex: %s", __func__, strerror(ret));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+
+			new_client->ssh_evt = ssh_event_new();
+			if (new_client->ssh_evt == NULL) {
+				nc_verb_error("%s: could not create SSH event (%s:%d)", __func__, __FILE__, __LINE__);
+				return;
+			}
+			ssh_event_add_session(new_client->ssh_evt, new_client->ssh_sess);
+
+			/* add the client into the global clients structure */
+			/* GLOBAL WRITE LOCK */
+			pthread_rwlock_wrlock(&ssh_state.global_lock);
+			client_append(&ssh_state.clients, new_client);
+			/* GLOBAL WRITE UNLOCK */
+			pthread_rwlock_unlock(&ssh_state.global_lock);
 		}
 
-		new_client->ssh_sess = ssh_new();
-		if (new_client->ssh_sess == NULL) {
-			nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
-			_client_free(new_client);
-			continue;
-		}
-
-		if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) == SSH_ERROR) {
-			nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
-			_client_free(new_client);
-			continue;
-		}
-
-		gettimeofday((struct timeval*)&new_client->conn_time, NULL);
-
-		if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
-			nc_verb_error("%s: ssh error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
-			_client_free(new_client);
-			continue;
-		}
-
-		ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
-		ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHODS);
-
-		if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
-			nc_verb_error("%s: failed to init mutex: %s", __func__, strerror(ret));
-			_client_free(new_client);
-			continue;
-		}
-
-		new_client->ssh_evt = ssh_event_new();
-		if (new_client->ssh_evt == NULL) {
-			nc_verb_error("%s: could not create SSH event (%s:%d)", __func__, __FILE__, __LINE__);
-			return;
-		}
-		ssh_event_add_session(new_client->ssh_evt, new_client->ssh_sess);
-
-		/* add the client into the global clients structure */
-		/* GLOBAL WRITE LOCK */
-		pthread_rwlock_wrlock(&ssh_state.global_lock);
-		client_append(&ssh_state.clients, new_client);
-		/* GLOBAL WRITE UNLOCK */
-		pthread_rwlock_unlock(&ssh_state.global_lock);
 	} while (!quit && !restart_soft);
 
 	/* Cleanup */

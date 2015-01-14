@@ -82,7 +82,13 @@
 
 struct ch_app {
 	char* name;
-	struct nc_mngmt_server* servers;
+	struct ch_server {
+		char* address;
+		uint16_t port;
+		volatile uint8_t active;
+		struct ch_server* next;
+		struct ch_server* prev;
+	} *servers;
 	uint8_t start_server; /* 0 first-listed, 1 last-connected */
 	uint8_t rec_interval;       /* reconnect-strategy/interval-secs */
 	uint8_t rec_count;          /* reconnect-strategy/count-max */
@@ -428,12 +434,84 @@ static void clh_close(void* arg) {
 	close(*((int*)(arg)));
 }
 
+static struct client_struct* sock_connect(const char* address, uint16_t port) {
+	struct client_struct* ret;
+	int is_ipv4;
+
+	struct sockaddr_in* saddr4;
+	struct sockaddr_in6* saddr6;
+
+	ret = calloc(1, sizeof(struct client_struct));
+	ret->sock = -1;
+
+	if (strchr(address, ':') != NULL) {
+		is_ipv4 = 0;
+	} else {
+		is_ipv4 = 1;
+	}
+
+	if ((ret->sock = socket((is_ipv4 ? AF_INET : AF_INET6), SOCK_STREAM, IPPROTO_TCP)) == -1) {
+		nc_verb_error("%s: creating socket failed (%s)", __func__, strerror(errno));
+		goto fail;
+	}
+
+	if (is_ipv4) {
+		saddr4 = (struct sockaddr_in*)&ret->saddr;
+
+		saddr4->sin_family = AF_INET;
+		saddr4->sin_port = htons(port);
+
+		if (inet_pton(AF_INET, address, &saddr4->sin_addr) != 1) {
+			nc_verb_error("%s: failed to convert IPv4 address \"%s\"", __func__, address);
+			goto fail;
+		}
+
+		if (connect(ret->sock, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
+			nc_verb_error("Call Home: could not connect to %s:%u (%s)", address, port, strerror(errno));
+			goto fail;
+		}
+
+	} else {
+		saddr6 = (struct sockaddr_in6*)&ret->saddr;
+
+		saddr6->sin6_family = AF_INET6;
+		saddr6->sin6_port = htons(port);
+
+		if (inet_pton(AF_INET6, address, &saddr6->sin6_addr) != 1) {
+			nc_verb_error("%s: failed to convert IPv6 address \"%s\"", __func__, address);
+			goto fail;
+		}
+
+		if (connect(ret->sock, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
+			nc_verb_error("Call Home: could not connect %s:%u (%s)",address, port, strerror(errno));
+			goto fail;
+		}
+	}
+
+	nc_verb_verbose("Call Home: connected to %s:%u", address, port);
+	return ret;
+
+fail:
+	free(ret);
+	return NULL;
+}
+
+/* --!!-- used as a pseudo lock --!!--
+ *
+ * The only inaccessible state is:
+ *		callhome_check == 0
+ *		callhome_client != NULL
+ */
+volatile int callhome_check = 0;
+volatile struct client_struct* callhome_client = NULL;
+
 /* each app has its own thread */
 __attribute__((noreturn))
 static void* app_loop(void* app_v) {
-	struct ch_app *app = (struct ch_app*)app_v;
-	struct nc_mngmt_server *start_server = NULL;
-	int pid, sock;
+	struct ch_app* app = (struct ch_app*)app_v;
+	struct ch_server *cur_server = NULL;
+	struct client_struct* new_client;
+	int i;
 	int efd, e;
 	int timeout;
 	int sleep_flag;
@@ -449,23 +527,47 @@ static void* app_loop(void* app_v) {
 		pthread_testcancel();
 
 		/* get last connected server if any */
-		if ((start_server = nc_callhome_mngmt_server_getactive(app->servers)) == NULL) {
+		for (cur_server = app->servers; cur_server != NULL && cur_server->active == 0; cur_server = cur_server->next);
+		if (cur_server == NULL) {
 			/*
 			 * first-listed start-with's value is set in config or this is the
 			 * first attempt to connect, so use the first listed server spec
 			 */
-			start_server = app->servers;
+			cur_server = app->servers;
+		} else {
+			/* remove active flag */
+			cur_server->active = 0;
 		}
 
-		sock = -1;
-		pid = -1;
-		//pid = nc_callhome_connect(start_server, app->rec_interval, app->rec_count, sshd_argv[0], sshd_argv, &sock);
+		/* try to connect to a server indefinitely */
+		for (;;) {
+			for (i = 0; i < app->rec_count; ++i) {
+				if ((new_client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
+					break;
+				}
+				sleep(app->rec_interval);
+			}
 
-		if (pid == -1) {
-			continue;
+			if (new_client != NULL) {
+				break;
+			}
+
+			cur_server = cur_server->next;
+			if (cur_server == NULL) {
+				cur_server = app->servers;
+			}
 		}
-		pthread_cleanup_push(clh_close, &sock);
-		//nc_verb_verbose("Call Home transport server (%s) started (PID %d)", sshd_argv[0], pid);
+
+publish_client:
+		/* publish the new client for the main application loop to create a new SSH session */
+		if (callhome_check == 1) {
+			/* there is a new client not yet processed, wait our turn */
+			usleep(CLIENT_SLEEP_TIME*1000);
+			goto publish_client;
+		}
+		callhome_check = 1;
+		callhome_client = new_client;
+		cur_server->active = 1;
 
 		/* check sock to get information about the connection */
 		/* we have to use epoll API since we need event (not the level) triggering */
@@ -482,13 +584,19 @@ static void* app_loop(void* app_v) {
 			event_in.events = EPOLLET | EPOLLRDHUP;
 			timeout = -1; /* indefinite timeout */
 		}
-		event_in.data.fd = sock;
-		epoll_ctl(efd, EPOLL_CTL_ADD, sock, &event_in);
+		/* we do not need to close this socket,
+		 * the main thread will take care of
+		 * the whole client cleanup
+		 */
+		event_in.data.fd = new_client->sock;
+		epoll_ctl(efd, EPOLL_CTL_ADD, new_client->sock, &event_in);
 
 		for (;;) {
 			e = epoll_wait(efd, &event_out, 1, timeout);
 			if (e == 0 && app->connection) {
-				nc_verb_verbose("Call Home (app %s) timeouted. Killing process %d.", app->name, pid);
+				new_client->to_free = 1;
+				nc_verb_verbose("Call Home (app %s) timeout expired.", app->name);
+				nc_verb_verbose("%s: test: %p, chans %p", new_client, new_client->ssh_chans);
 				sleep_flag = 1;
 				break;
 			} else if (e == -1) {
@@ -504,6 +612,7 @@ static void* app_loop(void* app_v) {
 				 * countdown
 				 */
 				if (event_out.events & EPOLLRDHUP) {
+					new_client->sock = -1;
 					nc_verb_verbose("Call Home (app %s) closed.", app->name);
 					sleep_flag = 1;
 					break;
@@ -511,15 +620,9 @@ static void* app_loop(void* app_v) {
 			}
 		}
 		pthread_cleanup_pop(1);
-		pthread_cleanup_pop(1);
 
 		/* wait if set so */
 		if (sleep_flag) {
-			/* kill the transport server */
-			kill(pid, SIGTERM);
-			waitpid(pid, NULL, 0);
-			pid = -1;
-
 			/* wait for timeout minutes before another connection */
 			sleep(app->rep_timeout);
 		}
@@ -527,16 +630,16 @@ static void* app_loop(void* app_v) {
 }
 
 static int app_create(xmlNodePtr node, struct nc_err** error) {
-	struct ch_app *new;
+	struct ch_app* new;
+	struct ch_server* srv, *del_srv;
 	xmlNodePtr auxnode, servernode, childnode;
-	xmlChar *port, *host, *auxstr;
+	xmlChar* auxstr;
 
-	new = malloc(sizeof(struct ch_app));
+	new = calloc(1, sizeof(struct ch_app));
 
 	/* get name */
 	auxnode = find_node(node, BAD_CAST "name");
 	new->name = (char*)xmlNodeGetContent(auxnode);
-	new->servers = NULL;
 
 	/* get servers list */
 	auxnode = find_node(node, BAD_CAST "servers");
@@ -544,52 +647,47 @@ static int app_create(xmlNodePtr node, struct nc_err** error) {
 		if ((servernode->type != XML_ELEMENT_NODE) || (xmlStrcmp(servernode->name, BAD_CAST "server") != 0)) {
 			continue;
 		}
-		host = NULL;
-		port = NULL;
+
+		/* alloc new server */
+		if (new->servers == NULL) {
+			new->servers = calloc(1, sizeof(struct ch_server));
+			srv = new->servers;
+		} else {
+			/* srv is the last server */
+			srv->next = calloc(1, sizeof(struct ch_server));
+			srv->next->prev = srv;
+			srv = srv->next;
+		}
+
 		for (childnode = servernode->children; childnode != NULL; childnode = childnode->next) {
 			if (childnode->type != XML_ELEMENT_NODE) {
 				continue;
 			}
 			if (xmlStrcmp(childnode->name, BAD_CAST "address") == 0) {
-				if (!host) {
-					host = xmlNodeGetContent(childnode);
+				if (!srv->address) {
+					srv->address = strdup((char*)xmlNodeGetContent(childnode));
 				} else {
 					nc_verb_error("%s: duplicated address element", __func__);
 					*error = nc_err_new(NC_ERR_BAD_ELEM);
 					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
 					nc_err_set(*error, NC_ERR_PARAM_MSG, "Duplicated address element");
-					free(host);
-					free(port);
-					nc_callhome_mngmt_server_free(new->servers);
-					free(new->name);
-					free(new);
-					return (EXIT_FAILURE);
+					goto fail;
 				}
 			} else if (xmlStrcmp(childnode->name, BAD_CAST "port") == 0) {
-				port = xmlNodeGetContent(childnode);
+				srv->port = atoi((char*)xmlNodeGetContent(childnode));
 			}
 		}
-		if (host == NULL || port == NULL) {
-			nc_verb_error("%s: invalid address specification (host: %s, port: %s)", __func__, host, port);
+		if (srv->address == NULL || srv->port == 0) {
+			nc_verb_error("%s: invalid address specification (host: %s, port: %s)", __func__, srv->address, srv->port);
 			*error = nc_err_new(NC_ERR_BAD_ELEM);
 			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
-			free(host);
-			free(port);
-			nc_callhome_mngmt_server_free(new->servers);
-			free(new->name);
-			free(new);
-			return (EXIT_FAILURE);
+			goto fail;
 		}
-		new->servers = nc_callhome_mngmt_server_add(new->servers,(const char*)host, (const char*)port);
-		free(host);
-		free(port);
 	}
 
 	if (new->servers == NULL) {
-		nc_verb_error("%s: No server to connect to from %s app.", __func__, new->name);
-		free(new->name);
-		free(new);
-		return (EXIT_FAILURE);
+		nc_verb_error("%s: no server to connect to from %s app", __func__, new->name);
+		goto fail;
 	}
 
 	/* get reconnect settings */
@@ -656,7 +754,20 @@ static int app_create(xmlNodePtr node, struct nc_err** error) {
 		callhome_apps = new;
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
+
+fail:
+	for (srv = new->servers; srv != NULL;) {
+		del_srv = srv;
+		srv = srv->next;
+
+		free(del_srv->address);
+		free(del_srv);
+	}
+	free(new->name);
+	free(new);
+
+	return EXIT_FAILURE;
 }
 
 static struct ch_app* app_get(const char* name) {
@@ -677,9 +788,10 @@ static struct ch_app* app_get(const char* name) {
 
 static int app_rm(const char* name) {
 	struct ch_app* app;
+	struct ch_server* srv, *del_srv;
 
 	if ((app = app_get(name)) == NULL) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	pthread_cancel(app->thread);
@@ -696,11 +808,17 @@ static int app_rm(const char* name) {
 		app->prev->next = NULL;
 	}
 
+	for (srv = app->servers; srv != NULL;) {
+		del_srv = srv;
+		srv = srv->next;
+		free(del_srv->address);
+		free(del_srv);
+	}
+
 	free(app->name);
-	nc_callhome_mngmt_server_free(app->servers);
 	free(app);
 
-	return(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
 #endif
