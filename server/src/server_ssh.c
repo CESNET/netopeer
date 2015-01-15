@@ -30,6 +30,7 @@
 #include <libssh/server.h>
 
 #include "server_ssh.h"
+#include "netconf_server_transapi.h"
 
 extern int quit, restart_soft;
 
@@ -82,6 +83,14 @@ static inline void _client_free(struct client_struct* client) {
 	}
 
 	free(client->username);
+
+	/* let the callhome thread know the client was freed */
+	if (client->callhome_st != NULL) {
+		pthread_mutex_lock(&client->callhome_st->ch_lock);
+		client->callhome_st->freed = 1;
+		pthread_cond_signal(&client->callhome_st->ch_cond);
+		pthread_mutex_unlock(&client->callhome_st->ch_lock);
+	}
 }
 
 static struct client_struct* client_find_by_sshsession(struct client_struct* root, ssh_session sshsession) {
@@ -233,7 +242,7 @@ static struct chan_struct* client_find_channel_by_sid(struct client_struct* root
 }
 
 /* return seconds rounded down */
-static int timeval_diff(struct timeval tv1, struct timeval tv2) {
+int timeval_diff(struct timeval tv1, struct timeval tv2) {
 	time_t sec;
 
 	if (tv1.tv_usec > 1000000) {
@@ -335,6 +344,11 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		}
 
 		return 0;
+	}
+
+	/* some data flow happened */
+	if (client->callhome_st != NULL) {
+		gettimeofday((struct timeval*)&client->callhome_st->data_flow_time, NULL);
 	}
 
 	return len;
@@ -815,6 +829,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 				}
 
 				client_remove(&ssh_state.clients, cur_client);
+
 				/* GLOBAL WRITE UNLOCK */
 				pthread_rwlock_unlock(&ssh_state.global_lock);
 				/* GLOBAL READ LOCK */
@@ -885,6 +900,11 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 					nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 					cur_chan->to_free = 1;
 				} else if (ret != -1) {
+
+					/* some data flow happened */
+					if (cur_client->callhome_st != NULL) {
+						gettimeofday((struct timeval*)&cur_client->callhome_st->data_flow_time, NULL);
+					}
 
 					/* we had some data, there may be more, sleeping may be a waste of response time */
 					skip_sleep = 1;
@@ -1132,9 +1152,8 @@ void ssh_listen_loop(int do_init) {
 		return;
 	}
 
-	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, KEYS_DIR "ssh_host_rsa_key");
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, SERVER_KEY);
 	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_DSAKEY, "ssh_host_dsa_key");
-	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_ECDSAKEY, "ssh_host_ecdsa_key");
 
 	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
 

@@ -15,11 +15,15 @@
 #define NETOPEER_MODULE_NAME "Netopeer"
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
-struct module {
-	char * name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
-	struct ncds_ds * ds; /**< pointer to datastore returned by libnetconf */
+struct np_options {
+	/* TODO */
+};
+
+struct np_module {
+	char* name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
+	struct ncds_ds* ds; /**< pointer to datastore returned by libnetconf */
 	ncds_id id; /**< Related datastore ID */
-	struct module *prev, *next;
+	struct np_module* prev, *next;
 };
 
 /**
@@ -30,7 +34,7 @@ struct module {
  *
  * @return EXIT_SUCCES or EXIT_FAILURE
  */
-int module_enable(struct module* module, int add);
+int module_enable(struct np_module* module, int add);
 
 /**
  * @brief Stop module, remove it from library (and destroy)
@@ -40,6 +44,6 @@ int module_enable(struct module* module, int add);
  *
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int module_disable(struct module* module, int destroy);
+int module_disable(struct np_module* module, int destroy);
 
 #endif /* _CFGNETOPEER_TRANSAPI_H_ */

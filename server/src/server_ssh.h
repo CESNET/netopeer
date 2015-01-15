@@ -11,7 +11,7 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
-#define KEYS_DIR "/etc/ssh/"
+#define SERVER_KEY "/etc/ssh/ssh_host_rsa_key"
 
 /* SSH_AUTH_METHOD_UNKNOWN SSH_AUTH_METHOD_NONE SSH_AUTH_METHOD_PASSWORD SSH_AUTH_METHOD_PUBLICKEY SSH_AUTH_METHOD_HOSTBASED SSH_AUTH_METHOD_INTERACTIVE SSH_AUTH_METHOD_GSSAPI_MIC */
 #define SSH_AUTH_METHODS (SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY)
@@ -73,6 +73,7 @@ struct client_struct {
 	struct chan_struct* ssh_chans;
 	ssh_session ssh_sess;
 	ssh_event ssh_evt;
+	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
 };
@@ -88,6 +89,8 @@ struct state_struct {
 	pthread_rwlock_t global_lock;
 	struct client_struct* clients;
 };
+
+int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void ssh_listen_loop(int do_init);
 

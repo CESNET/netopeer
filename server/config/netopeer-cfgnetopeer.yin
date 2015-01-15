@@ -8,11 +8,16 @@
     <text>CESNET, z.s.p.o.</text>
   </organization>
   <contact>
-    <text>dkupka@cesnet.cz</text>
+    <text>mvasko@cesnet.cz</text>
   </contact>
   <description>
     <text>Module specifying Netopeer module data model and RPC operation.</text>
   </description>
+  <revision date="2015-01-15">
+    <description>
+      <text>Netopeer-specific NETCONF server options added.</text>
+    </description>
+  </revision>
   <revision date="2013-02-14">
     <description>
       <text>Modules are now configurable. Except implemented-rpcs which depends on module data model.</text>
@@ -29,13 +34,154 @@
     </description>
   </revision>
   <container name="netopeer">
+    <leaf name="hello-timeout">
+      <type name="uint32">
+        <range value="0 | 10 .. 3600"/>
+      </type>
+      <units name="seconds"/>
+      <default value="600"/>
+      <description>
+        <text>Specifies the number of seconds that a session
+   may exist before the hello PDU is received.
+   A session will be dropped if no hello PDU
+   is received before this number of seconds elapses.
+
+   If this parameter is set to zero, then the server
+   will wait forever for a hello message, and not
+   drop any sessions stuck in 'hello-wait' state.
+
+   Setting this parameter to zero may permit
+   denial of service attacks, since only a limited
+   number of concurrent sessions are supported
+   by the server.</text>
+      </description>
+    </leaf>
+    <leaf name="idle-timeout">
+      <type name="uint32">
+        <range value="0 | 10 .. 360000"/>
+      </type>
+      <units name="seconds"/>
+      <default value="3600"/>
+      <description>
+        <text>Specifies the number of seconds that a session
+   may remain idle without issuing any RPC requests.
+   A session will be dropped if it is idle for an
+   interval longer than this number of seconds.
+
+   Sessions that have a notification subscription
+   active are never dropped.
+
+   If this parameter is set to zero, then the server
+   will never drop a session because it is idle.</text>
+      </description>
+    </leaf>
+    <leaf name="max-sessions">
+      <type name="uint16">
+        <range value="0 .. 1024"/>
+      </type>
+      <default value="8"/>
+      <description>
+        <text>Specifies the maximum number of concurrent sessions
+  that can be active at one time.  The value 0 indicates
+  that no artificial session limit should be used.</text>
+      </description>
+    </leaf>
+    <container name="ssh">
+      <container name="server-keys">
+        <leaf name="rsa-key">
+          <type name="string"/>
+          <default value="/etc/ssh/ssh_host_rsa_key"/>
+          <description>
+            <text>Path to a private RSA key that will be
+ used by clients for authentication.</text>
+          </description>
+        </leaf>
+        <leaf name="dsa-key">
+          <type name="string"/>
+          <description>
+            <text>Path to a private DSA key that will be
+ used by clients for authentication.</text>
+          </description>
+        </leaf>
+      </container>
+      <container name="client-auth-keys">
+        <list name="client-auth-key">
+          <key value="path"/>
+          <leaf name="path">
+            <type name="string"/>
+            <description>
+              <text>Path to the public key.</text>
+            </description>
+          </leaf>
+          <leaf name="username">
+            <type name="string"/>
+            <mandatory value="true"/>
+            <description>
+              <text>SSH and NETCONF username to be used
+ for the session authenticated with
+ this public key.</text>
+            </description>
+          </leaf>
+        </list>
+      </container>
+      <leaf name="password-auth-enabled">
+        <type name="boolean"/>
+        <default value="true"/>
+        <description>
+          <text>Decides whether clients can use the 'password'
+ SSH authentication method (RFC 4252).</text>
+        </description>
+      </leaf>
+      <leaf name="auth-attempts">
+        <type name="uint8">
+          <range value="1 .. max"/>
+        </type>
+        <default value="3"/>
+        <description>
+          <text>Maximum failed authentication attempts after
+ which the client is dropped.</text>
+        </description>
+      </leaf>
+      <leaf name="auth-timeout">
+        <type name="uint16">
+          <range value="5 .. max"/>
+        </type>
+        <units name="seconds"/>
+        <default value="10"/>
+        <description>
+          <text>Maximum number of seconds a client is allowed
+ for authentication after which it is dropped.</text>
+        </description>
+      </leaf>
+    </container>
+    <leaf name="response-time">
+      <type name="uint16"/>
+      <units name="miliseconds"/>
+      <default value="50"/>
+      <description>
+        <text>Maximum number of miliseconds any client request
+ will be responded to.</text>
+      </description>
+    </leaf>
+    <leaf name="client-removal-time">
+      <type name="uint16"/>
+      <units name="miliseconds"/>
+      <default value="10"/>
+      <description>
+        <text>Number of miliseconds that the server is willing
+ to wait for removing an invalid client before
+ bailing out and trying again later. Response
+ time plus client removal time is the theoretical
+ maximum response time.</text>
+      </description>
+    </leaf>
     <container name="modules">
       <list name="module">
         <key value="name"/>
         <leaf name="name">
           <type name="string"/>
           <description>
-            <text>Name of module</text>
+            <text>Name of a module.</text>
           </description>
         </leaf>
         <leaf name="enabled">

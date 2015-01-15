@@ -67,39 +67,19 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
 
+#include "netconf_server_transapi.h"
 #include "server_ssh.h"
-
-#define NETCONF_DEFAULT_PORT 830
-#define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
 
 #ifndef DISABLE_CALLHOME
 
-struct ch_app {
-	char* name;
-	struct ch_server {
-		char* address;
-		uint16_t port;
-		volatile uint8_t active;
-		struct ch_server* next;
-		struct ch_server* prev;
-	} *servers;
-	uint8_t start_server; /* 0 first-listed, 1 last-connected */
-	uint8_t rec_interval;       /* reconnect-strategy/interval-secs */
-	uint8_t rec_count;          /* reconnect-strategy/count-max */
-	uint8_t connection;   /* 0 persistent, 1 periodic */
-	uint8_t rep_timeout;        /* connection-type/periodic/timeout-mins */
-	uint8_t rep_linger;         /* connection-type/periodic/linger-secs */
-	pthread_t thread;
-	struct ch_app *next;
-	struct ch_app *prev;
-};
-static struct ch_app *callhome_apps = NULL;
+static struct ch_app* callhome_apps = NULL;
 
 #endif
 
@@ -429,11 +409,6 @@ static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name) {
 	return (NULL);
 }
 
-/* close() cleanup handler */
-static void clh_close(void* arg) {
-	close(*((int*)(arg)));
-}
-
 static struct client_struct* sock_connect(const char* address, uint16_t port) {
 	struct client_struct* ret;
 	int is_ipv4;
@@ -509,13 +484,11 @@ volatile struct client_struct* callhome_client = NULL;
 __attribute__((noreturn))
 static void* app_loop(void* app_v) {
 	struct ch_app* app = (struct ch_app*)app_v;
-	struct ch_server *cur_server = NULL;
-	struct client_struct* new_client;
+	struct ch_server* cur_server = NULL;
+	struct chan_struct* chan;
+	struct timeval cur_time;
+	struct timespec ts;
 	int i;
-	int efd, e;
-	int timeout;
-	int sleep_flag;
-	struct epoll_event event_in, event_out;
 
 	/* TODO sigmask for the thread? */
 
@@ -525,6 +498,8 @@ static void* app_loop(void* app_v) {
 
 	for (;;) {
 		pthread_testcancel();
+
+		app->ch_st->freed = 0;
 
 		/* get last connected server if any */
 		for (cur_server = app->servers; cur_server != NULL && cur_server->active == 0; cur_server = cur_server->next);
@@ -542,13 +517,13 @@ static void* app_loop(void* app_v) {
 		/* try to connect to a server indefinitely */
 		for (;;) {
 			for (i = 0; i < app->rec_count; ++i) {
-				if ((new_client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
+				if ((app->client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
 					break;
 				}
 				sleep(app->rec_interval);
 			}
 
-			if (new_client != NULL) {
+			if (app->client != NULL) {
 				break;
 			}
 
@@ -558,6 +533,9 @@ static void* app_loop(void* app_v) {
 			}
 		}
 
+		gettimeofday((struct timeval*)&app->ch_st->data_flow_time, NULL);
+		app->client->callhome_st = app->ch_st;
+
 publish_client:
 		/* publish the new client for the main application loop to create a new SSH session */
 		if (callhome_check == 1) {
@@ -566,28 +544,63 @@ publish_client:
 			goto publish_client;
 		}
 		callhome_check = 1;
-		callhome_client = new_client;
+		callhome_client = app->client;
 		cur_server->active = 1;
-
-		/* check sock to get information about the connection */
-		/* we have to use epoll API since we need event (not the level) triggering */
-		efd = -1;
-		pthread_cleanup_push(clh_close, &efd);
-		efd = epoll_create(1);
 
 		if (app->connection) {
 			/* periodic connection */
+			pthread_mutex_lock(&app->ch_st->ch_lock);
+			while (app->ch_st->freed == 0) {
+				clock_gettime(CLOCK_REALTIME, &ts);
+				ts.tv_sec += CALLHOME_PERIODIC_LINGER_CHECK;
+				i = pthread_cond_timedwait(&app->ch_st->ch_cond, &app->ch_st->ch_lock, &ts);
+				if (i == ETIMEDOUT) {
+					gettimeofday(&cur_time, NULL);
+					if (timeval_diff(cur_time, app->ch_st->data_flow_time) >= app->rep_linger) {
+
+						/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
+						nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
+						app->client->callhome_st = NULL;
+						if (app->client->ssh_chans != NULL) {
+							for (chan = app->client->ssh_chans; chan != NULL; chan = chan->next) {
+								chan->to_free = 1;
+							}
+						} else {
+							app->client->to_free = 1;
+						}
+						sleep(app->rep_timeout*60);
+						break;
+					}
+				}
+			}
+			pthread_mutex_unlock(&app->ch_st->ch_lock);
+			if (app->ch_st->freed == 1) {
+				nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
+			}
+
+		} else {
+			/* persistent connection */
+			pthread_mutex_lock(&app->ch_st->ch_lock);
+			while (app->ch_st->freed == 0) {
+				pthread_cond_wait(&app->ch_st->ch_cond, &app->ch_st->ch_lock);
+			}
+			pthread_mutex_unlock(&app->ch_st->ch_lock);
+			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
+		}
+
+		/*if (app->connection) {
+			* periodic connection *
 			event_in.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
 			timeout = 1000 * app->rep_linger;
 		} else {
-			/* persistent connection */
+			* persistent connection *
 			event_in.events = EPOLLET | EPOLLRDHUP;
-			timeout = -1; /* indefinite timeout */
+			timeout = -1; * indefinite timeout *
 		}
-		/* we do not need to close this socket,
+		* we do not need to close this socket,
 		 * the main thread will take care of
 		 * the whole client cleanup
-		 */
+		 *
 		event_in.data.fd = new_client->sock;
 		epoll_ctl(efd, EPOLL_CTL_ADD, new_client->sock, &event_in);
 
@@ -596,7 +609,6 @@ publish_client:
 			if (e == 0 && app->connection) {
 				new_client->to_free = 1;
 				nc_verb_verbose("Call Home (app %s) timeout expired.", app->name);
-				nc_verb_verbose("%s: test: %p, chans %p", new_client, new_client->ssh_chans);
 				sleep_flag = 1;
 				break;
 			} else if (e == -1) {
@@ -606,11 +618,11 @@ publish_client:
 					break;
 				}
 			} else {
-				/* some event occurred */
-				/* in case of periodic connection, it is probably EPOLLIN,
+				* some event occurred *
+				* in case of periodic connection, it is probably EPOLLIN,
 				 * the only reaction is to run epoll_wait() again to start idle
 				 * countdown
-				 */
+				 *
 				if (event_out.events & EPOLLRDHUP) {
 					new_client->sock = -1;
 					nc_verb_verbose("Call Home (app %s) closed.", app->name);
@@ -621,11 +633,12 @@ publish_client:
 		}
 		pthread_cleanup_pop(1);
 
-		/* wait if set so */
+		* wait if set so *
 		if (sleep_flag) {
-			/* wait for timeout minutes before another connection */
+			* wait for timeout minutes before another connection *
 			sleep(app->rep_timeout);
 		}
+		*/
 	}
 }
 
@@ -740,6 +753,12 @@ static int app_create(xmlNodePtr node, struct nc_err** error) {
 		}
 	}
 
+	/* create cond and lock */
+	new->ch_st = malloc(sizeof(struct client_ch_struct));
+	new->ch_st->freed = 0;
+	pthread_mutex_init(&new->ch_st->ch_lock, NULL);
+	pthread_cond_init(&new->ch_st->ch_cond, NULL);
+
 	pthread_create(&(new->thread), NULL, app_loop, new);
 
 	/* insert the created app structure into the list */
@@ -815,6 +834,16 @@ static int app_rm(const char* name) {
 		free(del_srv);
 	}
 
+	/* a valid client running, mark it for deletion */
+	if (app->ch_st->freed == 0) {
+		app->client->callhome_st = NULL;
+		app->client->to_free = 1;
+	}
+
+	pthread_mutex_destroy(&app->ch_st->ch_lock);
+	pthread_cond_destroy(&app->ch_st->ch_cond);
+	free(app->ch_st);
+
 	free(app->name);
 	free(app);
 
@@ -834,7 +863,7 @@ static int app_rm(const char* name) {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 
 #ifndef DISABLE_CALLHOME
 	char* name;
@@ -863,7 +892,7 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application 
 	(void)new_node;
 	(void)error;
 
-	nc_verb_warning("Callhome is not supported in libnetconf!.");
+	nc_verb_warning("Callhome is not supported in libnetconf!");
 #endif
 
 	return EXIT_SUCCESS;

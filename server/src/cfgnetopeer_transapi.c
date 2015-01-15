@@ -81,12 +81,12 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
-static struct module* modules = NULL;
+static struct np_module* modules = NULL;
 
 extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
 
-void module_free(struct module * module) {
+void module_free(struct np_module* module) {
 	if (module->ds) {
 		module_disable(module, 1);
 	} else {
@@ -98,8 +98,7 @@ void module_free(struct module * module) {
 /*
  * if repo_type is -1, then we are working with augment models specifications
  */
-static int parse_model_cfg(struct module *module, xmlNodePtr node, NCDS_TYPE repo_type)
-{
+static int parse_model_cfg(struct np_module* module, xmlNodePtr node, NCDS_TYPE repo_type) {
 	char *transapi_path = NULL, *model_path = NULL, *feature, *name, *aux;
 	struct transapi *st = NULL;
 	xmlNodePtr aux_node;
@@ -195,8 +194,7 @@ static int parse_model_cfg(struct module *module, xmlNodePtr node, NCDS_TYPE rep
 	return (EXIT_SUCCESS);
 }
 
-int module_enable(struct module * module, int add)
-{
+int module_enable(struct np_module* module, int add) {
 	char *config_path = NULL, *repo_path = NULL, *repo_type_str = NULL;
 	int repo_type = -1, main_model_count;
 	xmlDocPtr module_config;
@@ -350,8 +348,7 @@ err_cleanup:
 	return (EXIT_FAILURE);
 }
 
-int module_disable(struct module * module, int destroy)
-{
+int module_disable(struct np_module* module, int destroy) {
 	ncds_free(module->ds);
 	module->ds = NULL;
 
@@ -392,16 +389,14 @@ int module_disable(struct module * module, int destroy)
 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int netopeer_transapi_init(xmlDocPtr * UNUSED(running))
-{
+int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 	return(EXIT_SUCCESS);
 }
 
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void netopeer_transapi_close(void)
-{
+void netopeer_transapi_close(void) {
 	nc_verb_verbose("Netopeer module cleanup.");
 	while (modules) {
 		module_disable(modules, 1);
@@ -416,8 +411,7 @@ void netopeer_transapi_close(void)
  * @param[out] err  Double pointer to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr netopeer_get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err))
-{
+xmlDocPtr netopeer_get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err** UNUSED(err)) {
 	/* no state data */
 	return(NULL);
 }
@@ -444,8 +438,7 @@ struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer (void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error))
-{
+int callback_n_netopeer(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error)) {
 	return EXIT_SUCCESS;
 }
 
@@ -460,11 +453,10 @@ int callback_n_netopeer (void ** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
+int callback_n_netopeer_n_modules_n_module(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	xmlNodePtr tmp, node;
-	char * module_name = NULL, * module_allowed;
-	struct module * module = modules;
+	char* module_name = NULL, *module_allowed;
+	struct np_module* module = modules;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
@@ -502,7 +494,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 			return(EXIT_SUCCESS);
 		}
 
-		if ((module = calloc(1, sizeof(struct module))) == NULL) {
+		if ((module = calloc(1, sizeof(struct np_module))) == NULL) {
 			free(module_name);
 			*error = nc_err_new(NC_ERR_RES_DENIED);
 			return(EXIT_FAILURE);
@@ -556,11 +548,10 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module_n_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** UNUSED(error))
-{
+int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** UNUSED(error)) {
 	xmlNodePtr tmp, node;
-	char *module_name = NULL;
-	struct module * module = modules;
+	char* module_name = NULL;
+	struct np_module* module = modules;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
@@ -626,7 +617,7 @@ struct transapi_data_callbacks netopeer_clbks =  {
  * @param node	List of nodes that will be searched.
  * @return Pointer to the matching node or NULL
  */
-xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
+xmlNodePtr get_rpc_node(const char* name, const xmlNodePtr node) {
 	xmlNodePtr ret = NULL;
 
 	for (ret = node; ret != NULL; ret = ret->next) {
@@ -646,8 +637,7 @@ xmlNodePtr get_rpc_node(const char *name, const xmlNodePtr node) {
 * If input was not set in RPC message argument in set to NULL.
 */
 
-nc_reply * rpc_netopeer_reboot (xmlNodePtr input)
-{
+nc_reply* rpc_netopeer_reboot(xmlNodePtr input) {
 	xmlNodePtr type_node = get_rpc_node("type", input);
 	char * type_str = NULL;
 
@@ -670,11 +660,10 @@ nc_reply * rpc_netopeer_reboot (xmlNodePtr input)
 	return(nc_reply_ok());
 }
 
-nc_reply * rpc_reload_module (xmlNodePtr input)
-{
+nc_reply* rpc_reload_module(xmlNodePtr input) {
 	xmlNodePtr module_node = get_rpc_node("module", input);
-	char * module_name;
-	struct module * module = modules;
+	char* module_name;
+	struct np_module* module = modules;
 
 	if (module_node) {
 		module_name = (char*)xmlNodeGetContent(module_node);

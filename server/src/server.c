@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
 	int daemonize = 0, len;
 	int verbose = 0;
 	int listen_init = 1;
-	struct module* netopeer_module = NULL, *server_module = NULL;
+	struct np_module* netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
 
 restart:
 	/* start NETCONF server module */
-	if ((server_module = calloc(1, sizeof(struct module))) == NULL) {
+	if ((server_module = calloc(1, sizeof(struct np_module))) == NULL) {
 		nc_verb_error("Creating necessary NETCONF server plugin failed!");
 		return EXIT_FAILURE;
 	}
@@ -249,7 +249,7 @@ restart:
 
 	/* start netopeer device module - it will start all modules that are
 	 * in its configuration and in server configuration */
-	if ((netopeer_module = calloc(1, sizeof(struct module))) == NULL) {
+	if ((netopeer_module = calloc(1, sizeof(struct np_module))) == NULL) {
 		nc_verb_error("Creating necessary Netopeer plugin failed!");
 		module_disable(server_module, 1);
 		return EXIT_FAILURE;

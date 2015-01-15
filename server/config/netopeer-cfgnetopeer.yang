@@ -4,10 +4,14 @@ module netopeer-cfgnetopeer {
 
   organization "CESNET, z.s.p.o.";
   contact
-    "dkupka@cesnet.cz";
+    "mvasko@cesnet.cz";
   description
     "Module specifying Netopeer module data model and RPC operation.";
 
+  revision 2015-01-15 {
+    description
+      "Netopeer-specific NETCONF server options added.";
+  }
   revision 2013-02-14 {
     description
       "Modules are now configurable. Except implemented-rpcs which depends on module data model.";
@@ -22,13 +26,152 @@ module netopeer-cfgnetopeer {
   }
 
   container netopeer {
+    leaf hello-timeout {
+      type uint32 {
+        range "0 | 10 .. 3600";
+      }
+      units "seconds";
+      default '600';
+      description
+        "Specifies the number of seconds that a session
+            may exist before the hello PDU is received.
+            A session will be dropped if no hello PDU
+            is received before this number of seconds elapses.
+
+            If this parameter is set to zero, then the server
+            will wait forever for a hello message, and not
+            drop any sessions stuck in 'hello-wait' state.
+
+            Setting this parameter to zero may permit
+            denial of service attacks, since only a limited
+            number of concurrent sessions are supported
+            by the server.";
+    }
+
+    leaf idle-timeout {
+      type uint32 {
+        range "0 | 10 .. 360000";
+      }
+      units "seconds";
+      default '3600';
+      description
+        "Specifies the number of seconds that a session
+            may remain idle without issuing any RPC requests.
+            A session will be dropped if it is idle for an
+            interval longer than this number of seconds.
+
+            Sessions that have a notification subscription
+            active are never dropped.
+
+            If this parameter is set to zero, then the server
+            will never drop a session because it is idle.";
+    }
+
+    leaf max-sessions {
+      type uint16 {
+        range "0 .. 1024";
+      }
+      default '8';
+      description
+        "Specifies the maximum number of concurrent sessions
+           that can be active at one time.  The value 0 indicates
+           that no artificial session limit should be used.";
+    }
+
+    container ssh {
+      container server-keys {
+        leaf rsa-key {
+          type string;
+          default "/etc/ssh/ssh_host_rsa_key";
+          description
+            "Path to a private RSA key that will be
+              used by clients for authentication.";
+        }
+        leaf dsa-key {
+          type string;
+          description
+            "Path to a private DSA key that will be
+              used by clients for authentication.";
+        }
+      }
+
+      container client-auth-keys {
+        list client-auth-key {
+          key "path";
+          leaf path {
+            type string;
+            description
+              "Path to the public key.";
+          }
+          leaf username {
+            type string;
+            mandatory true;
+            description
+              "SSH and NETCONF username to be used
+                for the session authenticated with
+                this public key.";
+          }
+        }
+      }
+
+      leaf password-auth-enabled {
+        type boolean;
+        default true;
+        description
+          "Decides whether clients can use the 'password'
+            SSH authentication method (RFC 4252).";
+      }
+
+      leaf auth-attempts {
+        type uint8 {
+          range "1 .. max";
+        }
+        default 3;
+        description
+          "Maximum failed authentication attempts after
+            which the client is dropped.";
+      }
+
+      leaf auth-timeout {
+        type uint16 {
+          range "5 .. max";
+        }
+        units "seconds";
+        default 10;
+        description
+          "Maximum number of seconds a client is allowed
+            for authentication after which it is dropped.";
+      }
+    }
+
+    leaf response-time {
+      type uint16;
+      units "miliseconds";
+      default 50;
+      description
+        "Maximum number of miliseconds any client request
+          will be responded to.";
+    }
+
+    leaf client-removal-time {
+      type uint16;
+      units "miliseconds";
+      default 10;
+      description
+        "Number of miliseconds that the server is willing
+          to wait for removing an invalid client before
+          bailing out and trying again later. Response
+          time plus client removal time is the theoretical
+          maximum response time.";
+    }
+
     container modules {
       list module {
         key "name";
         leaf name {
           type string;
           description
-            "Name of module";
+            "Name of a module.";
         }
         leaf enabled {
           type boolean;
