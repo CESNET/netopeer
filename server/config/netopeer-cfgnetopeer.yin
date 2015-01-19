@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module name="netopeer-cfgnetopeer"
-        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
-        xmlns:cfgnetopeer="urn:cesnet:tmc:netopeer:1.0">
+<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:cfgnetopeer="urn:cesnet:tmc:netopeer:1.0" name="netopeer-cfgnetopeer">
   <namespace uri="urn:cesnet:tmc:netopeer:1.0"/>
   <prefix value="cfgnetopeer"/>
   <organization>
@@ -93,14 +91,16 @@
           <default value="/etc/ssh/ssh_host_rsa_key"/>
           <description>
             <text>Path to a private RSA key that will be
- used by clients for authentication.</text>
+ used by clients for server identity
+ confirmation.</text>
           </description>
         </leaf>
         <leaf name="dsa-key">
           <type name="string"/>
           <description>
             <text>Path to a private DSA key that will be
- used by clients for authentication.</text>
+ used by clients for server identity
+ confirmation.</text>
           </description>
         </leaf>
       </container>
@@ -160,7 +160,7 @@
       <default value="50"/>
       <description>
         <text>Maximum number of miliseconds any client request
- will be responded to.</text>
+ will almost certainly be responded to.</text>
       </description>
     </leaf>
     <leaf name="client-removal-time">

@@ -16,14 +16,30 @@
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
 struct np_options {
-	/* TODO */
-};
-
-struct np_module {
-	char* name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
-	struct ncds_ds* ds; /**< pointer to datastore returned by libnetconf */
-	ncds_id id; /**< Related datastore ID */
-	struct np_module* prev, *next;
+	uint32_t hello_timeout; //TODO
+	uint32_t idle_timeout; //TODO
+	uint16_t max_sessions;
+	uint8_t server_key_change_flag;		// flag to communicate server key change
+	char* rsa_key;
+	char* dsa_key;
+	pthread_mutex_t client_keys_lock;
+	struct np_auth_key {
+		char* path;
+		char* username;
+		struct np_auth_key* next;
+		struct np_auth_key* prev;
+	} *client_auth_keys; //TODO
+	uint8_t password_auth_enabled;
+	uint8_t auth_attempts;
+	uint16_t auth_timeout;
+	uint16_t response_time;
+	uint16_t client_removal_time;
+	struct np_module {
+		char* name; /**< Module name, same as filename (without .xml extension) in MODULES_CFG_DIR */
+		struct ncds_ds* ds; /**< pointer to datastore returned by libnetconf */
+		ncds_id id; /**< Related datastore ID */
+		struct np_module* prev, *next;
+	} *modules;
 };
 
 /**

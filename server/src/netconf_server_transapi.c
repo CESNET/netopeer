@@ -76,6 +76,9 @@
 
 #include "netconf_server_transapi.h"
 #include "server_ssh.h"
+#include "cfgnetopeer_transapi.h"
+
+extern struct np_options netopeer_options;
 
 #ifndef DISABLE_CALLHOME
 
@@ -540,7 +543,7 @@ publish_client:
 		/* publish the new client for the main application loop to create a new SSH session */
 		if (callhome_check == 1) {
 			/* there is a new client not yet processed, wait our turn */
-			usleep(CLIENT_SLEEP_TIME*1000);
+			usleep(netopeer_options.response_time*1000);
 			goto publish_client;
 		}
 		callhome_check = 1;
@@ -915,7 +918,7 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(
 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int server_transapi_init(xmlDocPtr * UNUSED(running)) {
+int server_transapi_init(xmlDocPtr* UNUSED(running)) {
 	xmlDocPtr doc;
 	struct nc_err* error = NULL;
 	const char* str_err;

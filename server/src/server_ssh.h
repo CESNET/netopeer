@@ -11,23 +11,12 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
-#define SERVER_KEY "/etc/ssh/ssh_host_rsa_key"
-
-/* SSH_AUTH_METHOD_UNKNOWN SSH_AUTH_METHOD_NONE SSH_AUTH_METHOD_PASSWORD SSH_AUTH_METHOD_PUBLICKEY SSH_AUTH_METHOD_HOSTBASED SSH_AUTH_METHOD_INTERACTIVE SSH_AUTH_METHOD_GSSAPI_MIC */
-#define SSH_AUTH_METHODS (SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY)
-
 #define PUBKEY_FILE "/home/vasko/.ssh/id_rsa.pub"
 #define PUBKEY_USER "vasko"
 
 #define CLIENT_MAX_AUTH_ATTEMPTS 3
 /* time for the users to authenticate themselves, in seconds */
 #define CLIENT_AUTH_TIMEOUT 10
-
-/* time in msec the threads are going to rest for (maximum response time) */
-#define CLIENT_SLEEP_TIME 50
-
-/* time in msec the data thread can additionally wait, in order to remove an invalid client */
-#define CLIENT_REMOVAL_LOCK_TIMEOUT 10
 
 #define BASE_READ_BUFFER_SIZE 2048
 

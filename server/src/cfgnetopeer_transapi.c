@@ -43,6 +43,7 @@
  */
 
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <stdlib.h>
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
@@ -81,10 +82,19 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
-static struct np_module* modules = NULL;
+struct np_options netopeer_options = {
+	.client_keys_lock = PTHREAD_MUTEX_INITIALIZER
+};
 
 extern struct transapi server_transapi;
 struct transapi netopeer_transapi;
+
+char* get_node_content(const xmlNodePtr node) {
+	if (node == NULL || node->children == NULL) {
+		return NULL;
+	}
+	return (char*)node->children->content;
+}
 
 void module_free(struct np_module* module) {
 	if (module->ds) {
@@ -326,11 +336,11 @@ int module_enable(struct np_module* module, int add) {
 	}
 
 	if (add) {
-		if (modules) {
-			modules->prev = module;
+		if (netopeer_options.modules) {
+			netopeer_options.modules->prev = module;
 		}
-		module->next = modules;
-		modules = module;
+		module->next = netopeer_options.modules;
+		netopeer_options.modules = module;
 	}
 
 	return (EXIT_SUCCESS);
@@ -363,8 +373,8 @@ int module_disable(struct np_module* module, int destroy) {
 		if (module->prev) {
 			module->prev->next = module->next;
 		}
-		if (modules == module) {
-			modules = module->next;
+		if (netopeer_options.modules == module) {
+			netopeer_options.modules = module->next;
 		}
 
 		module_free(module);
@@ -390,16 +400,28 @@ int module_disable(struct np_module* module, int destroy) {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
-	return(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void netopeer_transapi_close(void) {
-	nc_verb_verbose("Netopeer module cleanup.");
-	while (modules) {
-		module_disable(modules, 1);
+	struct np_auth_key* key, *del_key;
+
+	nc_verb_verbose("Netopeer cleanup.");
+
+	free(netopeer_options.rsa_key);
+	free(netopeer_options.dsa_key);
+	for (key = netopeer_options.client_auth_keys; key != NULL;) {
+		del_key = key;
+		key = key->next;
+		free(del_key->path);
+		free(del_key->username);
+		free(del_key);
+	}
+	while (netopeer_options.modules) {
+		module_disable(netopeer_options.modules, 1);
 	}
 }
 
@@ -428,7 +450,7 @@ struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.
 */
 
 /**
- * @brief This callback will be run when node in path /n:netopeer changes
+ * @brief This callback will be run when node in path /n:netopeer/n:hello-timeout changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -438,7 +460,483 @@ struct ns_pair netopeer_namespace_mapping[] = {{"n", "urn:cesnet:tmc:netopeer:1.
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error)) {
+int callback_n_netopeer_n_hello_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint32_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.hello_timeout = 600;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.hello_timeout = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:idle-timeout changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_idle_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint32_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.idle_timeout = 3600;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.idle_timeout = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:max-sessions changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_max_sessions(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint16_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.max_sessions = 8;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.max_sessions = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:server-keys/n:rsa-key changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL;
+
+	if (op & XMLDIFF_REM) {
+		free(netopeer_options.rsa_key);
+		netopeer_options.rsa_key = strdup("/etc/ssh/ssh_host_rsa_key");
+		netopeer_options.server_key_change_flag = 1;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	free(netopeer_options.rsa_key);
+	netopeer_options.rsa_key = strdup(content);
+	netopeer_options.server_key_change_flag = 1;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:server-keys/n:dsa-key changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL;
+
+	if (op & XMLDIFF_REM) {
+		free(netopeer_options.dsa_key);
+		netopeer_options.dsa_key = NULL;
+		netopeer_options.server_key_change_flag = 1;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	free(netopeer_options.dsa_key);
+	netopeer_options.dsa_key = strdup(content);
+	netopeer_options.server_key_change_flag = 1;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	xmlNodePtr node;
+	char* path = NULL, *username = NULL;
+	struct np_auth_key* key;
+
+	if (op & XMLDIFF_REM) {
+		node = old_node;
+	} else {
+		node = new_node;
+	}
+
+	for (node = node->children; node != NULL; node = node->next) {
+		if (xmlStrEqual(node->name, BAD_CAST "path")) {
+			path = get_node_content(node);
+		}
+		if (xmlStrEqual(node->name, BAD_CAST "username")) {
+			username = get_node_content(node);
+		}
+	}
+
+	if (path == NULL || username == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: path and/or username missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		for (key = netopeer_options.client_auth_keys; key != NULL; key = key->next) {
+			if (strcmp(key->path, path) == 0) {
+				break;
+			}
+		}
+
+		if (key == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: internal error: changed key not found", __func__);
+			return EXIT_FAILURE;
+		}
+
+		/* CLIENT KEYS LOCK */
+		pthread_mutex_lock(&netopeer_options.client_keys_lock);
+
+		/* remove the key */
+		if (op & XMLDIFF_REM) {
+			if (key->prev == NULL) {
+				netopeer_options.client_auth_keys = key->next;
+				free(key->path);
+				free(key->username);
+				free(key);
+				if (netopeer_options.client_auth_keys != NULL) {
+					netopeer_options.client_auth_keys->prev = NULL;
+				}
+			} else {
+				key->prev->next = key->next;
+				if (key->next != NULL) {
+					key->next->prev = key->prev;
+				}
+				free(key->path);
+				free(key->username);
+				free(key);
+			}
+
+		/* modify the key */
+		} else {
+			free(key->username);
+			key->username = strdup(username);
+		}
+
+		/* CLIENT KEYS UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
+
+	} else if (op & XMLDIFF_ADD) {
+
+		/* CLIENT KEYS LOCK */
+		pthread_mutex_lock(&netopeer_options.client_keys_lock);
+
+		/* add the key */
+		if (netopeer_options.client_auth_keys == NULL) {
+			netopeer_options.client_auth_keys = calloc(1, sizeof(struct np_auth_key));
+			netopeer_options.client_auth_keys->path = strdup(path);
+			netopeer_options.client_auth_keys->username = strdup(username);
+		} else {
+			for (key = netopeer_options.client_auth_keys; key->next != NULL; key = key->next) {
+				key->next = calloc(1, sizeof(struct np_auth_key));
+				key->path = strdup(path);
+				key->username = strdup(username);
+				key->next->prev = key;
+			}
+		}
+
+		/* CLIENT KEYS UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
+	}
+
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:password-auth-enabled changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_password_auth_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.password_auth_enabled = 1;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	if (strcmp(content, "false") == 0) {
+		netopeer_options.password_auth_enabled = 0;
+	} else {
+		netopeer_options.password_auth_enabled = 1;
+	}
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:auth-attempts changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint8_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.auth_attempts = 3;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.auth_attempts = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:auth-timeout
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_ssh_n_auth_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint16_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.auth_timeout = 10;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.auth_timeout = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:response-time changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_response_time(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint16_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.response_time = 50;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.response_time = num;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /n:netopeer/n:client-removal-time changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_n_netopeer_n_client_removal_time(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL, *ptr, *msg;
+	uint16_t num;
+
+	if (op & XMLDIFF_REM) {
+		netopeer_options.client_removal_time = 10;
+		return EXIT_SUCCESS;
+	}
+
+	content = get_node_content(new_node);
+	if (content == NULL) {
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_verb_error("%s: node content missing", __func__);
+		return EXIT_FAILURE;
+	}
+
+	num = strtol(content, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", content);
+		*error = nc_err_new(NC_ERR_OP_FAILED);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+
+	netopeer_options.client_removal_time = num;
 	return EXIT_SUCCESS;
 }
 
@@ -456,7 +954,7 @@ int callback_n_netopeer(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr U
 int callback_n_netopeer_n_modules_n_module(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	xmlNodePtr tmp, node;
 	char* module_name = NULL, *module_allowed;
-	struct np_module* module = modules;
+	struct np_module* module = netopeer_options.modules;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
@@ -551,7 +1049,7 @@ int callback_n_netopeer_n_modules_n_module(void** UNUSED(data), XMLDIFF_OP op, x
 int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** UNUSED(error)) {
 	xmlNodePtr tmp, node;
 	char* module_name = NULL;
-	struct np_module* module = modules;
+	struct np_module* module = netopeer_options.modules;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
@@ -599,11 +1097,21 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
-struct transapi_data_callbacks netopeer_clbks =  {
-	.callbacks_count = 3,
+struct transapi_data_callbacks netopeer_clbks = {
+	.callbacks_count = 13,
 	.data = NULL,
 	.callbacks = {
-		{.path = "/n:netopeer", .func = callback_n_netopeer},
+		{.path = "/n:netopeer/n:hello-timeout", .func = callback_n_netopeer_n_hello_timeout},
+		{.path = "/n:netopeer/n:idle-timeout", .func = callback_n_netopeer_n_idle_timeout},
+		{.path = "/n:netopeer/n:max-sessions", .func = callback_n_netopeer_n_max_sessions},
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key},
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key},
+		{.path = "/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key", .func = callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key},
+		{.path = "/n:netopeer/n:ssh/n:password-auth-enabled", .func = callback_n_netopeer_n_ssh_n_password_auth_enabled},
+		{.path = "/n:netopeer/n:ssh/n:auth-attempts", .func = callback_n_netopeer_n_ssh_n_auth_attempts},
+		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = callback_n_netopeer_n_ssh_n_auth_timeout},
+		{.path = "/n:netopeer/n:response-time", .func = callback_n_netopeer_n_response_time},
+		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
 		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
 		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled}
 	}
@@ -639,7 +1147,7 @@ xmlNodePtr get_rpc_node(const char* name, const xmlNodePtr node) {
 
 nc_reply* rpc_netopeer_reboot(xmlNodePtr input) {
 	xmlNodePtr type_node = get_rpc_node("type", input);
-	char * type_str = NULL;
+	char* type_str = NULL;
 
 	if (type_node) {
 		type_str = (char*)xmlNodeGetContent(type_node);
@@ -652,23 +1160,23 @@ nc_reply* rpc_netopeer_reboot(xmlNodePtr input) {
 		restart_hard = 1;
 	} else {
 		free(type_str);
-		return(nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE)));
+		return nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE));
 	}
 
 	free(type_str);
 
-	return(nc_reply_ok());
+	return nc_reply_ok();
 }
 
 nc_reply* rpc_reload_module(xmlNodePtr input) {
 	xmlNodePtr module_node = get_rpc_node("module", input);
 	char* module_name;
-	struct np_module* module = modules;
+	struct np_module* module = netopeer_options.modules;
 
 	if (module_node) {
 		module_name = (char*)xmlNodeGetContent(module_node);
 	} else {
-		return(nc_reply_error(nc_err_new(NC_ERR_MISSING_ELEM)));
+		return nc_reply_error(nc_err_new(NC_ERR_MISSING_ELEM));
 	}
 
 	while (module) {
@@ -680,14 +1188,14 @@ nc_reply* rpc_reload_module(xmlNodePtr input) {
 	free(module_name);
 
 	if (module == NULL) {
-		return(nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE)));
+		return nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE));
 	}
 
 	if (module_disable(module, 0) || module_enable(module, 0)) {
-		return(nc_reply_error(nc_err_new(NC_ERR_OP_FAILED)));
+		return nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
 	}
 
-	return(nc_reply_ok());
+	return nc_reply_ok();
 }
 /*
 * Structure transapi_rpc_callbacks provide mapping between callbacks and RPC messages.
@@ -697,8 +1205,8 @@ nc_reply* rpc_reload_module(xmlNodePtr input) {
 struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 	.callbacks_count = 2,
 	.callbacks = {
-		{.name="netopeer-reboot", .func=rpc_netopeer_reboot},
-		{.name="reload-module", .func=rpc_reload_module}
+		{.name = "netopeer-reboot", .func = rpc_netopeer_reboot},
+		{.name = "reload-module", .func = rpc_reload_module}
 	}
 };
 

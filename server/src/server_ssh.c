@@ -31,6 +31,7 @@
 
 #include "server_ssh.h"
 #include "netconf_server_transapi.h"
+#include "cfgnetopeer_transapi.h"
 
 extern int quit, restart_soft;
 
@@ -40,7 +41,9 @@ extern struct client_struct* callhome_client;
 /* one global structure holding all the client information */
 struct state_struct ssh_state;
 
-/* TODO concurrent access */
+extern struct np_options netopeer_options;
+
+/* TODO concurrent access (merge with ^?) */
 extern struct bind_addr* ssh_binds;
 
 static inline void _chan_free(struct chan_struct* chan) {
@@ -270,46 +273,16 @@ void* client_notif_thread(void* arg) {
 }
 
 static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UNUSED(userdata)) {
+	struct client_struct* client;
+	struct chan_struct* chan;
 
-	(void)session;
-	(void)channel;
+	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+		return;
+	}
 
-	/* TODO something */
+	chan->to_free = 1;
 }
-
-/*static void sshcb_channel_close(ssh_session session, ssh_channel channel, void *userdata) {
-	(void)session;
-	(void)channel;
-	(void)userdata;
-	nc_verb_verbose("%s call", __func__);
-}
-
-static void sshcb_channel_signal(ssh_session session, ssh_channel channel, const char *signal, void *userdata) {
-	(void)session;
-	(void)channel;
-	(void)signal;
-	(void)userdata;
-	nc_verb_verbose("%s call", __func__);
-}
-
-static void sshcb_channel_exit_status(ssh_session session, ssh_channel channel, int exit_status, void *userdata) {
-	(void)session;
-	(void)channel;
-	(void)exit_status;
-	(void)userdata;
-	nc_verb_verbose("%s call", __func__);
-}
-
-static void sshcb_channel_exit_signal(ssh_session session, ssh_channel channel, const char *signal, int core, const char *errmsg, const char *lang, void *userdata) {
-	(void)session;
-	(void)channel;
-	(void)signal;
-	(void)core;
-	(void)errmsg;
-	(void)lang;
-	(void)userdata;
-	nc_verb_verbose("%s call", __func__);
-}*/
 
 /* returns how much of the data was processed */
 static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int UNUSED(is_stderr), void* UNUSED(userdata)) {
@@ -471,26 +444,6 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 	struct client_struct* client;
 	ssh_key pkey;
 
-	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		if (ssh_pki_import_pubkey_file(PUBKEY_FILE, &pkey) != SSH_OK) {
-			nc_verb_verbose("%s: failed to import a public key", __func__);
-			return SSH_AUTH_DENIED;
-		}
-
-		if (ssh_key_cmp(pubkey, pkey, SSH_KEY_CMP_PUBLIC) != 0) {
-			nc_verb_verbose("User '%s' tried to use an unknown public key.", user);
-			return SSH_AUTH_DENIED;
-		}
-
-		if (strcmp(user, PUBKEY_USER) != 0) {
-			nc_verb_verbose("User '%s' not the owner of the presented public key.", user);
-			return SSH_AUTH_DENIED;
-		}
-
-		/* accepting only the use of a public key */
-		return SSH_AUTH_SUCCESS;
-	}
-
 	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_AUTH_DENIED;
@@ -510,6 +463,21 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 		client->authenticated = 1;
 		nc_verb_verbose("User '%s' authenticated.", user);
 		return SSH_AUTH_SUCCESS;
+
+	} else if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
+		if (ssh_pki_import_pubkey_file(PUBKEY_FILE, &pkey) != SSH_OK) {
+			nc_verb_verbose("%s: failed to import a public key", __func__);
+
+		} else if (ssh_key_cmp(pubkey, pkey, SSH_KEY_CMP_PUBLIC) != 0) {
+			nc_verb_verbose("User '%s' tried to use an unknown public key.", user);
+
+		} else if (strcmp(user, PUBKEY_USER) != 0) {
+			nc_verb_verbose("User '%s' not the owner of the presented public key.", user);
+
+		} else {
+			/* accepting only the use of a public key */
+			return SSH_AUTH_SUCCESS;
+		}
 	}
 
 	nc_verb_verbose("Failed user '%s' authentication attempt.", user);
@@ -521,10 +489,6 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 static struct ssh_channel_callbacks_struct ssh_channel_cb = {
 	.channel_data_function = sshcb_channel_data,
 	.channel_eof_function = sshcb_channel_eof,
-	/*.channel_close_function = sshcb_channel_close,
-	.channel_signal_function = sshcb_channel_signal,
-	.channel_exit_status_function = sshcb_channel_exit_status,
-	.channel_exit_signal_function = sshcb_channel_exit_signal,*/
 	.channel_subsystem_request_function = sshcb_channel_subsystem
 };
 
@@ -788,7 +752,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 		/* GLOBAL READ UNLOCK */
 		pthread_rwlock_unlock(&ssh_state.global_lock);
 
-		usleep(CLIENT_SLEEP_TIME*1000);
+		usleep(netopeer_options.response_time*1000);
 	} while (!quit);
 
 	return NULL;
@@ -814,7 +778,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 			/* check whether the client shouldn't be freed */
 			if (cur_client->to_free) {
 				clock_gettime(CLOCK_REALTIME, &ts);
-				ts.tv_nsec += CLIENT_REMOVAL_LOCK_TIMEOUT*1000000;
+				ts.tv_nsec += netopeer_options.client_removal_time*1000000;
 				/* GLOBAL READ UNLOCK */
 				pthread_rwlock_unlock(&ssh_state.global_lock);
 				/* GLOBAL WRITE LOCK */
@@ -862,7 +826,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 			/* check the client for authentication timeout and failed attempts */
 			if (!cur_client->authenticated) {
 				gettimeofday(&cur_time, NULL);
-				if (timeval_diff(cur_time, cur_client->conn_time) >= CLIENT_AUTH_TIMEOUT) {
+				if (timeval_diff(cur_time, cur_client->conn_time) >= netopeer_options.auth_timeout) {
 					nc_verb_warning("Failed to authenticate for too long, dropping a client.");
 
 					/* mark client for deletion */
@@ -870,7 +834,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 					continue;
 				}
 
-				if (cur_client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+				if (cur_client->auth_attempts >= netopeer_options.auth_attempts) {
 					nc_verb_warning("Reached the number of failed authentication attempts, dropping a client.");
 					cur_client->to_free = 1;
 					continue;
@@ -951,7 +915,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 			skip_sleep = 0;
 		} else {
 			/* we did not do anything productive, so let the thread sleep */
-			usleep(CLIENT_SLEEP_TIME*1000);
+			usleep(netopeer_options.response_time*1000);
 		}
 	} while (!quit || ssh_state.clients != NULL);
 
@@ -1065,7 +1029,7 @@ static struct client_struct* sock_accept(struct pollfd* pollsock, unsigned int p
 
 	/* poll for a new connection */
 	errno = 0;
-	r = poll(pollsock, pollsock_count, CLIENT_SLEEP_TIME);
+	r = poll(pollsock, pollsock_count, netopeer_options.response_time);
 	if (r == 0 || (r == -1 && errno == EINTR)) {
 		/* we either timeouted or going to exit or restart */
 		return NULL;
@@ -1112,9 +1076,10 @@ static struct ssh_server_callbacks_struct ssh_server_cb = {
 };
 
 void ssh_listen_loop(int do_init) {
-	ssh_bind sshbind;
+	ssh_bind sshbind = NULL;
 	int ret;
-	struct client_struct* new_client;
+	struct client_struct* new_client, *cur_client;
+	struct chan_struct* cur_chan;
 	struct pollfd* pollsock;
 	unsigned int pollsock_count;
 
@@ -1147,19 +1112,29 @@ void ssh_listen_loop(int do_init) {
 		ssh_callbacks_init(&ssh_channel_cb);
 	}
 
-	if ((sshbind = ssh_bind_new()) == NULL) {
-		nc_verb_error("%s: failed to create SSH bind", __func__);
-		return;
-	}
-
-	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, SERVER_KEY);
-	//ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_DSAKEY, "ssh_host_dsa_key");
-
-	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
-
 	/* Main accept loop */
 	do {
 		new_client = NULL;
+
+		/* Check server keys for a change in the SSH bind */
+		if (netopeer_options.server_key_change_flag) {
+			ssh_bind_free(sshbind);
+			if ((sshbind = ssh_bind_new()) == NULL) {
+				nc_verb_error("%s: failed to create SSH bind", __func__);
+				return;
+			}
+
+			if (netopeer_options.rsa_key != NULL) {
+				ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, netopeer_options.rsa_key);
+			}
+			if (netopeer_options.dsa_key != NULL) {
+				ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, netopeer_options.dsa_key);
+			}
+
+			ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
+
+			netopeer_options.server_key_change_flag = 0;
+		}
 
 		/* Callhome client check */
 		if (callhome_check == 1 && callhome_client != NULL) {
@@ -1175,6 +1150,42 @@ void ssh_listen_loop(int do_init) {
 
 		/* New client SSH session creation */
 		if (new_client != NULL) {
+
+			/* Maximum number of sessions check */
+			if (netopeer_options.max_sessions > 0) {
+				ret = 0;
+				/* GLOBAL READ LOCK */
+				pthread_rwlock_rdlock(&ssh_state.global_lock);
+				for (cur_client = ssh_state.clients; cur_client != NULL; cur_client = cur_client->next) {
+
+					/* CLIENT LOCK */
+					pthread_mutex_lock(&cur_client->client_lock);
+					if (cur_client->ssh_chans == NULL) {
+						/* count this client as one soon-to-be valid session */
+						++ret;
+					}
+					for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
+						/* count every channel, we rather include some invalid ones than
+						* exclude some soon-to-be valid, which could cause more sessions
+						* to be allowed than max_sessions
+						*/
+						++ret;
+					}
+					/* CLIENT UNLOCK */
+					pthread_mutex_unlock(&cur_client->client_lock);
+				}
+				/* GLOBAL READ UNLOCK */
+				pthread_rwlock_unlock(&ssh_state.global_lock);
+				if (ret > netopeer_options.max_sessions) {
+					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
+					new_client->to_free = 1;
+					_client_free(new_client);
+					/* sleep to prevent clients from immediate connection retry */
+					usleep(netopeer_options.response_time*1000);
+					continue;
+				}
+			}
+
 			new_client->ssh_sess = ssh_new();
 			if (new_client->ssh_sess == NULL) {
 				nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1200,7 +1211,12 @@ void ssh_listen_loop(int do_init) {
 			}
 
 			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
-			ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHODS);
+
+			if (netopeer_options.password_auth_enabled) {
+				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
+			} else {
+				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PUBLICKEY);
+			}
 
 			if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
 				nc_verb_error("%s: failed to init mutex: %s", __func__, strerror(ret));

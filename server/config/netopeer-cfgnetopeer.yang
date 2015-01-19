@@ -85,13 +85,15 @@ module netopeer-cfgnetopeer {
           default "/etc/ssh/ssh_host_rsa_key";
           description
             "Path to a private RSA key that will be
-              used by clients for authentication.";
+              used by clients for server identity
+              confirmation.";
         }
         leaf dsa-key {
           type string;
           description
             "Path to a private DSA key that will be
-              used by clients for authentication.";
+              used by clients for server identity
+              confirmation.";
         }
       }
 
@@ -150,7 +152,7 @@ module netopeer-cfgnetopeer {
       default 50;
       description
         "Maximum number of miliseconds any client request
-          will be responded to.";
+          will almost certainly be responded to.";
     }
 
     leaf client-removal-time {
