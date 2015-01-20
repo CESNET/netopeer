@@ -11,7 +11,6 @@ struct client_ch_struct {
 	int freed;
 	pthread_mutex_t ch_lock;
 	pthread_cond_t ch_cond;
-	volatile struct timeval data_flow_time;
 };
 
 struct ch_app {

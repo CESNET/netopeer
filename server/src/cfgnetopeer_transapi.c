@@ -83,7 +83,8 @@ Feel free to use it to distinguish module behavior for different error-option va
 NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
 struct np_options netopeer_options = {
-	.client_keys_lock = PTHREAD_MUTEX_INITIALIZER
+	.client_keys_lock = PTHREAD_MUTEX_INITIALIZER,
+	.binds_lock = PTHREAD_MUTEX_INITIALIZER
 };
 
 extern struct transapi server_transapi;
@@ -380,49 +381,6 @@ int module_disable(struct np_module* module, int destroy) {
 		module_free(module);
 	}
 	return(EXIT_SUCCESS);
-}
-
-/**
- * @brief Initialize plugin after loaded and before any other functions are called.
-
- * This function should not apply any configuration data to the controlled device. If no
- * running is returned (it stays *NULL), complete startup configuration is consequently
- * applied via module callbacks. When a running configuration is returned, libnetconf
- * then applies (via module's callbacks) only the startup configuration data that
- * differ from the returned running configuration data.
-
- * Please note, that copying startup data to the running is performed only after the
- * libnetconf's system-wide close - see nc_close() function documentation for more
- * information.
-
- * @param[out] running	Current configuration of managed device.
-
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
- */
-void netopeer_transapi_close(void) {
-	struct np_auth_key* key, *del_key;
-
-	nc_verb_verbose("Netopeer cleanup.");
-
-	free(netopeer_options.rsa_key);
-	free(netopeer_options.dsa_key);
-	for (key = netopeer_options.client_auth_keys; key != NULL;) {
-		del_key = key;
-		key = key->next;
-		free(del_key->path);
-		free(del_key->username);
-		free(del_key);
-	}
-	while (netopeer_options.modules) {
-		module_disable(netopeer_options.modules, 1);
-	}
 }
 
 /**
@@ -1116,6 +1074,171 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled}
 	}
 };
+
+/**
+ * @brief Initialize plugin after loaded and before any other functions are called.
+
+ * This function should not apply any configuration data to the controlled device. If no
+ * running is returned (it stays *NULL), complete startup configuration is consequently
+ * applied via module callbacks. When a running configuration is returned, libnetconf
+ * then applies (via module's callbacks) only the startup configuration data that
+ * differ from the returned running configuration data.
+
+ * Please note, that copying startup data to the running is performed only after the
+ * libnetconf's system-wide close - see nc_close() function documentation for more
+ * information.
+
+ * @param[out] running	Current configuration of managed device.
+
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
+	xmlDocPtr doc;
+	struct nc_err* error = NULL;
+	const char* str_err;
+
+	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module...");
+
+	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><ssh><server-keys><rsa-key>/etc/ssh/ssh_host_rsa_key</rsa-key></server-keys><password-auth-enabled>true</password-auth-enabled><auth-attempts>3</auth-attempts><auth-timeout>10</auth-timeout></ssh><response-time>50</response-time><client-removal-time>10</client-removal-time></netopeer>",
+		NULL, NULL, 0);
+	if (doc == NULL) {
+		nc_verb_error("Unable to parse the default cfgnetopeer configuration.");
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_hello_timeout(NULL, XMLDIFF_ADD, NULL, doc->children->children, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_idle_timeout(NULL, XMLDIFF_ADD, NULL, doc->children->children->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_max_sessions(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->children, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_ssh_n_password_auth_enabled(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_ssh_n_auth_attempts(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_ssh_n_auth_timeout(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next->next->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_response_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	if (callback_n_netopeer_n_client_removal_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next->next, &error) != EXIT_SUCCESS) {
+		if (error != NULL) {
+			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
+			if (str_err != NULL) {
+				nc_verb_error(str_err);
+			}
+			nc_err_free(error);
+		}
+		xmlFreeDoc(doc);
+		return EXIT_FAILURE;
+	}
+
+	xmlFreeDoc(doc);
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
+ */
+void netopeer_transapi_close(void) {
+	struct np_auth_key* key, *del_key;
+
+	nc_verb_verbose("Netopeer cleanup.");
+
+	free(netopeer_options.rsa_key);
+	free(netopeer_options.dsa_key);
+	for (key = netopeer_options.client_auth_keys; key != NULL;) {
+		del_key = key;
+		key = key->next;
+		free(del_key->path);
+		free(del_key->username);
+		free(del_key);
+	}
+	while (netopeer_options.modules) {
+		module_disable(netopeer_options.modules, 1);
+	}
+}
 
 /**
  * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,

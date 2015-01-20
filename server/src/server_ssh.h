@@ -11,9 +11,6 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
-#define PUBKEY_FILE "/home/vasko/.ssh/id_rsa.pub"
-#define PUBKEY_USER "vasko"
-
 #define CLIENT_MAX_AUTH_ATTEMPTS 3
 /* time for the users to authenticate themselves, in seconds */
 #define CLIENT_AUTH_TIMEOUT 10
@@ -24,18 +21,6 @@
 #define NC_V11_END_MSG "\n##\n"
 #define NC_MAX_END_MSG_LEN 6
 
-struct ntf_thread_config {
-	struct nc_session* session;
-	nc_rpc* subscribe_rpc;
-};
-
-struct bind_addr {
-	char* addr;
-	unsigned int* ports;
-	unsigned int port_count;
-	struct bind_addr* next;
-};
-
 /* for each SSH channel of each SSH session */
 struct chan_struct {
 	ssh_channel ssh_chan;
@@ -43,6 +28,8 @@ struct chan_struct {
 	int chan_out[2];			// pipe - libssh channel write, libnetconf read
 	int netconf_subsystem;
 	struct nc_session* nc_sess;
+	pthread_t new_sess_tid;
+	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	volatile int to_free;		// is this channel valid?
 	struct chan_struct* next;
 };
@@ -79,7 +66,17 @@ struct state_struct {
 	struct client_struct* clients;
 };
 
-int timeval_diff(struct timeval tv1, struct timeval tv2);
+struct ntf_thread_config {
+	struct nc_session* session;
+	nc_rpc* subscribe_rpc;
+};
+
+struct ncsess_thread_config {
+	struct chan_struct* chan;
+	struct client_struct* client;
+};
+
+unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void ssh_listen_loop(int do_init);
 

@@ -86,8 +86,8 @@ static struct ch_app* callhome_apps = NULL;
 
 #endif
 
-void free_bind_addr(struct bind_addr** list) {
-	struct bind_addr* prev;
+void free_bind_addr(struct np_bind_addr** list) {
+	struct np_bind_addr* prev;
 
 	if (list == NULL) {
 		return;
@@ -102,8 +102,8 @@ void free_bind_addr(struct bind_addr** list) {
 	}
 }
 
-struct bind_addr* find_bind_addr(struct bind_addr* root, const char* addr) {
-	struct bind_addr* cur = NULL;
+struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, const char* addr) {
+	struct np_bind_addr* cur = NULL;
 
 	if (root == NULL || addr == NULL) {
 		return NULL;
@@ -118,8 +118,8 @@ struct bind_addr* find_bind_addr(struct bind_addr* root, const char* addr) {
 	return cur;
 }
 
-void add_bind_addr(struct bind_addr** root, const char* addr, unsigned int port) {
-	struct bind_addr* cur;
+void add_bind_addr(struct np_bind_addr** root, const char* addr, unsigned int port) {
+	struct np_bind_addr* cur;
 	unsigned int i;
 
 	if (root == NULL) {
@@ -127,7 +127,7 @@ void add_bind_addr(struct bind_addr** root, const char* addr, unsigned int port)
 	}
 
 	if (*root == NULL) {
-		*root = malloc(sizeof(struct bind_addr));;
+		*root = malloc(sizeof(struct np_bind_addr));;
 		(*root)->addr = strdup(addr);
 		(*root)->ports = malloc(sizeof(unsigned int));
 		(*root)->ports[0] = port;
@@ -151,7 +151,7 @@ void add_bind_addr(struct bind_addr** root, const char* addr, unsigned int port)
 	} else {
 		/* addr member is not in the list yet, add it */
 		for (cur = *root; cur->next != NULL; cur = cur->next);
-		cur->next = malloc(sizeof(struct bind_addr));
+		cur->next = malloc(sizeof(struct np_bind_addr));
 		cur->next->addr = strdup(addr);
 		cur->next->ports = malloc(sizeof(unsigned int));
 		cur->next->ports[0] = port;
@@ -160,8 +160,8 @@ void add_bind_addr(struct bind_addr** root, const char* addr, unsigned int port)
 	}
 }
 
-void del_bind_addr(struct bind_addr** root, const char* addr, unsigned int port) {
-	struct bind_addr* cur, *prev = NULL;
+void del_bind_addr(struct np_bind_addr** root, const char* addr, unsigned int port) {
+	struct np_bind_addr* cur, *prev = NULL;
 	unsigned int i;
 
 	if (root == NULL || addr == NULL) {
@@ -209,22 +209,22 @@ void del_bind_addr(struct bind_addr** root, const char* addr, unsigned int port)
 	}
 }
 
-struct bind_addr* deep_copy_bind_addr(struct bind_addr* root) {
-	struct bind_addr* ret = NULL, *cur, *new_cur;
+struct np_bind_addr* deep_copy_bind_addr(struct np_bind_addr* root) {
+	struct np_bind_addr* ret = NULL, *cur, *new_cur;
 
 	if (root == NULL) {
 		return NULL;
 	}
 
-	ret = malloc(sizeof(struct bind_addr));
-	memcpy(ret, root, sizeof(struct bind_addr));
+	ret = malloc(sizeof(struct np_bind_addr));
+	memcpy(ret, root, sizeof(struct np_bind_addr));
 	ret->addr = strdup(root->addr);
 	ret->ports = malloc(root->port_count*sizeof(unsigned int));
 	memcpy(ret->ports, root->ports, root->port_count*sizeof(unsigned int));
 
 	for (cur = root, new_cur = ret; cur->next != NULL; cur = cur->next, new_cur = new_cur->next) {
-		new_cur->next = malloc(sizeof(struct bind_addr));
-		memcpy(new_cur->next, cur->next, sizeof(struct bind_addr));
+		new_cur->next = malloc(sizeof(struct np_bind_addr));
+		memcpy(new_cur->next, cur->next, sizeof(struct np_bind_addr));
 		new_cur->next->addr = strdup(cur->next->addr);
 		new_cur->next->ports = malloc(cur->next->port_count*sizeof(unsigned int));
 		memcpy(new_cur->next->ports, cur->next->ports, cur->next->port_count*sizeof(unsigned int));
@@ -232,8 +232,6 @@ struct bind_addr* deep_copy_bind_addr(struct bind_addr* root) {
 
 	return ret;
 }
-
-struct bind_addr* ssh_binds = NULL;
 
 /* transAPI version which must be compatible with libnetconf */
 /* int transapi_version = 4; */
@@ -306,33 +304,46 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 	}
 	port = atoi(content);
 
+	/* BINDS LOCK */
+	pthread_mutex_lock(&netopeer_options.binds_lock);
+
 	if (op & XMLDIFF_REM) {
-		del_bind_addr(&ssh_binds, "::0", port);
+		del_bind_addr(&netopeer_options.binds, "::0", port);
+		netopeer_options.binds_change_flag = 1;
+
+		nc_verb_verbose("%s: stoppend listening on the port %d", __func__, port);
 	} else if (op & XMLDIFF_MOD) {
-		/* there must be only 2 localhosts in the global structure */
-		if (ssh_binds == NULL || ssh_binds->next != NULL || strcmp(ssh_binds->addr, "::") != 0 ||
-				ssh_binds->port_count != 1) {
+		/* there must be only the localhost in the global structure */
+		if (netopeer_options.binds == NULL || netopeer_options.binds->next != NULL ||
+				strcmp(netopeer_options.binds->addr, "::0") != 0 || netopeer_options.binds->port_count != 1) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 			return EXIT_FAILURE;
 		}
-		ssh_binds->ports[0] = port;
+		netopeer_options.binds->ports[0] = port;
+		netopeer_options.binds_change_flag = 1;
+
+		nc_verb_verbose("%s: port changed to %d", __func__, port);
 
 	} else if (op & XMLDIFF_ADD) {
-		nc_verb_verbose("%s: port %d", __func__, port);
-
 		/* listens on any IPv4 and IPv6 address */
-		add_bind_addr(&ssh_binds, "::0", port);
+		add_bind_addr(&netopeer_options.binds, "::0", port);
+		netopeer_options.binds_change_flag = 1;
+
+		nc_verb_verbose("%s: port %d", __func__, port);
 	}
+
+	/* BINDS UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.binds_lock);
 
 	return EXIT_SUCCESS;
 }
 
 int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	xmlNodePtr cur;
-	struct bind_addr* bind;
+	struct np_bind_addr* bind;
 	char* addr = NULL, *content;
 	unsigned int port = 0, old_port, i;
 
@@ -360,10 +371,14 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 		return EXIT_FAILURE;
 	}
 
+	/* BINDS LOCK */
+	pthread_mutex_lock(&netopeer_options.binds_lock);
+
 	if (op & XMLDIFF_REM) {
-		del_bind_addr(&ssh_binds, addr, port);
+		del_bind_addr(&netopeer_options.binds, addr, port);
+		netopeer_options.binds_change_flag = 1;
 	} else if (op & XMLDIFF_MOD) {
-		bind = find_bind_addr(ssh_binds, addr);
+		bind = find_bind_addr(netopeer_options.binds, addr);
 		content = get_nodes_content(old_node, NULL);
 		if (content == NULL || bind == NULL) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
@@ -377,6 +392,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 		for (i = 0; i < bind->port_count; ++i) {
 			if (bind->ports[i] == old_port) {
 				bind->ports[i] = port;
+				netopeer_options.binds_change_flag = 1;
 				break;
 			}
 		}
@@ -389,8 +405,12 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 			return EXIT_FAILURE;
 		}
 	} else if (op & XMLDIFF_ADD) {
-		add_bind_addr(&ssh_binds, addr, port);
+		add_bind_addr(&netopeer_options.binds, addr, port);
+		netopeer_options.binds_change_flag = 1;
 	}
+
+	/* BINDS UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.binds_lock);
 
 	return EXIT_SUCCESS;
 }
@@ -488,7 +508,6 @@ __attribute__((noreturn))
 static void* app_loop(void* app_v) {
 	struct ch_app* app = (struct ch_app*)app_v;
 	struct ch_server* cur_server = NULL;
-	struct chan_struct* chan;
 	struct timeval cur_time;
 	struct timespec ts;
 	int i;
@@ -536,7 +555,6 @@ static void* app_loop(void* app_v) {
 			}
 		}
 
-		gettimeofday((struct timeval*)&app->ch_st->data_flow_time, NULL);
 		app->client->callhome_st = app->ch_st;
 
 publish_client:
@@ -558,21 +576,20 @@ publish_client:
 				ts.tv_sec += CALLHOME_PERIODIC_LINGER_CHECK;
 				i = pthread_cond_timedwait(&app->ch_st->ch_cond, &app->ch_st->ch_lock, &ts);
 				if (i == ETIMEDOUT) {
-					gettimeofday(&cur_time, NULL);
-					if (timeval_diff(cur_time, app->ch_st->data_flow_time) >= app->rep_linger) {
+					if (app->client->ssh_chans == NULL) {
+						/* very weird */
+						app->client->to_free = 1;
+					} else {
+						gettimeofday(&cur_time, NULL);
+						if (timeval_diff(cur_time, app->client->ssh_chans->last_rpc_time) >= app->rep_linger) {
 
-						/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
-						nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
-						app->client->callhome_st = NULL;
-						if (app->client->ssh_chans != NULL) {
-							for (chan = app->client->ssh_chans; chan != NULL; chan = chan->next) {
-								chan->to_free = 1;
-							}
-						} else {
-							app->client->to_free = 1;
+							/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
+							nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
+							app->client->callhome_st = NULL;
+							app->client->ssh_chans->to_free = 1;
+							sleep(app->rep_timeout*60);
+							break;
 						}
-						sleep(app->rep_timeout*60);
-						break;
 					}
 				}
 			}
@@ -590,58 +607,6 @@ publish_client:
 			pthread_mutex_unlock(&app->ch_st->ch_lock);
 			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
 		}
-
-		/*if (app->connection) {
-			* periodic connection *
-			event_in.events = EPOLLET | EPOLLIN | EPOLLRDHUP;
-			timeout = 1000 * app->rep_linger;
-		} else {
-			* persistent connection *
-			event_in.events = EPOLLET | EPOLLRDHUP;
-			timeout = -1; * indefinite timeout *
-		}
-		* we do not need to close this socket,
-		 * the main thread will take care of
-		 * the whole client cleanup
-		 *
-		event_in.data.fd = new_client->sock;
-		epoll_ctl(efd, EPOLL_CTL_ADD, new_client->sock, &event_in);
-
-		for (;;) {
-			e = epoll_wait(efd, &event_out, 1, timeout);
-			if (e == 0 && app->connection) {
-				new_client->to_free = 1;
-				nc_verb_verbose("Call Home (app %s) timeout expired.", app->name);
-				sleep_flag = 1;
-				break;
-			} else if (e == -1) {
-				nc_verb_warning("Call Home (app %s) loop: epoll error (%s)", app->name, strerror(errno));
-				if (errno != EINTR) {
-					sleep_flag = 0;
-					break;
-				}
-			} else {
-				* some event occurred *
-				* in case of periodic connection, it is probably EPOLLIN,
-				 * the only reaction is to run epoll_wait() again to start idle
-				 * countdown
-				 *
-				if (event_out.events & EPOLLRDHUP) {
-					new_client->sock = -1;
-					nc_verb_verbose("Call Home (app %s) closed.", app->name);
-					sleep_flag = 1;
-					break;
-				}
-			}
-		}
-		pthread_cleanup_pop(1);
-
-		* wait if set so *
-		if (sleep_flag) {
-			* wait for timeout minutes before another connection *
-			sleep(app->rep_timeout);
-		}
-		*/
 	}
 }
 
@@ -924,16 +889,15 @@ int server_transapi_init(xmlDocPtr* UNUSED(running)) {
 	const char* str_err;
 
 	/* set device according to defaults */
-	nc_verb_verbose("Setting default configuration for ietf-netconf-server module");
+	nc_verb_verbose("Setting the default configuration for the ietf-netconf-server module...");
 
 	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&
 			ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh")) {
 		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><ssh><listen><port>830</port></listen></ssh></netconf>",
 		NULL, NULL, 0);
 		if (doc == NULL) {
-			nc_verb_error("Unable to parse default configuration.");
-			xmlFreeDoc(doc);
-			return (EXIT_FAILURE);
+			nc_verb_error("Unable to parse the default ietf-netconf-server configuration.");
+			return EXIT_FAILURE;
 		}
 
 		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
@@ -945,50 +909,10 @@ int server_transapi_init(xmlDocPtr* UNUSED(running)) {
 				nc_err_free(error);
 			}
 			xmlFreeDoc(doc);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		xmlFreeDoc(doc);
 	}
-
-#ifdef ENABLE_TLS
-	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&
-			ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
-		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
-		NULL, NULL, 0);
-		if (doc == NULL) {
-			nc_verb_error("Unable to parse default configuration.");
-			xmlFreeDoc(doc);
-			kill_sshd();
-			return (EXIT_FAILURE);
-		}
-
-		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
-			if (error != NULL) {
-				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-				if (str_err != NULL) {
-					nc_verb_error(str_err);
-				}
-				nc_err_free(error);
-			}
-			xmlFreeDoc(doc);
-			kill_sshd();
-			return (EXIT_FAILURE);
-		}
-		if (callback_srv_netconf_srv_tls_srv_listen(NULL, XMLDIFF_ADD, NULL, doc->children->children->children, &error) != EXIT_SUCCESS) {
-			if (error != NULL) {
-				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-				if (str_err != NULL) {
-					nc_verb_error(str_err);
-				}
-				nc_err_free(error);
-			}
-			xmlFreeDoc(doc);
-			kill_sshd();
-			return (EXIT_FAILURE);
-		}
-		xmlFreeDoc(doc);
-	}
-#endif
 
 	return EXIT_SUCCESS;
 }

@@ -16,8 +16,8 @@
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
 struct np_options {
-	uint32_t hello_timeout; //TODO
-	uint32_t idle_timeout; //TODO
+	uint32_t hello_timeout;
+	uint32_t idle_timeout;
 	uint16_t max_sessions;
 	uint8_t server_key_change_flag;		// flag to communicate server key change
 	char* rsa_key;
@@ -28,7 +28,7 @@ struct np_options {
 		char* username;
 		struct np_auth_key* next;
 		struct np_auth_key* prev;
-	} *client_auth_keys; //TODO
+	} *client_auth_keys;
 	uint8_t password_auth_enabled;
 	uint8_t auth_attempts;
 	uint16_t auth_timeout;
@@ -40,6 +40,14 @@ struct np_options {
 		ncds_id id; /**< Related datastore ID */
 		struct np_module* prev, *next;
 	} *modules;
+	pthread_mutex_t binds_lock;
+	uint8_t binds_change_flag;
+	struct np_bind_addr {
+		char* addr;
+		unsigned int* ports;
+		unsigned int port_count;
+		struct np_bind_addr* next;
+	} *binds;
 };
 
 /**
