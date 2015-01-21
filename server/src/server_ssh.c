@@ -961,8 +961,6 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 					/* we had some data, there may be more, sleeping may be a waste of response time */
 					skip_sleep = 1;
 
-					/* TODO libssh bug */
-					ssh_set_fd_towrite(cur_client->ssh_sess);
 					ssh_channel_write(cur_chan->ssh_chan, to_send, to_send_len);
 				}
 
