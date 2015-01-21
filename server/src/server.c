@@ -54,6 +54,8 @@
 #include "cfgnetopeer_transapi.h"
 #include "server_ssh.h"
 
+extern struct np_options netopeer_options;
+
 /* flags of main server loop, they are turned when a signal comes */
 volatile int quit = 0, restart_soft = 0, restart_hard = 0;
 
@@ -145,15 +147,14 @@ int main(int argc, char** argv) {
 	char *aux_string = NULL, path[PATH_MAX];
 	int next_option;
 	int daemonize = 0, len;
-	int verbose = 0;
 	int listen_init = 1;
 	struct np_module* netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
-		verbose = NC_VERB_ERROR;
+		netopeer_options.verbose = NC_VERB_ERROR;
 	} else {
-		verbose = atoi(aux_string);
+		netopeer_options.verbose = atoi(aux_string);
 	}
 
 	aux_string = NULL; /* for sure to avoid unwanted changes in environment */
@@ -168,7 +169,7 @@ int main(int argc, char** argv) {
 			print_usage(argv[0]);
 			break;
 		case 'v':
-			verbose = atoi(optarg);
+			netopeer_options.verbose = atoi(optarg);
 			break;
 		case 'V':
 			print_version(argv[0]);
@@ -193,13 +194,10 @@ int main(int argc, char** argv) {
 	nc_callback_print(clb_print);
 
 	/* normalize value if not from the enum */
-	if (verbose < NC_VERB_ERROR) {
-		nc_verbosity(NC_VERB_ERROR);
-	} else if (verbose > NC_VERB_DEBUG) {
-		nc_verbosity(NC_VERB_DEBUG);
-	} else {
-		nc_verbosity(verbose);
+	if (netopeer_options.verbose > NC_VERB_DEBUG) {
+		netopeer_options.verbose = NC_VERB_DEBUG;
 	}
+	nc_verbosity(netopeer_options.verbose);
 
 	/* go to the background as a daemon */
 	if (daemonize == 1) {
@@ -228,7 +226,7 @@ int main(int argc, char** argv) {
 	/* initialize library including internal datastores and maybee something more */
 	if (nc_init(NC_INIT_ALL | NC_INIT_MULTILAYER) < 0) {
 		nc_verb_error("Library initialization failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	server_start = 1;

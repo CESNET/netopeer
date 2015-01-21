@@ -1178,6 +1178,7 @@ static struct ssh_server_callbacks_struct ssh_server_cb = {
 void ssh_listen_loop(int do_init) {
 	ssh_bind sshbind = NULL;
 	int ret;
+	char verb_str[2];
 	struct client_struct* new_client, *cur_client;
 	struct chan_struct* cur_chan;
 	struct pollfd* pollsock = NULL;
@@ -1201,7 +1202,7 @@ void ssh_listen_loop(int do_init) {
 
 		ssh_threads_set_callbacks(ssh_threads_get_pthread());
 		ssh_init();
-		ssh_set_log_level(3);
+		ssh_set_log_level(netopeer_options.verbose);
 		ssh_callbacks_init(&ssh_server_cb);
 		ssh_callbacks_init(&ssh_channel_cb);
 	}
@@ -1242,7 +1243,8 @@ void ssh_listen_loop(int do_init) {
 				ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, netopeer_options.dsa_key);
 			}
 
-			ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, "3");
+			sprintf(verb_str, "%d", netopeer_options.verbose);
+			ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, verb_str);
 
 			netopeer_options.server_key_change_flag = 0;
 		}

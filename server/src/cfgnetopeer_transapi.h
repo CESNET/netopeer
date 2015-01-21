@@ -16,6 +16,7 @@
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
 struct np_options {
+	uint8_t verbose;
 	uint32_t hello_timeout;
 	uint32_t idle_timeout;
 	uint16_t max_sessions;
