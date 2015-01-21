@@ -39,7 +39,7 @@ extern int callhome_check;
 extern struct client_struct* callhome_client;
 
 /* one global structure holding all the client information */
-struct state_struct ssh_state;
+struct state_struct netopeer_state;
 
 extern struct np_options netopeer_options;
 
@@ -308,7 +308,7 @@ static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UN
 	struct client_struct* client;
 	struct chan_struct* chan;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return;
 	}
@@ -322,7 +322,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 	struct chan_struct* chan;
 	int ret;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return 0;
 	}
@@ -360,7 +360,7 @@ static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, con
 	struct ncsess_thread_config* nstc;
 	int ret;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_ERROR;
 	}
@@ -458,7 +458,7 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	struct client_struct* client;
 	char* pass_hash;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_AUTH_DENIED;
 	}
@@ -526,7 +526,7 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 	struct client_struct* client;
 	char* username;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_AUTH_DENIED;
 	}
@@ -578,7 +578,7 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 	struct client_struct* client;
 	struct chan_struct* cur_chan;
 
-	if ((client = client_find_by_sshsession(ssh_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return NULL;
 	}
@@ -625,9 +625,9 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 
 	do {
 		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&ssh_state.global_lock);
+		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
-		for (client = ssh_state.clients; client != NULL; client = client->next) {
+		for (client = netopeer_state.clients; client != NULL; client = client->next) {
 			if (client->to_free) {
 				continue;
 			}
@@ -711,7 +711,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 					}
 
 					/* find the requested session (channel) */
-					for (kill_client = ssh_state.clients; kill_client != NULL; kill_client = kill_client->next) {
+					for (kill_client = netopeer_state.clients; kill_client != NULL; kill_client = kill_client->next) {
 						if (kill_client == client) {
 							continue;
 						}
@@ -823,7 +823,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 		}
 
 		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&ssh_state.global_lock);
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 		usleep(netopeer_options.response_time*1000);
 	} while (!quit);
@@ -844,33 +844,33 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 
 	do {
 		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&ssh_state.global_lock);
+		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
 		/* go through all the clients */
-		for (cur_client = ssh_state.clients; cur_client != NULL; cur_client = cur_client->next) {
+		for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
 			/* check whether the client shouldn't be freed */
 			if (cur_client->to_free) {
 				clock_gettime(CLOCK_REALTIME, &ts);
 				ts.tv_nsec += netopeer_options.client_removal_time*1000000;
 				/* GLOBAL READ UNLOCK */
-				pthread_rwlock_unlock(&ssh_state.global_lock);
+				pthread_rwlock_unlock(&netopeer_state.global_lock);
 				/* GLOBAL WRITE LOCK */
-				if ((ret = pthread_rwlock_timedwrlock(&ssh_state.global_lock, &ts)) != 0) {
+				if ((ret = pthread_rwlock_timedwrlock(&netopeer_state.global_lock, &ts)) != 0) {
 					if (ret != ETIMEDOUT) {
 						nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
 					}
 					/* GLOBAL READ LOCK */
-					pthread_rwlock_rdlock(&ssh_state.global_lock);
+					pthread_rwlock_rdlock(&netopeer_state.global_lock);
 					/* continue with the next client again holding the read lock */
 					continue;
 				}
 
-				client_remove(&ssh_state.clients, cur_client);
+				client_remove(&netopeer_state.clients, cur_client);
 
 				/* GLOBAL WRITE UNLOCK */
-				pthread_rwlock_unlock(&ssh_state.global_lock);
+				pthread_rwlock_unlock(&netopeer_state.global_lock);
 				/* GLOBAL READ LOCK */
-				pthread_rwlock_rdlock(&ssh_state.global_lock);
+				pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
 				/* do not sleep, we may be exiting based on a signal received,
 				 * so remove all the clients without wasting time */
@@ -995,7 +995,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 		}
 
 		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&ssh_state.global_lock);
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 		if (skip_sleep) {
 			skip_sleep = 0;
@@ -1003,7 +1003,7 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 			/* we did not do anything productive, so let the thread sleep */
 			usleep(netopeer_options.response_time*1000);
 		}
-	} while (!quit || ssh_state.clients != NULL);
+	} while (!quit || netopeer_state.clients != NULL);
 
 	free(to_send);
 	return NULL;
@@ -1184,16 +1184,16 @@ void ssh_listen_loop(int do_init) {
 
 	/* Init */
 	if (do_init) {
-		if ((ret = pthread_rwlock_init(&ssh_state.global_lock, NULL)) != 0) {
+		if ((ret = pthread_rwlock_init(&netopeer_state.global_lock, NULL)) != 0) {
 			nc_verb_error("%s: failed to init mutex (%s)", __func__, strerror(ret));
 			return;
 		}
 
-		if ((ret = pthread_create(&ssh_state.ssh_data_tid, NULL, ssh_data_thread, NULL)) != 0) {
+		if ((ret = pthread_create(&netopeer_state.ssh_data_tid, NULL, ssh_data_thread, NULL)) != 0) {
 			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
 			return;
 		}
-		if ((ret = pthread_create(&ssh_state.netconf_rpc_tid, NULL, netconf_rpc_thread, NULL)) != 0) {
+		if ((ret = pthread_create(&netopeer_state.netconf_rpc_tid, NULL, netconf_rpc_thread, NULL)) != 0) {
 			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
 			return;
 		}
@@ -1214,10 +1214,10 @@ void ssh_listen_loop(int do_init) {
 			/* BINDS LOCK */
 			pthread_mutex_lock(&netopeer_options.binds_lock);
 
-			netopeer_options.binds_change_flag = 0;
 			sock_cleanup(pollsock, pollsock_count);
 			pollsock = sock_listen(netopeer_options.binds, &pollsock_count);
 
+			netopeer_options.binds_change_flag = 0;
 			/* BINDS UNLOCK */
 			pthread_mutex_unlock(&netopeer_options.binds_lock);
 
@@ -1266,8 +1266,8 @@ void ssh_listen_loop(int do_init) {
 			if (netopeer_options.max_sessions > 0) {
 				ret = 0;
 				/* GLOBAL READ LOCK */
-				pthread_rwlock_rdlock(&ssh_state.global_lock);
-				for (cur_client = ssh_state.clients; cur_client != NULL; cur_client = cur_client->next) {
+				pthread_rwlock_rdlock(&netopeer_state.global_lock);
+				for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
 
 					/* CLIENT LOCK */
 					pthread_mutex_lock(&cur_client->client_lock);
@@ -1286,7 +1286,7 @@ void ssh_listen_loop(int do_init) {
 					pthread_mutex_unlock(&cur_client->client_lock);
 				}
 				/* GLOBAL READ UNLOCK */
-				pthread_rwlock_unlock(&ssh_state.global_lock);
+				pthread_rwlock_unlock(&netopeer_state.global_lock);
 				if (ret > netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
 					new_client->to_free = 1;
@@ -1345,10 +1345,10 @@ void ssh_listen_loop(int do_init) {
 
 			/* add the client into the global clients structure */
 			/* GLOBAL WRITE LOCK */
-			pthread_rwlock_wrlock(&ssh_state.global_lock);
-			client_append(&ssh_state.clients, new_client);
+			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			client_append(&netopeer_state.clients, new_client);
 			/* GLOBAL WRITE UNLOCK */
-			pthread_rwlock_unlock(&ssh_state.global_lock);
+			pthread_rwlock_unlock(&netopeer_state.global_lock);
 		}
 
 	} while (!quit && !restart_soft);
@@ -1359,18 +1359,18 @@ void ssh_listen_loop(int do_init) {
 	if (!restart_soft) {
 		/* TODO a total timeout after which we cancel and free clients by force? */
 		/* wait for all the clients to exit nicely themselves */
-		if ((ret = pthread_join(ssh_state.netconf_rpc_tid, NULL)) != 0) {
+		if ((ret = pthread_join(netopeer_state.netconf_rpc_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the netconf RPC thread (%s)", __func__, strerror(ret));
 		}
 
-		client_mark_all_channels_for_cleanup(&ssh_state.clients);
+		client_mark_all_channels_for_cleanup(&netopeer_state.clients);
 
-		if ((ret = pthread_join(ssh_state.ssh_data_tid, NULL)) != 0) {
+		if ((ret = pthread_join(netopeer_state.ssh_data_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
 
 		ssh_finalize();
 
-		pthread_rwlock_destroy(&ssh_state.global_lock);
+		pthread_rwlock_destroy(&netopeer_state.global_lock);
 	}
 }
