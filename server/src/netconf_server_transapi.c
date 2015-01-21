@@ -93,7 +93,7 @@ void free_bind_addr(struct np_bind_addr** list) {
 		return;
 	}
 
-	for (; *list != NULL;) {
+	while (*list != NULL) {
 		prev = *list;
 		*list = (*list)->next;
 		free(prev->addr);
@@ -921,7 +921,9 @@ int server_transapi_init(xmlDocPtr* UNUSED(running)) {
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void server_transapi_close(void) {
-	return;
+	pthread_mutex_lock(&netopeer_options.binds_lock);
+	free_bind_addr(&netopeer_options.binds);
+	pthread_mutex_unlock(&netopeer_options.binds_lock);
 }
 
 /*
