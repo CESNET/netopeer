@@ -1244,8 +1244,8 @@ void ssh_listen_loop(int do_init) {
 		/* Callhome client check */
 		if (callhome_check == 1 && callhome_client != NULL) {
 			new_client = callhome_client;
-			callhome_client = NULL;
 			callhome_check = 0;
+			callhome_client = NULL;
 		}
 
 		/* Listen client check */
