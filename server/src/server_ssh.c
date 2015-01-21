@@ -551,7 +551,7 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 			nc_verb_verbose("User '%s' tried to use an unknown (unauthorized) public key.", user);
 
 		} else if (strcmp(user, username) != 0) {
-			nc_verb_verbose("User '%s' is not the username of the presented public key.", user);
+			nc_verb_verbose("User '%s' is not the username identified with the presented public key.", user);
 			free(username);
 
 		} else {
@@ -1307,6 +1307,14 @@ void ssh_listen_loop(int do_init) {
 				continue;
 			}
 
+			if (netopeer_options.password_auth_enabled) {
+				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
+			} else {
+				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PUBLICKEY);
+			}
+
+			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
+
 			if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) == SSH_ERROR) {
 				nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
 				new_client->to_free = 1;
@@ -1321,14 +1329,6 @@ void ssh_listen_loop(int do_init) {
 				new_client->to_free = 1;
 				_client_free(new_client);
 				continue;
-			}
-
-			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
-
-			if (netopeer_options.password_auth_enabled) {
-				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
-			} else {
-				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PUBLICKEY);
 			}
 
 			if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
