@@ -38,16 +38,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 #include <errno.h>
-#include <libgen.h>
 #include <signal.h>
-#include <limits.h>
 #include <syslog.h>
-
-#include <libxml/tree.h>
-#include <libxml/parser.h>
 
 #include <libnetconf_xml.h>
 
