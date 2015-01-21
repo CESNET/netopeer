@@ -48,8 +48,6 @@ includedir = @includedir@
 libdir =  @libdir@
 mandir = @mandir@
 sysconfdir = @sysconfdir@
-dbusconfdir = @DBUSCONF@
-dbusservices = @DBUSSERVICES@
 modulesdir = @MODULESDIR@
 
 TOPDIR = @CONFIGURE_PWD@
@@ -104,10 +102,7 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \
 	config/NETCONF-server.xml.in \
-	config/org.liberouter.netopeer.conf.in \
-	config/org.liberouter.netopeer.server.service.in \
-	config/Netopeer.xml.in \
-	stunnel/stunnel.conf.in
+	config/Netopeer.xml.in
 
 MANPAGES = manager/netopeer-manager.1 \
 	netopeer-server.8 \
@@ -210,14 +205,6 @@ install: $(SERVER) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
 	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool)))
-	if test -n "$(dbusconfdir)"; then \
-		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
-	fi
-	if test -n "$(dbusservices)"; then \
-		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
-	fi
 	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
 	for i in $(SERVER_MODULES_CONF); do \
 		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
@@ -228,30 +215,6 @@ install: $(SERVER) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	done
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	@if test ! -f $(CFGDIR)/sshd_config; then \
-		if test -f /etc/ssh/sshd_config; then \
-			grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
-		else \
-			touch $(CFGDIR)/sshd_config; \
-		fi; \
-		echo "" >> $(CFGDIR)/sshd_config; \
-		echo "# NETCONF SSH Subsystem settings" >> $(CFGDIR)/sshd_config; \
-		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
-	fi
-	chmod 600 $(CFGDIR)/sshd_config;
-	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
-	@if test -n "@TLS@"; then \
-		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); sub(/{BINDIR}/, "'$(BINDIR)'"); sub(/{AGENT}/, "'$(AGENT)'"); print}' config/stunnel_config.in > config/stunnel_config; \
-		$(INSTALL) -d $(CFGDIR)/stunnel/; \
-		$(INSTALL_DATA_PRIVATE) config/stunnel_config $(CFGDIR)/; \
-		rm -rf config/stunnel_config; \
-		$(INSTALL_DATA_PRIVATE) stunnel/server.* $(CFGDIR)/stunnel; \
-		$(INSTALL) -d $(CFGDIR)/stunnel/certs; \
-		$(INSTALL) -d $(CFGDIR)/stunnel/crl; \
-		$(INSTALL_DATA_PRIVATE) stunnel/ca_rootCA.pem $(CFGDIR)/stunnel/certs; \
-		c_rehash $(CFGDIR)/stunnel/certs; \
-		echo "NOTE: Check $(CFGDIR)/stunnel_config for NETCONF TLS server configuration."; \
-	fi
 	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
 	if test -n "$(MANHTMLS)"; then \
 		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \

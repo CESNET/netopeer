@@ -620,13 +620,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 MODULESDIR
-NCSERVER_FEATURES
-AGENT_LIBS
 SERVER_LIBS
-SERVER_HDRS_COMM
-AGENT_HDRS_COMM
-SERVER_SRCS_COMM
-AGENT_SRCS_COMM
 DISTRO
 LIBNETCONF_DATADIR
 CONFIGURE_PARAMS
@@ -648,12 +642,6 @@ build_os
 build_vendor
 build_cpu
 build
-DBUSSERVICESFILE
-DBUSSERVICES
-DBUSCONFFILE
-DBUSCONF
-LIBDBUS_LIBS
-LIBDBUS_CFLAGS
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -670,14 +658,9 @@ LDFLAGS
 CFLAGS
 CC
 RPMBUILD
-C_REHASH
 UNAME
-STUNNEL_EXEC
-TLS
-DBUSPOLICY
 GROUPDEFINE
 GROUP
-SSHD_EXEC
 ROFF2HTML
 PKG_CONFIG
 CONFIGURE_PWD
@@ -725,17 +708,10 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-with_sshd
 with_distro
 enable_debug
 with_group
-enable_dbus
-enable_tls
-with_stunnel
 with_libnetconf
-with_libdbus
-with_dbus_config_dir
-with_dbus_services
 with_modules_dir
 '
       ac_precious_vars='build_alias
@@ -751,8 +727,6 @@ PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 LIBNETCONF_CFLAGS
 LIBNETCONF_LIBS
-LIBDBUS_CFLAGS
-LIBDBUS_LIBS
 CPP'
 
 
@@ -1368,34 +1342,16 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
-  --disable-dbus          Use UNIX sockets instead of DBus.
-  --enable-tls            Enable support for NETCONF over TLS using OpenSSL
-                          (and Stunnel).
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-sshd=PATH        Set absolute path to the SSH daemon (searched in
-                          PATH by default)
   --with-distro=DISTRO    Compile for specific Linux distribution (RHEL based
                           by default)
   --with-group=GROUP      Limit access to Netopeer server only to the
                           specified group of users
-  --with-stunnel=PATH     Set absolute path to the stunnel (TLS daemon). Makes
-                          sense only with --enable-tls option, by default it
-                          is searched in PATH.
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
-  --with-libdbus=PATH     Set explicit installation prefix to the libdbus
-                          library
-  --with-dbus-config-dir=DIR
-                          path to D-Bus config files (/etc/dbus-1/system.d/ by
-                          default)
-  --with-dbus-services[=DIR]
-                          path to D-Bus services directory
-                          (/usr/share/dbus-1/system-services/ by default), if
-                          this parameter is not used, service file for
-                          netopeer-server is not installed!
   --with-modules-dir=DIR  path to directory where netopeer modules
                           configuration will be stored
                           ($(sysconfdir)/netopeer/modules.conf.d/ by default)
@@ -1418,10 +1374,6 @@ Some influential environment variables:
               C compiler flags for LIBNETCONF, overriding pkg-config
   LIBNETCONF_LIBS
               linker flags for LIBNETCONF, overriding pkg-config
-  LIBDBUS_CFLAGS
-              C compiler flags for LIBDBUS, overriding pkg-config
-  LIBDBUS_LIBS
-              linker flags for LIBDBUS, overriding pkg-config
   CPP         C preprocessor
 
 Use these variables to override the choices made by `configure' or to help
@@ -2590,75 +2542,6 @@ fi
 
 
 
-# Check for sshd (OpenSSH).
-
-# Check whether --with-sshd was given.
-if test "${with_sshd+set}" = set; then :
-  withval=$with_sshd; if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
-		SSHD_EXEC="";
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for sshd" >&5
-$as_echo_n "checking for sshd... " >&6; }
-		SSHD_EXEC="$with_sshd";
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $SSHD_EXEC" >&5
-$as_echo "$SSHD_EXEC" >&6; }
-	fi
-else
-  SSHD_EXEC="";
-
-fi
-
-
-if test -z "$SSHD_EXEC"; then
-	# Extract the first word of "sshd", so it can be a program name with args.
-set dummy sshd; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_SSHD_EXEC+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $SSHD_EXEC in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_SSHD_EXEC="$SSHD_EXEC" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_SSHD_EXEC="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_SSHD_EXEC" && ac_cv_path_SSHD_EXEC="no"
-  ;;
-esac
-fi
-SSHD_EXEC=$ac_cv_path_SSHD_EXEC
-if test -n "$SSHD_EXEC"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SSHD_EXEC" >&5
-$as_echo "$SSHD_EXEC" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test "x$SSHD_EXEC" = "xno"; then
-	as_fn_error $? "\"sshd\" not found." "$LINENO" 5
-fi
-if test ! -x "$SSHD_EXEC"; then
-	as_fn_error $? "SSH daemon \"$SSHD_EXEC\" is not executable file." "$LINENO" 5
-fi
-
 # check for Linux distribution
 
 # Check whether --with-distro was given.
@@ -2708,13 +2591,11 @@ if test "${with_group+set}" = set; then :
   withval=$with_group;
 		GROUP="$with_group"
 		GROUPDEFINE="#define GROUP \"$with_group\""
-		DBUSPOLICY="group=\"$with_group\""
 		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
 
 else
   GROUP=""
 	GROUPDEFINE="#undef GROUP"
-	DBUSPOLICY="context=\"default\""
 
 fi
 
@@ -2722,121 +2603,6 @@ fi
 $as_echo "$GROUP" >&6; }
 
 
-
-
-# Check whether --enable-dbus was given.
-if test "${enable_dbus+set}" = set; then :
-  enableval=$enable_dbus; if test "$enableval" = "no"; then
-		dbus="no"
-		CPPFLAGS="$CPPFLAGS -DDISABLE_DBUS"
-	else
-		dbus="yes"
-	fi
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-dbus"
-
-else
-  # use DBus by default
-	dbus="yes"
-
-fi
-
-if test "$dbus" = "yes"; then
-	HDRS_COMM="src/netopeer_dbus.h src/server_operations_dbus.h"
-	SRCS_COMM="src/netopeer_dbus.c src/server_operations_dbus.c"
-	HDRS_AGENT_COMM="comm_dbus.h"
-	SRCS_AGENT_COMM="comm_dbus.c"
-else
-	HDRS_AGENT_COMM="comm_socket.h"
-	SRCS_AGENT_COMM="comm_socket.c"
-fi
-
-tls="no"
-NCSERVER_FEATURES=""
-# Check whether --enable-tls was given.
-if test "${enable_tls+set}" = set; then :
-  enableval=$enable_tls; if test "$enableval" = "yes"; then
-		tls="yes"
-		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
-	fi
-	TLS="yes"
-
-
-fi
-
-
-
-# Check whether --with-stunnel was given.
-if test "${with_stunnel+set}" = set; then :
-  withval=$with_stunnel; if test -z "$with_stunnel" -o "x$with_stunnel" = "xyes"; then
-		STUNNEL_EXEC="";
-	else
-		STUNNEL_EXEC="$with_stunnel";
-	fi
-else
-  STUNNEL_EXEC=""
-
-fi
-
-
-if test "$tls" = "yes"; then
-	# check stunnel
-	if test -z "$STUNNEL_EXEC"; then
-		# Extract the first word of "stunnel", so it can be a program name with args.
-set dummy stunnel; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_STUNNEL_EXEC+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $STUNNEL_EXEC in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_STUNNEL_EXEC="$STUNNEL_EXEC" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_STUNNEL_EXEC="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_STUNNEL_EXEC" && ac_cv_path_STUNNEL_EXEC="no"
-  ;;
-esac
-fi
-STUNNEL_EXEC=$ac_cv_path_STUNNEL_EXEC
-if test -n "$STUNNEL_EXEC"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $STUNNEL_EXEC" >&5
-$as_echo "$STUNNEL_EXEC" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for stunnel" >&5
-$as_echo_n "checking for stunnel... " >&6; }
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $STUNNEL_EXEC" >&5
-$as_echo "$STUNNEL_EXEC" >&6; }
-	fi
-	if test "x$STUNNEL_EXEC" = "xno"; then
-		as_fn_error $? "Missing stunnel required for NETCONF over TLS transport." "$LINENO" 5
-	elif test ! -x "$STUNNEL_EXEC"; then
-		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" is not executable file." "$LINENO" 5
-	elif ! $STUNNEL_EXEC -version 2>&1 | grep netopeer &>/dev/null; then
-		as_fn_error $? "TLS daemon \"$STUNNEL_EXEC\" not patched, read README in \"server/stunnel\"." "$LINENO" 5
-	fi
-fi
 
 ############################ Check for programs ################################
 
@@ -2918,55 +2684,6 @@ $as_echo "$target_cpu" >&6; }
         as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
         ;;
 esac
-
-#check for c_rehash
-if test "$tls" = "yes"; then
-	# Extract the first word of "c_rehash", so it can be a program name with args.
-set dummy c_rehash; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_C_REHASH+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $C_REHASH in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_C_REHASH="$C_REHASH" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_C_REHASH="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_C_REHASH" && ac_cv_path_C_REHASH="no"
-  ;;
-esac
-fi
-C_REHASH=$ac_cv_path_C_REHASH
-if test -n "$C_REHASH"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $C_REHASH" >&5
-$as_echo "$C_REHASH" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-	if test "$C_REHASH" = "no"; then
-		as_fn_error $? "\"c_rehash not found!\"" "$LINENO" 5
-	fi
-
-fi
 
 # Check python for manager and configurator
 
@@ -4347,10 +4064,131 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&5
-$as_echo "$as_me: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&2;}; CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME"
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&5
+$as_echo "$as_me: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&2;};
+		CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME";
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
+$as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char ncntf_dispatch_receive ();
+int
+main ()
+{
+return ncntf_dispatch_receive ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ncntf_dispatch_receive=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
+
+else
+  ac_cv_search_ncntf_dispatch_receive=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ncntf_dispatch_receive" >&5
+$as_echo "$ac_cv_search_ncntf_dispatch_receive" >&6; }
+ac_res=$ac_cv_search_ncntf_dispatch_receive
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+
+			as_fn_error $? "libnetconf does not support notifications." "$LINENO" 5;
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_init" >&5
+$as_echo_n "checking for library containing nc_init... " >&6; }
+if ${ac_cv_search_nc_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char nc_init ();
+int
+main ()
+{
+return nc_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' netconf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_nc_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_nc_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_nc_init+:} false; then :
+
+else
+  ac_cv_search_nc_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_init" >&5
+$as_echo "$ac_cv_search_nc_init" >&6; }
+ac_res=$ac_cv_search_nc_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "libnetconf not found!" "$LINENO" 5
+fi
+
 
 fi
+
+
+fi
+
 
 
 
@@ -4580,372 +4418,9 @@ fi
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_init" >&5
-$as_echo_n "checking for library containing nc_init... " >&6; }
-if ${ac_cv_search_nc_init+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char nc_init ();
-int
-main ()
-{
-return nc_init ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' netconf; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_nc_init=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_nc_init+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_nc_init+:} false; then :
-
-else
-  ac_cv_search_nc_init=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_nc_init" >&5
-$as_echo "$ac_cv_search_nc_init" >&6; }
-ac_res=$ac_cv_search_nc_init
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "libnetconf not found." "$LINENO" 5
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
-$as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
-if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ncntf_dispatch_receive ();
-int
-main ()
-{
-return ncntf_dispatch_receive ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' netconf; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_ncntf_dispatch_receive=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
-
-else
-  ac_cv_search_ncntf_dispatch_receive=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ncntf_dispatch_receive" >&5
-$as_echo "$ac_cv_search_ncntf_dispatch_receive" >&6; }
-ac_res=$ac_cv_search_ncntf_dispatch_receive
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "libnetconf does not support notifications." "$LINENO" 5
-fi
 
 REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
-
-# libdbus
-if test "$dbus" = "yes"; then
-
-	AGENT_SRCS_COMM="src/agent_comm_dbus.c"
-	SERVER_SRCS_COMM="src/server_comm_dbus.c"
-	AGENT_HDRS_COMM="src/netopeer_dbus.h"
-	SERVER_HDRS_COMM="src/netopeer_dbus.h"
-
-	# - library
-
-# Check whether --with-libdbus was given.
-if test "${with_libdbus+set}" = set; then :
-  withval=$with_libdbus; CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-		LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
-
-else
-
-		# get info from pkg-config about installed package
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for LIBDBUS" >&5
-$as_echo_n "checking for LIBDBUS... " >&6; }
-
-if test -n "$LIBDBUS_CFLAGS"; then
-    pkg_cv_LIBDBUS_CFLAGS="$LIBDBUS_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"dbus-1 >= 1.0.0\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "dbus-1 >= 1.0.0") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_LIBDBUS_CFLAGS=`$PKG_CONFIG --cflags "dbus-1 >= 1.0.0" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$LIBDBUS_LIBS"; then
-    pkg_cv_LIBDBUS_LIBS="$LIBDBUS_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"dbus-1 >= 1.0.0\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "dbus-1 >= 1.0.0") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_LIBDBUS_LIBS=`$PKG_CONFIG --libs "dbus-1 >= 1.0.0" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
-        else
-	        LIBDBUS_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "dbus-1 >= 1.0.0" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$LIBDBUS_PKG_ERRORS" >&5
-
-	as_fn_error $? "Package requirements (dbus-1 >= 1.0.0) were not met:
-
-$LIBDBUS_PKG_ERRORS
-
-Consider adjusting the PKG_CONFIG_PATH environment variable if you
-installed software in a non-standard prefix.
-
-Alternatively, you may set the environment variables LIBDBUS_CFLAGS
-and LIBDBUS_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details." "$LINENO" 5
-elif test $pkg_failed = untried; then
-     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
-is in your PATH or set the PKG_CONFIG environment variable to the full
-path to pkg-config.
-
-Alternatively, you may set the environment variables LIBDBUS_CFLAGS
-and LIBDBUS_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
-
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.
-See \`config.log' for more details" "$LINENO" 5; }
-else
-	LIBDBUS_CFLAGS=$pkg_cv_LIBDBUS_CFLAGS
-	LIBDBUS_LIBS=$pkg_cv_LIBDBUS_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-fi
-		CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
-		LIBS="$LIBDBUS_LIBS $LIBS"
-
-fi
-
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dbus_bus_get" >&5
-$as_echo_n "checking for library containing dbus_bus_get... " >&6; }
-if ${ac_cv_search_dbus_bus_get+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char dbus_bus_get ();
-int
-main ()
-{
-return dbus_bus_get ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' dbus-1; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_dbus_bus_get=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_dbus_bus_get+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_dbus_bus_get+:} false; then :
-
-else
-  ac_cv_search_dbus_bus_get=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dbus_bus_get" >&5
-$as_echo "$ac_cv_search_dbus_bus_get" >&6; }
-ac_res=$ac_cv_search_dbus_bus_get
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "libdbus not found." "$LINENO" 5
-fi
-
-
-	# - configuration directory
-
-# Check whether --with-dbus-config-dir was given.
-if test "${with_dbus_config_dir+set}" = set; then :
-  withval=$with_dbus_config_dir; DBUSCONF="$withval"
-
-else
-  DBUSCONF="/etc/dbus-1/system.d/"
-
-fi
-
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus configuration directory $DBUSCONF" >&5
-$as_echo_n "checking for existence of D-Bus configuration directory $DBUSCONF... " >&6; }
-	if test ! -d "$DBUSCONF"; then
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
-$as_echo "missing" >&6; }
-		as_fn_error $? "Wrong D-Bus configuration path, $DBUSCONF does not exist." "$LINENO" 5
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
-$as_echo "ok" >&6; }
-		DBUSCONFFILE="$DBUSCONF/org.liberouter.netopeer.conf"
-
-
-	fi
-
-	# - services directory
-
-# Check whether --with-dbus-services was given.
-if test "${with_dbus_services+set}" = set; then :
-  withval=$with_dbus_services; if test "$withval" = "yes"; then
-				DBUSSERVICES="/usr/share/dbus-1/system-services/"
-			else
-				DBUSSERVICES="$withval"
-			fi
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for existence of D-Bus services directory $DBUSSERVICES" >&5
-$as_echo_n "checking for existence of D-Bus services directory $DBUSSERVICES... " >&6; }
-			if test ! -d "$DBUSSERVICES"; then
-				{ $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
-$as_echo "missing" >&6; }
-				as_fn_error $? "Wrong D-Bus service path
-else
-  $DBUSSERVICES does not exist." "$LINENO" 5
-			else
-				{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
-$as_echo "ok" >&6; }
-
-			fi
-			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
-			DBUSSERVICESFILE="$DBUSSERVICES/org.liberouter.netopeer.server.service"
-
-
-
-fi
-
-
-	# - spec file dependencies
-	case $DISTRO in
-		suse )
-			BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
-			REQS="$REQS dbus-1 >= 1.0.0"
-			;;
-		* )
-			# RH distros
-			BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
-			REQS="$REQS dbus >= 1.0.0"
-			;;
-	esac
-else
-	AGENT_SRCS_COMM="src/agent_comm_socket.c src/comm_socket.c"
-	SERVER_SRCS_COMM="src/server_comm_socket.c src/comm_socket.c"
-	AGENT_HDRS_COMM="src/netopeer_socket.h"
-	SERVER_HDRS_COMM="src/netopeer_socket.h"
-fi
 
 SERVER_LIBS=$LIBS
 
@@ -5849,7 +5324,7 @@ fi
 
 done
 
-for ac_header in dbus/dbus.h libnetconf_xml.h libxml/tree.h
+for ac_header in libnetconf_xml.h libxml/tree.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -5982,14 +5457,6 @@ done
 
 
 
-
-
-
-
-
-
-
-
 if test -z "$RPMBUILD"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&5
 $as_echo "$as_me: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&2;}
@@ -5998,10 +5465,6 @@ fi
 ac_config_files="$ac_config_files Makefile"
 
 ac_config_files="$ac_config_files manager/netopeer-manager.tmp:manager/netopeer-manager.in"
-
-ac_config_files="$ac_config_files config/org.liberouter.netopeer.conf"
-
-ac_config_files="$ac_config_files config/org.liberouter.netopeer.server.service"
 
 ac_config_files="$ac_config_files config/Netopeer.xml.tmp:config/Netopeer.xml.in"
 
@@ -6014,8 +5477,6 @@ ac_config_files="$ac_config_files config/netopeer-cfgnetopeer-data.rng"
 ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
-
-ac_config_files="$ac_config_files src/config.h"
 
 ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
@@ -6728,15 +6189,12 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "manager/netopeer-manager.tmp") CONFIG_FILES="$CONFIG_FILES manager/netopeer-manager.tmp:manager/netopeer-manager.in" ;;
-    "config/org.liberouter.netopeer.conf") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.conf" ;;
-    "config/org.liberouter.netopeer.server.service") CONFIG_FILES="$CONFIG_FILES config/org.liberouter.netopeer.server.service" ;;
     "config/Netopeer.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml.tmp:config/Netopeer.xml.in" ;;
     "config/NETCONF-server.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in" ;;
     "config/ietf-netconf-server-data.rng") CONFIG_FILES="$CONFIG_FILES config/ietf-netconf-server-data.rng" ;;
     "config/netopeer-cfgnetopeer-data.rng") CONFIG_FILES="$CONFIG_FILES config/netopeer-cfgnetopeer-data.rng" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
-    "src/config.h") CONFIG_FILES="$CONFIG_FILES src/config.h" ;;
     "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
