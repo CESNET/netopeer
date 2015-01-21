@@ -494,13 +494,7 @@ fail:
 	return NULL;
 }
 
-/* --!!-- used as a pseudo lock --!!--
- *
- * The only inaccessible state is:
- *		callhome_check == 0
- *		callhome_client != NULL
- */
-volatile int callhome_check = 0;
+pthread_mutex_t callhome_lock = PTHREAD_MUTEX_INITIALIZER;
 volatile struct client_struct* callhome_client = NULL;
 
 /* each app has its own thread */
@@ -557,15 +551,19 @@ static void* app_loop(void* app_v) {
 
 		app->client->callhome_st = app->ch_st;
 
-publish_client:
 		/* publish the new client for the main application loop to create a new SSH session */
-		if (callhome_check == 1) {
-			/* there is a new client not yet processed, wait our turn */
-			usleep(netopeer_options.response_time*1000);
-			goto publish_client;
+		while (1) {
+			/* CALLHOME LOCK */
+			pthread_mutex_lock(&callhome_lock);
+			if (callhome_client == NULL) {
+				callhome_client = app->client;
+				/* CALLHOME UNLOCK */
+				pthread_mutex_unlock(&callhome_lock);
+				break;
+			}
+			/* CALLHOME UNLOCK */
+			pthread_mutex_unlock(&callhome_lock);
 		}
-		callhome_check = 1;
-		callhome_client = app->client;
 		cur_server->active = 1;
 
 		if (app->connection) {

@@ -29,7 +29,7 @@
 
 extern int quit, restart_soft;
 
-extern int callhome_check;
+extern pthread_mutex_t callhome_lock;
 extern struct client_struct* callhome_client;
 
 /* one global structure holding all the client information */
@@ -1242,10 +1242,13 @@ void ssh_listen_loop(int do_init) {
 		}
 
 		/* Callhome client check */
-		if (callhome_check == 1 && callhome_client != NULL) {
+		if (callhome_client != NULL) {
+			/* CALLHOME LOCK */
+			pthread_mutex_lock(&callhome_lock);
 			new_client = callhome_client;
-			callhome_check = 0;
 			callhome_client = NULL;
+			/* CALLHOME UNLOCK */
+			pthread_mutex_unlock(&callhome_lock);
 		}
 
 		/* Listen client check */
