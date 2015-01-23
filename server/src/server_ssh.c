@@ -457,7 +457,7 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 		return SSH_AUTH_DENIED;
 	}
 
-	if (client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+	if (client->auth_attempts >= netopeer_options.auth_attempts) {
 		return SSH_AUTH_DENIED;
 	}
 
@@ -525,7 +525,7 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 		return SSH_AUTH_DENIED;
 	}
 
-	if (client->auth_attempts >= CLIENT_MAX_AUTH_ATTEMPTS) {
+	if (client->auth_attempts >= netopeer_options.auth_attempts) {
 		return SSH_AUTH_DENIED;
 	}
 

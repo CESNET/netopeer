@@ -11,10 +11,6 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
-#define CLIENT_MAX_AUTH_ATTEMPTS 3
-/* time for the users to authenticate themselves, in seconds */
-#define CLIENT_AUTH_TIMEOUT 10
-
 #define BASE_READ_BUFFER_SIZE 2048
 
 #define NC_V10_END_MSG "]]>]]>"
