@@ -15,7 +15,6 @@
 
 #define NC_V10_END_MSG "]]>]]>"
 #define NC_V11_END_MSG "\n##\n"
-#define NC_MAX_END_MSG_LEN 6
 
 /* for each SSH channel of each SSH session */
 struct chan_struct {

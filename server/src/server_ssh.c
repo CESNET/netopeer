@@ -314,6 +314,8 @@ static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UN
 static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int UNUSED(is_stderr), void* UNUSED(userdata)) {
 	struct client_struct* client;
 	struct chan_struct* chan;
+	char* end_rpc;
+	static uint32_t prev_read = 0;
 	int ret;
 
 	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
@@ -328,14 +330,23 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 
 	//nc_verb_verbose("%s: raw data received:\n%.*s", __func__, len, data);
 
+	((char*)data)[len] = '\0';
+
 	/* check if we received a whole NETCONF message */
-	if (strncmp(data+len-strlen(NC_V10_END_MSG), NC_V10_END_MSG, strlen(NC_V10_END_MSG)) != 0 &&
-			strncmp(data+len-strlen(NC_V11_END_MSG), NC_V11_END_MSG, strlen(NC_V11_END_MSG)) != 0) {
+	if ((end_rpc = strstr(data+prev_read, NC_V11_END_MSG)) != NULL) {
+		end_rpc += strlen(NC_V11_END_MSG);
+	} else if ((end_rpc = strstr(data+prev_read, NC_V10_END_MSG)) != NULL) {
+		end_rpc += strlen(NC_V10_END_MSG);
+	} else {
+		prev_read = len;
 		return 0;
 	}
 
+	/* remember the part we already checked for END_MSG tag */
+	prev_read = len-(end_rpc-(char*)data);
+
 	/* pass data from the client to the library */
-	if ((ret = write(chan->chan_out[1], data, len)) != (signed)len) {
+	if ((ret = write(chan->chan_out[1], data, end_rpc-(char*)data)) != end_rpc-(char*)data) {
 		if (ret == -1) {
 			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
 		} else {
@@ -345,7 +356,8 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 		return 0;
 	}
 
-	return len;
+	/* if there were data from 2 RPCs, keep the second unfinished one */
+	return end_rpc-(char*)data;
 }
 
 static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, const char* subsystem, void* UNUSED(userdata)) {
