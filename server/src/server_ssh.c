@@ -19,9 +19,8 @@
 #include <shadow.h>
 #include <pwd.h>
 
-#include <libssh/libssh.h>
-#include <libssh/callbacks.h>
-#include <libssh/server.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #include "server_ssh.h"
 #include "netconf_server_transapi.h"
@@ -37,48 +36,31 @@ struct state_struct netopeer_state;
 
 extern struct np_options netopeer_options;
 
-static inline void _chan_free(struct chan_struct* chan) {
-	if (chan->nc_sess != NULL) {
-		nc_verb_error("%s: internal error: freeing a channel with an opened NC session", __func__);
-	}
-
-	if (chan->new_sess_tid != 0) {
-		pthread_cancel(chan->new_sess_tid);
-	}
-	if (chan->ssh_chan != NULL) {
-		ssh_channel_free(chan->ssh_chan);
-	}
-	if (chan->nc_sess != NULL) {
-		nc_session_free(chan->nc_sess);
-	}
-	close(chan->chan_in[0]);
-	close(chan->chan_in[1]);
-	close(chan->chan_out[0]);
-	close(chan->chan_out[1]);
-}
-
 static inline void _client_free(struct client_struct* client) {
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
 
-	ssh_event_free(client->ssh_evt);
-
-	if (client->ssh_chans != NULL) {
-		nc_verb_error("%s: internal error: freeing a client with some channels", __func__);
+	free(client->tls_buf);
+	if (client->nc_sess != NULL) {
+		nc_session_free(client->nc_sess);
 	}
-
-	if (client->ssh_sess != NULL) {
-		/* !! frees all the associated channels as well !! (if any left) */
-		ssh_free(client->ssh_sess);
+	if (new_sess_tid != 0) {
+		pthread_cancel(new_sess_tid);
 	}
-
-	pthread_mutex_destroy(&client->client_lock);
-
+	if (client->tls != NULL) {
+		if (SSL_shutdown(client->tls) == 0) {
+			nc_verb_verbose("%s: dropping client without waiting for \"close_alert\"", __func__);
+		}
+		SSL_free(client->tls);
+	}
 	if (client->sock != -1) {
 		close(client->sock);
 	}
-
+	close(client->tls_in[0]);
+	close(client->tls_in[1]);
+	close(client->tls_out[0]);
+	close(client->tls_out[1]);
 	free(client->username);
 
 	/* let the callhome thread know the client was freed */
@@ -90,15 +72,15 @@ static inline void _client_free(struct client_struct* client) {
 	}
 }
 
-static struct client_struct* client_find_by_sshsession(struct client_struct* root, ssh_session sshsession) {
+static struct client_struct* client_find_by_tlssession(struct client_struct* root, SSL* tlssession) {
 	struct client_struct* client;
 
-	if (sshsession == NULL) {
+	if (tlssession == NULL) {
 		return NULL;
 	}
 
 	for (client = root; client != NULL; client = client->next) {
-		if (client->ssh_sess == sshsession) {
+		if (client->tls_sess == tlssession) {
 			break;
 		}
 	}
@@ -106,42 +88,16 @@ static struct client_struct* client_find_by_sshsession(struct client_struct* roo
 	return client;
 }
 
-static void client_mark_all_channels_for_cleanup(struct client_struct** root) {
+static void client_mark_all_clients_for_cleanup(struct client_struct** root) {
 	struct client_struct* client;
-	struct chan_struct* chan;
 
 	if (root == NULL || *root == NULL) {
 		return;
 	}
 
 	for (client = *root; client != NULL; client = client->next) {
-		/* CLIENT LOCK */
-		pthread_mutex_lock(&client->client_lock);
-
-		if (client->ssh_chans == NULL) {
-			client->to_free = 1;
-			continue;
-		}
-
-		for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-			chan->to_free = 1;
-		}
-
-		/* CLIENT UNLOCK */
-		pthread_mutex_unlock(&client->client_lock);
+		client->to_free = 1;
 	}
-}
-
-static struct chan_struct* client_find_channel_by_sshchan(struct client_struct* client, ssh_channel sshchannel) {
-	struct chan_struct* chan = NULL;
-
-	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->ssh_chan == sshchannel) {
-			break;
-		}
-	}
-
-	return chan;
 }
 
 static void client_append(struct client_struct** root, struct client_struct* clients) {
@@ -186,56 +142,49 @@ static void client_remove(struct client_struct** root, struct client_struct* del
 	free(client);
 }
 
-static struct chan_struct* client_free_channel(struct client_struct* client, struct chan_struct* chan) {
-	struct chan_struct* cur_chan, *prev_chan = NULL;
-
-	for (cur_chan = client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
-		if (cur_chan == chan) {
-			break;
-		}
-
-		prev_chan = cur_chan;
-	}
-
-	if (cur_chan == NULL) {
-		nc_verb_error("%s: internal error: channel not found (%s:%d)", __func__, __FILE__, __LINE__);
-		return NULL;
-	}
-
-	if (prev_chan == NULL) {
-		_chan_free(cur_chan);
-		free(client->ssh_chans);
-		client->ssh_chans = NULL;
-		return NULL;
-	}
-
-	prev_chan->next = cur_chan->next;
-	_chan_free(cur_chan);
-	free(cur_chan);
-	return prev_chan;
-}
-
-static struct chan_struct* client_find_channel_by_sid(struct client_struct* root, const char* sid) {
+static struct client_struct* client_find_by_sid(struct client_struct* root, const char* sid) {
 	struct client_struct* client;
-	struct chan_struct* chan = NULL;
 
 	if (sid == NULL) {
 		return NULL;
 	}
 
 	for (client = root; client != NULL; client = client->next) {
-		for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-			if (chan->nc_sess == NULL) {
-				continue;
-			}
+		if (client->nc_sess == NULL) {
+			continue;
+		}
 
-			if (strcmp(sid, nc_session_get_id(chan->nc_sess)) == 0) {
-				break;
-			}
+		if (strcmp(sid, nc_session_get_id(client->nc_sess)) == 0) {
+			break;
 		}
 	}
 
-	return chan;
+	return client;
+}
+
+static char* asn1time_to_str(ASN1_TIME *t) {
+	char *cp;
+	BIO *bio;
+	int n;
+
+	if(t == NULL) {
+		return;
+	}
+	bio = BIO_new(BIO_s_mem());
+	if(bio == NULL)
+		return;
+	ASN1_TIME_print(bio, t);
+	n = BIO_pending(bio);
+	cp = malloc(n+1);
+	n = BIO_read(bio, cp, n);
+	if(n < 0) {
+		BIO_free(bio);
+		free(cp);
+		return;
+	}
+	cp[n] = '\0';
+	BIO_free(bio);
+	return cp;
 }
 
 /* return seconds rounded down */
@@ -256,6 +205,128 @@ unsigned int timeval_diff(struct timeval tv1, struct timeval tv2) {
 	return sec;
 }
 
+int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
+	X509_STORE *store;
+	X509_LOOKUP *lookup;
+	X509_STORE_CTX store_ctx;
+	X509_OBJECT obj;
+	X509_NAME* subject;
+	X509_NAME* issuer;
+	X509* cert;
+	X509_CRL* crl;
+	X509_REVOKED* revoked;
+	EVP_PKEY* pubkey;
+	long serial;
+	int i, n, rc;
+	char* cp;
+	ASN1_TIME* last_update = NULL, * next_update = NULL;
+
+	/* cert verification failed */
+	if (!preverify_ok) {
+		return 0;
+	}
+
+	/* check for revocation if set */
+	if (netopeer_options.crl_dir != NULL) {
+		store = X509_STORE_new();
+		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
+		if (lookup == NULL) {
+			nc_verb_error("%s: failed to add lookup method", __func__);
+			return 0; // FAILED
+		}
+		if (X509_LOOKUP_add_dir(lookup, netopeer_options.crl_dir, X509_FILETYPE_PEM) == 0) {
+			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
+			return 0; // FAILED
+		}
+
+		cert = X509_STORE_CTX_get_current_cert(x509_ctx);
+		subject = X509_get_subject_name(cert);
+		issuer = X509_get_issuer_name(cert);
+
+		/* try to retrieve a CRL corresponding to the _subject_ of
+		* the current certificate in order to verify it's integrity */
+		memset((char*)&obj, 0, sizeof(obj));
+		X509_STORE_CTX_init(&store_ctx, store, NULL, NULL);
+		rc = X509_STORE_get_by_subject(&store_ctx, X509_LU_CRL, subject, &obj);
+		X509_STORE_CTX_cleanup(&store_ctx);
+		crl = obj.data.crl;
+		if (rc > 0 && crl) {
+			cp = X509_NAME_oneline(subject, NULL, 0);
+			nc_verb_verbose("%s: CRL issuer: %s", __func__, cp);
+			OPENSSL_free(cp);
+
+			last_update = X509_CRL_get_lastUpdate(crl);
+			next_update = X509_CRL_get_nextUpdate(crl);
+			cp = asn1time_to_str(last_update);
+			nc_verb_verbose("%s: CRL last update: %s", __func__, cp);
+			free(cp);
+			cp = asn1time_to_str(next_update);
+			nc_verb_verbose("%s: CRL next update: %s", __func__, cp);
+			free(cp);
+
+			/* verify the signature on this CRL */
+			pubkey = X509_get_pubkey(cert);
+			if (X509_CRL_verify(crl, pubkey) <= 0) {
+				nc_verb_error("%s: CRL invalid signature", __func__);
+				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CRL_SIGNATURE_FAILURE);
+				X509_OBJECT_free_contents(&obj);
+				if (pubkey) {
+					EVP_PKEY_free(pubkey);
+				}
+				return 0; /* fail */
+			}
+			if (pubkey) {
+				EVP_PKEY_free(pubkey);
+			}
+
+			/* check date of CRL to make sure it's not expired */
+			if (next_update == NULL) {
+				nc_verb_error("%s: CRL invalid nextUpdate field", __func__);
+				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD);
+				X509_OBJECT_free_contents(&obj);
+				return 0; /* fail */
+			}
+			if (X509_cmp_current_time(next_update) < 0) {
+				nc_verb_error("%s: CRL expired - revoking all certificates", __func__);
+				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CRL_HAS_EXPIRED);
+				X509_OBJECT_free_contents(&obj);
+				return 0; /* fail */
+			}
+			X509_OBJECT_free_contents(&obj);
+		}
+
+		/* try to retrieve a CRL corresponding to the _issuer_ of
+		* the current certificate in order to check for revocation */
+		memset((char*)&obj, 0, sizeof(obj));
+		X509_STORE_CTX_init(&store_ctx, store, NULL, NULL);
+		rc = X509_STORE_get_by_subject(&store_ctx, X509_LU_CRL, issuer, &obj);
+		X509_STORE_CTX_cleanup(&store_ctx);
+		crl = obj.data.crl;
+		if (rc > 0 && crl) {
+			/* check if the current certificate is revoked by this CRL */
+			n = sk_X509_REVOKED_num(X509_CRL_get_REVOKED(crl));
+			for (i = 0; i < n; i++) {
+				revoked = sk_X509_REVOKED_value(X509_CRL_get_REVOKED(crl), i);
+				if (ASN1_INTEGER_cmp(revoked->serialNumber, X509_get_serialNumber(cert)) == 0) {
+					serial = ASN1_INTEGER_get(revoked->serialNumber);
+					cp = X509_NAME_oneline(issuer, NULL, 0);
+					nc_verb_error("%s: certificate with serial %ld (0x%lX) revoked per CRL from issuer %s", __func__, serial, serial, cp);
+					OPENSSL_free(cp);
+					X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CERT_REVOKED);
+					X509_OBJECT_free_contents(&obj);
+					return 0; /* fail */
+				}
+			}
+			X509_OBJECT_free_contents(&obj);
+		}
+	}
+
+	/* cert-to-name */
+	//TODO
+
+	return 1; /* success */
+}
+
 void* client_notif_thread(void* arg) {
 	struct ntf_thread_config *config = (struct ntf_thread_config*)arg;
 
@@ -268,356 +339,86 @@ void* client_notif_thread(void* arg) {
 
 /* separate thread because nc_session_accept_inout is blocking */
 void* netconf_session_thread(void* arg) {
-	struct ncsess_thread_config* nstc = (struct ncsess_thread_config*)arg;
+	struct client_struct* client = (struct client_struct*)arg;
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	nstc->chan->nc_sess = nc_session_accept_inout(caps, nstc->client->username, nstc->chan->chan_out[0], nstc->chan->chan_in[1]);
+	client->nc_sess = nc_session_accept_inout(caps, client->username, client->ssl_out[0], client->ssl_in[1]);
 	nc_cpblts_free(caps);
-	if (nstc->chan->to_free == 1) {
+	if (client->to_free == 1) {
 		/* probably a signal received */
-		if (nstc->chan->nc_sess != NULL) {
+		if (client->nc_sess != NULL) {
 			/* unlikely to happen */
-			nc_session_free(nstc->chan->nc_sess);
+			nc_session_free(client->nc_sess);
 		}
-		free(nstc);
 		return NULL;
 	}
-	if (nstc->chan->nc_sess == NULL) {
+	if (client->nc_sess == NULL) {
 		nc_verb_error("%s: failed to create a new NETCONF session", __func__);
-		nstc->chan->to_free = 1;
-		free(nstc);
+		client->to_free = 1;
 		return NULL;
 	}
 
-	nstc->chan->new_sess_tid = 0;
-	nc_verb_verbose("New server session for '%s' with ID %s", nstc->client->username, nc_session_get_id(nstc->chan->nc_sess));
-	gettimeofday((struct timeval*)&nstc->chan->last_rpc_time, NULL);
-	free(nstc);
+	client->new_sess_tid = 0;
+	nc_verb_verbose("New server session for '%s' with ID %s", client->username, nc_session_get_id(client->nc_sess));
+	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
 
 	return NULL;
 }
 
-static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UNUSED(userdata)) {
-	struct client_struct* client;
-	struct chan_struct* chan;
-
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return;
-	}
-
-	chan->to_free = 1;
-}
-
 /* returns how much of the data was processed */
-static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int UNUSED(is_stderr), void* UNUSED(userdata)) {
-	struct client_struct* client;
-	struct chan_struct* chan;
+static int check_tls_data_to_nc(struct client_struct* client) {
 	char* end_rpc;
-	static uint32_t prev_read = 0;
-	int ret;
+	int ret, rpc_len;
 
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+	new_data = SSL_pending(client->tls);
+	if (new_data == 0) {
 		return 0;
 	}
 
-	if (!chan->netconf_subsystem) {
-		nc_verb_error("%s: some data received, but the netconf subsystem was not yet requested: raw data:\n%.*s", __func__, len, data);
-		return len;
+	if (client->tls_buf_size-client->tls_buf_len < new_data) {
+		client->tls_buf_size = client->tls_buf_len+new_data+1;
+		client->tls_buf = realloc(client->tls_buf, client->tls_buf_size);
 	}
 
-	//nc_verb_verbose("%s: raw data received:\n%.*s", __func__, len, data);
+	ret = SSL_read(client->tls, client->tls_buf+client->tls_buf_len, new_data);
+	if (ret < 1) {
+		ret = SSL_get_error(client->tls, ret);
+		nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
+		return 1;
+	}
 
-	((char*)data)[len] = '\0';
+	client->tls_buf_len += ret;
+	client->tls_buf[client->tls_buf_len] = '\0';
 
 	/* check if we received a whole NETCONF message */
-	if ((end_rpc = strstr(data+prev_read, NC_V11_END_MSG)) != NULL) {
+	if ((end_rpc = strstr(client->tls_buf, NC_V11_END_MSG)) != NULL) {
 		end_rpc += strlen(NC_V11_END_MSG);
-	} else if ((end_rpc = strstr(data+prev_read, NC_V10_END_MSG)) != NULL) {
+	} else if ((end_rpc = strstr(client->tls_buf, NC_V10_END_MSG)) != NULL) {
 		end_rpc += strlen(NC_V10_END_MSG);
 	} else {
-		prev_read = len;
 		return 0;
 	}
 
-	/* remember the part we already checked for END_MSG tag */
-	prev_read = len-(end_rpc-(char*)data);
+	rpc_len = end_rpc-client->tls_buf;
 
 	/* pass data from the client to the library */
-	if ((ret = write(chan->chan_out[1], data, end_rpc-(char*)data)) != end_rpc-(char*)data) {
+	if ((ret = write(client->tls_out[1], client->tls_buf, end_rpc-client->tls_buf)) != end_rpc-client->tls_buf) {
 		if (ret == -1) {
 			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
 		} else {
 			nc_verb_error("%s: failed to pass the client data to the library", __func__);
 		}
-
-		return 0;
+		return 1;
 	}
 
-	/* if there were data from 2 RPCs, keep the second unfinished one */
-	return end_rpc-(char*)data;
-}
-
-static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, const char* subsystem, void* UNUSED(userdata)) {
-	struct client_struct* client;
-	struct chan_struct* chan;
-	struct ncsess_thread_config* nstc;
-	int ret;
-
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return SSH_ERROR;
+	if (client->tls_buf_len > rpc_len) {
+		memmove(client->tls_buf, client->tls_buf+client->tls_buf_len, client->tls_buf_len-rpc_len);
 	}
+	client->tls_buf_len -= rpc_len;
+	client->tls_buf[client->tls_buf_len] = '\0';
 
-	if (strcmp(subsystem, "netconf") == 0) {
-		if (chan->netconf_subsystem) {
-			nc_verb_warning("Client '%s' requested subsystem 'netconf' for the second time", client->username);
-		} else {
-			chan->netconf_subsystem = 1;
-
-			if (chan->new_sess_tid != 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			}
-
-			/* start a separate thread for NETCONF session accept */
-			nstc = malloc(sizeof(struct ncsess_thread_config));
-			nstc->chan = chan;
-			nstc->client = client;
-			if ((ret = pthread_create(&chan->new_sess_tid, NULL, netconf_session_thread, nstc)) != 0) {
-				nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
-				free(nstc);
-				chan->to_free = 1;
-				/* not an SSH error */
-				return SSH_OK;
-			}
-			pthread_detach(chan->new_sess_tid);
-		}
-	} else {
-		nc_verb_warning("Client '%s' requested unknown subsystem '%s'", client->username, subsystem);
-	}
-
-	return SSH_OK;
-}
-
-static char* auth_password_get_pwd_hash(const char* username) {
-	struct passwd* pwd;
-	struct spwd* spwd;
-	char* pass_hash = NULL;
-
-	pwd = getpwnam(username);
-	if (pwd == NULL) {
-		nc_verb_verbose("User '%s' not found locally.", username);
-		return NULL;
-	}
-
-	if (strcmp(pwd->pw_passwd, "x") == 0) {
-		spwd = getspnam(username);
-		if (spwd == NULL) {
-			nc_verb_verbose("Failed to retrieve the shadow entry for '%s'.", username);
-			return NULL;
-		}
-
-		pass_hash = spwd->sp_pwdp;
-	} else {
-		pass_hash = pwd->pw_passwd;
-	}
-
-	if (pass_hash == NULL) {
-		nc_verb_error("%s: no password could be retrieved for '%s'", __func__, username);
-		return NULL;
-	}
-
-	/* check the hash structure for special meaning */
-	if (strcmp(pass_hash, "*") == 0 || strcmp(pass_hash, "!") == 0) {
-		nc_verb_verbose("User '%s' is not allowed to authenticate using a password.", username);
-		return NULL;
-	}
-	if (strcmp(pass_hash, "*NP*") == 0) {
-		nc_verb_verbose("Retrieving password for '%s' from a NIS+ server not supported.", username);
-		return NULL;
-	}
-
-	return pass_hash;
-}
-
-static int auth_password_compare_pwd(const char* pass_hash, const char* pass_clear) {
-	char* new_pass_hash;
-
-	if (strcmp(pass_hash, "") == 0) {
-		if (strcmp(pass_clear, "") == 0) {
-			nc_verb_verbose("User authentication successful with an empty password!");
-			return 0;
-		} else {
-			/* the user did now know he does not need any password,
-			 * (which should not be used) so deny authentication */
-			return 1;
-		}
-	}
-
-	new_pass_hash = crypt(pass_clear, pass_hash);
-	return strcmp(new_pass_hash, pass_hash);
-}
-
-static int sshcb_auth_password(ssh_session session, const char* user, const char* pass, void* UNUSED(userdata)) {
-	struct client_struct* client;
-	char* pass_hash;
-
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return SSH_AUTH_DENIED;
-	}
-
-	if (client->auth_attempts >= netopeer_options.auth_attempts) {
-		return SSH_AUTH_DENIED;
-	}
-
-	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested password authentication.", client->username);
-		return SSH_AUTH_DENIED;
-	}
-
-	pass_hash = auth_password_get_pwd_hash(user);
-	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, pass) == 0) {
-		client->username = strdup(user);
-		client->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated.", user);
-		return SSH_AUTH_SUCCESS;
-	}
-
-	client->auth_attempts++;
-	nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", user, client->auth_attempts);
-
-	return SSH_AUTH_DENIED;
-}
-
-static char* auth_pubkey_compare_key(struct ssh_key_struct* key) {
-	struct np_auth_key* auth_key;
-	ssh_key pub_key;
-	char* username = NULL;
-
-	/* CLIENT KEYS LOCK */
-	pthread_mutex_lock(&netopeer_options.client_keys_lock);
-
-	for (auth_key = netopeer_options.client_auth_keys; auth_key != NULL; auth_key = auth_key->next) {
-		if (ssh_pki_import_pubkey_file(auth_key->path, &pub_key) != SSH_OK) {
-			if (eaccess(auth_key->path, R_OK) != 0) {
-				nc_verb_verbose("%s: failed to import the public key \"%s\" (%s)", __func__, auth_key->path, strerror(errno));
-			} else {
-				nc_verb_verbose("%s: failed to import the public key \"%s\": %s", __func__, auth_key->path, ssh_get_error(pub_key));
-			}
-			continue;
-		}
-
-		if (ssh_key_cmp(key, pub_key, SSH_KEY_CMP_PUBLIC) == 0) {
-			ssh_key_free(pub_key);
-			break;
-		}
-
-		ssh_key_free(pub_key);
-	}
-
-	if (auth_key != NULL) {
-		username = strdup(auth_key->username);
-	}
-
-	/* CLIENT KEYS UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.client_keys_lock);
-
-	return username;
-}
-
-static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_key_struct* pubkey, char signature_state, void* UNUSED(userdata)) {
-	struct client_struct* client;
-	char* username;
-
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return SSH_AUTH_DENIED;
-	}
-
-	if (client->auth_attempts >= netopeer_options.auth_attempts) {
-		return SSH_AUTH_DENIED;
-	}
-
-	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication.", client->username);
-		return SSH_AUTH_DENIED;
-	}
-
-	if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
-		client->username = strdup(user);
-		client->authenticated = 1;
-		nc_verb_verbose("User '%s' authenticated.", user);
-		return SSH_AUTH_SUCCESS;
-
-	} else if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		if ((username = auth_pubkey_compare_key(pubkey)) == NULL) {
-			nc_verb_verbose("User '%s' tried to use an unknown (unauthorized) public key.", user);
-
-		} else if (strcmp(user, username) != 0) {
-			nc_verb_verbose("User '%s' is not the username identified with the presented public key.", user);
-			free(username);
-
-		} else {
-			free(username);
-			/* accepting only the use of a public key */
-			return SSH_AUTH_SUCCESS;
-		}
-	}
-
-	client->auth_attempts++;
-	nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", user, client->auth_attempts);
-
-	return SSH_AUTH_DENIED;
-}
-
-static struct ssh_channel_callbacks_struct ssh_channel_cb = {
-	.channel_data_function = sshcb_channel_data,
-	.channel_eof_function = sshcb_channel_eof,
-	.channel_subsystem_request_function = sshcb_channel_subsystem
-};
-
-static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata)) {
-	int ret;
-	struct client_struct* client;
-	struct chan_struct* cur_chan;
-
-	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return NULL;
-	}
-
-	/* CLIENT LOCK */
-	pthread_mutex_lock(&client->client_lock);
-
-	if (client->ssh_chans == NULL) {
-		client->ssh_chans = calloc(1, sizeof(struct chan_struct));
-		cur_chan = client->ssh_chans;
-	} else {
-		for (cur_chan = client->ssh_chans; cur_chan->next != NULL; cur_chan = cur_chan->next);
-		cur_chan->next = calloc(1, sizeof(struct chan_struct));
-		cur_chan = cur_chan->next;
-	}
-	cur_chan->ssh_chan = ssh_channel_new(client->ssh_sess);
-
-	if ((ret = pipe(cur_chan->chan_in)) != 0 || (ret = pipe(cur_chan->chan_out)) != 0) {
-		nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
-		return NULL;
-	}
-	if (fcntl(cur_chan->chan_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(cur_chan->chan_in[1], F_SETFL, O_NONBLOCK) != 0 ||
-			fcntl(cur_chan->chan_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(cur_chan->chan_out[1], F_SETFL, O_NONBLOCK) != 0) {
-		nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
-		return NULL;
-	}
-	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
-	ssh_set_channel_callbacks(cur_chan->ssh_chan, &ssh_channel_cb);
-
-	/* CLIENT UNLOCK */
-	pthread_mutex_unlock(&client->client_lock);
-
-	return cur_chan->ssh_chan;
+	return 0;
 }
 
 void* netconf_rpc_thread(void* UNUSED(arg)) {
@@ -627,205 +428,174 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 	xmlNodePtr op;
 	struct nc_err* err;
 	struct client_struct* client;
-	struct chan_struct* chan;
 
 	do {
 		/* GLOBAL READ LOCK */
 		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
 		for (client = netopeer_state.clients; client != NULL; client = client->next) {
-			if (client->to_free) {
+			if (client->to_free || client->nc_sess) {
 				continue;
 			}
 
-			/* CLIENT LOCK */
-			pthread_mutex_lock(&client->client_lock);
-
-			for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-				if (chan->to_free || chan->nc_sess == NULL) {
-					continue;
-				}
-
-				/* receive a new RPC */
-				rpc_type = nc_session_recv_rpc(chan->nc_sess, 0, &rpc);
-				if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
-					/* no RPC, or processed internally */
-					continue;
-				}
-
-				gettimeofday((struct timeval*)&chan->last_rpc_time, NULL);
-
-				if (rpc_type == NC_MSG_UNKNOWN) {
-					if (nc_session_get_status(chan->nc_sess) != NC_SESSION_STATUS_WORKING) {
-						/* something really bad happened, and communication is not possible anymore */
-						nc_verb_error("%s: failed to receive client's message (nc session not working)", __func__);
-						chan->to_free = 1;
-					}
-					/* ignore */
-					continue;
-				}
-
-				if (rpc_type != NC_MSG_RPC) {
-					/* NC_MSG_HELLO, NC_MSG_REPLY, NC_MSG_NOTIFICATION */
-					nc_verb_warning("%s: received a %s RPC from session %s, ignoring", __func__,
-									(rpc_type == NC_MSG_HELLO ? "hello" : (rpc_type == NC_MSG_REPLY ? "reply" : "notification")),
-									nc_session_get_id(chan->nc_sess));
-					continue;
-				}
-
-				/* process the new RPC */
-				switch (nc_rpc_get_op(rpc)) {
-				case NC_OP_CLOSESESSION:
-					chan->to_free = 1;
-					rpc_reply = nc_reply_ok();
-					break;
-
-				case NC_OP_KILLSESSION:
-					if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
-							xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
-						nc_verb_error("%s: corrupted RPC message", __func__);
-						rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
-						err = NULL;
-						xmlFreeNodeList(op);
-						break;
-					}
-					if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
-						nc_verb_error("%s: no session ID found");
-						err = nc_err_new(NC_ERR_MISSING_ELEM);
-						nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
-						rpc_reply = nc_reply_error(err);
-						err = NULL;
-						xmlFreeNodeList(op);
-						break;
-					}
-
-					/* block-local variables */
-					struct chan_struct* kill_chan = NULL;
-					struct client_struct* kill_client;
-					char* sid;
-
-					sid = (char*)xmlNodeGetContent(op->children);
-					xmlFreeNodeList(op);
-
-					/* check if this client is not requested to be killed */
-					if (client_find_channel_by_sid(client, sid) != NULL) {
-						free(sid);
-						err = nc_err_new(NC_ERR_INVALID_VALUE);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "Requested to kill this session.");
-						rpc_reply = nc_reply_error(err);
-						break;
-					}
-
-					/* find the requested session (channel) */
-					for (kill_client = netopeer_state.clients; kill_client != NULL; kill_client = kill_client->next) {
-						if (kill_client == client) {
-							continue;
-						}
-
-						/* LOCK KILL CLIENT */
-						pthread_mutex_lock(&kill_client->client_lock);
-
-						kill_chan = client_find_channel_by_sid(kill_client, sid);
-						if (kill_chan != NULL) {
-							break;
-						}
-
-						/* UNLOCK KILL CLIENT */
-						pthread_mutex_unlock(&kill_client->client_lock);
-					}
-
-					if (kill_chan == NULL) {
-						nc_verb_error("%s: no session with ID %s found", sid);
-						free(sid);
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "No session with the requested ID found.");
-						rpc_reply = nc_reply_error(err);
-						break;
-					}
-
-					kill_chan->to_free = 1;
-
-					/* UNLOCK KILL CLIENT */
-					pthread_mutex_unlock(&kill_client->client_lock);
-
-					nc_verb_verbose("Session of the user '%s' with the ID %s killed.", kill_client->username, sid);
-					rpc_reply = nc_reply_ok();
-
-					free(sid);
-					break;
-
-				case NC_OP_CREATESUBSCRIPTION:
-					/* create-subscription message */
-					if (nc_cpblts_enabled(chan->nc_sess, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
-						rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
-						break;
-					}
-
-					/* check if notifications are allowed on this session */
-					if (nc_session_notif_allowed(chan->nc_sess) == 0) {
-						nc_verb_error("%s: notification subscription is not allowed on the session %s", __func__, nc_session_get_id(chan->nc_sess));
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_TYPE, "protocol");
-						nc_err_set(err, NC_ERR_PARAM_MSG, "Another notification subscription is currently active on this session.");
-						rpc_reply = nc_reply_error(err);
-						err = NULL;
-						break;
-					}
-
-					rpc_reply = ncntf_subscription_check(rpc);
-					if (nc_reply_get_type(rpc_reply) != NC_REPLY_OK) {
-						break;
-					}
-
-					pthread_t thread;
-					struct ntf_thread_config* ntf_config;
-
-					if ((ntf_config = malloc(sizeof(struct ntf_thread_config))) == NULL) {
-						nc_verb_error("%s: memory allocation failed", __func__);
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "Memory allocation failed.");
-						rpc_reply = nc_reply_error(err);
-						err = NULL;
-						break;
-					}
-					ntf_config->session = chan->nc_sess;
-					ntf_config->subscribe_rpc = nc_rpc_dup(rpc);
-
-					/* perform notification sending */
-					if ((pthread_create(&thread, NULL, client_notif_thread, ntf_config)) != 0) {
-						nc_reply_free(rpc_reply);
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "Creating thread for sending Notifications failed.");
-						rpc_reply = nc_reply_error(err);
-						err = NULL;
-						break;
-					}
-					pthread_detach(thread);
-					break;
-
-				default:
-					if ((rpc_reply = ncds_apply_rpc2all(chan->nc_sess, rpc, NULL)) == NULL) {
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "For unknown reason no reply was returned by the library.");
-						rpc_reply = nc_reply_error(err);
-					} else if (rpc_reply == NCDS_RPC_NOT_APPLICABLE) {
-						err = nc_err_new(NC_ERR_OP_FAILED);
-						nc_err_set(err, NC_ERR_PARAM_MSG, "There is no device/data that could be affected.");
-						nc_reply_free(rpc_reply);
-						rpc_reply = nc_reply_error(err);
-					}
-
-					break;
-				}
-
-				/* send reply */
-				nc_session_send_reply(chan->nc_sess, rpc, rpc_reply);
-				nc_reply_free(rpc_reply);
-				nc_rpc_free(rpc);
+			/* receive a new RPC */
+			rpc_type = nc_session_recv_rpc(client->nc_sess, 0, &rpc);
+			if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
+				/* no RPC, or processed internally */
+				continue;
 			}
 
-			/* CLIENT UNLOCK */
-			pthread_mutex_unlock(&client->client_lock);
+			gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
+
+			if (rpc_type == NC_MSG_UNKNOWN) {
+			if (nc_session_get_status(client->nc_sess) != NC_SESSION_STATUS_WORKING) {
+					/* something really bad happened, and communication is not possible anymore */
+					nc_verb_error("%s: failed to receive client's message (nc session not working)", __func__);
+					client->to_free = 1;
+				}
+				/* ignore */
+				continue;
+			}
+
+			if (rpc_type != NC_MSG_RPC) {
+				/* NC_MSG_HELLO, NC_MSG_REPLY, NC_MSG_NOTIFICATION */
+				nc_verb_warning("%s: received a %s RPC from session %s, ignoring", __func__,
+								(rpc_type == NC_MSG_HELLO ? "hello" : (rpc_type == NC_MSG_REPLY ? "reply" : "notification")),
+								nc_session_get_id(client->nc_sess));
+				continue;
+			}
+
+			/* process the new RPC */
+			switch (nc_rpc_get_op(rpc)) {
+			case NC_OP_CLOSESESSION:
+				SSL_shutdown(client->tls);
+				client->to_free = 1;
+				rpc_reply = nc_reply_ok();
+				break;
+
+			case NC_OP_KILLSESSION:
+				if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
+						xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
+					nc_verb_error("%s: corrupted RPC message", __func__);
+					rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
+					err = NULL;
+					xmlFreeNodeList(op);
+					break;
+				}
+				if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
+					nc_verb_error("%s: no session ID found");
+					err = nc_err_new(NC_ERR_MISSING_ELEM);
+					nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
+					rpc_reply = nc_reply_error(err);
+					err = NULL;
+					xmlFreeNodeList(op);
+					break;
+				}
+
+				/* block-local variables */
+				struct client_struct* kill_client;
+				char* sid;
+
+				sid = (char*)xmlNodeGetContent(op->children);
+				xmlFreeNodeList(op);
+
+				/* check if this client is not requested to be killed */
+				if (strcmp(nc_session_get_id(client->nc_sess), sid) == 0) {
+					free(sid);
+					err = nc_err_new(NC_ERR_INVALID_VALUE);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "Requested to kill this session.");
+					rpc_reply = nc_reply_error(err);
+					break;
+				}
+
+				/* find the requested session */
+				kill_client = client_find_by_sid(netopeer.clients, sid);
+				if (kill_chan == NULL) {
+					nc_verb_error("%s: no session with ID %s found", sid);
+					free(sid);
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "No session with the requested ID found.");
+					rpc_reply = nc_reply_error(err);
+					break;
+				}
+
+				SSL_shutdown(kill_client->tls);
+				kill_client->to_free = 1;
+
+				nc_verb_verbose("Session of the user '%s' with the ID %s killed.", kill_client->username, sid);
+				rpc_reply = nc_reply_ok();
+
+				free(sid);
+				break;
+
+			case NC_OP_CREATESUBSCRIPTION:
+				/* create-subscription message */
+				if (nc_cpblts_enabled(cclient->nc_sess, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
+					rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
+					break;
+				}
+
+				/* check if notifications are allowed on this session */
+				if (nc_session_notif_allowed(client->nc_sess) == 0) {
+					nc_verb_error("%s: notification subscription is not allowed on the session %s", __func__, nc_session_get_id(client->nc_sess));
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_TYPE, "protocol");
+					nc_err_set(err, NC_ERR_PARAM_MSG, "Another notification subscription is currently active on this session.");
+					rpc_reply = nc_reply_error(err);
+					err = NULL;
+					break;
+				}
+
+				rpc_reply = ncntf_subscription_check(rpc);
+				if (nc_reply_get_type(rpc_reply) != NC_REPLY_OK) {
+					break;
+				}
+
+				pthread_t thread;
+				struct ntf_thread_config* ntf_config;
+
+				if ((ntf_config = malloc(sizeof(struct ntf_thread_config))) == NULL) {
+					nc_verb_error("%s: memory allocation failed", __func__);
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "Memory allocation failed.");
+					rpc_reply = nc_reply_error(err);
+					err = NULL;
+					break;
+				}
+				ntf_config->session = client->nc_sess;
+				ntf_config->subscribe_rpc = nc_rpc_dup(rpc);
+
+				/* perform notification sending */
+				if ((pthread_create(&thread, NULL, client_notif_thread, ntf_config)) != 0) {
+					nc_reply_free(rpc_reply);
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "Creating thread for sending Notifications failed.");
+					rpc_reply = nc_reply_error(err);
+					err = NULL;
+					break;
+				}
+				pthread_detach(thread);
+				break;
+
+			default:
+				if ((rpc_reply = ncds_apply_rpc2all(client->nc_sess, rpc, NULL)) == NULL) {
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "For unknown reason no reply was returned by the library.");
+					rpc_reply = nc_reply_error(err);
+				} else if (rpc_reply == NCDS_RPC_NOT_APPLICABLE) {
+					err = nc_err_new(NC_ERR_OP_FAILED);
+					nc_err_set(err, NC_ERR_PARAM_MSG, "There is no device/data that could be affected.");
+					nc_reply_free(rpc_reply);
+					rpc_reply = nc_reply_error(err);
+				}
+
+				break;
+			}
+
+			/* send reply */
+			nc_session_send_reply(client->nc_sess, rpc, rpc_reply);
+			nc_reply_free(rpc_reply);
+			nc_rpc_free(rpc);
 		}
 
 		/* GLOBAL READ UNLOCK */
@@ -837,9 +607,8 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 	return NULL;
 }
 
-void* ssh_data_thread(void* UNUSED(arg)) {
+void* tls_data_thread(void* UNUSED(arg)) {
 	struct client_struct* cur_client;
-	struct chan_struct* cur_chan;
 	struct timeval cur_time;
 	struct timespec ts;
 	char* to_send;
@@ -854,6 +623,79 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 
 		/* go through all the clients */
 		for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
+			/* TODO check SSL state - set to_free if fail */
+
+			/* check if there aren't some pending data */
+			if (!cur_client->to_free && check_tls_data_to_nc(cur_client) != 0) {
+				nc_verb_warning("Failed to check pending client data, it has probably disconnected.");
+				/* TODO this invalid socket may have been reused and we would close
+				 * it during cleanup */
+				//cur_client->sock = -1;
+				cur_client->to_free = 1;
+				continue;
+			}
+
+			gettimeofday(&cur_time, NULL);
+
+			/* check the csession for hello timeout */
+			if (cur_client->nc_sess == NULL && timeval_diff(cur_time, cur_client->last_rpc_time) >= netopeer_options.hello_timeout) {
+				if (cur_client->new_sess_tid == 0) {
+					nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+				} else {
+					pthread_cancel(cur_client->new_sess_tid);
+					cur_client->new_sess_tid = 0;
+				}
+				SSL_shutdown(cur_client->tls);
+				cur_client->to_free = 1;
+				continue;
+			}
+
+			/* check the session for idle timeout */
+			if (timeval_diff(cur_time, cur_client->last_rpc_time) >= netopeer_options.idle_timeout) {
+				/* check for active event subscriptions, in that case we can never disconnect an idle session */
+				if (cur_client->nc_sess == NULL || !ncntf_session_get_active_subscription(cur_client->nc_sess)) {
+					nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.");
+					SSL_shutdown(cur_client->tls);
+					cur_client->to_free = 1;
+					continue;
+				}
+			}
+
+			errno = 0;
+			to_send_len = 0;
+			while (1) {
+				to_send_len += (ret = read(cur_client->tls_in[0], to_send+to_send_len, to_send_size-to_send_len));
+				if (ret == -1) {
+					break;
+				}
+
+				/* double the buffer size if too small */
+				if (to_send_len == to_send_size) {
+					to_send_size *= 2;
+					to_send = realloc(to_send, to_send_size);
+				} else {
+					break;
+				}
+			}
+
+			if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				continue;
+			}
+
+			if (ret == -1) {
+				nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
+				cur_client->to_free = 1;
+				continue;
+			}
+
+			ret = SSL_write(cur_client->tls, to_send, to_send_len);
+			if (ret != to_send_len) {
+				ret = SSL_get_error(client->tls, ret);
+				nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
+				cur_client->to_free = 1;
+				continue;
+			}
+
 			/* check whether the client shouldn't be freed */
 			if (cur_client->to_free) {
 				clock_gettime(CLOCK_REALTIME, &ts);
@@ -886,118 +728,8 @@ void* ssh_data_thread(void* UNUSED(arg)) {
 				break;
 			}
 
-			/* poll the client for SSH events, the callbacks are called accordingly */
-			if (ssh_event_dopoll(cur_client->ssh_evt, 0) == SSH_ERROR) {
-				nc_verb_warning("Failed to poll a client, it has probably disconnected.");
-				/* this invalid socket may have been reused and we would close
-				 * it during cleanup */
-				cur_client->sock = -1;
-				if (cur_client->ssh_chans != NULL) {
-					for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
-						cur_chan->to_free = 1;
-					}
-				} else {
-					cur_client->to_free = 1;
-					continue;
-				}
-			}
-
-			gettimeofday(&cur_time, NULL);
-
-			/* check the client for authentication timeout and failed attempts */
-			if (!cur_client->authenticated) {
-				if (timeval_diff(cur_time, cur_client->conn_time) >= netopeer_options.auth_timeout) {
-					nc_verb_warning("Failed to authenticate for too long, dropping a client.");
-
-					/* mark client for deletion */
-					cur_client->to_free = 1;
-					continue;
-				}
-
-				if (cur_client->auth_attempts >= netopeer_options.auth_attempts) {
-					nc_verb_warning("Reached the number of failed authentication attempts, dropping a client.");
-					cur_client->to_free = 1;
-					continue;
-				}
-			}
-
-			/* check every channel of the client for pending data */
-			for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
-
-				/* check the channel for hello timeout */
-				if (cur_chan->nc_sess == NULL && timeval_diff(cur_time, cur_chan->last_rpc_time) >= netopeer_options.hello_timeout) {
-					if (cur_chan->new_sess_tid == 0) {
-						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-					} else {
-						pthread_cancel(cur_chan->new_sess_tid);
-						cur_chan->new_sess_tid = 0;
-					}
-					cur_chan->to_free = 1;
-				}
-
-				/* check the channel for idle timeout */
-				if (timeval_diff(cur_time, cur_chan->last_rpc_time) >= netopeer_options.idle_timeout) {
-					/* check for active event subscriptions, in that case we can never disconnect an idle session */
-					if (cur_chan->nc_sess == NULL || !ncntf_session_get_active_subscription(cur_chan->nc_sess)) {
-						nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.");
-						cur_chan->to_free = 1;
-					}
-				}
-
-				to_send_len = 0;
-				while (1) {
-					to_send_len += (ret = read(cur_chan->chan_in[0], to_send+to_send_len, to_send_size-to_send_len));
-					if (ret == -1) {
-						break;
-					}
-
-					/* double the buffer size if too small */
-					if (to_send_len == to_send_size) {
-						to_send_size *= 2;
-						to_send = realloc(to_send, to_send_size);
-					} else {
-						break;
-					}
-				}
-
-				if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-					nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-					cur_chan->to_free = 1;
-				} else if (ret != -1) {
-					/* we had some data, there may be more, sleeping may be a waste of response time */
-					skip_sleep = 1;
-
-					ssh_channel_write(cur_chan->ssh_chan, to_send, to_send_len);
-				}
-
-				/* free the channel here, if requested */
-				if (cur_chan->to_free) {
-
-					/* CLIENT LOCK */
-					pthread_mutex_lock(&cur_client->client_lock);
-
-					/* again, don't sleep, we may have been asked to quit */
-					skip_sleep = 1;
-					nc_session_free(cur_chan->nc_sess);
-					cur_chan->nc_sess = NULL;
-
-					/* make sure the channel iteration continues correctly */
-					cur_chan = client_free_channel(cur_client, cur_chan);
-					if (cur_chan == NULL) {
-						/* last channel removed, remove client */
-						if (cur_client->ssh_chans == NULL) {
-							cur_client->to_free = 1;
-						}
-
-						/* CLIENT UNLOCK */
-						pthread_mutex_unlock(&cur_client->client_lock);
-						break;
-					}
-
-					/* CLIENT UNLOCK */
-					pthread_mutex_unlock(&cur_client->client_lock);
-				}
-			}
+			/* we had some data, there may be more, sleeping may be a waste of response time */
+			skip_sleep = 1;
 		}
 
 		/* GLOBAL READ UNLOCK */
@@ -1172,19 +904,10 @@ static void sock_cleanup(struct pollfd* pollsock, unsigned int pollsock_count) {
 	free(pollsock);
 }
 
-static struct ssh_server_callbacks_struct ssh_server_cb = {
-	.auth_password_function = sshcb_auth_password,
-	//.auth_none_function =
-	.auth_pubkey_function = sshcb_auth_pubkey,
-	.channel_open_request_session_function = sshcb_channel_open
-};
-
-void ssh_listen_loop(int do_init) {
-	ssh_bind sshbind = NULL;
+void tls_listen_loop(int do_init) {
+	SSL_CTX* tls_ctx = NULL;
 	int ret;
-	char verb_str[2];
 	struct client_struct* new_client, *cur_client;
-	struct chan_struct* cur_chan;
 	struct pollfd* pollsock = NULL;
 	unsigned int pollsock_count = 0;
 
@@ -1195,7 +918,7 @@ void ssh_listen_loop(int do_init) {
 			return;
 		}
 
-		if ((ret = pthread_create(&netopeer_state.ssh_data_tid, NULL, ssh_data_thread, NULL)) != 0) {
+		if ((ret = pthread_create(&netopeer_state.tls_data_tid, NULL, tls_data_thread, NULL)) != 0) {
 			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
 			return;
 		}
@@ -1204,11 +927,8 @@ void ssh_listen_loop(int do_init) {
 			return;
 		}
 
-		ssh_threads_set_callbacks(ssh_threads_get_pthread());
-		ssh_init();
-		ssh_set_log_level(netopeer_options.verbose);
-		ssh_callbacks_init(&ssh_server_cb);
-		ssh_callbacks_init(&ssh_channel_cb);
+		SSL_load_error_strings();
+		SSL_library_init();
 	}
 
 	/* Main accept loop */
@@ -1233,24 +953,26 @@ void ssh_listen_loop(int do_init) {
 		}
 
 		/* Check server keys for a change */
-		if (netopeer_options.server_key_change_flag) {
-			ssh_bind_free(sshbind);
-			if ((sshbind = ssh_bind_new()) == NULL) {
-				nc_verb_error("%s: failed to create SSH bind", __func__);
+		if (netopeer_options.server_cert_change_flag) {
+			SSL_CTX_free(tls_ctx);
+			if ((tls_ctx = SSL_CTX_new(TLSv1_2_server_method())) == NULL) {
+				nc_verb_error("%s: failed to create SSL context", __func__);
 				return;
 			}
+			SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, tls_verify_callback);
 
-			if (netopeer_options.rsa_key != NULL) {
-				ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, netopeer_options.rsa_key);
+			if (netopeer_options.server_cert != NULL && SSL_CTX_use_certificate_file(tls_ctx, netopeer_options.server_cert, SSL_FILETYPE_PEM) != 1) {
+				nc_verb_error("Loading the server certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
 			}
-			if (netopeer_options.dsa_key != NULL) {
-				ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, netopeer_options.dsa_key);
+			if (netopeer_options.server_key != NULL && SSL_CTX_use_PrivateKey_file(tls_ctx, netopeer_options.server_key, SSL_FILETYPE_PEM) != 1) {
+				nc_verb_error("Loading the server key failed (%s).", ERR_reason_error_string(ERR_get_error()));
+			}
+			/* TODO this dir must contain server cert CA chain certificates! */
+			if (netopeer_options.trusted_certs_dir != NULL && SSL_CTX_load_verify_locations(tls_ctx, NULL, netopeer_options.trusted_certs_dir) != 1) {
+				nc_verb_error("Loading the trusted certificate directory failed (%s).", ERR_reason_error_string(ERR_get_error()));
 			}
 
-			sprintf(verb_str, "%d", netopeer_options.verbose);
-			ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, verb_str);
-
-			netopeer_options.server_key_change_flag = 0;
+			netopeer_options.server_cert_change_flag = 0;
 		}
 
 		/* Callhome client check */
@@ -1277,26 +999,12 @@ void ssh_listen_loop(int do_init) {
 				/* GLOBAL READ LOCK */
 				pthread_rwlock_rdlock(&netopeer_state.global_lock);
 				for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
-
-					/* CLIENT LOCK */
-					pthread_mutex_lock(&cur_client->client_lock);
-					if (cur_client->ssh_chans == NULL) {
-						/* count this client as one soon-to-be valid session */
-						++ret;
-					}
-					for (cur_chan = cur_client->ssh_chans; cur_chan != NULL; cur_chan = cur_chan->next) {
-						/* count every channel, we rather include some invalid ones than
-						* exclude some soon-to-be valid, which could cause more sessions
-						* to be allowed than max_sessions
-						*/
-						++ret;
-					}
-					/* CLIENT UNLOCK */
-					pthread_mutex_unlock(&cur_client->client_lock);
+					++ret;
 				}
 				/* GLOBAL READ UNLOCK */
 				pthread_rwlock_unlock(&netopeer_state.global_lock);
-				if (ret > netopeer_options.max_sessions) {
+
+				if (ret >= netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
 					new_client->to_free = 1;
 					_client_free(new_client);
@@ -1306,51 +1014,25 @@ void ssh_listen_loop(int do_init) {
 				}
 			}
 
-			new_client->ssh_sess = ssh_new();
-			if (new_client->ssh_sess == NULL) {
-				nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
+			new_client->tls = SSL_new(tls_ctx);
+			if (new_client->tls == NULL) {
+				nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
 				new_client->to_free = 1;
 				_client_free(new_client);
 				continue;
 			}
 
-			if (netopeer_options.password_auth_enabled) {
-				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
-			} else {
-				ssh_set_auth_methods(new_client->ssh_sess, SSH_AUTH_METHOD_PUBLICKEY);
-			}
+			SSL_set_fd(new_client->tls, new_client->sock);
+			SSL_set_mode(new_client->tls, SSL_MODE_AUTO_RETRY);
 
-			ssh_set_server_callbacks(new_client->ssh_sess, &ssh_server_cb);
-
-			if (ssh_bind_accept_fd(sshbind, new_client->ssh_sess, new_client->sock) == SSH_ERROR) {
-				nc_verb_error("%s: SSH failed to accept a new connection: %s", __func__, ssh_get_error(sshbind));
+			if (SSL_accept(new_client->tls) != 1) {
+				nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 				new_client->to_free = 1;
 				_client_free(new_client);
 				continue;
 			}
 
 			gettimeofday((struct timeval*)&new_client->conn_time, NULL);
-
-			if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
-				nc_verb_error("%s: SSH key exchange error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
-				new_client->to_free = 1;
-				_client_free(new_client);
-				continue;
-			}
-
-			if ((ret = pthread_mutex_init(&new_client->client_lock, NULL)) != 0) {
-				nc_verb_error("%s: failed to init mutex: %s", __func__, strerror(ret));
-				new_client->to_free = 1;
-				_client_free(new_client);
-				continue;
-			}
-
-			new_client->ssh_evt = ssh_event_new();
-			if (new_client->ssh_evt == NULL) {
-				nc_verb_error("%s: could not create SSH event (%s:%d)", __func__, __FILE__, __LINE__);
-				return;
-			}
-			ssh_event_add_session(new_client->ssh_evt, new_client->ssh_sess);
 
 			/* add the client into the global clients structure */
 			/* GLOBAL WRITE LOCK */
@@ -1364,7 +1046,7 @@ void ssh_listen_loop(int do_init) {
 
 	/* Cleanup */
 	sock_cleanup(pollsock, pollsock_count);
-	ssh_bind_free(sshbind);
+	SSL_CTX_free(tls_ctx);
 	if (!restart_soft) {
 		/* TODO a total timeout after which we cancel and free clients by force? */
 		/* wait for all the clients to exit nicely themselves */
@@ -1372,13 +1054,11 @@ void ssh_listen_loop(int do_init) {
 			nc_verb_warning("%s: failed to join the netconf RPC thread (%s)", __func__, strerror(ret));
 		}
 
-		client_mark_all_channels_for_cleanup(&netopeer_state.clients);
+		client_mark_all_for_cleanup(&netopeer_state.clients);
 
 		if ((ret = pthread_join(netopeer_state.ssh_data_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
-
-		ssh_finalize();
 
 		pthread_rwlock_destroy(&netopeer_state.global_lock);
 	}
