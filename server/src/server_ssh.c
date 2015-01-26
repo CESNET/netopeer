@@ -45,8 +45,8 @@ static inline void _client_free(struct client_struct* client) {
 	if (client->nc_sess != NULL) {
 		nc_session_free(client->nc_sess);
 	}
-	if (new_sess_tid != 0) {
-		pthread_cancel(new_sess_tid);
+	if (client->new_sess_tid != 0) {
+		pthread_cancel(client->new_sess_tid);
 	}
 	if (client->tls != NULL) {
 		if (SSL_shutdown(client->tls) == 0) {
@@ -72,23 +72,7 @@ static inline void _client_free(struct client_struct* client) {
 	}
 }
 
-static struct client_struct* client_find_by_tlssession(struct client_struct* root, SSL* tlssession) {
-	struct client_struct* client;
-
-	if (tlssession == NULL) {
-		return NULL;
-	}
-
-	for (client = root; client != NULL; client = client->next) {
-		if (client->tls_sess == tlssession) {
-			break;
-		}
-	}
-
-	return client;
-}
-
-static void client_mark_all_clients_for_cleanup(struct client_struct** root) {
+static void client_mark_all_for_cleanup(struct client_struct** root) {
 	struct client_struct* client;
 
 	if (root == NULL || *root == NULL) {
@@ -167,20 +151,21 @@ static char* asn1time_to_str(ASN1_TIME *t) {
 	BIO *bio;
 	int n;
 
-	if(t == NULL) {
-		return;
+	if (t == NULL) {
+		return NULL;
 	}
 	bio = BIO_new(BIO_s_mem());
-	if(bio == NULL)
-		return;
+	if (bio == NULL) {
+		return NULL;
+	}
 	ASN1_TIME_print(bio, t);
 	n = BIO_pending(bio);
 	cp = malloc(n+1);
 	n = BIO_read(bio, cp, n);
-	if(n < 0) {
+	if (n < 0) {
 		BIO_free(bio);
 		free(cp);
-		return;
+		return NULL;
 	}
 	cp[n] = '\0';
 	BIO_free(bio);
@@ -227,14 +212,14 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	}
 
 	/* check for revocation if set */
-	if (netopeer_options.crl_dir != NULL) {
+	if (NETOPEER_TLS_CRL_DIR != NULL) {
 		store = X509_STORE_new();
 		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
 		if (lookup == NULL) {
 			nc_verb_error("%s: failed to add lookup method", __func__);
 			return 0; // FAILED
 		}
-		if (X509_LOOKUP_add_dir(lookup, netopeer_options.crl_dir, X509_FILETYPE_PEM) == 0) {
+		if (X509_LOOKUP_add_dir(lookup, NETOPEER_TLS_CRL_DIR, X509_FILETYPE_PEM) == 0) {
 			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
 			return 0; // FAILED
 		}
@@ -343,7 +328,7 @@ void* netconf_session_thread(void* arg) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	client->nc_sess = nc_session_accept_inout(caps, client->username, client->ssl_out[0], client->ssl_in[1]);
+	client->nc_sess = nc_session_accept_inout(caps, client->username, client->tls_out[0], client->tls_in[1]);
 	nc_cpblts_free(caps);
 	if (client->to_free == 1) {
 		/* probably a signal received */
@@ -369,7 +354,8 @@ void* netconf_session_thread(void* arg) {
 /* returns how much of the data was processed */
 static int check_tls_data_to_nc(struct client_struct* client) {
 	char* end_rpc;
-	int ret, rpc_len;
+	int ret;
+	unsigned int new_data, rpc_len;
 
 	new_data = SSL_pending(client->tls);
 	if (new_data == 0) {
@@ -421,6 +407,63 @@ static int check_tls_data_to_nc(struct client_struct* client) {
 	return 0;
 }
 
+/* return NULL - SSL error can be retrieved */
+static X509* base64der_to_cert(const char* in) {
+	X509* out;
+	char* buf;
+	BIO* bio;
+
+	if (in == NULL) {
+		return NULL;
+	}
+
+	asprintf(&buf, "%s%s%s", "-----BEGIN CERTIFICATE-----\n", in, "\n-----END CERTIFICATE-----");
+	bio = BIO_new_mem_buf(buf, strlen(buf));
+	if (bio == NULL) {
+		free(buf);
+		return NULL;
+	}
+
+	out = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	if (out == NULL) {
+		free(buf);
+		BIO_free(bio);
+		return NULL;
+	}
+
+	free(buf);
+	BIO_free(bio);
+	return out;
+}
+
+static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
+	EVP_PKEY* out;
+	char* buf;
+	BIO* bio;
+
+	if (in == NULL) {
+		return NULL;
+	}
+
+	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), "PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), "PRIVATE KEY-----");
+	bio = BIO_new_mem_buf(buf, strlen(buf));
+	if (bio == NULL) {
+		free(buf);
+		return NULL;
+	}
+
+	out = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+	if (out == NULL) {
+		free(buf);
+		BIO_free(bio);
+		return NULL;
+	}
+
+	free(buf);
+	BIO_free(bio);
+	return out;
+}
+
 void* netconf_rpc_thread(void* UNUSED(arg)) {
 	nc_rpc* rpc = NULL;
 	nc_reply* rpc_reply = NULL;
@@ -448,7 +491,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 			gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
 
 			if (rpc_type == NC_MSG_UNKNOWN) {
-			if (nc_session_get_status(client->nc_sess) != NC_SESSION_STATUS_WORKING) {
+				if (nc_session_get_status(client->nc_sess) != NC_SESSION_STATUS_WORKING) {
 					/* something really bad happened, and communication is not possible anymore */
 					nc_verb_error("%s: failed to receive client's message (nc session not working)", __func__);
 					client->to_free = 1;
@@ -509,8 +552,8 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 				}
 
 				/* find the requested session */
-				kill_client = client_find_by_sid(netopeer.clients, sid);
-				if (kill_chan == NULL) {
+				kill_client = client_find_by_sid(netopeer_state.clients, sid);
+				if (kill_client == NULL) {
 					nc_verb_error("%s: no session with ID %s found", sid);
 					free(sid);
 					err = nc_err_new(NC_ERR_OP_FAILED);
@@ -530,7 +573,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 
 			case NC_OP_CREATESUBSCRIPTION:
 				/* create-subscription message */
-				if (nc_cpblts_enabled(cclient->nc_sess, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
+				if (nc_cpblts_enabled(client->nc_sess, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
 					rpc_reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
 					break;
 				}
@@ -690,7 +733,7 @@ void* tls_data_thread(void* UNUSED(arg)) {
 
 			ret = SSL_write(cur_client->tls, to_send, to_send_len);
 			if (ret != to_send_len) {
-				ret = SSL_get_error(client->tls, ret);
+				ret = SSL_get_error(cur_client->tls, ret);
 				nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
 				cur_client->to_free = 1;
 				continue;
@@ -906,6 +949,10 @@ static void sock_cleanup(struct pollfd* pollsock, unsigned int pollsock_count) {
 
 void tls_listen_loop(int do_init) {
 	SSL_CTX* tls_ctx = NULL;
+	X509_STORE* trusted_store = NULL;
+	X509* cert = NULL;
+	EVP_PKEY* key = NULL;
+	struct np_trusted_cert* trusted_cert;
 	int ret;
 	struct client_struct* new_client, *cur_client;
 	struct pollfd* pollsock = NULL;
@@ -953,26 +1000,57 @@ void tls_listen_loop(int do_init) {
 		}
 
 		/* Check server keys for a change */
-		if (netopeer_options.server_cert_change_flag) {
+		if (netopeer_options.tls_ctx_change_flag) {
 			SSL_CTX_free(tls_ctx);
 			if ((tls_ctx = SSL_CTX_new(TLSv1_2_server_method())) == NULL) {
 				nc_verb_error("%s: failed to create SSL context", __func__);
 				return;
 			}
-			SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, tls_verify_callback);
+			SSL_CTX_set_verify(tls_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, tls_verify_callback);
 
-			if (netopeer_options.server_cert != NULL && SSL_CTX_use_certificate_file(tls_ctx, netopeer_options.server_cert, SSL_FILETYPE_PEM) != 1) {
-				nc_verb_error("Loading the server certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
-			}
-			if (netopeer_options.server_key != NULL && SSL_CTX_use_PrivateKey_file(tls_ctx, netopeer_options.server_key, SSL_FILETYPE_PEM) != 1) {
-				nc_verb_error("Loading the server key failed (%s).", ERR_reason_error_string(ERR_get_error()));
-			}
-			/* TODO this dir must contain server cert CA chain certificates! */
-			if (netopeer_options.trusted_certs_dir != NULL && SSL_CTX_load_verify_locations(tls_ctx, NULL, netopeer_options.trusted_certs_dir) != 1) {
-				nc_verb_error("Loading the trusted certificate directory failed (%s).", ERR_reason_error_string(ERR_get_error()));
+			/* TLS_CTX LOCK */
+			pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+			if (netopeer_options.server_cert == NULL || netopeer_options.server_key == NULL) {
+				nc_verb_warning("Server certificate and/or private key not set, client TLS verification will fail.");
+			} else {
+				cert = base64der_to_cert(netopeer_options.server_cert);
+				if (cert == NULL || SSL_CTX_use_certificate(tls_ctx, cert) != 1) {
+					nc_verb_error("Loading the server certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
+				}
+				X509_free(cert);
+
+				key = base64der_to_privatekey(netopeer_options.server_key, netopeer_options.server_key_type);
+				if (key == NULL || SSL_CTX_use_PrivateKey(tls_ctx, key) != 1) {
+					nc_verb_error("Loading the server key failed (%s).", ERR_reason_error_string(ERR_get_error()));
+				}
+				EVP_PKEY_free(key);
 			}
 
-			netopeer_options.server_cert_change_flag = 0;
+			if (netopeer_options.trusted_certs == NULL) {
+				nc_verb_warning("No trusted certificates set, for TLS verification to pass at least the server certificate CA chain must be trusted.");
+			} else {
+				trusted_store = X509_STORE_new();
+
+				for (trusted_cert = netopeer_options.trusted_certs; trusted_cert != NULL; trusted_cert = trusted_cert->next) {
+					cert = base64der_to_cert(trusted_cert->cert);
+					if (cert == NULL) {
+						nc_verb_error("Loading a trusted certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
+						continue;
+					}
+					X509_STORE_add_cert(trusted_store, cert);
+					cert = NULL;
+					/* TODO needs cert free? */
+				}
+
+				SSL_CTX_set_cert_store(tls_ctx, trusted_store);
+				trusted_store = NULL;
+			}
+
+			netopeer_options.tls_ctx_change_flag = 0;
+
+			/* TLS_CTX UNLOCK */
+			pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 		}
 
 		/* Callhome client check */
@@ -992,6 +1070,15 @@ void tls_listen_loop(int do_init) {
 
 		/* New client SSH session creation */
 		if (new_client != NULL) {
+
+			/* TLS context creation check */
+			if (tls_ctx == NULL) {
+				nc_verb_error("Some mandatory TLS configuration not set, dropping the new client.");
+				new_client->to_free = 1;
+				_client_free(new_client);
+				usleep(netopeer_options.response_time*1000);
+				continue;
+			}
 
 			/* Maximum number of sessions check */
 			if (netopeer_options.max_sessions > 0) {
@@ -1056,7 +1143,7 @@ void tls_listen_loop(int do_init) {
 
 		client_mark_all_for_cleanup(&netopeer_state.clients);
 
-		if ((ret = pthread_join(netopeer_state.ssh_data_tid, NULL)) != 0) {
+		if ((ret = pthread_join(netopeer_state.tls_data_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
 

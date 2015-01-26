@@ -6,9 +6,9 @@
 		</model>
 		<model-main>
 			<path>@sysconfdir@/netopeer/cfgnetopeer/ietf-netconf-server.yin</path>
-			<feature>ssh</feature>
-			<feature>inbound-ssh</feature>
-			<feature>outbound-ssh</feature>
+			<feature>tls</feature>
+			<feature>inbound-tls</feature>
+			<feature>outbound-tls</feature>
 			@NCSERVER_FEATURES@
 		</model-main>
 	</data-models>

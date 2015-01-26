@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <syslog.h>
@@ -139,15 +140,15 @@ int main(int argc, char** argv) {
 
 	char *aux_string = NULL, path[PATH_MAX];
 	int next_option;
-	int daemonize = 0, len;
+	int daemonize = 0, len, verbose;
 	int listen_init = 1;
 	struct np_module* netopeer_module = NULL, *server_module = NULL;
 
 	/* initialize message system and set verbose and debug variables */
 	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
-		netopeer_options.verbose = NC_VERB_ERROR;
+		verbose = NC_VERB_ERROR;
 	} else {
-		netopeer_options.verbose = atoi(aux_string);
+		verbose = atoi(aux_string);
 	}
 
 	aux_string = NULL; /* for sure to avoid unwanted changes in environment */
@@ -162,7 +163,7 @@ int main(int argc, char** argv) {
 			print_usage(argv[0]);
 			break;
 		case 'v':
-			netopeer_options.verbose = atoi(optarg);
+			verbose = atoi(optarg);
 			break;
 		case 'V':
 			print_version(argv[0]);
@@ -187,10 +188,10 @@ int main(int argc, char** argv) {
 	nc_callback_print(clb_print);
 
 	/* normalize value if not from the enum */
-	if (netopeer_options.verbose > NC_VERB_DEBUG) {
-		netopeer_options.verbose = NC_VERB_DEBUG;
+	if (verbose > NC_VERB_DEBUG) {
+		verbose = NC_VERB_DEBUG;
 	}
-	nc_verbosity(netopeer_options.verbose);
+	nc_verbosity(verbose);
 
 	/* go to the background as a daemon */
 	if (daemonize == 1) {
@@ -257,7 +258,7 @@ restart:
 	server_start = 0;
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
-	ssh_listen_loop(listen_init);
+	tls_listen_loop(listen_init);
 
 	/* unload Netopeer module -> unload all modules */
 	module_disable(server_module, 1);

@@ -2,6 +2,10 @@ module netopeer-cfgnetopeer {
   namespace "urn:cesnet:tmc:netopeer:1.0";
   prefix cfgnetopeer;
 
+  import ietf-x509-cert-to-name {
+    prefix x509c2n;
+  }
+
   organization "CESNET, z.s.p.o.";
   contact
     "mvasko@cesnet.cz";
@@ -79,6 +83,8 @@ module netopeer-cfgnetopeer {
     }
 
     container ssh {
+      description
+        "Netopeer SSH options.";
       container server-keys {
         leaf rsa-key {
           type string;
@@ -143,6 +149,81 @@ module netopeer-cfgnetopeer {
         description
           "Maximum number of seconds a client is allowed
             for authentication after which it is dropped.";
+      }
+    }
+
+    container tls {
+      description
+        "Netopeer TLS options.";
+      leaf server-cert {
+        type binary;
+        description
+          "Server certificate (in base64-encoded DER) presented to clients.";
+      }
+
+      container server-key {
+        leaf key-data {
+          type string;
+          mandatory true;
+          description
+            "Server private key (in base64-encoded DER) matching
+              the server certificate.";
+        }
+
+        leaf key-type {
+          type enumeration {
+            enum "DSA" {
+              value 0;
+            }
+            enum "RSA" {
+              value 1;
+            }
+          }
+          mandatory true;
+          description
+            "The type of the server private key.";
+        }
+      }
+
+      container trusted-ca-certs {
+        description
+          "A list of Certificate Authority (CA) certificates that a
+         NETCONF server can use to authenticate a NETCONF client's
+         certificate. A client's certificate is authenticated if
+         its Issuer matches one of the configured trusted CA
+         certificates.";
+        leaf-list trusted-ca-cert {
+          type binary;
+          description
+            "The binary certificate structure (DER) encoded
+              in base64.";
+        }
+      }
+
+      container trusted-client-certs {
+        description
+          "A list of client certificates that a NETCONF server can
+         use to authenticate a NETCONF client's certificate.  A
+         client's certificate is authenticated if it is an exact
+         match to one of the configured trusted client certificates.";
+        leaf-list trusted-client-cert {
+          type binary;
+          description
+            "The binary certificate structure (DER) encoded
+              in base64.";
+        }
+      }
+
+      container cert-maps {
+        description
+          "The cert-maps container is used by a NETCONF server to
+        map the NETCONF client's presented X.509 certificate to
+        a NETCONF username.
+
+        If no matching and valid cert-to-name list entry can be
+        found, then the NETCONF server MUST close the connection,
+        and MUST NOT accept NETCONF messages over it.";
+        uses x509c2n:cert-to-name;
       }
     }
 

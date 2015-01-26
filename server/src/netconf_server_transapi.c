@@ -290,7 +290,7 @@ struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yan
 * You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
 */
 
-int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+int callback_srv_netconf_srv_tls_srv_listen_oneport(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	unsigned int port;
 	char* content;
 
@@ -298,7 +298,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 	if (content == NULL) {
 		nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/port");
 		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 		return EXIT_FAILURE;
 	}
@@ -318,7 +318,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 				strcmp(netopeer_options.binds->addr, "::0") != 0 || netopeer_options.binds->port_count != 1) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/port");
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/port");
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 			return EXIT_FAILURE;
 		}
@@ -341,7 +341,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 	return EXIT_SUCCESS;
 }
 
-int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+int callback_srv_netconf_srv_tls_srv_listen_manyports(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	xmlNodePtr cur;
 	struct np_bind_addr* bind;
 	char* addr = NULL, *content;
@@ -366,7 +366,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 	if (addr == NULL || port == 0) {
 		nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
 		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 		return EXIT_FAILURE;
 	}
@@ -383,7 +383,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 		if (content == NULL || bind == NULL) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 			return EXIT_FAILURE;
 		}
@@ -400,7 +400,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports(void ** UNUSED(data), XMLD
 		if (i == bind->port_count) {
 			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/listen/interface");
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
 			return EXIT_FAILURE;
 		}
@@ -574,17 +574,18 @@ static void* app_loop(void* app_v) {
 				ts.tv_sec += CALLHOME_PERIODIC_LINGER_CHECK;
 				i = pthread_cond_timedwait(&app->ch_st->ch_cond, &app->ch_st->ch_lock, &ts);
 				if (i == ETIMEDOUT) {
-					if (app->client->ssh_chans == NULL) {
+					if (app->client->tls == NULL) {
 						/* very weird */
 						app->client->to_free = 1;
 					} else {
 						gettimeofday(&cur_time, NULL);
-						if (timeval_diff(cur_time, app->client->ssh_chans->last_rpc_time) >= app->rep_linger) {
+						if (timeval_diff(cur_time, app->client->last_rpc_time) >= app->rep_linger) {
 
 							/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 							nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
 							app->client->callhome_st = NULL;
-							app->client->ssh_chans->to_free = 1;
+							SSL_shutdown(app->client->tls);
+							app->client->to_free = 1;
 							sleep(app->rep_timeout*60);
 							break;
 						}
@@ -819,7 +820,7 @@ static int app_rm(const char* name) {
 #endif
 
 /**
- * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application changes
+ * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -829,7 +830,7 @@ static int app_rm(const char* name) {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 
 #ifndef DISABLE_CALLHOME
 	char* name;
@@ -882,23 +883,23 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int server_transapi_init(xmlDocPtr* UNUSED(running)) {
-	xmlDocPtr doc;
+	xmlDocPtr doc = NULL;
 	struct nc_err* error = NULL;
 	const char* str_err;
 
 	/* set device according to defaults */
 	nc_verb_verbose("Setting the default configuration for the ietf-netconf-server module...");
 
-	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&
-			ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh")) {
-		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><ssh><listen><port>830</port></listen></ssh></netconf>",
-		NULL, NULL, 0);
+	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&
+			ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
+		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
+				NULL, NULL, 0);
 		if (doc == NULL) {
 			nc_verb_error("Unable to parse the default ietf-netconf-server configuration.");
 			return EXIT_FAILURE;
 		}
 
-		if (callback_srv_netconf_srv_ssh_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
+		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
 			if (error != NULL) {
 				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
 				if (str_err != NULL) {
@@ -933,9 +934,9 @@ struct transapi_data_callbacks server_clbks =  {
 	.callbacks_count = 3,
 	.data = NULL,
 	.callbacks = {
-		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = callback_srv_netconf_srv_ssh_srv_listen_oneport},
-		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = callback_srv_netconf_srv_ssh_srv_listen_manyports},
-		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application},
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_oneport},
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_manyports},
+		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
 	}
 };
 

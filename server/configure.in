@@ -194,8 +194,8 @@ REQS="$REQS libxml2"
 # libssh
 AC_SEARCH_LIBS([SSL_library_init], [ssl], [], [AC_MSG_ERROR([Missing the libssl library.])])
 
-# crypt
-AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the crypt library.])])
+# libcrypto
+AC_SEARCH_LIBS([X509_free], [crypto], [], [AC_MSG_ERROR([Missing the libcrypto library.])])
 
 # libnetconf
 AC_SEARCH_LIBS([nc_callhome_listen], [netconf], [],

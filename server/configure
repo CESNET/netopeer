@@ -3810,10 +3810,10 @@ else
 fi
 
 
-# crypt
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing crypt" >&5
-$as_echo_n "checking for library containing crypt... " >&6; }
-if ${ac_cv_search_crypt+:} false; then :
+# libcrypto
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing X509_free" >&5
+$as_echo_n "checking for library containing X509_free... " >&6; }
+if ${ac_cv_search_X509_free+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_func_search_save_LIBS=$LIBS
@@ -3826,16 +3826,16 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char crypt ();
+char X509_free ();
 int
 main ()
 {
-return crypt ();
+return X509_free ();
   ;
   return 0;
 }
 _ACEOF
-for ac_lib in '' crypt; do
+for ac_lib in '' crypto; do
   if test -z "$ac_lib"; then
     ac_res="none required"
   else
@@ -3843,30 +3843,30 @@ for ac_lib in '' crypt; do
     LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
   fi
   if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_crypt=$ac_res
+  ac_cv_search_X509_free=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext
-  if ${ac_cv_search_crypt+:} false; then :
+  if ${ac_cv_search_X509_free+:} false; then :
   break
 fi
 done
-if ${ac_cv_search_crypt+:} false; then :
+if ${ac_cv_search_X509_free+:} false; then :
 
 else
-  ac_cv_search_crypt=no
+  ac_cv_search_X509_free=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_crypt" >&5
-$as_echo "$ac_cv_search_crypt" >&6; }
-ac_res=$ac_cv_search_crypt
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_X509_free" >&5
+$as_echo "$ac_cv_search_X509_free" >&6; }
+ac_res=$ac_cv_search_X509_free
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "Missing the crypt library." "$LINENO" 5
+  as_fn_error $? "Missing the libcrypto library." "$LINENO" 5
 fi
 
 

@@ -83,7 +83,8 @@ Feel free to use it to distinguish module behavior for different error-option va
 NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
 
 struct np_options netopeer_options = {
-	.client_keys_lock = PTHREAD_MUTEX_INITIALIZER,
+	.tls_ctx_lock = PTHREAD_MUTEX_INITIALIZER,
+	.ctn_map_lock = PTHREAD_MUTEX_INITIALIZER,
 	.binds_lock = PTHREAD_MUTEX_INITIALIZER
 };
 
@@ -95,6 +96,181 @@ char* get_node_content(const xmlNodePtr node) {
 		return NULL;
 	}
 	return (char*)node->children->content;
+}
+
+void add_trusted_cert(struct np_trusted_cert** root, const char* cert, uint8_t client_cert) {
+	struct np_trusted_cert* tr_cert;
+
+	if (root == NULL || cert == NULL) {
+		return;
+	}
+
+	if (*root == NULL) {
+		*root = calloc(1, sizeof(struct np_trusted_cert));
+		(*root)->cert = strdup(cert);
+		(*root)->client_cert = client_cert;
+		return;
+	}
+
+	for (tr_cert = *root; tr_cert->next != NULL; tr_cert = tr_cert->next);
+
+	tr_cert->next = calloc(1, sizeof(struct np_trusted_cert));
+	tr_cert->next->cert = strdup(cert);
+	tr_cert->next->client_cert = client_cert;
+	tr_cert->next->prev = tr_cert;
+}
+
+int del_trusted_cert(struct np_trusted_cert** root, const char* cert, uint8_t client_cert) {
+	struct np_trusted_cert* tr_cert;
+
+	if (root == NULL || *root == NULL || cert == NULL) {
+		return 1;
+	}
+
+	for (tr_cert = *root; tr_cert != NULL; tr_cert = tr_cert->next) {
+		if (tr_cert->client_cert != client_cert) {
+			continue;
+		}
+		if (strcmp(tr_cert->cert, cert) == 0) {
+			break;
+		}
+	}
+
+	if (tr_cert == NULL) {
+		return 1;
+	}
+
+	if (tr_cert->prev == NULL) {
+		if (tr_cert->next != NULL) {
+			tr_cert->next->prev = NULL;
+		}
+		*root = tr_cert->next;
+	} else {
+		if (tr_cert->next != NULL) {
+			tr_cert->next->prev = tr_cert->prev;
+		}
+		tr_cert->prev->next = tr_cert->next;
+	}
+	free(tr_cert->cert);
+	free(tr_cert);
+
+	return 0;
+}
+
+void add_ctn_item(struct np_ctn_item** root, uint32_t id, const char* fingerprint, CTN_MAP_TYPE map_type, const char* name) {
+	struct np_ctn_item* ctn, *ctn_prev;
+
+	if (root == NULL || fingerprint == NULL) {
+		return;
+	}
+
+	if (*root == NULL) {
+		*root = calloc(1, sizeof(struct np_ctn_item));
+		(*root)->id = id;
+		(*root)->fingerprint = strdup(fingerprint);
+		(*root)->map_type = map_type;
+		if (name != NULL) {
+			(*root)->name = strdup(name);
+		}
+		return;
+	}
+
+	for (ctn = *root;; ctn = ctn->next) {
+		if (id > ctn->id) {
+			break;
+		}
+
+		/* id is the largest, add at the end */
+		if (ctn->next == NULL) {
+			ctn->next = calloc(1, sizeof(struct np_ctn_item));
+			ctn->next->id = id;
+			ctn->next->fingerprint = strdup(fingerprint);
+			ctn->next->map_type = map_type;
+			if (name != NULL) {
+				ctn->next->name = strdup(name);
+			}
+			ctn->next->prev = ctn;
+			return;
+		}
+	}
+
+	/* add it BEFORE ctn */
+	ctn_prev = ctn->prev;
+	ctn->prev = calloc(1, sizeof(struct np_ctn_item));
+	ctn->prev->id = id;
+	ctn->prev->fingerprint = strdup(fingerprint);
+	ctn->prev->map_type = map_type;
+	if (name != NULL) {
+		ctn->prev->name = strdup(name);
+	}
+	ctn->prev->next = ctn;
+	if (ctn_prev != NULL) {
+		ctn->prev->prev = ctn_prev;
+		ctn_prev->next = ctn->prev;
+	}
+
+}
+
+int del_ctn_item(struct np_ctn_item** root, uint32_t id, const char* fingerprint, CTN_MAP_TYPE map_type, const char* name) {
+	struct np_ctn_item* ctn;
+
+	if (root == NULL || *root == NULL || fingerprint == NULL) {
+		return 1;
+	}
+
+	for (ctn = *root; ctn != NULL; ctn = ctn->next) {
+		if (ctn->id > id) {
+			return 1;
+		}
+		if (ctn->id == id) {
+			if ((ctn->name == NULL && name != NULL) || (ctn->name != NULL && name == NULL) || ctn->map_type != map_type) {
+				continue;
+			}
+
+			if (strcmp(ctn->fingerprint, fingerprint) == 0 && ((ctn->name == NULL && name == NULL) || strcmp(ctn->name, name) == 0)) {
+				break;
+			}
+		}
+	}
+
+	if (ctn == NULL) {
+		return 1;
+	}
+
+	if (ctn->prev == NULL) {
+		if (ctn->next != NULL) {
+			ctn->next->prev = NULL;
+		}
+		*root = ctn->next;
+	} else {
+		if (ctn->next != NULL) {
+			ctn->next->prev = ctn->prev;
+		}
+		ctn->prev->next = ctn->next;
+	}
+	free(ctn->fingerprint);
+	free(ctn->name);
+	free(ctn);
+
+	return 0;
+}
+
+CTN_MAP_TYPE ctn_type_parse(const char* str) {
+	if (strcmp(str, "specified") == 0) {
+		return CTN_MAP_TYPE_SPECIFIED;
+	} else if (strcmp(str, "san-rfc822-name") == 0) {
+		return CTN_MAP_TYPE_SAN_RFC822_NAME;
+	} else if (strcmp(str, "san-dns-name") == 0) {
+		return CTN_MAP_TYPE_SAN_DNS_NAME;
+	} else if (strcmp(str, "san-ip-address") == 0) {
+		return CTN_MAP_TYPE_SAN_IP_ADDRESS;
+	} else if (strcmp(str, "san-any") == 0) {
+		return CTN_MAP_TYPE_SAN_ANY;
+	} else if (strcmp(str, "common-name") == 0) {
+		return CTN_MAP_TYPE_COMMON_NAME;
+	}
+
+	return CTN_MAP_TYPE_COMMON_NAME;
 }
 
 void module_free(struct np_module* module) {
@@ -437,8 +613,9 @@ int callback_n_netopeer_n_hello_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlN
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
+		*error = nc_err_new(NC_ERR_BAD_ELEM);
 		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/hello-timeout");
 		free(msg);
 		return EXIT_FAILURE;
 	}
@@ -477,8 +654,9 @@ int callback_n_netopeer_n_idle_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNo
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
+		*error = nc_err_new(NC_ERR_BAD_ELEM);
 		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/idle-timeout");
 		free(msg);
 		return EXIT_FAILURE;
 	}
@@ -517,8 +695,9 @@ int callback_n_netopeer_n_max_sessions(void** UNUSED(data), XMLDIFF_OP op, xmlNo
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
 		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
+		*error = nc_err_new(NC_ERR_BAD_ELEM);
 		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/max-sessions");
 		free(msg);
 		return EXIT_FAILURE;
 	}
@@ -528,7 +707,7 @@ int callback_n_netopeer_n_max_sessions(void** UNUSED(data), XMLDIFF_OP op, xmlNo
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:server-keys/n:rsa-key changes
+ * @brief This callback will be run when node in path /n:netopeer/n:tls/n:server-cert changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -538,31 +717,36 @@ int callback_n_netopeer_n_max_sessions(void** UNUSED(data), XMLDIFF_OP op, xmlNo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+int callback_n_netopeer_n_tls_n_server_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
 	char* content = NULL;
 
-	if (op & XMLDIFF_REM) {
-		free(netopeer_options.rsa_key);
-		netopeer_options.rsa_key = strdup("/etc/ssh/ssh_host_rsa_key");
-		netopeer_options.server_key_change_flag = 1;
-		return EXIT_SUCCESS;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		content = get_node_content(new_node);
+		if (content == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: node content missing", __func__);
+			return EXIT_FAILURE;
+		}
 	}
 
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
-	}
+	/* TLS_CTX LOCK */
+	pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
 
-	free(netopeer_options.rsa_key);
-	netopeer_options.rsa_key = strdup(content);
-	netopeer_options.server_key_change_flag = 1;
+	free(netopeer_options.server_cert);
+	netopeer_options.server_cert = NULL;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		netopeer_options.server_cert = strdup(content);
+	}
+	netopeer_options.tls_ctx_change_flag = 1;
+
+	/* TLS_CTX UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+
 	return EXIT_SUCCESS;
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:server-keys/n:dsa-key changes
+ * @brief This callback will be run when node in path /n:netopeer/n:tls/n:server-key changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -572,140 +756,57 @@ int callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(void** UNUSED(data), XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
-	char* content = NULL;
+int callback_n_netopeer_n_tls_n_server_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+	char* key = NULL, *type = NULL;
+	xmlNodePtr child;
 
-	if (op & XMLDIFF_REM) {
-		free(netopeer_options.dsa_key);
-		netopeer_options.dsa_key = NULL;
-		netopeer_options.server_key_change_flag = 1;
-		return EXIT_SUCCESS;
-	}
+	if (op & (XMLDIFF_MOD | XMLDIFF_REM)) {
+		for (child = new_node->children; child != NULL; child = child->next) {
+			if (xmlStrEqual(child->name, BAD_CAST "key-data")) {
+				key = get_node_content(child);
+			}
 
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
-	}
-
-	free(netopeer_options.dsa_key);
-	netopeer_options.dsa_key = strdup(content);
-	netopeer_options.server_key_change_flag = 1;
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	xmlNodePtr node;
-	char* path = NULL, *username = NULL;
-	struct np_auth_key* key;
-
-	if (op & XMLDIFF_REM) {
-		node = old_node;
-	} else {
-		node = new_node;
-	}
-
-	for (node = node->children; node != NULL; node = node->next) {
-		if (xmlStrEqual(node->name, BAD_CAST "path")) {
-			path = get_node_content(node);
-		}
-		if (xmlStrEqual(node->name, BAD_CAST "username")) {
-			username = get_node_content(node);
-		}
-	}
-
-	if (path == NULL || username == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: path and/or username missing", __func__);
-		return EXIT_FAILURE;
-	}
-
-	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
-		for (key = netopeer_options.client_auth_keys; key != NULL; key = key->next) {
-			if (strcmp(key->path, path) == 0) {
-				break;
+			if (xmlStrEqual(child->name, BAD_CAST "key-type")) {
+				type = get_node_content(child);
 			}
 		}
 
-		if (key == NULL) {
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_verb_error("%s: internal error: changed key not found", __func__);
+		if (key == NULL || type == NULL) {
+			*error = nc_err_new(NC_ERR_MISSING_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "key-data and/or key-type element missing.");
 			return EXIT_FAILURE;
 		}
 
-		/* CLIENT KEYS LOCK */
-		pthread_mutex_lock(&netopeer_options.client_keys_lock);
-
-		/* remove the key */
-		if (op & XMLDIFF_REM) {
-			if (key->prev == NULL) {
-				netopeer_options.client_auth_keys = key->next;
-				free(key->path);
-				free(key->username);
-				free(key);
-				if (netopeer_options.client_auth_keys != NULL) {
-					netopeer_options.client_auth_keys->prev = NULL;
-				}
-			} else {
-				key->prev->next = key->next;
-				if (key->next != NULL) {
-					key->next->prev = key->prev;
-				}
-				free(key->path);
-				free(key->username);
-				free(key);
-			}
-
-		/* modify the key */
-		} else {
-			free(key->username);
-			key->username = strdup(username);
+		if (strcmp(type, "RSA") != 0 && strcmp(type, "DSA") != 0) {
+			*error = nc_err_new(NC_ERR_BAD_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/server-key/key-type");
+			return EXIT_FAILURE;
 		}
-
-		/* CLIENT KEYS UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
-
-	} else if (op & XMLDIFF_ADD) {
-
-		/* CLIENT KEYS LOCK */
-		pthread_mutex_lock(&netopeer_options.client_keys_lock);
-
-		/* add the key */
-		if (netopeer_options.client_auth_keys == NULL) {
-			netopeer_options.client_auth_keys = calloc(1, sizeof(struct np_auth_key));
-			netopeer_options.client_auth_keys->path = strdup(path);
-			netopeer_options.client_auth_keys->username = strdup(username);
-		} else {
-			for (key = netopeer_options.client_auth_keys; key->next != NULL; key = key->next) {
-				key->next = calloc(1, sizeof(struct np_auth_key));
-				key->path = strdup(path);
-				key->username = strdup(username);
-				key->next->prev = key;
-			}
-		}
-
-		/* CLIENT KEYS UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
 	}
 
+	/* TLS_CTX LOCK */
+	pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+	free(netopeer_options.server_key);
+	netopeer_options.server_key = NULL;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		netopeer_options.server_key = strdup(key);
+		if (strcmp(type, "RSA") == 0) {
+			netopeer_options.server_key_type = 1;
+		} else {
+			netopeer_options.server_key_type = 0;
+		}
+	}
+	netopeer_options.tls_ctx_change_flag = 1;
+
+	/* TLS_CTX UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 
 	return EXIT_SUCCESS;
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:password-auth-enabled changes
+ * @brief This callback will be run when node in path /n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -715,31 +816,53 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_password_auth_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
+int callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 	char* content = NULL;
 
-	if (op & XMLDIFF_REM) {
-		netopeer_options.password_auth_enabled = 1;
-		return EXIT_SUCCESS;
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		content = get_node_content(old_node);
+		if (content == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: node content missing", __func__);
+			return EXIT_FAILURE;
+		}
+
+		/* TLS_CTX LOCK */
+		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+		if (del_trusted_cert(&netopeer_options.trusted_certs, content, 0) != 0) {
+			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
+		} else {
+			netopeer_options.tls_ctx_change_flag = 1;
+		}
+
+		/* TLS_CTX UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 	}
 
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		content = get_node_content(new_node);
+		if (content == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: node content missing", __func__);
+			return EXIT_FAILURE;
+		}
+
+		/* TLS_CTX LOCK */
+		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+		add_trusted_cert(&netopeer_options.trusted_certs, content, 0);
+		netopeer_options.tls_ctx_change_flag = 1;
+
+		/* TLS_CTX UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 	}
 
-	if (strcmp(content, "false") == 0) {
-		netopeer_options.password_auth_enabled = 0;
-	} else {
-		netopeer_options.password_auth_enabled = 1;
-	}
 	return EXIT_SUCCESS;
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:auth-attempts changes
+ * @brief This callback will be run when node in path /n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -749,37 +872,53 @@ int callback_n_netopeer_n_ssh_n_password_auth_enabled(void** UNUSED(data), XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
-	char* content = NULL, *ptr, *msg;
-	uint8_t num;
+int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	char* content = NULL;
 
-	if (op & XMLDIFF_REM) {
-		netopeer_options.auth_attempts = 3;
-		return EXIT_SUCCESS;
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		content = get_node_content(old_node);
+		if (content == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: node content missing", __func__);
+			return EXIT_FAILURE;
+		}
+
+		/* TLS_CTX LOCK */
+		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+		if (del_trusted_cert(&netopeer_options.trusted_certs, content, 1) != 0) {
+			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
+		} else {
+			netopeer_options.tls_ctx_change_flag = 1;
+		}
+
+		/* TLS_CTX UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 	}
 
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		content = get_node_content(new_node);
+		if (content == NULL) {
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_verb_error("%s: node content missing", __func__);
+			return EXIT_FAILURE;
+		}
+
+		/* TLS_CTX LOCK */
+		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+
+		add_trusted_cert(&netopeer_options.trusted_certs, content, 1);
+		netopeer_options.tls_ctx_change_flag = 1;
+
+		/* TLS_CTX UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
 	}
 
-	num = strtol(content, &ptr, 10);
-	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
-		return EXIT_FAILURE;
-	}
-
-	netopeer_options.auth_attempts = num;
 	return EXIT_SUCCESS;
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:ssh/n:auth-timeout
+ * @brief This callback will be run when node in path /n:netopeer/n:tls/n:cert-maps/n:cert-to-name changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -789,32 +928,68 @@ int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_ssh_n_auth_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
-	char* content = NULL, *ptr, *msg;
-	uint16_t num;
+int callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	char* id = NULL, *fingerprint = NULL, *map_type = NULL, *name = NULL, *ptr, *msg;
+	xmlNodePtr child;
 
-	if (op & XMLDIFF_REM) {
-		netopeer_options.auth_timeout = 10;
-		return EXIT_SUCCESS;
+callback_restart:
+	for (child = (op & (XMLDIFF_MOD | XMLDIFF_REM) ? old_node->children : new_node->children); child != NULL; child = child->next) {
+		if (xmlStrEqual(child->name, BAD_CAST "id")) {
+			id = get_node_content(child);
+		}
+		if (xmlStrEqual(child->name, BAD_CAST "fingerprint")) {
+			fingerprint = get_node_content(child);
+		}
+		if (xmlStrEqual(child->name, BAD_CAST "map-type")) {
+			map_type = get_node_content(child);
+		}
+		if (xmlStrEqual(child->name, BAD_CAST "name")) {
+			name = get_node_content(child);
+		}
+
+		if (id == NULL || fingerprint == NULL || map_type == NULL) {
+			*error = nc_err_new(NC_ERR_MISSING_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "id and/or fingerprint and/or map-type element missing.");
+			return EXIT_FAILURE;
+		}
+		strtol(id, &ptr, 10);
+		if (*ptr != '\0') {
+			asprintf(&msg, "Could not convert '%s' to a number.", id);
+			*error = nc_err_new(NC_ERR_BAD_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/cert-maps/cert-to-name/id");
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+			return EXIT_FAILURE;
+		}
+		if (strcmp(map_type, "specified") == 0 && name == NULL) {
+			*error = nc_err_new(NC_ERR_MISSING_ELEM);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "name element missing.");
+			return EXIT_FAILURE;
+		}
 	}
 
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
+	/* CTN_MAP LOCK */
+	pthread_mutex_lock(&netopeer_options.ctn_map_lock);
+
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		if (del_ctn_item(&netopeer_options.ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name) != 0) {
+			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
+		}
+
+		if (op & XMLDIFF_MOD) {
+			/* CTN_MAP UNLOCK */
+			pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+			op = XMLDIFF_ADD;
+			goto callback_restart;
+		}
+	}
+	if (op & XMLDIFF_ADD) {
+		add_ctn_item(&netopeer_options.ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name);
 	}
 
-	num = strtol(content, &ptr, 10);
-	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
-		return EXIT_FAILURE;
-	}
+	/* CTN_MAP UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
 
-	netopeer_options.auth_timeout = num;
 	return EXIT_SUCCESS;
 }
 
@@ -1056,18 +1231,17 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks netopeer_clbks = {
-	.callbacks_count = 13,
+	.callbacks_count = 12,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/n:netopeer/n:hello-timeout", .func = callback_n_netopeer_n_hello_timeout},
 		{.path = "/n:netopeer/n:idle-timeout", .func = callback_n_netopeer_n_idle_timeout},
 		{.path = "/n:netopeer/n:max-sessions", .func = callback_n_netopeer_n_max_sessions},
-		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key},
-		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key},
-		{.path = "/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key", .func = callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key},
-		{.path = "/n:netopeer/n:ssh/n:password-auth-enabled", .func = callback_n_netopeer_n_ssh_n_password_auth_enabled},
-		{.path = "/n:netopeer/n:ssh/n:auth-attempts", .func = callback_n_netopeer_n_ssh_n_auth_attempts},
-		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = callback_n_netopeer_n_ssh_n_auth_timeout},
+		{.path = "/n:netopeer/n:tls/n:server-cert", .func = callback_n_netopeer_n_tls_n_server_cert},
+		{.path = "/n:netopeer/n:tls/n:server-key", .func = callback_n_netopeer_n_tls_n_server_key},
+		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert},
+		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert},
+		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name},
 		{.path = "/n:netopeer/n:response-time", .func = callback_n_netopeer_n_response_time},
 		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
 		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
@@ -1099,7 +1273,13 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 
 	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module...");
 
-	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><ssh><server-keys><rsa-key>/etc/ssh/ssh_host_rsa_key</rsa-key></server-keys><password-auth-enabled>true</password-auth-enabled><auth-attempts>3</auth-attempts><auth-timeout>10</auth-timeout></ssh><response-time>50</response-time><client-removal-time>10</client-removal-time></netopeer>",
+	/* TODO
+	 *
+	 * NETOPEER_TLS_SERVER_CERT existuje, aj NETOPEER_TLS_SERVER_KEY - hodit do konfiguracie, inak warning?
+	 * NETOPEER_TLS_TRUSTED_DIR - vsetko co tam najdem hodit do konfiguracie, c_rehash pre istotu, aby sa to naozaj pouzilo
+	 */
+
+	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><response-time>50</response-time><client-removal-time>10</client-removal-time></netopeer>",
 		NULL, NULL, 0);
 	if (doc == NULL) {
 		nc_verb_error("Unable to parse the default cfgnetopeer configuration.");
@@ -1142,7 +1322,7 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 		return EXIT_FAILURE;
 	}
 
-	if (callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->children, &error) != EXIT_SUCCESS) {
+	if (callback_n_netopeer_n_response_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next, &error) != EXIT_SUCCESS) {
 		if (error != NULL) {
 			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
 			if (str_err != NULL) {
@@ -1154,55 +1334,7 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 		return EXIT_FAILURE;
 	}
 
-	if (callback_n_netopeer_n_ssh_n_password_auth_enabled(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next, &error) != EXIT_SUCCESS) {
-		if (error != NULL) {
-			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-			if (str_err != NULL) {
-				nc_verb_error(str_err);
-			}
-			nc_err_free(error);
-		}
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
-
-	if (callback_n_netopeer_n_ssh_n_auth_attempts(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next->next, &error) != EXIT_SUCCESS) {
-		if (error != NULL) {
-			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-			if (str_err != NULL) {
-				nc_verb_error(str_err);
-			}
-			nc_err_free(error);
-		}
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
-
-	if (callback_n_netopeer_n_ssh_n_auth_timeout(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->children->next->next->next, &error) != EXIT_SUCCESS) {
-		if (error != NULL) {
-			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-			if (str_err != NULL) {
-				nc_verb_error(str_err);
-			}
-			nc_err_free(error);
-		}
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
-
-	if (callback_n_netopeer_n_response_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next, &error) != EXIT_SUCCESS) {
-		if (error != NULL) {
-			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-			if (str_err != NULL) {
-				nc_verb_error(str_err);
-			}
-			nc_err_free(error);
-		}
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
-
-	if (callback_n_netopeer_n_client_removal_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next->next, &error) != EXIT_SUCCESS) {
+	if (callback_n_netopeer_n_client_removal_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next, &error) != EXIT_SUCCESS) {
 		if (error != NULL) {
 			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
 			if (str_err != NULL) {
@@ -1222,18 +1354,25 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void netopeer_transapi_close(void) {
-	struct np_auth_key* key, *del_key;
+	struct np_trusted_cert* cert, *del_cert;
+	struct np_ctn_item* item, *del_item;
 
 	nc_verb_verbose("Netopeer cleanup.");
 
-	free(netopeer_options.rsa_key);
-	free(netopeer_options.dsa_key);
-	for (key = netopeer_options.client_auth_keys; key != NULL;) {
-		del_key = key;
-		key = key->next;
-		free(del_key->path);
-		free(del_key->username);
-		free(del_key);
+	free(netopeer_options.server_cert);
+	free(netopeer_options.server_key);
+	for (cert = netopeer_options.trusted_certs; cert != NULL;) {
+		del_cert = cert;
+		cert = cert->next;
+		free(del_cert->cert);
+		free(del_cert);
+	}
+	for (item = netopeer_options.ctn_map; item != NULL;) {
+		del_item = item;
+		item = item->next;
+		free(del_item->fingerprint);
+		free(del_item->name);
+		free(del_item);
 	}
 	while (netopeer_options.modules) {
 		module_disable(netopeer_options.modules, 1);

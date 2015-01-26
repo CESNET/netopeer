@@ -1,8 +1,9 @@
 #ifndef _SERVER_SSH_H_
 #define _SERVER_SSH_H_
 
-#include <openssl/ssl.h
+#include <openssl/ssl.h>
 #include <pthread.h>
+#include <sys/socket.h>
 #include <libnetconf.h>
 
 #ifdef __GNUC__
