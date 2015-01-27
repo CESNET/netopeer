@@ -97,7 +97,8 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/ietf-x509-cert-to-name.yin \
 	config/ietf-netconf-server-data.rng \
 	config/ietf-netconf-server-gdefs.rng \
-	config/ietf-netconf-server-schematron.xsl
+	config/ietf-netconf-server-schematron.xsl \
+	config/datastore.xml
 
 CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \

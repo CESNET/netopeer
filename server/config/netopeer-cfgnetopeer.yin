@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:cfgnetopeer="urn:cesnet:tmc:netopeer:1.0" name="netopeer-cfgnetopeer">
+<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:cfgnetopeer="urn:cesnet:tmc:netopeer:1.0" xmlns:x509c2n="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name" name="netopeer-cfgnetopeer">
   <namespace uri="urn:cesnet:tmc:netopeer:1.0"/>
   <prefix value="cfgnetopeer"/>
+  <import module="ietf-x509-cert-to-name">
+    <prefix value="x509c2n"/>
+  </import>
   <organization>
     <text>CESNET, z.s.p.o.</text>
   </organization>
@@ -85,6 +88,9 @@
       </description>
     </leaf>
     <container name="ssh">
+      <description>
+        <text>Netopeer SSH options.</text>
+      </description>
       <container name="server-keys">
         <leaf name="rsa-key">
           <type name="string"/>
@@ -153,6 +159,84 @@
  for authentication after which it is dropped.</text>
         </description>
       </leaf>
+    </container>
+    <container name="tls">
+      <description>
+        <text>Netopeer TLS options.</text>
+      </description>
+      <leaf name="server-cert">
+        <type name="binary"/>
+        <description>
+          <text>Server certificate (in base64-encoded DER) presented to clients.</text>
+        </description>
+      </leaf>
+      <container name="server-key">
+        <leaf name="key-data">
+          <type name="binary"/>
+          <mandatory value="true"/>
+          <description>
+            <text>Server private key (in base64-encoded DER) matching
+ the server certificate.</text>
+          </description>
+        </leaf>
+        <leaf name="key-type">
+          <type name="enumeration">
+            <enum name="DSA">
+              <value value="0"/>
+            </enum>
+            <enum name="RSA">
+              <value value="1"/>
+            </enum>
+          </type>
+          <mandatory value="true"/>
+          <description>
+            <text>The type of the server private key.</text>
+          </description>
+        </leaf>
+      </container>
+      <container name="trusted-ca-certs">
+        <description>
+          <text>A list of Certificate Authority (CA) certificates that a
+NETCONF server can use to authenticate a NETCONF client's
+certificate. A client's certificate is authenticated if
+its Issuer matches one of the configured trusted CA
+certificates.</text>
+        </description>
+        <leaf-list name="trusted-ca-cert">
+          <type name="binary"/>
+          <description>
+            <text>The binary certificate structure (DER) encoded
+ in base64.</text>
+          </description>
+        </leaf-list>
+      </container>
+      <container name="trusted-client-certs">
+        <description>
+          <text>A list of client certificates that a NETCONF server can
+use to authenticate a NETCONF client's certificate.  A
+client's certificate is authenticated if it is an exact
+match to one of the configured trusted client certificates.</text>
+        </description>
+        <leaf-list name="trusted-client-cert">
+          <type name="binary"/>
+          <description>
+            <text>The binary certificate structure (DER) encoded
+ in base64.</text>
+          </description>
+        </leaf-list>
+      </container>
+      <container name="cert-maps">
+        <description>
+          <text>The cert-maps container is used by a NETCONF server to
+map the NETCONF client's presented X.509 certificate to
+a NETCONF username.
+
+If no matching and valid cert-to-name list entry can be
+found, then the NETCONF server MUST close the connection,
+and MUST NOT accept NETCONF messages over it.</text>
+        </description>
+        <uses name="x509c2n:cert-to-name"/>
+      </container>
     </container>
     <leaf name="response-time">
       <type name="uint16"/>

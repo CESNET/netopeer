@@ -47,6 +47,7 @@ struct state_struct {
 	 */
 	pthread_rwlock_t global_lock;
 	struct client_struct* clients;
+	int last_tls_idx;
 };
 
 struct ntf_thread_config {

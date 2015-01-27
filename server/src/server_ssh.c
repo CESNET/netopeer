@@ -21,6 +21,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/x509v3.h>
 
 #include "server_ssh.h"
 #include "netconf_server_transapi.h"
@@ -32,7 +33,9 @@ extern pthread_mutex_t callhome_lock;
 extern struct client_struct* callhome_client;
 
 /* one global structure holding all the client information */
-struct state_struct netopeer_state;
+struct state_struct netopeer_state = {
+	.global_lock = PTHREAD_RWLOCK_INITIALIZER
+};
 
 extern struct np_options netopeer_options;
 
@@ -190,23 +193,309 @@ unsigned int timeval_diff(struct timeval tv1, struct timeval tv2) {
 	return sec;
 }
 
-int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
+static void digest_to_str(const unsigned char* digest, unsigned int dig_len, char** str) {
+	unsigned int i;
+
+	*str = malloc(dig_len*3);
+	for (i = 0; i < dig_len-1; ++i) {
+		sprintf((*str)+(i*3), "%02x:", digest[i]);
+	}
+	sprintf((*str)+(i*3), "%02x", digest[i]);
+}
+
+/* return: 0 - username assigned, 1 - username unchanged (no match), 2 - error occured, username unchanged */
+static int tls_ctn_get_username_from_cert(X509* client_cert, CTN_MAP_TYPE map_type, char** username) {
+	STACK_OF(GENERAL_NAME)* san_names;
+	GENERAL_NAME* san_name;
+	ASN1_OCTET_STRING* ip;
+	int i, san_count;
+	char* subject, *common_name;
+
+	if (map_type == CTN_MAP_TYPE_COMMON_NAME) {
+		subject = X509_NAME_oneline(X509_get_subject_name(client_cert), NULL, 0);
+		common_name = strstr(subject, "CN=");
+		if (common_name == NULL) {
+			nc_verb_warning("%s: cert does not include the commonName field", __func__);
+			free(subject);
+			return 1;
+		}
+		common_name += 3;
+		if (strchr(common_name, '/') != 0) {
+			*strchr(common_name, '/') = '\0';
+		}
+		*username = strdup(common_name);
+		free(subject);
+	} else {
+		/* retrieve subjectAltName's rfc822Name (email), dNSName and iPAddress values */
+		san_names = X509_get_ext_d2i(client_cert, NID_subject_alt_name, NULL, NULL);
+		if (san_names == NULL) {
+			nc_verb_warning("%s: cert has no SANs or failed to retrieve them", __func__);
+			return 1;
+		}
+
+		san_count = sk_GENERAL_NAME_num(san_names);
+		for (i = 0; i < san_count; ++i) {
+			san_name = sk_GENERAL_NAME_value(san_names, i);
+
+			/* rfc822Name (email) */
+			if ((map_type == CTN_MAP_TYPE_SAN_ANY || map_type == CTN_MAP_TYPE_SAN_RFC822_NAME) &&
+					san_name->type == GEN_EMAIL) {
+				*username = strdup((char*)ASN1_STRING_data(san_name->d.rfc822Name));
+				break;
+			}
+
+			/* dNSName */
+			if ((map_type == CTN_MAP_TYPE_SAN_ANY || map_type == CTN_MAP_TYPE_SAN_DNS_NAME) &&
+					san_name->type == GEN_DNS) {
+				*username = strdup((char*)ASN1_STRING_data(san_name->d.dNSName));
+				break;
+			}
+
+			/* iPAddress */
+			if ((map_type == CTN_MAP_TYPE_SAN_ANY || map_type == CTN_MAP_TYPE_SAN_IP_ADDRESS) &&
+					san_name->type == GEN_IPADD) {
+				ip = san_name->d.iPAddress;
+				if (ip->length == 4) {
+					asprintf(username, "%d.%d.%d.%d", ip->data[0], ip->data[1], ip->data[2], ip->data[3]);
+					break;
+				} else if (ip->length == 16) {
+					asprintf(username, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+						ip->data[0], ip->data[1], ip->data[2], ip->data[3], ip->data[4], ip->data[5],
+						ip->data[6], ip->data[7], ip->data[8], ip->data[9], ip->data[10], ip->data[11],
+						ip->data[12], ip->data[13], ip->data[14], ip->data[15]);
+					break;
+				} else {
+					nc_verb_warning("%s: SAN IP address in an unknown format (length is %d)", __func__, ip->length);
+				}
+			}
+		}
+		sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+
+		if (i < san_count) {
+			switch (map_type) {
+			case CTN_MAP_TYPE_SAN_RFC822_NAME:
+				nc_verb_warning("%s: cert does not include the SAN rfc822Name field", __func__);
+				break;
+			case CTN_MAP_TYPE_SAN_DNS_NAME:
+				nc_verb_warning("%s: cert does not include the SAN dNSName field", __func__);
+				break;
+			case CTN_MAP_TYPE_SAN_IP_ADDRESS:
+				nc_verb_warning("%s: cert does not include the SAN iPAddress field", __func__);
+				break;
+			case CTN_MAP_TYPE_SAN_ANY:
+				nc_verb_warning("%s: cert does not include any relevant SAN fields", __func__);
+				break;
+			default:
+				break;
+			}
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/* return: 0 - result assigned, 1 - result unchanged (no match), 2 - error occured, result unchanged */
+static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
+	char* digest_md5 = NULL, *digest_sha1 = NULL, *digest_sha224 = NULL;
+	char* digest_sha256 = NULL, *digest_sha384 = NULL, *digest_sha512 = NULL;
+	struct np_ctn_item* ctn;
+	unsigned char* buf = malloc(64);
+	unsigned int buf_len = 64;
+
+	if (cur_cert == NULL || client_cert == NULL || result == NULL) {
+		free(buf);
+		return 1;
+	}
+
+	/* CTN_MAP LOCK */
+	pthread_mutex_lock(&netopeer_options.ctn_map_lock);
+
+	for (ctn = netopeer_options.ctn_map; ctn != NULL; ctn = ctn->next) {
+		/* MD5 */
+		if (strncmp(ctn->fingerprint, "01", 2) == 0) {
+			if (digest_md5 == NULL) {
+				if (X509_digest(cur_cert, EVP_md5(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating MD5 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_md5);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_md5) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* SHA-1 */
+		} else if (strncmp(ctn->fingerprint, "02", 2) == 0) {
+			if (digest_sha1 == NULL) {
+				if (X509_digest(cur_cert, EVP_sha1(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating SHA-1 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_sha1);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_sha1) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* SHA-224 */
+		} else if (strncmp(ctn->fingerprint, "03", 2) == 0) {
+			if (digest_sha224 == NULL) {
+				if (X509_digest(cur_cert, EVP_sha224(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating SHA-224 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_sha224);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_sha224) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* SHA-256 */
+		} else if (strncmp(ctn->fingerprint, "04", 2) == 0) {
+			if (digest_sha256 == NULL) {
+				if (X509_digest(cur_cert, EVP_sha256(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating SHA-256 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_sha256);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_sha256) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* SHA-384 */
+		} else if (strncmp(ctn->fingerprint, "05", 2) == 0) {
+			if (digest_sha384 == NULL) {
+				if (X509_digest(cur_cert, EVP_sha384(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating SHA-384 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_sha384);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_sha384) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* SHA-512 */
+		} else if (strncmp(ctn->fingerprint, "06", 2) == 0) {
+			if (digest_sha512 == NULL) {
+				if (X509_digest(cur_cert, EVP_sha512(), buf, &buf_len) != 1) {
+					nc_verb_error("%s: calculating SHA-512 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
+					goto fail;
+				}
+				digest_to_str(buf, buf_len, &digest_sha512);
+			}
+
+			if (strcasecmp(ctn->fingerprint+3, digest_sha512) == 0) {
+				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
+					/* we got a winner! */
+					*result = strdup(ctn->name);
+					break;
+				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
+					/* another winner! */
+					break;
+				}
+			}
+
+		/* unkown */
+		} else {
+			nc_verb_warning("%s: unknown fingerprint algorithm used (%s), skipping", __func__, ctn->fingerprint);
+		}
+	}
+
+	/* CTN_MAP UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+
+	free(digest_md5);
+	free(digest_sha1);
+	free(digest_sha224);
+	free(digest_sha256);
+	free(digest_sha384);
+	free(digest_sha512);
+	free(buf);
+	return 0;
+
+fail:
+	/* CTN_MAP UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+
+	free(digest_md5);
+	free(digest_sha1);
+	free(digest_sha224);
+	free(digest_sha256);
+	free(digest_sha384);
+	free(digest_sha512);
+	free(buf);
+	return 1;
+}
+
+static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	X509_STORE *store;
 	X509_LOOKUP *lookup;
 	X509_STORE_CTX store_ctx;
 	X509_OBJECT obj;
 	X509_NAME* subject;
 	X509_NAME* issuer;
-	X509* cert;
+	X509* cert, *peer_cert;
 	X509_CRL* crl;
 	X509_REVOKED* revoked;
+	STACK_OF(X509)* cert_chain_stack;
 	EVP_PKEY* pubkey;
+	SSL* cur_tls;
+	struct client_struct* new_client;
 	long serial;
 	int i, n, rc;
 	char* cp;
 	ASN1_TIME* last_update = NULL, * next_update = NULL;
 
-	/* cert verification failed */
+	/* standard certificate verification failed */
 	if (!preverify_ok) {
 		return 0;
 	}
@@ -217,10 +506,12 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
 		if (lookup == NULL) {
 			nc_verb_error("%s: failed to add lookup method", __func__);
+			X509_STORE_free(store);
 			return 0; // FAILED
 		}
 		if (X509_LOOKUP_add_dir(lookup, NETOPEER_TLS_CRL_DIR, X509_FILETYPE_PEM) == 0) {
 			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
+			X509_STORE_free(store);
 			return 0; // FAILED
 		}
 
@@ -258,6 +549,7 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 				if (pubkey) {
 					EVP_PKEY_free(pubkey);
 				}
+				X509_STORE_free(store);
 				return 0; /* fail */
 			}
 			if (pubkey) {
@@ -269,12 +561,14 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 				nc_verb_error("%s: CRL invalid nextUpdate field", __func__);
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD);
 				X509_OBJECT_free_contents(&obj);
+				X509_STORE_free(store);
 				return 0; /* fail */
 			}
 			if (X509_cmp_current_time(next_update) < 0) {
 				nc_verb_error("%s: CRL expired - revoking all certificates", __func__);
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CRL_HAS_EXPIRED);
 				X509_OBJECT_free_contents(&obj);
+				X509_STORE_free(store);
 				return 0; /* fail */
 			}
 			X509_OBJECT_free_contents(&obj);
@@ -299,15 +593,77 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 					OPENSSL_free(cp);
 					X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CERT_REVOKED);
 					X509_OBJECT_free_contents(&obj);
+					X509_STORE_free(store);
 					return 0; /* fail */
 				}
 			}
 			X509_OBJECT_free_contents(&obj);
 		}
+		X509_STORE_free(store);
 	}
 
+	/* get the new client structure */
+	cur_tls = X509_STORE_CTX_get_ex_data(x509_ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+	new_client = (struct client_struct*)SSL_get_ex_data(cur_tls, netopeer_state.last_tls_idx);
+	if (new_client == NULL) {
+		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+		return 0;
+	}
+
+	/* TODO
+	 *
+	 * verify only this cert (tls_cert_to_name), on match get the client certificate
+	 * (last in chain), call tls_ctn_get_username_from_cert (not on specified)
+	 */
+
 	/* cert-to-name */
-	//TODO
+	cert = X509_STORE_CTX_get_current_cert(x509_ctx);
+	subject = X509_get_subject_name(cert);
+	issuer = X509_get_issuer_name(cert);
+
+	cp = X509_NAME_oneline(subject, NULL, 0);
+	nc_verb_verbose("%s: cert verify: subject: %s", __func__, cp);
+	OPENSSL_free(cp);
+	cp = X509_NAME_oneline(issuer, NULL, 0);
+	nc_verb_verbose("%s: cert verify: issuer:  %s", __func__, cp);
+	OPENSSL_free(cp);
+
+	cp = NULL;
+	if (tls_cert_to_name(cert, peer_cert, &cp) != 0) {
+		/* cert-to-name encountered an error */
+		X509_free(cert);
+		sk_X509_pop_free(cert_chain_stack, X509_free);
+		break;
+	}
+	X509_free(cert);
+
+	if (cp != NULL) {
+		/* cert-to-name found a match */
+		new_client->username = cp;
+		break;
+	}
+
+	/* get the last certificate, that is the peer (client) certificate */
+	cert_chain_stack = X509_STORE_CTX_get1_chain(x509_ctx);
+	peer_cert = NULL;
+	while ((cert = sk_X509_pop(cert_chain_stack)) != NULL) {
+		X509_free(peer_cert);
+		peer_cert = cert;
+	}
+	sk_X509_pop_free(cert_chain_stack, X509_free);
+	X509_free(peer_cert);
+
+	if (cert == NULL) {
+		nc_verb_verbose("%s: cert-to-name did not find any match", __func__);
+	}
+
+	if (new_client->username == NULL) {
+		nc_verb_error("Cert-to-name unsuccessful, dropping the new client.");
+		X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+		return 0;
+	} else {
+		nc_verb_verbose("Cert-to-name success, the new client username recognized as '%s'.", new_client->username);
+	}
 
 	return 1; /* success */
 }
@@ -445,7 +801,7 @@ static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
 		return NULL;
 	}
 
-	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), "PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), "PRIVATE KEY-----");
+	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----");
 	bio = BIO_new_mem_buf(buf, strlen(buf));
 	if (bio == NULL) {
 		free(buf);
@@ -680,7 +1036,7 @@ void* tls_data_thread(void* UNUSED(arg)) {
 
 			gettimeofday(&cur_time, NULL);
 
-			/* check the csession for hello timeout */
+			/* check the ncsession for hello timeout */
 			if (cur_client->nc_sess == NULL && timeval_diff(cur_time, cur_client->last_rpc_time) >= netopeer_options.hello_timeout) {
 				if (cur_client->new_sess_tid == 0) {
 					nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
@@ -960,11 +1316,6 @@ void tls_listen_loop(int do_init) {
 
 	/* Init */
 	if (do_init) {
-		if ((ret = pthread_rwlock_init(&netopeer_state.global_lock, NULL)) != 0) {
-			nc_verb_error("%s: failed to init mutex (%s)", __func__, strerror(ret));
-			return;
-		}
-
 		if ((ret = pthread_create(&netopeer_state.tls_data_tid, NULL, tls_data_thread, NULL)) != 0) {
 			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
 			return;
@@ -1112,6 +1463,10 @@ void tls_listen_loop(int do_init) {
 			SSL_set_fd(new_client->tls, new_client->sock);
 			SSL_set_mode(new_client->tls, SSL_MODE_AUTO_RETRY);
 
+			/* generate new index for TLS-specific data, for the verify callback */
+			netopeer_state.last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+			SSL_set_ex_data(new_client->tls, netopeer_state.last_tls_idx, new_client);
+
 			if (SSL_accept(new_client->tls) != 1) {
 				nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 				new_client->to_free = 1;
@@ -1146,7 +1501,5 @@ void tls_listen_loop(int do_init) {
 		if ((ret = pthread_join(netopeer_state.tls_data_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
-
-		pthread_rwlock_destroy(&netopeer_state.global_lock);
 	}
 }

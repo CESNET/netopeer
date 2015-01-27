@@ -163,7 +163,7 @@ module netopeer-cfgnetopeer {
 
       container server-key {
         leaf key-data {
-          type string;
+          type binary;
           mandatory true;
           description
             "Server private key (in base64-encoded DER) matching

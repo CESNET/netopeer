@@ -760,7 +760,7 @@ int callback_n_netopeer_n_tls_n_server_key(void** UNUSED(data), XMLDIFF_OP op, x
 	char* key = NULL, *type = NULL;
 	xmlNodePtr child;
 
-	if (op & (XMLDIFF_MOD | XMLDIFF_REM)) {
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
 		for (child = new_node->children; child != NULL; child = child->next) {
 			if (xmlStrEqual(child->name, BAD_CAST "key-data")) {
 				key = get_node_content(child);
@@ -942,30 +942,33 @@ callback_restart:
 		}
 		if (xmlStrEqual(child->name, BAD_CAST "map-type")) {
 			map_type = get_node_content(child);
+			if (strchr(map_type, ':') != NULL) {
+				map_type = strchr(map_type, ':')+1;
+			}
 		}
 		if (xmlStrEqual(child->name, BAD_CAST "name")) {
 			name = get_node_content(child);
 		}
+	}
 
-		if (id == NULL || fingerprint == NULL || map_type == NULL) {
-			*error = nc_err_new(NC_ERR_MISSING_ELEM);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "id and/or fingerprint and/or map-type element missing.");
-			return EXIT_FAILURE;
-		}
-		strtol(id, &ptr, 10);
-		if (*ptr != '\0') {
-			asprintf(&msg, "Could not convert '%s' to a number.", id);
-			*error = nc_err_new(NC_ERR_BAD_ELEM);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/cert-maps/cert-to-name/id");
-			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-			free(msg);
-			return EXIT_FAILURE;
-		}
-		if (strcmp(map_type, "specified") == 0 && name == NULL) {
-			*error = nc_err_new(NC_ERR_MISSING_ELEM);
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "name element missing.");
-			return EXIT_FAILURE;
-		}
+	if (id == NULL || fingerprint == NULL || map_type == NULL) {
+		*error = nc_err_new(NC_ERR_MISSING_ELEM);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, "id and/or fingerprint and/or map-type element missing.");
+		return EXIT_FAILURE;
+	}
+	strtol(id, &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Could not convert '%s' to a number.", id);
+		*error = nc_err_new(NC_ERR_BAD_ELEM);
+		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/cert-maps/cert-to-name/id");
+		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+		free(msg);
+		return EXIT_FAILURE;
+	}
+	if (strcmp(map_type, "specified") == 0 && name == NULL) {
+		*error = nc_err_new(NC_ERR_MISSING_ELEM);
+		nc_err_set(*error, NC_ERR_PARAM_MSG, "name element missing.");
+		return EXIT_FAILURE;
 	}
 
 	/* CTN_MAP LOCK */
@@ -1272,12 +1275,6 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 	const char* str_err;
 
 	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module...");
-
-	/* TODO
-	 *
-	 * NETOPEER_TLS_SERVER_CERT existuje, aj NETOPEER_TLS_SERVER_KEY - hodit do konfiguracie, inak warning?
-	 * NETOPEER_TLS_TRUSTED_DIR - vsetko co tam najdem hodit do konfiguracie, c_rehash pre istotu, aby sa to naozaj pouzilo
-	 */
 
 	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><response-time>50</response-time><client-removal-time>10</client-removal-time></netopeer>",
 		NULL, NULL, 0);
