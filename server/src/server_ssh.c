@@ -20,6 +20,7 @@
 #include <pwd.h>
 
 #include <openssl/ssl.h>
+#include <openssl/evp.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
@@ -65,6 +66,7 @@ static inline void _client_free(struct client_struct* client) {
 	close(client->tls_out[0]);
 	close(client->tls_out[1]);
 	free(client->username);
+	X509_free(client->cert);
 
 	/* let the callhome thread know the client was freed */
 	if (client->callhome_st != NULL) {
@@ -203,7 +205,7 @@ static void digest_to_str(const unsigned char* digest, unsigned int dig_len, cha
 	sprintf((*str)+(i*3), "%02x", digest[i]);
 }
 
-/* return: 0 - username assigned, 1 - username unchanged (no match), 2 - error occured, username unchanged */
+/* return: 0 - username assigned, 1 - error occured, username unchanged */
 static int tls_ctn_get_username_from_cert(X509* client_cert, CTN_MAP_TYPE map_type, char** username) {
 	STACK_OF(GENERAL_NAME)* san_names;
 	GENERAL_NAME* san_name;
@@ -303,7 +305,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 	unsigned char* buf = malloc(64);
 	unsigned int buf_len = 64;
 
-	if (cur_cert == NULL || client_cert == NULL || result == NULL) {
+	if (cert == NULL || map_type == NULL || name == NULL) {
 		free(buf);
 		return 1;
 	}
@@ -315,7 +317,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 		/* MD5 */
 		if (strncmp(ctn->fingerprint, "01", 2) == 0) {
 			if (digest_md5 == NULL) {
-				if (X509_digest(cur_cert, EVP_md5(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_md5(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating MD5 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -323,21 +325,19 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_md5) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
 		/* SHA-1 */
 		} else if (strncmp(ctn->fingerprint, "02", 2) == 0) {
 			if (digest_sha1 == NULL) {
-				if (X509_digest(cur_cert, EVP_sha1(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_sha1(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating SHA-1 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -345,21 +345,19 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha1) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
 		/* SHA-224 */
 		} else if (strncmp(ctn->fingerprint, "03", 2) == 0) {
 			if (digest_sha224 == NULL) {
-				if (X509_digest(cur_cert, EVP_sha224(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_sha224(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating SHA-224 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -367,21 +365,19 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha224) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
 		/* SHA-256 */
 		} else if (strncmp(ctn->fingerprint, "04", 2) == 0) {
 			if (digest_sha256 == NULL) {
-				if (X509_digest(cur_cert, EVP_sha256(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_sha256(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating SHA-256 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -389,21 +385,19 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha256) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
 		/* SHA-384 */
 		} else if (strncmp(ctn->fingerprint, "05", 2) == 0) {
 			if (digest_sha384 == NULL) {
-				if (X509_digest(cur_cert, EVP_sha384(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_sha384(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating SHA-384 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -411,21 +405,19 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha384) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
 		/* SHA-512 */
 		} else if (strncmp(ctn->fingerprint, "06", 2) == 0) {
 			if (digest_sha512 == NULL) {
-				if (X509_digest(cur_cert, EVP_sha512(), buf, &buf_len) != 1) {
+				if (X509_digest(cert, EVP_sha512(), buf, &buf_len) != 1) {
 					nc_verb_error("%s: calculating SHA-512 digest: %s", __func__, ERR_reason_error_string(ERR_get_error()));
 					goto fail;
 				}
@@ -433,18 +425,16 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 			}
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha512) == 0) {
+				/* we got ourselves a winner! */
 				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
-					/* we got a winner! */
-					*result = strdup(ctn->name);
-					break;
-				} else if (tls_ctn_get_username_from_cert(client_cert, ctn->map_type, result) == 0) {
-					/* another winner! */
-					break;
+					*name = strdup(ctn->name);
 				}
+				break;
 			}
 
-		/* unkown */
+		/* unknown */
 		} else {
 			nc_verb_warning("%s: unknown fingerprint algorithm used (%s), skipping", __func__, ctn->fingerprint);
 		}
@@ -493,6 +483,9 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	long serial;
 	int i, n, rc;
 	char* cp;
+	unsigned char* digest1, *digest2;
+	unsigned int dig_len;
+	CTN_MAP_TYPE map_type;
 	ASN1_TIME* last_update = NULL, * next_update = NULL;
 
 	/* standard certificate verification failed */
@@ -610,11 +603,22 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		return 0;
 	}
 
-	/* TODO
-	 *
-	 * verify only this cert (tls_cert_to_name), on match get the client certificate
-	 * (last in chain), call tls_ctn_get_username_from_cert (not on specified)
-	 */
+	/* cert-to-name already successful */
+	if (new_client->username != NULL) {
+		return 1;
+	}
+
+	/* get the last certificate, that is the peer (client) certificate */
+	if (new_client->cert == NULL) {
+		cert_chain_stack = X509_STORE_CTX_get1_chain(x509_ctx);
+		peer_cert = NULL;
+		while ((cert = sk_X509_pop(cert_chain_stack)) != NULL) {
+			X509_free(peer_cert);
+			peer_cert = cert;
+		}
+		sk_X509_pop_free(cert_chain_stack, X509_free);
+		new_client->cert = peer_cert;
+	}
 
 	/* cert-to-name */
 	cert = X509_STORE_CTX_get_current_cert(x509_ctx);
@@ -622,50 +626,52 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	issuer = X509_get_issuer_name(cert);
 
 	cp = X509_NAME_oneline(subject, NULL, 0);
-	nc_verb_verbose("%s: cert verify: subject: %s", __func__, cp);
+	nc_verb_verbose("%s: CTN cert: subject: %s", __func__, cp);
 	OPENSSL_free(cp);
 	cp = X509_NAME_oneline(issuer, NULL, 0);
-	nc_verb_verbose("%s: cert verify: issuer:  %s", __func__, cp);
+	nc_verb_verbose("%s: CTN cert: issuer:  %s", __func__, cp);
 	OPENSSL_free(cp);
 
-	cp = NULL;
-	if (tls_cert_to_name(cert, peer_cert, &cp) != 0) {
-		/* cert-to-name encountered an error */
-		X509_free(cert);
-		sk_X509_pop_free(cert_chain_stack, X509_free);
-		break;
+	if (tls_cert_to_name(cert, &map_type, &cp) != 0) {
+		/* cert-to-name was not successful on this certificate */
+		goto fail;
 	}
-	X509_free(cert);
 
-	if (cp != NULL) {
-		/* cert-to-name found a match */
+	if (map_type == CTN_MAP_TYPE_SPECIFIED) {
 		new_client->username = cp;
-		break;
+	} else if (tls_ctn_get_username_from_cert(new_client->cert, map_type, &new_client->username) != 0) {
+		goto fail;
 	}
 
-	/* get the last certificate, that is the peer (client) certificate */
-	cert_chain_stack = X509_STORE_CTX_get1_chain(x509_ctx);
-	peer_cert = NULL;
-	while ((cert = sk_X509_pop(cert_chain_stack)) != NULL) {
-		X509_free(peer_cert);
-		peer_cert = cert;
-	}
-	sk_X509_pop_free(cert_chain_stack, X509_free);
-	X509_free(peer_cert);
+	nc_verb_verbose("Cert-to-name success, the new client username recognized as '%s'.", new_client->username);
+	return 1;
 
-	if (cert == NULL) {
-		nc_verb_verbose("%s: cert-to-name did not find any match", __func__);
+fail:
+	dig_len = 16;
+	digest1 = malloc(dig_len);
+	digest2 = malloc(dig_len);
+	X509_digest(cert, EVP_md5(), digest1, &dig_len);
+	X509_digest(new_client->cert, EVP_md5(), digest2, &dig_len);
+
+	/* Compare the peer cert with the currently examined cert,
+	 * if they match, this was the last chance for CTN to succeed.
+	 */
+	for (i = 0; i < (signed)dig_len; ++i) {
+		if (digest1[i] != digest2[i]) {
+			break;
+		}
+	}
+	free(digest1);
+	free(digest2);
+
+	if (i < (signed)dig_len) {
+		nc_verb_verbose("%s: CTN cert fail: cert-to-name will continue on the next cert in chain", __func__);
+		return 1;
 	}
 
-	if (new_client->username == NULL) {
-		nc_verb_error("Cert-to-name unsuccessful, dropping the new client.");
-		X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
-		return 0;
-	} else {
-		nc_verb_verbose("Cert-to-name success, the new client username recognized as '%s'.", new_client->username);
-	}
-
-	return 1; /* success */
+	nc_verb_error("Cert-to-name unsuccessful, dropping the new client.");
+	X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+	return 0;
 }
 
 void* client_notif_thread(void* arg) {
@@ -711,22 +717,30 @@ void* netconf_session_thread(void* arg) {
 static int check_tls_data_to_nc(struct client_struct* client) {
 	char* end_rpc;
 	int ret;
-	unsigned int new_data, rpc_len;
+	unsigned int rpc_len;
 
-	new_data = SSL_pending(client->tls);
-	if (new_data == 0) {
-		return 0;
-	}
-
-	if (client->tls_buf_size-client->tls_buf_len < new_data) {
-		client->tls_buf_size = client->tls_buf_len+new_data+1;
-		client->tls_buf = realloc(client->tls_buf, client->tls_buf_size);
-	}
-
-	ret = SSL_read(client->tls, client->tls_buf+client->tls_buf_len, new_data);
-	if (ret < 1) {
+	ret = SSL_read(client->tls, client->tls_buf + client->tls_buf_len, (client->tls_buf_size - client->tls_buf_len) - 1);
+	if (ret == 0) {
+		/* The client disconnected, we could find out whether by force
+		 * or SSL "close notify" alert was sent, but we couldn't care less,
+		 * it was not a proper NETCONF close session either way.
+		 */
+		return 1;
+	} else if (ret < 0) {
 		ret = SSL_get_error(client->tls, ret);
-		nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
+		if ((ret >= 2 && ret <= 4) || ret == 7 || ret == 8) {
+			/*
+			 * 2 - SSL_ERROR_WANT_READ
+			 * 3 - SSL_ERROR_WANT_WRITE
+			 * 4 - SSL_ERROR_WANT_X509_LOOKUP
+			 * 7 - SSL_ERROR_WANT_CONNECT
+			 * 8 - SSL_ERROR_WANT_ACCEPT
+			 *
+			 * errors caused by the non-blocking socket, ignore
+			 */
+			return 0;
+		}
+		nc_verb_error("%s: SSL read failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
 		return 1;
 	}
 
@@ -742,10 +756,10 @@ static int check_tls_data_to_nc(struct client_struct* client) {
 		return 0;
 	}
 
-	rpc_len = end_rpc-client->tls_buf;
+	rpc_len = end_rpc - client->tls_buf;
 
 	/* pass data from the client to the library */
-	if ((ret = write(client->tls_out[1], client->tls_buf, end_rpc-client->tls_buf)) != end_rpc-client->tls_buf) {
+	if ((ret = write(client->tls_out[1], client->tls_buf, rpc_len)) != (signed)rpc_len) {
 		if (ret == -1) {
 			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
 		} else {
@@ -755,7 +769,7 @@ static int check_tls_data_to_nc(struct client_struct* client) {
 	}
 
 	if (client->tls_buf_len > rpc_len) {
-		memmove(client->tls_buf, client->tls_buf+client->tls_buf_len, client->tls_buf_len-rpc_len);
+		memmove(client->tls_buf, client->tls_buf + client->tls_buf_len, client->tls_buf_len - rpc_len);
 	}
 	client->tls_buf_len -= rpc_len;
 	client->tls_buf[client->tls_buf_len] = '\0';
@@ -833,7 +847,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
 		for (client = netopeer_state.clients; client != NULL; client = client->next) {
-			if (client->to_free || client->nc_sess) {
+			if (client->to_free || client->nc_sess == NULL) {
 				continue;
 			}
 
@@ -867,7 +881,6 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 			/* process the new RPC */
 			switch (nc_rpc_get_op(rpc)) {
 			case NC_OP_CLOSESESSION:
-				SSL_shutdown(client->tls);
 				client->to_free = 1;
 				rpc_reply = nc_reply_ok();
 				break;
@@ -918,7 +931,6 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 					break;
 				}
 
-				SSL_shutdown(kill_client->tls);
 				kill_client->to_free = 1;
 
 				nc_verb_verbose("Session of the user '%s' with the ID %s killed.", kill_client->username, sid);
@@ -1022,16 +1034,13 @@ void* tls_data_thread(void* UNUSED(arg)) {
 
 		/* go through all the clients */
 		for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
-			/* TODO check SSL state - set to_free if fail */
-
-			/* check if there aren't some pending data */
+			/* check if there aren't some TLS data pending */
 			if (!cur_client->to_free && check_tls_data_to_nc(cur_client) != 0) {
-				nc_verb_warning("Failed to check pending client data, it has probably disconnected.");
-				/* TODO this invalid socket may have been reused and we would close
+				nc_verb_warning("Failed to read from the client '%s', it has probably disconnected.", cur_client->username);
+				/* this invalid socket may have been reused and we would close
 				 * it during cleanup */
-				//cur_client->sock = -1;
+				cur_client->sock = -1;
 				cur_client->to_free = 1;
-				continue;
 			}
 
 			gettimeofday(&cur_time, NULL);
@@ -1044,9 +1053,7 @@ void* tls_data_thread(void* UNUSED(arg)) {
 					pthread_cancel(cur_client->new_sess_tid);
 					cur_client->new_sess_tid = 0;
 				}
-				SSL_shutdown(cur_client->tls);
 				cur_client->to_free = 1;
-				continue;
 			}
 
 			/* check the session for idle timeout */
@@ -1054,9 +1061,7 @@ void* tls_data_thread(void* UNUSED(arg)) {
 				/* check for active event subscriptions, in that case we can never disconnect an idle session */
 				if (cur_client->nc_sess == NULL || !ncntf_session_get_active_subscription(cur_client->nc_sess)) {
 					nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.");
-					SSL_shutdown(cur_client->tls);
 					cur_client->to_free = 1;
-					continue;
 				}
 			}
 
@@ -1077,6 +1082,11 @@ void* tls_data_thread(void* UNUSED(arg)) {
 				}
 			}
 
+			/* nothing to send, just free it */
+			if (ret == -1 && cur_client->to_free) {
+				goto free_client;
+			}
+
 			if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 				continue;
 			}
@@ -1084,7 +1094,6 @@ void* tls_data_thread(void* UNUSED(arg)) {
 			if (ret == -1) {
 				nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 				cur_client->to_free = 1;
-				continue;
 			}
 
 			ret = SSL_write(cur_client->tls, to_send, to_send_len);
@@ -1092,11 +1101,13 @@ void* tls_data_thread(void* UNUSED(arg)) {
 				ret = SSL_get_error(cur_client->tls, ret);
 				nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
 				cur_client->to_free = 1;
-				continue;
 			}
 
+free_client:
 			/* check whether the client shouldn't be freed */
 			if (cur_client->to_free) {
+				SSL_shutdown(cur_client->tls);
+
 				clock_gettime(CLOCK_REALTIME, &ts);
 				ts.tv_nsec += netopeer_options.client_removal_time*1000000;
 				/* GLOBAL READ UNLOCK */
@@ -1303,6 +1314,41 @@ static void sock_cleanup(struct pollfd* pollsock, unsigned int pollsock_count) {
 	free(pollsock);
 }
 
+static void tls_thread_locking_func(int mode, int n, const char* UNUSED(file), int UNUSED(line)) {
+	if (mode & CRYPTO_LOCK) {
+		pthread_mutex_lock(netopeer_state.tls_mutex_buf+n);
+	} else {
+		pthread_mutex_unlock(netopeer_state.tls_mutex_buf+n);
+	}
+}
+
+static unsigned long tls_thread_id_func() {
+	return (unsigned long)pthread_self();
+}
+
+static void tls_thread_setup(void) {
+	int i;
+
+	netopeer_state.tls_mutex_buf = malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
+	for (i = 0; i < CRYPTO_num_locks(); ++i) {
+		pthread_mutex_init(netopeer_state.tls_mutex_buf+i, NULL);
+	}
+
+	CRYPTO_set_id_callback(tls_thread_id_func);
+	CRYPTO_set_locking_callback(tls_thread_locking_func);
+}
+
+static void tls_thread_cleanup(void) {
+	int i;
+
+	CRYPTO_set_id_callback(NULL);
+	CRYPTO_set_locking_callback(NULL);
+	for (i = 0; i < CRYPTO_num_locks(); ++i) {
+		pthread_mutex_destroy(netopeer_state.tls_mutex_buf+i);
+	}
+	free(netopeer_state.tls_mutex_buf);
+}
+
 void tls_listen_loop(int do_init) {
 	SSL_CTX* tls_ctx = NULL;
 	X509_STORE* trusted_store = NULL;
@@ -1326,7 +1372,9 @@ void tls_listen_loop(int do_init) {
 		}
 
 		SSL_load_error_strings();
-		SSL_library_init();
+		OpenSSL_add_ssl_algorithms();
+
+		tls_thread_setup();
 	}
 
 	/* Main accept loop */
@@ -1390,8 +1438,7 @@ void tls_listen_loop(int do_init) {
 						continue;
 					}
 					X509_STORE_add_cert(trusted_store, cert);
-					cert = NULL;
-					/* TODO needs cert free? */
+					X509_free(cert);
 				}
 
 				SSL_CTX_set_cert_store(tls_ctx, trusted_store);
@@ -1467,6 +1514,9 @@ void tls_listen_loop(int do_init) {
 			netopeer_state.last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 			SSL_set_ex_data(new_client->tls, netopeer_state.last_tls_idx, new_client);
 
+			new_client->tls_buf_size = BASE_READ_BUFFER_SIZE;
+			new_client->tls_buf = malloc(new_client->tls_buf_size);
+
 			if (SSL_accept(new_client->tls) != 1) {
 				nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 				new_client->to_free = 1;
@@ -1474,7 +1524,32 @@ void tls_listen_loop(int do_init) {
 				continue;
 			}
 
-			gettimeofday((struct timeval*)&new_client->conn_time, NULL);
+			fcntl(new_client->sock, F_SETFL, O_NONBLOCK);
+
+			if ((ret = pipe(new_client->tls_in)) != 0 || (ret = pipe(new_client->tls_out)) != 0) {
+				nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+			if (fcntl(new_client->tls_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_in[1], F_SETFL, O_NONBLOCK) != 0 ||
+					fcntl(new_client->tls_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_out[1], F_SETFL, O_NONBLOCK) != 0) {
+				nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+
+			gettimeofday((struct timeval*)&new_client->last_rpc_time, NULL);
+
+			/* start a separate thread for NETCONF session accept */
+			if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
+				nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
+				new_client->to_free = 1;
+				_client_free(new_client);
+				continue;
+			}
+			pthread_detach(new_client->new_sess_tid);
 
 			/* add the client into the global clients structure */
 			/* GLOBAL WRITE LOCK */
@@ -1501,5 +1576,11 @@ void tls_listen_loop(int do_init) {
 		if ((ret = pthread_join(netopeer_state.tls_data_tid, NULL)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
+
+		tls_thread_cleanup();
+
+		EVP_cleanup();
+		CRYPTO_cleanup_all_ex_data();
+		ERR_free_strings();
 	}
 }

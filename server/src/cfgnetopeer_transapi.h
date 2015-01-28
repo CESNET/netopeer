@@ -15,11 +15,7 @@
 #define NETOPEER_MODULE_NAME "Netopeer"
 #define NCSERVER_MODULE_NAME "NETCONF-server"
 
-#define NETOPEER_TLS_SERVER_CERT "/home/vasko/Documents/my_certs/demoCA/certs/server.crt"
-#define NETOPEER_TLS_SERVER_KEY "/home/vasko/Documents/my_certs/demoCA/private/server.key"
-
-#define NETOPEER_TLS_TRUSTED_DIR "/home/vasko/Documents/my_certs/demoCA/certs"
-#define NETOPEER_TLS_CRL_DIR "/home/vasko/Documents/my_certs/demoCA/crl"
+#define NETOPEER_TLS_CRL_DIR NULL
 
 typedef enum {
 	CTN_MAP_TYPE_SPECIFIED,
