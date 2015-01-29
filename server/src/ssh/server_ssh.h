@@ -1,0 +1,59 @@
+#ifndef _SERVER_SSH_H_
+#define _SERVER_SSH_H_
+
+#include <libssh/libssh.h>
+#include <libssh/callbacks.h>
+#include <libssh/server.h>
+
+#ifdef __GNUC__
+#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#	define UNUSED(x) UNUSED_ ## x
+#endif
+
+/* for each SSH channel of each SSH session */
+struct chan_struct {
+	ssh_channel ssh_chan;
+	int chan_in[2];				// pipe - libssh channel read, libnetconf write
+	int chan_out[2];			// pipe - libssh channel write, libnetconf read
+	int netconf_subsystem;
+	struct nc_session* nc_sess;
+	pthread_t new_sess_tid;
+	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
+	volatile int to_free;		// is this channel valid?
+	struct chan_struct* next;
+};
+
+/* for each client */
+struct client_struct_ssh {
+	int ssh;
+
+	int sock;
+	struct sockaddr_storage saddr;
+	char* username;
+	struct client_ch_struct* callhome_st;
+	volatile int to_free;
+	struct client_struct* next;
+
+	/*
+	 * when accessing or adding/removing ssh_chans
+	 */
+	pthread_mutex_t client_lock;
+	volatile struct timeval conn_time;	// timestamp of the new connection
+	int auth_attempts;					// number of failed auth attempts
+	volatile int authenticated;			// is the user authenticated? TODO remove
+	struct chan_struct* ssh_chans;
+	ssh_session ssh_sess;
+	ssh_event ssh_evt;
+};
+
+struct ncsess_thread_config {
+	struct chan_struct* chan;
+	struct client_struct* client;
+};
+
+unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
+
+void ssh_listen_loop(int do_init);
+
+#endif /* _SERVER_SSH_H_ */

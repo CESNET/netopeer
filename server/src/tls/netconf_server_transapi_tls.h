@@ -1,6 +1,7 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_H_
 #define _NETCONF_SERVER_TRANSAPI_H_
 
+#define NETCONF_DEFAULT_PORT 830
 #define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
 
 /* every number-of-secs will the last sent or received data timestamp be checked */
@@ -13,7 +14,6 @@ struct client_ch_struct {
 };
 
 struct ch_app {
-	int ssh;
 	char* name;
 	struct ch_server {
 		char* address;

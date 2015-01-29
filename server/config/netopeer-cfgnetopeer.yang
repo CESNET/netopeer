@@ -29,6 +29,16 @@ module netopeer-cfgnetopeer {
       "Initial revision";
   }
 
+  feature ssh {
+    description
+      "Enable SSH transport.";
+  }
+
+  feature tls {
+    description
+      "Enable TLS transport.";
+  }
+
   container netopeer {
     leaf hello-timeout {
       type uint32 {
@@ -82,7 +92,46 @@ module netopeer-cfgnetopeer {
            that no artificial session limit should be used.";
     }
 
+    leaf response-time {
+      type uint16;
+      units "miliseconds";
+      default 50;
+      description
+        "Maximum number of miliseconds any client request
+          will almost certainly be responded to.";
+    }
+
+    leaf client-removal-time {
+      type uint16;
+      units "miliseconds";
+      default 10;
+      description
+        "Number of miliseconds that the server is willing
+          to wait for removing an invalid client before
+          bailing out and trying again later. Response
+          time plus client removal time is the theoretical
+          maximum response time.";
+    }
+
+    container modules {
+      list module {
+        key "name";
+        leaf name {
+          type string;
+          description
+            "Name of a module.";
+        }
+        leaf enabled {
+          type boolean;
+          default false;
+          description
+            "Specify whether or not the module is allowed to be managed over server.";
+        }
+      }
+    }
+
     container ssh {
+      if-feature ssh;
       description
         "Netopeer SSH options.";
       container server-keys {
@@ -153,6 +202,7 @@ module netopeer-cfgnetopeer {
     }
 
     container tls {
+      if-feature tls;
       description
         "Netopeer TLS options.";
       leaf server-cert {
@@ -214,6 +264,13 @@ module netopeer-cfgnetopeer {
         }
       }
 
+      leaf crl-dir {
+        type string;
+        description
+          "The directory to search for Certificate Revocation List
+            certificates.";
+      }
+
       container cert-maps {
         description
           "The cert-maps container is used by a NETCONF server to
@@ -224,44 +281,6 @@ module netopeer-cfgnetopeer {
         found, then the NETCONF server MUST close the connection,
         and MUST NOT accept NETCONF messages over it.";
         uses x509c2n:cert-to-name;
-      }
-    }
-
-    leaf response-time {
-      type uint16;
-      units "miliseconds";
-      default 50;
-      description
-        "Maximum number of miliseconds any client request
-          will almost certainly be responded to.";
-    }
-
-    leaf client-removal-time {
-      type uint16;
-      units "miliseconds";
-      default 10;
-      description
-        "Number of miliseconds that the server is willing
-          to wait for removing an invalid client before
-          bailing out and trying again later. Response
-          time plus client removal time is the theoretical
-          maximum response time.";
-    }
-
-    container modules {
-      list module {
-        key "name";
-        leaf name {
-          type string;
-          description
-            "Name of a module.";
-        }
-        leaf enabled {
-          type boolean;
-          default false;
-          description
-            "Specify whether or not the module is allowed to be managed over server.";
-        }
       }
     }
   }

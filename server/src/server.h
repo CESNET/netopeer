@@ -1,7 +1,6 @@
-#ifndef _SERVER_TLS_H_
-#define _SERVER_TLS_H_
+#ifndef _SERVER_H_
+#define _SERVER_H_
 
-#include <openssl/ssl.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <libnetconf.h>
@@ -19,18 +18,11 @@
 
 /* for each client */
 struct client_struct {
+	int ssh;		// 1 - SSH, 0 - TLS
+
 	int sock;
-	int tls_in[2];				// pipe - libssl read, libnetconf write
-	int tls_out[2];				// pipe - libssl write, libnetconf read
-	char* tls_buf;
-	uint32_t tls_buf_size;
-	uint32_t tls_buf_len;
-	struct nc_session* nc_sess;
-	pthread_t new_sess_tid;
-	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	struct sockaddr_storage saddr;
 	char* username;
-	SSL* tls;
 	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
@@ -38,7 +30,7 @@ struct client_struct {
 
 /* one global structure */
 struct state_struct {
-	pthread_t tls_data_tid;
+	pthread_t data_tid;
 	pthread_t netconf_rpc_tid;
 	/*
 	 * READ - when accessing clients
@@ -46,8 +38,7 @@ struct state_struct {
 	 */
 	pthread_rwlock_t global_lock;
 	struct client_struct* clients;
-	int last_tls_idx;
-	pthread_mutex_t* tls_mutex_buf;
+	struct state_struct_tls* tls_state;
 };
 
 struct ntf_thread_config {
@@ -59,4 +50,4 @@ unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void tls_listen_loop(int do_init);
 
-#endif /* _SERVER_TLS_H_ */
+#endif /* _SERVER_H_ */

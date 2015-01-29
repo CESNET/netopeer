@@ -86,7 +86,7 @@ static struct ch_app* callhome_apps = NULL;
 
 #endif
 
-void free_bind_addr(struct np_bind_addr** list) {
+static void free_all_bind_addr(struct np_bind_addr** list) {
 	struct np_bind_addr* prev;
 
 	if (list == NULL) {
@@ -97,12 +97,11 @@ void free_bind_addr(struct np_bind_addr** list) {
 		prev = *list;
 		*list = (*list)->next;
 		free(prev->addr);
-		free(prev->ports);
 		free(prev);
 	}
 }
 
-struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, const char* addr) {
+static struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, int ssh, const char* addr, unsigned int port) {
 	struct np_bind_addr* cur = NULL;
 
 	if (root == NULL || addr == NULL) {
@@ -110,7 +109,7 @@ struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, const char* addr)
 	}
 
 	for (cur = root; cur != NULL; cur = cur->next) {
-		if (strcmp(cur->addr, addr) == 0) {
+		if (cur->ssh == ssh && strcmp(cur->addr, addr) == 0 && cur->port == port) {
 			break;
 		}
 	}
@@ -118,7 +117,7 @@ struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, const char* addr)
 	return cur;
 }
 
-void add_bind_addr(struct np_bind_addr** root, const char* addr, unsigned int port) {
+static void add_bind_addr(struct np_bind_addr** root, int ssh, const char* addr, unsigned int port) {
 	struct np_bind_addr* cur;
 	unsigned int i;
 
@@ -127,114 +126,48 @@ void add_bind_addr(struct np_bind_addr** root, const char* addr, unsigned int po
 	}
 
 	if (*root == NULL) {
-		*root = malloc(sizeof(struct np_bind_addr));;
+		*root = malloc(sizeof(struct np_bind_addr));
+		(*root)->ssh = ssh;
 		(*root)->addr = strdup(addr);
-		(*root)->ports = malloc(sizeof(unsigned int));
-		(*root)->ports[0] = port;
-		(*root)->port_count = 1;
+		(*root)->port = port;
 		(*root)->next = NULL;
 		return;
 	}
 
-	if ((cur = find_bind_addr(*root, addr)) != NULL) {
-		/* the list member with the address already exists, add a new port */
-		for (i = 0; i < cur->port_count; ++i) {
-			if (cur->ports[i] == port) {
-				/* the addr with the port already exist, consider this situation OK */
-				return;
-			}
-		}
-		++cur->port_count;
-		cur->ports = realloc(cur->ports, cur->port_count*sizeof(unsigned int));
-		cur->ports[cur->port_count-1] = port;
+	for (cur = *root; cur->next != NULL; cur = cur->next);
 
-	} else {
-		/* addr member is not in the list yet, add it */
-		for (cur = *root; cur->next != NULL; cur = cur->next);
-		cur->next = malloc(sizeof(struct np_bind_addr));
-		cur->next->addr = strdup(addr);
-		cur->next->ports = malloc(sizeof(unsigned int));
-		cur->next->ports[0] = port;
-		cur->next->port_count = 1;
-		cur->next->next = NULL;
-	}
+	cur->next = malloc(sizeof(struct np_bind_addr));
+	cur->next->ssh = ssh;
+	cur->next->addr = strdup(addr);
+	cur->next->port = port;
+	cur->next->next = NULL;
 }
 
-void del_bind_addr(struct np_bind_addr** root, const char* addr, unsigned int port) {
+static void del_bind_addr(struct np_bind_addr** root, int ssh, const char* addr, unsigned int port) {
 	struct np_bind_addr* cur, *prev = NULL;
-	unsigned int i;
 
 	if (root == NULL || addr == NULL) {
 		return;
 	}
 
 	for (cur = *root; cur != NULL; cur = cur->next) {
-		if (strcmp(cur->addr, addr) == 0) {
-			for (i = 0; i < cur->port_count; ++i) {
-				if (cur->ports[i] == port) {
-					break;
-				}
+		if (cur->ssh == ssh && strcmp(cur->addr, addr) == 0 && cur->port == port) {
+			if (prev == NULL) {
+				/* we're deleting the root */
+				*root = cur->next;
+				free(cur->addr);
+				free(cur);
+			} else {
+				/* standard list member deletion */
+				prev->next = cur->next;
+				free(cur->addr);
+				free(cur);
 			}
-
-			if (i < cur->port_count) {
-				/* address and port match */
-				if (cur->port_count == 1) {
-					/* delete the whole list member */
-					if (prev == NULL) {
-						/* we're deleting the root */
-						*root = cur->next;
-						free(cur->addr);
-						free(cur->ports);
-						free(cur);
-					} else {
-						/* standard list member deletion */
-						prev->next = cur->next;
-						free(cur->addr);
-						free(cur->ports);
-						free(cur);
-					}
-				} else {
-					/* we are deleting only one port from the array */
-					if (i != cur->port_count-1) {
-						/* the found port is not the last */
-						memmove(cur->ports+i+1, cur->ports+i, cur->port_count-i-1);
-					}
-					--cur->port_count;
-					cur->ports = realloc(cur->ports, cur->port_count*sizeof(unsigned int));
-				}
-				return;
-			}
+			return;
 		}
 		prev = cur;
 	}
 }
-
-struct np_bind_addr* deep_copy_bind_addr(struct np_bind_addr* root) {
-	struct np_bind_addr* ret = NULL, *cur, *new_cur;
-
-	if (root == NULL) {
-		return NULL;
-	}
-
-	ret = malloc(sizeof(struct np_bind_addr));
-	memcpy(ret, root, sizeof(struct np_bind_addr));
-	ret->addr = strdup(root->addr);
-	ret->ports = malloc(root->port_count*sizeof(unsigned int));
-	memcpy(ret->ports, root->ports, root->port_count*sizeof(unsigned int));
-
-	for (cur = root, new_cur = ret; cur->next != NULL; cur = cur->next, new_cur = new_cur->next) {
-		new_cur->next = malloc(sizeof(struct np_bind_addr));
-		memcpy(new_cur->next, cur->next, sizeof(struct np_bind_addr));
-		new_cur->next->addr = strdup(cur->next->addr);
-		new_cur->next->ports = malloc(cur->next->port_count*sizeof(unsigned int));
-		memcpy(new_cur->next->ports, cur->next->ports, cur->next->port_count*sizeof(unsigned int));
-	}
-
-	return ret;
-}
-
-/* transAPI version which must be compatible with libnetconf */
-/* int transapi_version = 4; */
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -261,17 +194,11 @@ Feel free to use it to distinguish module behavior for different error-option va
  */
 NC_EDIT_ERROPT_TYPE server_erropt = NC_EDIT_ERROPT_NOTSET;
 
-static char* get_nodes_content(xmlNodePtr old_node, xmlNodePtr new_node) {
-	if (new_node != NULL) {
-		if (new_node->children != NULL && new_node->children->content != NULL) {
-			return (char*)new_node->children->content;
-		}
+static char* get_node_content(xmlNodePtr node) {
+	if (node == NULL || node->children == NULL) {
 		return NULL;
 	}
-	if (old_node != NULL && old_node->children != NULL && old_node->children->content != NULL) {
-		return (char*)old_node->children->content;
-	}
-	return NULL;
+	return (char*)node->children->content;
 }
 
 xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **UNUSED(err)) {
@@ -284,55 +211,47 @@ xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(runnin
  */
 struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yang:ietf-netconf-server"}, {NULL, NULL}};
 
-/*
-* CONFIGURATION callbacks
-* Here follows set of callback functions run every time some change in associated part of running datastore occurs.
-* You can safely modify the bodies of all function as well as add new functions for better lucidity of code.
-*/
-
-int callback_srv_netconf_srv_tls_srv_listen_oneport(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	unsigned int port;
+int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
+	struct np_bind_addr* bind;
+	unsigned int port, new_port;
 	char* content;
 
-	content = get_nodes_content(old_node, new_node);
-	if (content == NULL) {
-		nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/port");
-		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
-		return EXIT_FAILURE;
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		content = get_node_content(old_node);
+		if (content == NULL) {
+			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
+			return EXIT_FAILURE;
+		}
+		port = atoi(content);
 	}
-	port = atoi(content);
+
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		content = get_node_content(new_node);
+		if (content == NULL) {
+			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
+			return EXIT_FAILURE;
+		}
+		new_port = atoi(content);
+	}
 
 	/* BINDS LOCK */
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 
-	if (op & XMLDIFF_REM) {
-		del_bind_addr(&netopeer_options.binds, "::0", port);
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		del_bind_addr(&netopeer_options.binds, ssh, "::0", port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: stoppend listening on the port %d", __func__, port);
-	} else if (op & XMLDIFF_MOD) {
-		/* there must be only the localhost in the global structure */
-		if (netopeer_options.binds == NULL || netopeer_options.binds->next != NULL ||
-				strcmp(netopeer_options.binds->addr, "::0") != 0 || netopeer_options.binds->port_count != 1) {
-			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/port");
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
-			return EXIT_FAILURE;
-		}
-		netopeer_options.binds->ports[0] = port;
+		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " stopped listening on the port %d", __func__, port);
+	}
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		add_bind_addr(&netopeer_options.binds, ssh, "::0", new_port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: port changed to %d", __func__, port);
-
-	} else if (op & XMLDIFF_ADD) {
-		/* listens on any IPv4 and IPv6 address */
-		add_bind_addr(&netopeer_options.binds, "::0", port);
-		netopeer_options.binds_change_flag = 1;
-
-		nc_verb_verbose("%s: port %d", __func__, port);
+		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " listening on the port %d", __func__, new_port);
 	}
 
 	/* BINDS UNLOCK */
@@ -341,72 +260,76 @@ int callback_srv_netconf_srv_tls_srv_listen_oneport(void ** UNUSED(data), XMLDIF
 	return EXIT_SUCCESS;
 }
 
-int callback_srv_netconf_srv_tls_srv_listen_manyports(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
 	xmlNodePtr cur;
 	struct np_bind_addr* bind;
-	char* addr = NULL, *content;
-	unsigned int port = 0, old_port, i;
+	char* addr = NULL, *new_addr = NULL, *content;
+	unsigned int port = 0, new_port = 0;
 
-	for (cur = (op & XMLDIFF_REM ? old_node->children : new_node->children); cur != NULL; cur = cur->next) {
-		if (cur->type != XML_ELEMENT_NODE) {
-			continue;
-		}
-
-		if (xmlStrEqual(cur->name, BAD_CAST "address")) {
-			addr = get_nodes_content(cur, NULL);
-		}
-		if (xmlStrEqual(cur->name, BAD_CAST "port")) {
-			content = get_nodes_content(cur, NULL);
-			if (content != NULL) {
-				port = atoi(content);
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		for (cur = old_node->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
 			}
+
+			if (xmlStrEqual(cur->name, BAD_CAST "address")) {
+				addr = get_node_content(cur);
+			}
+			if (xmlStrEqual(cur->name, BAD_CAST "port")) {
+				content = get_nodes_content(cur);
+				if (content != NULL) {
+					port = atoi(content);
+				}
+			}
+		}
+
+		if (addr == NULL || port == 0) {
+			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
+			return EXIT_FAILURE;
 		}
 	}
 
-	if (addr == NULL || port == 0) {
-		nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
-		nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
-		return EXIT_FAILURE;
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		for (cur = new_node->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
+			}
+
+			if (xmlStrEqual(cur->name, BAD_CAST "address")) {
+				new_addr = get_node_content(cur);
+			}
+			if (xmlStrEqual(cur->name, BAD_CAST "port")) {
+				content = get_nodes_content(cur);
+				if (content != NULL) {
+					new_port = atoi(content);
+				}
+			}
+		}
+
+		if (new_addr == NULL || new_port == 0) {
+			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			*error = nc_err_new(NC_ERR_OP_FAILED);
+			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
+			return EXIT_FAILURE;
+		}
 	}
 
 	/* BINDS LOCK */
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 
-	if (op & XMLDIFF_REM) {
-		del_bind_addr(&netopeer_options.binds, addr, port);
+	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
+		del_bind_addr(&netopeer_options.binds, ssh, addr, port);
 		netopeer_options.binds_change_flag = 1;
-	} else if (op & XMLDIFF_MOD) {
-		bind = find_bind_addr(netopeer_options.binds, addr);
-		content = get_nodes_content(old_node, NULL);
-		if (content == NULL || bind == NULL) {
-			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
-			return EXIT_FAILURE;
-		}
-		old_port = atoi(content);
 
-		for (i = 0; i < bind->port_count; ++i) {
-			if (bind->ports[i] == old_port) {
-				bind->ports[i] = port;
-				netopeer_options.binds_change_flag = 1;
-				break;
-			}
-		}
-
-		if (i == bind->port_count) {
-			nc_verb_error("%s: inconsistent state at %s:%s", __func__, __FILE__, __LINE__);
-			*error = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/tls/listen/interface");
-			nc_err_set(*error, NC_ERR_PARAM_MSG, "Internal error, check server logs.");
-			return EXIT_FAILURE;
-		}
-	} else if (op & XMLDIFF_ADD) {
-		add_bind_addr(&netopeer_options.binds, addr, port);
+		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " stopped listening on the address %s:%d", __func__, addr, port);
+	}
+	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
+		add_bind_addr(&netopeer_options.binds, ssh, new_addr, new_port);
 		netopeer_options.binds_change_flag = 1;
+
+		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " listening on the address %s:%d", __func__, new_addr, new_port);
 	}
 
 	/* BINDS UNLOCK */
@@ -584,7 +507,6 @@ static void* app_loop(void* app_v) {
 							/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 							nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
 							app->client->callhome_st = NULL;
-							SSL_shutdown(app->client->tls);
 							app->client->to_free = 1;
 							sleep(app->rep_timeout*60);
 							break;
@@ -609,13 +531,14 @@ static void* app_loop(void* app_v) {
 	}
 }
 
-static int app_create(xmlNodePtr node, struct nc_err** error) {
+static int app_create(xmlNodePtr node, struct nc_err** error, int ssh) {
 	struct ch_app* new;
 	struct ch_server* srv, *del_srv;
 	xmlNodePtr auxnode, servernode, childnode;
 	xmlChar* auxstr;
 
 	new = calloc(1, sizeof(struct ch_app));
+	new->ssh = ssh;
 
 	/* get name */
 	auxnode = find_node(node, BAD_CAST "name");
@@ -649,7 +572,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error) {
 				} else {
 					nc_verb_error("%s: duplicated address element", __func__);
 					*error = nc_err_new(NC_ERR_BAD_ELEM);
-					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
+					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/" (ssh ? "ssh" : "tls") "/call-home/applications/application/servers/address");
 					nc_err_set(*error, NC_ERR_PARAM_MSG, "Duplicated address element");
 					goto fail;
 				}
@@ -660,7 +583,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error) {
 		if (srv->address == NULL || srv->port == 0) {
 			nc_verb_error("%s: invalid address specification (host: %s, port: %s)", __func__, srv->address, srv->port);
 			*error = nc_err_new(NC_ERR_BAD_ELEM);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/ssh/call-home/applications/application/servers/address");
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/" (ssh ? "ssh" : "tls") "/call-home/applications/application/servers/address");
 			goto fail;
 		}
 	}
@@ -756,7 +679,7 @@ fail:
 	return EXIT_FAILURE;
 }
 
-static struct ch_app* app_get(const char* name) {
+static struct ch_app* app_get(const char* name, int ssh) {
 	struct ch_app *iter;
 
 	if (name == NULL) {
@@ -764,7 +687,7 @@ static struct ch_app* app_get(const char* name) {
 	}
 
 	for (iter = callhome_apps; iter != NULL; iter = iter->next) {
-		if (strcmp(iter->name, name) == 0) {
+		if (iter->ssh == ssh && strcmp(iter->name, name) == 0) {
 			break;
 		}
 	}
@@ -772,11 +695,11 @@ static struct ch_app* app_get(const char* name) {
 	return (iter);
 }
 
-static int app_rm(const char* name) {
+static int app_rm(const char* name, int ssh) {
 	struct ch_app* app;
 	struct ch_server* srv, *del_srv;
 
-	if ((app = app_get(name)) == NULL) {
+	if ((app = app_get(name, ssh)) == NULL) {
 		return EXIT_FAILURE;
 	}
 
@@ -819,51 +742,33 @@ static int app_rm(const char* name) {
 
 #endif
 
-/**
- * @brief This callback will be run when node in path /srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-
-#ifndef DISABLE_CALLHOME
+int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
 	char* name;
 
 	switch (op) {
 	case XMLDIFF_ADD:
-		app_create(new_node, error);
+		app_create(new_node, error, ssh);
 		break;
 	case XMLDIFF_REM:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name);
+		app_rm(name, ssh);
 		free(name);
 		break;
 	case XMLDIFF_MOD:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name);
+		app_rm(name, ssh);
 		free(name);
-		app_create(new_node, error);
+		app_create(new_node, error, ssh);
 		break;
 	default:
 		;/* do nothing */
 	}
-#else
-	(void)op;
-	(void)old_node;
-	(void)new_node;
-	(void)error;
-
-	nc_verb_warning("Callhome is not supported in libnetconf!");
-#endif
 
 	return EXIT_SUCCESS;
 }
+
+int server_transapi_init_ssh(void);
+int server_transapi_init_tls(void);
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
@@ -883,45 +788,36 @@ int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int server_transapi_init(xmlDocPtr* UNUSED(running)) {
-	xmlDocPtr doc = NULL;
-	struct nc_err* error = NULL;
-	const char* str_err;
+	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh") &&
+			server_transapi_init_ssh() != EXIT_SUCCESS) {
+		return EXIT_FAILURE;
+	}
 
-	/* set device according to defaults */
-	nc_verb_verbose("Setting the default configuration for the ietf-netconf-server module...");
-
-	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&
-			ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
-		doc = xmlReadDoc(BAD_CAST "<netconf xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\"><tls><listen><port>6513</port></listen></tls></netconf>",
-				NULL, NULL, 0);
-		if (doc == NULL) {
-			nc_verb_error("Unable to parse the default ietf-netconf-server configuration.");
-			return EXIT_FAILURE;
-		}
-
-		if (callback_srv_netconf_srv_tls_srv_listen_oneport(NULL, XMLDIFF_ADD, NULL, doc->children->children->children->children, &error) != EXIT_SUCCESS) {
-			if (error != NULL) {
-				str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-				if (str_err != NULL) {
-					nc_verb_error(str_err);
-				}
-				nc_err_free(error);
-			}
-			xmlFreeDoc(doc);
-			return EXIT_FAILURE;
-		}
-		xmlFreeDoc(doc);
+	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-tls") &&
+			server_transapi_init_tls() != EXIT_SUCCESS) {
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
 }
 
+void server_transapi_close_ssh(void);
+void server_transapi_close_tls(void);
+
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void server_transapi_close(void) {
+	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
+		server_transapi_close_tls();
+	}
+
+	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh")) {
+		server_transapi_close_ssh();
+	}
+
 	pthread_mutex_lock(&netopeer_options.binds_lock);
-	free_bind_addr(&netopeer_options.binds);
+	free_all_bind_addr(&netopeer_options.binds);
 	pthread_mutex_unlock(&netopeer_options.binds_lock);
 }
 
@@ -931,13 +827,9 @@ void server_transapi_close(void) {
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks server_clbks =  {
-	.callbacks_count = 3,
+	.callbacks_count = 0,
 	.data = NULL,
-	.callbacks = {
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_oneport},
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_manyports},
-		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application},
-	}
+	.callbacks = NULL
 };
 
 /*

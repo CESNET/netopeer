@@ -492,7 +492,10 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	}
 
 	/* check for revocation if set */
-	if (NETOPEER_TLS_CRL_DIR != NULL) {
+	/* CRL_DIR LOCK */
+	pthread_mutex_lock(&netopeer_options.crl_dir_lock);
+
+	if (netopeer_options.crl_dir != NULL) {
 		store = X509_STORE_new();
 		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
 		if (lookup == NULL) {
@@ -500,7 +503,13 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 			X509_STORE_free(store);
 			return 0; // FAILED
 		}
-		if (X509_LOOKUP_add_dir(lookup, NETOPEER_TLS_CRL_DIR, X509_FILETYPE_PEM) == 0) {
+
+		i = X509_LOOKUP_add_dir(lookup, netopeer_options.crl_dir, X509_FILETYPE_PEM);
+
+		/* CRL_DIR UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.crl_dir_lock);
+
+		if (i == 0) {
 			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
 			X509_STORE_free(store);
 			return 0; // FAILED
@@ -592,6 +601,8 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		}
 		X509_STORE_free(store);
 	}
+	/* CRL_DIR UNLOCK */
+	pthread_mutex_unlock(&netopeer_options.crl_dir_lock);
 
 	/* get the new client structure */
 	cur_tls = X509_STORE_CTX_get_ex_data(x509_ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
