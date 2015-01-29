@@ -1372,7 +1372,7 @@ void tls_listen_loop(int do_init) {
 		}
 
 		SSL_load_error_strings();
-		OpenSSL_add_ssl_algorithms();
+		SSL_library_init();
 
 		tls_thread_setup();
 	}
