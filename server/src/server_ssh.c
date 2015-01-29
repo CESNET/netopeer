@@ -1154,9 +1154,9 @@ free_client:
 		}
 	} while (!quit || netopeer_state.clients != NULL);
 
+	free(to_send);
 	CRYPTO_THREADID_current(&crypto_tid);
 	ERR_remove_thread_state(&crypto_tid);
-	free(to_send);
 	return NULL;
 }
 
@@ -1581,12 +1581,13 @@ void tls_listen_loop(int do_init) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
 		}
 
-		tls_thread_cleanup();
-
-		CRYPTO_THREADID_current(&crypto_tid);
-		ERR_remove_thread_state(&crypto_tid);
 		EVP_cleanup();
 		CRYPTO_cleanup_all_ex_data();
 		ERR_free_strings();
+		sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+		CRYPTO_THREADID_current(&crypto_tid);
+		ERR_remove_thread_state(&crypto_tid);
+
+		tls_thread_cleanup();
 	}
 }
