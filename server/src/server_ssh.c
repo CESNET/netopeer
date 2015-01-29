@@ -66,7 +66,6 @@ static inline void _client_free(struct client_struct* client) {
 	close(client->tls_out[0]);
 	close(client->tls_out[1]);
 	free(client->username);
-	X509_free(client->cert);
 
 	/* let the callhome thread know the client was freed */
 	if (client->callhome_st != NULL) {
@@ -476,7 +475,6 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	X509* cert, *peer_cert;
 	X509_CRL* crl;
 	X509_REVOKED* revoked;
-	STACK_OF(X509)* cert_chain_stack;
 	EVP_PKEY* pubkey;
 	SSL* cur_tls;
 	struct client_struct* new_client;
@@ -486,7 +484,7 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	unsigned char* digest1, *digest2;
 	unsigned int dig_len;
 	CTN_MAP_TYPE map_type;
-	ASN1_TIME* last_update = NULL, * next_update = NULL;
+	ASN1_TIME* last_update = NULL, *next_update = NULL;
 
 	/* standard certificate verification failed */
 	if (!preverify_ok) {
@@ -608,17 +606,8 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		return 1;
 	}
 
-	/* get the last certificate, that is the peer (client) certificate */
-	if (new_client->cert == NULL) {
-		cert_chain_stack = X509_STORE_CTX_get1_chain(x509_ctx);
-		peer_cert = NULL;
-		while ((cert = sk_X509_pop(cert_chain_stack)) != NULL) {
-			X509_free(peer_cert);
-			peer_cert = cert;
-		}
-		sk_X509_pop_free(cert_chain_stack, X509_free);
-		new_client->cert = peer_cert;
-	}
+	/* get the peer (client) certificate */
+	peer_cert = SSL_get_peer_certificate(cur_tls);
 
 	/* cert-to-name */
 	cert = X509_STORE_CTX_get_current_cert(x509_ctx);
@@ -639,9 +628,10 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 
 	if (map_type == CTN_MAP_TYPE_SPECIFIED) {
 		new_client->username = cp;
-	} else if (tls_ctn_get_username_from_cert(new_client->cert, map_type, &new_client->username) != 0) {
+	} else if (tls_ctn_get_username_from_cert(peer_cert, map_type, &new_client->username) != 0) {
 		goto fail;
 	}
+	X509_free(peer_cert);
 
 	nc_verb_verbose("Cert-to-name success, the new client username recognized as '%s'.", new_client->username);
 	return 1;
@@ -651,7 +641,8 @@ fail:
 	digest1 = malloc(dig_len);
 	digest2 = malloc(dig_len);
 	X509_digest(cert, EVP_md5(), digest1, &dig_len);
-	X509_digest(new_client->cert, EVP_md5(), digest2, &dig_len);
+	X509_digest(peer_cert, EVP_md5(), digest2, &dig_len);
+	X509_free(peer_cert);
 
 	/* Compare the peer cert with the currently examined cert,
 	 * if they match, this was the last chance for CTN to succeed.

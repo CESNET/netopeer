@@ -30,7 +30,6 @@ struct client_struct {
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	struct sockaddr_storage saddr;
 	char* username;
-	X509* cert;
 	SSL* tls;
 	struct client_ch_struct* callhome_st;
 	volatile int to_free;
