@@ -46,7 +46,7 @@
 #include <libnetconf_xml.h>
 
 #include "cfgnetopeer_transapi.h"
-#include "server_ssh.h"
+#include "server_tls.h"
 
 extern struct np_options netopeer_options;
 

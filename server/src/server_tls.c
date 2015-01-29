@@ -24,7 +24,7 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
-#include "server_ssh.h"
+#include "server_tls.h"
 #include "netconf_server_transapi.h"
 #include "cfgnetopeer_transapi.h"
 

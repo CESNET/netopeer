@@ -1,5 +1,5 @@
-#ifndef _SERVER_SSH_H_
-#define _SERVER_SSH_H_
+#ifndef _SERVER_TLS_H_
+#define _SERVER_TLS_H_
 
 #include <openssl/ssl.h>
 #include <pthread.h>
@@ -59,4 +59,4 @@ unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void tls_listen_loop(int do_init);
 
-#endif /* _SERVER_SSH_H_ */
+#endif /* _SERVER_TLS_H_ */
