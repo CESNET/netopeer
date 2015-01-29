@@ -1023,6 +1023,7 @@ void* tls_data_thread(void* UNUSED(arg)) {
 	struct timeval cur_time;
 	struct timespec ts;
 	char* to_send;
+	CRYPTO_THREADID crypto_tid;
 	int ret, to_send_size, to_send_len, skip_sleep = 0;
 
 	to_send_size = BASE_READ_BUFFER_SIZE;
@@ -1153,6 +1154,8 @@ free_client:
 		}
 	} while (!quit || netopeer_state.clients != NULL);
 
+	CRYPTO_THREADID_current(&crypto_tid);
+	ERR_remove_thread_state(&crypto_tid);
 	free(to_send);
 	return NULL;
 }
@@ -1359,6 +1362,7 @@ void tls_listen_loop(int do_init) {
 	struct client_struct* new_client, *cur_client;
 	struct pollfd* pollsock = NULL;
 	unsigned int pollsock_count = 0;
+	CRYPTO_THREADID crypto_tid;
 
 	/* Init */
 	if (do_init) {
@@ -1579,6 +1583,8 @@ void tls_listen_loop(int do_init) {
 
 		tls_thread_cleanup();
 
+		CRYPTO_THREADID_current(&crypto_tid);
+		ERR_remove_thread_state(&crypto_tid);
 		EVP_cleanup();
 		CRYPTO_cleanup_all_ex_data();
 		ERR_free_strings();
