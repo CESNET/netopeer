@@ -839,6 +839,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 	nc_reply* rpc_reply = NULL;
 	NC_MSG_TYPE rpc_type;
 	xmlNodePtr op;
+	int closing = 0;
 	struct nc_err* err;
 	struct client_struct* client;
 
@@ -881,7 +882,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 			/* process the new RPC */
 			switch (nc_rpc_get_op(rpc)) {
 			case NC_OP_CLOSESESSION:
-				client->to_free = 1;
+				closing = 1;
 				rpc_reply = nc_reply_ok();
 				break;
 
@@ -1007,6 +1008,14 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 			nc_session_send_reply(client->nc_sess, rpc, rpc_reply);
 			nc_reply_free(rpc_reply);
 			nc_rpc_free(rpc);
+
+			/* so that we do not free the client before
+			 * this reply gets sent
+			 */
+			if (closing) {
+				client->to_free = 1;
+				closing = 0;
+			}
 		}
 
 		/* GLOBAL READ UNLOCK */
