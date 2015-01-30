@@ -163,6 +163,21 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(
 #endif
 }
 
+int np_ssh_chapp_linger_check(struct ch_app* app) {
+	struct timeval cur_time;
+
+	gettimeofday(&cur_time, NULL);
+	if (timeval_diff(cur_time, app->client->ssh_chans->last_rpc_time) >= app->rep_linger) {
+
+		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
+		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
+		app->client->callhome_st = NULL;
+		app->client->ssh_chans->to_free = 1;
+		sleep(app->rep_timeout*60);
+		break;
+	}
+}
+
 const static int server_clbks_count_ssh = 3;
 
 int server_transapi_init_ssh(void) {

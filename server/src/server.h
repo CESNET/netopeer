@@ -5,20 +5,11 @@
 #include <sys/socket.h>
 #include <libnetconf.h>
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
-#define BASE_READ_BUFFER_SIZE 2048
-
-#define NC_V10_END_MSG "]]>]]>"
-#define NC_V11_END_MSG "\n##\n"
+#include "config.h"
 
 /* for each client */
 struct client_struct {
-	int ssh;		// 1 - SSH, 0 - TLS
+	NC_TRANSPORT transport;
 
 	int sock;
 	struct sockaddr_storage saddr;
@@ -26,6 +17,8 @@ struct client_struct {
 	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
+
+	char __padding[(((CLIENT_STRUCT_MAX_SIZE - 2*sizeof(int)) - sizeof(struct sockaddr_storage)) - 3*sizeof(void*)) - sizeof(NC_TRANSPORT)];
 };
 
 /* one global structure */
@@ -44,6 +37,14 @@ struct state_struct {
 struct ntf_thread_config {
 	struct nc_session* session;
 	nc_rpc* subscribe_rpc;
+};
+
+struct np_pollfd {
+	int fd;
+	short events;
+	short revents;
+
+	NC_TRANSPORT transport;
 };
 
 unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);

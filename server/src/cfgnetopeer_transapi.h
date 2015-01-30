@@ -20,6 +20,8 @@ struct np_options {
 	uint32_t hello_timeout;
 	uint32_t idle_timeout;
 	uint16_t max_sessions;
+	uint16_t response_time;
+	uint16_t client_removal_time;
 
 	struct np_options_ssh* ssh_opts;
 	struct np_options_tls* tls_opts;
@@ -30,15 +32,10 @@ struct np_options {
 		ncds_id id; /**< Related datastore ID */
 		struct np_module* prev, *next;
 	} *modules;
+
 	pthread_mutex_t binds_lock;
 	uint8_t binds_change_flag;
-	/* TODO move to proper header */
-	struct np_bind_addr {
-		int ssh;
-		char* addr;
-		unsigned int port;
-		struct np_bind_addr* next;
-	} *binds;
+	struct np_bind_addr* binds;
 };
 
 /**

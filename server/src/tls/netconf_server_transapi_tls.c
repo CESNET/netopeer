@@ -149,6 +149,23 @@ int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(
 #endif
 }
 
+int np_tls_chapp_linger_check(struct ch_app* app) {
+	struct timeval cur_time;
+
+	gettimeofday(&cur_time, NULL);
+	if (timeval_diff(cur_time, app->client->last_rpc_time) >= app->rep_linger) {
+
+		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
+		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
+		app->client->callhome_st = NULL;
+		app->client->to_free = 1;
+		sleep(app->rep_timeout*60);
+		return 1;
+	}
+
+	return 0;
+}
+
 const static int server_clbks_count_tls = 3;
 
 int server_transapi_init_tls(void) {

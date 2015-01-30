@@ -619,6 +619,8 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+NETOPEER_FEATURES
+NCSERVER_FEATURES
 MODULESDIR
 SERVER_LIBS
 DISTRO
@@ -658,6 +660,7 @@ LDFLAGS
 CFLAGS
 CC
 RPMBUILD
+LNCTOOL
 UNAME
 GROUPDEFINE
 GROUP
@@ -711,6 +714,8 @@ enable_option_checking
 with_distro
 enable_debug
 with_group
+enable_ssh
+enable_tls
 with_libnetconf
 with_modules_dir
 '
@@ -1342,6 +1347,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
+  --disable-ssh           Compile without SSH transport
+  --enable-tls            Compile with TLS transport
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2604,6 +2611,32 @@ $as_echo "$GROUP" >&6; }
 
 
 
+# --enable-ssh
+# Check whether --enable-ssh was given.
+if test "${enable_ssh+set}" = set; then :
+  enableval=$enable_ssh; if test "$enableval" = "no"; then
+		ssh=no
+	else
+		ssh=yes
+	fi
+
+else
+  # SSH is on by default
+	ssh=yes
+
+fi
+
+
+# --enable-tls
+# Check whether --enable-tls was given.
+if test "${enable_tls+set}" = set; then :
+  enableval=$enable_tls; tls=yes
+else
+  tls=no
+
+fi
+
+
 ############################ Check for programs ################################
 
 # in case of cross-compilation, try to gues cross-compiler if not set
@@ -2684,6 +2717,49 @@ $as_echo "$target_cpu" >&6; }
         as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
         ;;
 esac
+
+# Check for lnctool
+# Extract the first word of "lnctool", so it can be a program name with args.
+set dummy lnctool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_LNCTOOL+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$LNCTOOL"; then
+  ac_cv_prog_LNCTOOL="$LNCTOOL" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_LNCTOOL="yes"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_prog_LNCTOOL" && ac_cv_prog_LNCTOOL="no"
+fi
+fi
+LNCTOOL=$ac_cv_prog_LNCTOOL
+if test -n "$LNCTOOL"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LNCTOOL" >&5
+$as_echo "$LNCTOOL" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test "$LNCTOOL" = "no"; then
+	as_fn_error $? "\"lnctool not found!\"" "$LINENO" 5
+fi
 
 # Check python for manager and configurator
 
@@ -3750,8 +3826,129 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
-# libssh
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing SSL_library_init" >&5
+if test "$ssh" = "yes"; then
+	# libssh
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ssh_init" >&5
+$as_echo_n "checking for library containing ssh_init... " >&6; }
+if ${ac_cv_search_ssh_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char ssh_init ();
+int
+main ()
+{
+return ssh_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ssh; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ssh_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_ssh_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_ssh_init+:} false; then :
+
+else
+  ac_cv_search_ssh_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ssh_init" >&5
+$as_echo "$ac_cv_search_ssh_init" >&6; }
+ac_res=$ac_cv_search_ssh_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "Missing the libssh library." "$LINENO" 5
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ssh_threads_get_pthread" >&5
+$as_echo_n "checking for library containing ssh_threads_get_pthread... " >&6; }
+if ${ac_cv_search_ssh_threads_get_pthread+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char ssh_threads_get_pthread ();
+int
+main ()
+{
+return ssh_threads_get_pthread ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ssh_threads; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ssh_threads_get_pthread=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_ssh_threads_get_pthread+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_ssh_threads_get_pthread+:} false; then :
+
+else
+  ac_cv_search_ssh_threads_get_pthread=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ssh_threads_get_pthread" >&5
+$as_echo "$ac_cv_search_ssh_threads_get_pthread" >&6; }
+ac_res=$ac_cv_search_ssh_threads_get_pthread
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  as_fn_error $? "Missing the libssh_threads library." "$LINENO" 5
+fi
+
+fi
+
+if test "$tls" = "yes"; then
+	# libssl
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing SSL_library_init" >&5
 $as_echo_n "checking for library containing SSL_library_init... " >&6; }
 if ${ac_cv_search_SSL_library_init+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -3810,8 +4007,8 @@ else
 fi
 
 
-# libcrypto
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing X509_free" >&5
+	# libcrypto
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing X509_free" >&5
 $as_echo_n "checking for library containing X509_free... " >&6; }
 if ${ac_cv_search_X509_free+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -3869,8 +4066,10 @@ else
   as_fn_error $? "Missing the libcrypto library." "$LINENO" 5
 fi
 
+fi
 
 # libnetconf
+callhome=yes
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_callhome_listen" >&5
 $as_echo_n "checking for library containing nc_callhome_listen... " >&6; }
 if ${ac_cv_search_nc_callhome_listen+:} false; then :
@@ -3930,6 +4129,7 @@ else
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&5
 $as_echo "$as_me: WARNING: libnetconf is compiled without libssh2, disabling callhome." >&2;};
 		CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME";
+		callhome=no;
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ncntf_dispatch_receive" >&5
 $as_echo_n "checking for library containing ncntf_dispatch_receive... " >&6; }
 if ${ac_cv_search_ncntf_dispatch_receive+:} false; then :
@@ -4775,6 +4975,41 @@ rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 
+NCSERVER_FEATURES=""
+NETOPEER_FEATURES=""
+
+IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
+NETOPEER_CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
+
+if test "$ssh" = "yes"; then
+	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
+	NETOPEER_FEATURES="<feature>ssh</feature>"
+
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh --feature ietf-netconf-server:inbound-ssh"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES}ssh"
+
+	if test "$callhome" = "yes"; then
+		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
+		IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:outbound-ssh"
+	fi
+fi
+if test "$tls" = "yes"; then
+	NCSERVER_FEATURES="$NCSERVER_FEATURES<feature>tls</feature><feature>inbound-tls</feature>"
+	NETOPEER_FEATURES="$NETOPEER_FEATURES<feature>tls</feature>"
+
+	IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:tls --feature ietf-netconf-server:inbound-tls"
+	CFGNETOPEER_FEATURES="$CFGNETOPEER_FEATURES --feature netopeer-cfgnetopeer:tls"
+
+	if test "$callhome" = "yes"; then
+		NCSERVER_FEATURES="$(NCSERVER_FEATURES)<feature>outbound-tls</feature>"
+		IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:outbound-tls"
+	fi
+fi
+
+# Generate correct validation files
+lnctool --model ./config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+
 ######################### Checks for header files ##############################
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -5319,6 +5554,8 @@ done
 
 
 
+
+
 if test -z "$RPMBUILD"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&5
 $as_echo "$as_me: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&2;}
@@ -5331,10 +5568,6 @@ ac_config_files="$ac_config_files manager/netopeer-manager.tmp:manager/netopeer-
 ac_config_files="$ac_config_files config/Netopeer.xml.tmp:config/Netopeer.xml.in"
 
 ac_config_files="$ac_config_files config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in"
-
-ac_config_files="$ac_config_files config/ietf-netconf-server-data.rng"
-
-ac_config_files="$ac_config_files config/netopeer-cfgnetopeer-data.rng"
 
 ac_config_files="$ac_config_files netopeer-server.spec"
 
@@ -6053,8 +6286,6 @@ do
     "manager/netopeer-manager.tmp") CONFIG_FILES="$CONFIG_FILES manager/netopeer-manager.tmp:manager/netopeer-manager.in" ;;
     "config/Netopeer.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/Netopeer.xml.tmp:config/Netopeer.xml.in" ;;
     "config/NETCONF-server.xml.tmp") CONFIG_FILES="$CONFIG_FILES config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in" ;;
-    "config/ietf-netconf-server-data.rng") CONFIG_FILES="$CONFIG_FILES config/ietf-netconf-server-data.rng" ;;
-    "config/netopeer-cfgnetopeer-data.rng") CONFIG_FILES="$CONFIG_FILES config/netopeer-cfgnetopeer-data.rng" ;;
     "netopeer-server.spec") CONFIG_FILES="$CONFIG_FILES netopeer-server.spec" ;;
     "netopeer.rc") CONFIG_FILES="$CONFIG_FILES netopeer.rc" ;;
     "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;

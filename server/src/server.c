@@ -35,20 +35,43 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #define _GNU_SOURCE
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <unistd.h>
+#define _XOPEN_SOURCE
+
+#include <libnetconf_xml.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <sys/poll.h>
+#include <sys/time.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <shadow.h>
+#include <pwd.h>
+#include <stdarg.h>
+#include <unistd.h>
 #include <signal.h>
 #include <syslog.h>
 
 #include <libnetconf_xml.h>
 
+#include "server.h"
+#include "netconf_server_transapi.h"
 #include "cfgnetopeer_transapi.h"
-#include "server_tls.h"
 
 extern struct np_options netopeer_options;
+extern pthread_mutex_t callhome_lock;
+extern struct client_struct* callhome_client;
+
+/* one global structure holding all the client information */
+struct state_struct netopeer_state = {
+	.global_lock = PTHREAD_RWLOCK_INITIALIZER
+};
 
 /* flags of main server loop, they are turned when a signal comes */
 volatile int quit = 0, restart_soft = 0, restart_hard = 0;
@@ -72,7 +95,7 @@ void clb_print(NC_VERB_LEVEL level, const char* msg) {
 	}
 }
 
-void print_debug(const char * format, ...) {
+void print_debug(const char* format, ...) {
 #define MAX_DEBUG_LEN 4096
 	char msg[MAX_DEBUG_LEN];
 	va_list ap;
@@ -84,18 +107,18 @@ void print_debug(const char * format, ...) {
 	clb_print(NC_VERB_DEBUG, msg);
 }
 
-static void print_version (char *progname) {
-	fprintf (stdout, "%s version: %s\n", progname, VERSION);
-	exit (0);
+static void print_version(char* progname) {
+	fprintf(stdout, "%s version: %s\n", progname, VERSION);
+	exit(0);
 }
 
-static void print_usage (char * progname) {
-	fprintf (stdout, "Usage: %s [-dhV] [-v level]\n", progname);
-	fprintf (stdout, " -d                  daemonize server\n");
-	fprintf (stdout, " -h                  display help\n");
-	fprintf (stdout, " -v level            verbose output level\n");
-	fprintf (stdout, " -V                  show program version\n");
-	exit (0);
+static void print_usage(char* progname) {
+	fprintf(stdout, "Usage: %s [-dhV] [-v level]\n", progname);
+	fprintf(stdout, " -d                  daemonize server\n");
+	fprintf(stdout, " -h                  display help\n");
+	fprintf(stdout, " -v level            verbose output level\n");
+	fprintf(stdout, " -V                  show program version\n");
+	exit(0);
 }
 
 #define OPTSTRING "dhv:V"
@@ -107,7 +130,7 @@ static void print_usage (char * progname) {
  *
  * \param sig 	signal number
  */
-void signal_handler (int sig) {
+void signal_handler(int sig) {
 
 	switch (sig) {
 	case SIGINT:
@@ -132,7 +155,404 @@ void signal_handler (int sig) {
 	}
 }
 
-extern void ssh_listen_loop(int);
+static void client_append(struct client_struct** root, struct client_struct* clients) {
+	struct client_struct* cur;
+
+	if (root == NULL) {
+		return;
+	}
+
+	if (*root == NULL) {
+		*root = clients;
+		return;
+	}
+
+	for (cur = *root; cur->next != NULL; cur = cur->next);
+
+	cur->next = clients;
+}
+
+/* return seconds rounded down */
+unsigned int timeval_diff(struct timeval tv1, struct timeval tv2) {
+	time_t sec;
+
+	if (tv1.tv_usec > 1000000) {
+		tv1.tv_sec += tv1.tv_usec / 1000000;
+		tv1.tv_usec = tv1.tv_usec % 1000000;
+	}
+
+	if (tv2.tv_usec > 1000000) {
+		tv2.tv_sec += tv2.tv_usec / 1000000;
+		tv2.tv_usec = tv2.tv_usec % 1000000;
+	}
+
+	sec = (tv1.tv_sec > tv2.tv_sec ? tv1.tv_sec-tv2.tv_sec : tv2.tv_sec-tv1.tv_sec);
+	return sec;
+}
+
+void* client_notif_thread(void* arg) {
+	struct ntf_thread_config *config = (struct ntf_thread_config*)arg;
+
+	ncntf_dispatch_send(config->session, config->subscribe_rpc);
+	nc_rpc_free(config->subscribe_rpc);
+	free(config);
+
+	return NULL;
+}
+
+void* netconf_rpc_thread(void* UNUSED(arg)) {
+	struct client_struct* client;
+
+	do {
+		/* GLOBAL READ LOCK */
+		pthread_rwlock_rdlock(&netopeer_state.global_lock);
+
+		for (client = netopeer_state.clients; client != NULL; client = client->next) {
+			if (client->to_free) {
+				continue;
+			}
+
+#ifdef NP_SSH
+			np_ssh_client_netconf_rpc(client);
+#endif
+#ifdef NP_TLS
+			np_tls_client_netconf_rpc(client);
+#endif
+		}
+
+		/* GLOBAL READ UNLOCK */
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
+
+		usleep(netopeer_options.response_time*1000);
+	} while (!quit);
+
+#ifdef NP_TLS
+	np_tls_thread_cleanup();
+#endif
+	return NULL;
+}
+
+void* data_thread(void* UNUSED(arg)) {
+	struct client_struct* client;
+	int skip_sleep = 0, to_send_size;
+	char* to_send;
+
+	to_send_size = BASE_READ_BUFFER_SIZE;
+	to_send = malloc(to_send_size);
+
+	do {
+		/* GLOBAL READ LOCK */
+		pthread_rwlock_rdlock(&netopeer_state.global_lock);
+
+		/* go through all the clients */
+		for (client = netopeer_state.clients; client != NULL; client = client->next) {
+			switch (client->transport) {
+#ifdef NP_SSH
+			case NC_TRANSPORT_SSH:
+				skip_sleep = np_ssh_client_data(client, &to_send, &to_send_size);
+				break;
+#endif
+#ifdef NP_TLS
+			case NC_TRANSPORT_TLS:
+				skip_sleep = np_tls_client_data(client, &to_send, &to_send_size);
+				break;
+#endif
+			default:
+				;/* TODO free client? */
+			}
+
+			/* we removed a client, maybe the last so quit the loop */
+			if (skip_sleep == 2) {
+				break;
+			}
+		}
+
+		/* GLOBAL READ UNLOCK */
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
+
+		if (!skip_sleep) {
+			/* we did not do anything productive, so let the thread sleep */
+			usleep(netopeer_options.response_time*1000);
+		}
+	} while (!quit || netopeer_state.clients != NULL);
+
+	free(to_send);
+#ifdef NP_TLS
+	np_tls_thread_cleanup();
+#endif
+	return NULL;
+}
+
+static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned int* count) {
+	const int optVal = 1;
+	const socklen_t optLen = sizeof(optVal);
+	char is_ipv4;
+	struct np_pollfd* pollsock;
+	struct sockaddr_storage saddr;
+
+	struct sockaddr_in* saddr4;
+	struct sockaddr_in6* saddr6;
+
+	if (addrs == NULL) {
+		return NULL;
+	}
+
+	/*
+	 * Always have the last pollfd structure ready -
+	 * this way we can reuse it safely (continue;)
+	 * every time an error occurs during its
+	 * modification.
+	 */
+	*count = 1;
+	pollsock = calloc(1, sizeof(struct np_pollfd));
+
+	/* for every address and port a pollfd struct is created */
+	for (;addrs != NULL; addrs = addrs->next) {
+		pollsock[*count-1].transport = addrs->transport;
+
+		if (strchr(addrs->addr, ':') == NULL) {
+			is_ipv4 = 1;
+		} else {
+			is_ipv4 = 0;
+		}
+
+		pollsock[*count-1].fd = socket((is_ipv4 ? AF_INET : AF_INET6), SOCK_STREAM, 0);
+		if (pollsock[*count-1].fd == -1) {
+			nc_verb_error("%s: could not create socket (%s)", __func__, strerror(errno));
+			continue;
+		}
+
+		if (setsockopt(pollsock[*count-1].fd, SOL_SOCKET, SO_REUSEADDR, (void*) &optVal, optLen) != 0) {
+			nc_verb_error("%s: could not set socket SO_REUSEADDR option (%s)", __func__, strerror(errno));
+			continue;
+		}
+
+		bzero(&saddr, sizeof(struct sockaddr_storage));
+		if (is_ipv4) {
+			saddr4 = (struct sockaddr_in*)&saddr;
+
+			saddr4->sin_family = AF_INET;
+			saddr4->sin_port = htons(addrs->port);
+
+			if (inet_pton(AF_INET, addrs->addr, &saddr4->sin_addr) != 1) {
+				nc_verb_error("%s: failed to convert IPv4 address \"%s\"", __func__, addrs->addr);
+				continue;
+			}
+
+			if (bind(pollsock[*count-1].fd, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
+				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				continue;
+			}
+
+		} else {
+			saddr6 = (struct sockaddr_in6*)&saddr;
+
+			saddr6->sin6_family = AF_INET6;
+			saddr6->sin6_port = htons(addrs->port);
+
+			if (inet_pton(AF_INET6, addrs->addr, &saddr6->sin6_addr) != 1) {
+				nc_verb_error("%s: failed to convert IPv6 address \"%s\"", __func__, addrs->addr);
+				continue;
+			}
+
+			if (bind(pollsock[*count-1].fd, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
+				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				continue;
+			}
+		}
+
+		if (listen(pollsock[*count-1].fd, 5) == -1) {
+			nc_verb_error("%s: unable to start listening on \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+			continue;
+		}
+
+		pollsock[*count-1].events = POLLIN;
+
+		pollsock = realloc(pollsock, (*count+1)*sizeof(struct pollfd));
+		bzero(&pollsock[*count], sizeof(struct pollfd));
+		++(*count);
+	}
+
+	/* the last pollsock is not valid */
+	--(*count);
+	if (*count == 0) {
+		free(pollsock);
+		pollsock = NULL;
+	}
+	return pollsock;
+}
+
+/* always returns only a single new connection */
+static struct client_struct* sock_accept(struct np_pollfd* pollsock, unsigned int pollsock_count) {
+	int r;
+	unsigned int i;
+	socklen_t client_saddr_len;
+	struct client_struct* ret;
+
+	if (pollsock == NULL) {
+		return NULL;
+	}
+
+	/* poll for a new connection */
+	errno = 0;
+	r = poll((struct pollfd*)pollsock, pollsock_count, netopeer_options.response_time);
+	if (r == 0 || (r == -1 && errno == EINTR)) {
+		/* we either timeouted or going to exit or restart */
+		return NULL;
+	}
+	if (r == -1) {
+		nc_verb_error("%s: poll failed (%s)", __func__, strerror(errno));
+		return NULL;
+	}
+
+	ret = calloc(1, sizeof(struct client_struct));
+	client_saddr_len = sizeof(struct sockaddr_storage);
+
+	/* accept the first polled connection */
+	for (i = 0; i < pollsock_count; ++i) {
+		if (pollsock[i].revents & POLLIN) {
+			ret->sock = accept(pollsock[i].fd, (struct sockaddr*)&ret->saddr, &client_saddr_len);
+			if (ret->sock == -1) {
+				nc_verb_error("%s: accept failed (%s)", __func__, strerror(errno));
+				free(ret);
+				return NULL;
+			}
+			ret->transport = pollsock[i].transport;
+			pollsock[i].revents = 0;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static void sock_cleanup(struct np_pollfd* pollsock, unsigned int pollsock_count) {
+	unsigned int i;
+
+	if (pollsock == NULL) {
+		return;
+	}
+
+	for (i = 0; i < pollsock_count; ++i) {
+		close(pollsock[i].fd);
+	}
+	free(pollsock);
+}
+
+void listen_loop(int do_init) {
+	struct client_struct* new_client;
+	struct np_pollfd* pollsock = NULL;
+	unsigned int pollsock_count = 0;
+	int ret;
+
+	/* Init */
+	if (do_init) {
+#ifdef NP_SSH
+		np_ssh_init();
+#endif
+#ifdef NP_TLS
+		np_tls_init();
+#endif
+		if ((ret = pthread_create(&netopeer_state.data_tid, NULL, data_thread, NULL)) != 0) {
+			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+			return;
+		}
+		if ((ret = pthread_create(&netopeer_state.netconf_rpc_tid, NULL, netconf_rpc_thread, NULL)) != 0) {
+			nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+			return;
+		}
+	}
+
+	/* Main accept loop */
+	do {
+		new_client = NULL;
+
+		/* Binds change check */
+		if (netopeer_options.binds_change_flag) {
+			/* BINDS LOCK */
+			pthread_mutex_lock(&netopeer_options.binds_lock);
+
+			sock_cleanup(pollsock, pollsock_count);
+			pollsock = sock_listen(netopeer_options.binds, &pollsock_count);
+
+			netopeer_options.binds_change_flag = 0;
+			/* BINDS UNLOCK */
+			pthread_mutex_unlock(&netopeer_options.binds_lock);
+
+			if (pollsock == NULL) {
+				nc_verb_warning("Server is not listening on any address!");
+			}
+		}
+
+#ifdef NP_SSH
+		np_ssh_server_id_check();
+#endif
+#ifdef NP_TLS
+		np_tls_server_id_check();
+#endif
+
+		/* Callhome client check */
+		if (callhome_client != NULL) {
+			/* CALLHOME LOCK */
+			pthread_mutex_lock(&callhome_lock);
+			new_client = callhome_client;
+			callhome_client = NULL;
+			/* CALLHOME UNLOCK */
+			pthread_mutex_unlock(&callhome_lock);
+		}
+
+		/* Listen client check */
+		if (new_client == NULL) {
+			new_client = sock_accept(pollsock, pollsock_count);
+		}
+
+		/* New client SSH session creation */
+		if (new_client != NULL) {
+			switch (new_client->transport) {
+#ifdef NP_SSH
+			case NC_TRANSPORT_SSH:
+				np_ssh_create_client();
+				break;
+#endif
+#ifdef NP_TLS
+			case NC_TRANSPORT_TLS:
+				np_tls_create_client();
+				break;
+#endif
+			default:
+				;/* TODO free client? */
+			}
+
+			/* add the client into the global clients structure */
+			/* GLOBAL WRITE LOCK */
+			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			client_append(&netopeer_state.clients, new_client);
+			/* GLOBAL WRITE UNLOCK */
+			pthread_rwlock_unlock(&netopeer_state.global_lock);
+		}
+
+	} while (!quit && !restart_soft);
+
+	/* Cleanup */
+	sock_cleanup(pollsock, pollsock_count);
+	if (!restart_soft) {
+		/* TODO a total timeout after which we cancel and free clients by force? */
+		/* wait for all the clients to exit nicely themselves */
+		if ((ret = pthread_join(netopeer_state.netconf_rpc_tid, NULL)) != 0) {
+			nc_verb_warning("%s: failed to join the netconf RPC thread (%s)", __func__, strerror(ret));
+		}
+		if ((ret = pthread_join(netopeer_state.data_tid, NULL)) != 0) {
+			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
+		}
+
+#ifdef NP_SSH
+		np_ssh_cleanup();
+#endif
+#ifdef NP_TLS
+		np_tls_cleanup();
+#endif
+	}
+}
 
 int main(int argc, char** argv) {
 	struct sigaction action;
@@ -258,7 +678,7 @@ restart:
 	server_start = 0;
 	nc_verb_verbose("Netopeer server successfully initialized.");
 
-	tls_listen_loop(listen_init);
+	listen_loop(listen_init);
 
 	/* unload Netopeer module -> unload all modules */
 	module_disable(server_module, 1);

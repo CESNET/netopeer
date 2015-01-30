@@ -767,13 +767,30 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks netopeer_clbks = {
-	.callbacks_count = 0,
+	.callbacks_count = 7,
 	.data = NULL,
-	.callbacks = NULL
+	.callbacks = {
+		{.path = "/n:netopeer/n:hello-timeout", .func = callback_n_netopeer_n_hello_timeout},
+		{.path = "/n:netopeer/n:idle-timeout", .func = callback_n_netopeer_n_idle_timeout},
+		{.path = "/n:netopeer/n:max-sessions", .func = callback_n_netopeer_n_max_sessions},
+		{.path = "/n:netopeer/n:response-time", .func = callback_n_netopeer_n_response_time},
+		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
+		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
+		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled},
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = NULL},
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = NULL},
+		{.path = "/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key", .func = NULL},
+		{.path = "/n:netopeer/n:ssh/n:password-auth-enabled", .func = NULL},
+		{.path = "/n:netopeer/n:ssh/n:auth-attempts", .func = NULL},
+		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:server-cert", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:server-key", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = NULL},
+		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = NULL}
+	}
 };
-
-int netopeer_transapi_init_ssh(void);
-int netopeer_transapi_init_tls(void);
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
@@ -796,24 +813,6 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 	xmlDocPtr doc;
 	struct nc_err* error = NULL;
 	const char* str_err;
-
-	netopeer_clbks.callbacks_count = 7;
-	netopeer_clbks.callbacks = malloc(netopeer_clbks.callbacks_count * sizeof(struct clbk));
-
-	netopeer_clbks.callbacks[0].path = strdup("/n:netopeer/n:hello-timeout");
-	netopeer_clbks.callbacks[0].func = callback_n_netopeer_n_hello_timeout;
-	netopeer_clbks.callbacks[1].path = strdup("/n:netopeer/n:idle-timeout");
-	netopeer_clbks.callbacks[1].func = callback_n_netopeer_n_idle_timeout;
-	netopeer_clbks.callbacks[2].path = strdup("/n:netopeer/n:max-sessions");
-	netopeer_clbks.callbacks[2].func = callback_n_netopeer_n_max_sessions;
-	netopeer_clbks.callbacks[3].path = strdup("/n:netopeer/n:response-time");
-	netopeer_clbks.callbacks[3].func = callback_n_netopeer_n_response_time;
-	netopeer_clbks.callbacks[4].path = strdup("/n:netopeer/n:client-removal-time");
-	netopeer_clbks.callbacks[4].func = callback_n_netopeer_n_client_removal_time;
-	netopeer_clbks.callbacks[5].path = strdup("/n:netopeer/n:modules/n:module");
-	netopeer_clbks.callbacks[5].func = callback_n_netopeer_n_modules_n_module;
-	netopeer_clbks.callbacks[6].path = strdup("/n:netopeer/n:modules/n:module/n:enabled");
-	netopeer_clbks.callbacks[6].func = callback_n_netopeer_n_modules_n_module_n_enabled;
 
 	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module...");
 
@@ -885,43 +884,40 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 	}
 	xmlFreeDoc(doc);
 
-	if (ncds_feature_isenabled("cfgnetopeer", "ssh") && (netopeer_transapi_init_ssh() != EXIT_SUCCESS) {
+#ifdef NP_SSH
+	if (ncds_feature_isenabled("cfgnetopeer", "ssh") && (netopeer_transapi_init_ssh() != EXIT_SUCCESS)) {
 		return EXIT_FAILURE;
 	}
-	if (ncds_feature_isenabled("cfgnetopeer", "tls") && (netopeer_transapi_init_tls() != EXIT_SUCCESS) {
+#endif
+#ifdef NP_TLS
+	if (ncds_feature_isenabled("cfgnetopeer", "tls") && (netopeer_transapi_init_tls() != EXIT_SUCCESS)) {
 		return EXIT_FAILURE;
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
-
-void netopeer_transapi_close_ssh(void);
-void netopeer_transapi_close_tls(void)
 
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void netopeer_transapi_close(void) {
-	int i;
-
+#ifdef NP_TLS
 	if (ncds_feature_isenabled("cfgnetopeer", "tls")) {
 		netopeer_transapi_close_tls();
 	}
+#endif
+#ifdef NP_SSH
 	if (ncds_feature_isenabled("cfgnetopeer", "ssh")) {
 		netopeer_transapi_close_ssh();
 	}
+#endif
 
 	nc_verb_verbose("Netopeer cleanup.");
 
 	while (netopeer_options.modules) {
 		module_disable(netopeer_options.modules, 1);
 	}
-
-	for (i = 0; i < netopeer_clbks_count; ++i) {
-		free(netopeer_clbks.callbacks[i].path);
-	}
-
-	free(netopeer_clbks.callbacks);
 }
 
 /**

@@ -13,7 +13,7 @@ struct client_ch_struct {
 };
 
 struct ch_app {
-	int ssh;
+	NC_TRANSPORT transport;
 	char* name;
 	struct ch_server {
 		char* address;
@@ -33,6 +33,13 @@ struct ch_app {
 	struct client_ch_struct* ch_st;
 	struct ch_app *next;
 	struct ch_app *prev;
+};
+
+struct np_bind_addr {
+	NC_TRANSPORT transport;
+	char* addr;
+	unsigned int port;
+	struct np_bind_addr* next;
 };
 
 #endif

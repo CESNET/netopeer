@@ -75,8 +75,8 @@
 #include <libnetconf_ssh.h>
 
 #include "netconf_server_transapi.h"
-#include "server_tls.h"
 #include "cfgnetopeer_transapi.h"
+#include "server.h"
 
 extern struct np_options netopeer_options;
 
@@ -101,25 +101,8 @@ static void free_all_bind_addr(struct np_bind_addr** list) {
 	}
 }
 
-static struct np_bind_addr* find_bind_addr(struct np_bind_addr* root, int ssh, const char* addr, unsigned int port) {
-	struct np_bind_addr* cur = NULL;
-
-	if (root == NULL || addr == NULL) {
-		return NULL;
-	}
-
-	for (cur = root; cur != NULL; cur = cur->next) {
-		if (cur->ssh == ssh && strcmp(cur->addr, addr) == 0 && cur->port == port) {
-			break;
-		}
-	}
-
-	return cur;
-}
-
-static void add_bind_addr(struct np_bind_addr** root, int ssh, const char* addr, unsigned int port) {
+static void add_bind_addr(struct np_bind_addr** root, NC_TRANSPORT transport, const char* addr, unsigned int port) {
 	struct np_bind_addr* cur;
-	unsigned int i;
 
 	if (root == NULL) {
 		return;
@@ -127,7 +110,7 @@ static void add_bind_addr(struct np_bind_addr** root, int ssh, const char* addr,
 
 	if (*root == NULL) {
 		*root = malloc(sizeof(struct np_bind_addr));
-		(*root)->ssh = ssh;
+		(*root)->transport = transport;
 		(*root)->addr = strdup(addr);
 		(*root)->port = port;
 		(*root)->next = NULL;
@@ -137,13 +120,13 @@ static void add_bind_addr(struct np_bind_addr** root, int ssh, const char* addr,
 	for (cur = *root; cur->next != NULL; cur = cur->next);
 
 	cur->next = malloc(sizeof(struct np_bind_addr));
-	cur->next->ssh = ssh;
+	cur->next->transport = transport;
 	cur->next->addr = strdup(addr);
 	cur->next->port = port;
 	cur->next->next = NULL;
 }
 
-static void del_bind_addr(struct np_bind_addr** root, int ssh, const char* addr, unsigned int port) {
+static void del_bind_addr(struct np_bind_addr** root, NC_TRANSPORT transport, const char* addr, unsigned int port) {
 	struct np_bind_addr* cur, *prev = NULL;
 
 	if (root == NULL || addr == NULL) {
@@ -151,7 +134,7 @@ static void del_bind_addr(struct np_bind_addr** root, int ssh, const char* addr,
 	}
 
 	for (cur = *root; cur != NULL; cur = cur->next) {
-		if (cur->ssh == ssh && strcmp(cur->addr, addr) == 0 && cur->port == port) {
+		if (cur->transport == transport && strcmp(cur->addr, addr) == 0 && cur->port == port) {
 			if (prev == NULL) {
 				/* we're deleting the root */
 				*root = cur->next;
@@ -211,8 +194,7 @@ xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(runnin
  */
 struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yang:ietf-netconf-server"}, {NULL, NULL}};
 
-int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
-	struct np_bind_addr* bind;
+int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport) {
 	unsigned int port, new_port;
 	char* content;
 
@@ -242,16 +224,16 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
-		del_bind_addr(&netopeer_options.binds, ssh, "::0", port);
+		del_bind_addr(&netopeer_options.binds, transport, "::0", port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " stopped listening on the port %d", __func__, port);
+		nc_verb_verbose("%s: %s stopped listening on the port %d", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"), port);
 	}
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
-		add_bind_addr(&netopeer_options.binds, ssh, "::0", new_port);
+		add_bind_addr(&netopeer_options.binds, transport, "::0", new_port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " listening on the port %d", __func__, new_port);
+		nc_verb_verbose("%s: %s listening on the port %d", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"), new_port);
 	}
 
 	/* BINDS UNLOCK */
@@ -260,9 +242,8 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	return EXIT_SUCCESS;
 }
 
-int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
+int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport) {
 	xmlNodePtr cur;
-	struct np_bind_addr* bind;
 	char* addr = NULL, *new_addr = NULL, *content;
 	unsigned int port = 0, new_port = 0;
 
@@ -276,7 +257,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 				addr = get_node_content(cur);
 			}
 			if (xmlStrEqual(cur->name, BAD_CAST "port")) {
-				content = get_nodes_content(cur);
+				content = get_node_content(cur);
 				if (content != NULL) {
 					port = atoi(content);
 				}
@@ -301,7 +282,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 				new_addr = get_node_content(cur);
 			}
 			if (xmlStrEqual(cur->name, BAD_CAST "port")) {
-				content = get_nodes_content(cur);
+				content = get_node_content(cur);
 				if (content != NULL) {
 					new_port = atoi(content);
 				}
@@ -320,16 +301,16 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
-		del_bind_addr(&netopeer_options.binds, ssh, addr, port);
+		del_bind_addr(&netopeer_options.binds, transport, addr, port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " stopped listening on the address %s:%d", __func__, addr, port);
+		nc_verb_verbose("%s: %s stopped listening on the address %s:%d", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"), addr, port);
 	}
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
-		add_bind_addr(&netopeer_options.binds, ssh, new_addr, new_port);
+		add_bind_addr(&netopeer_options.binds, transport, new_addr, new_port);
 		netopeer_options.binds_change_flag = 1;
 
-		nc_verb_verbose("%s: " (ssh ? "SSH" : "TLS") " listening on the address %s:%d", __func__, new_addr, new_port);
+		nc_verb_verbose("%s: %s listening on the address %s:%d", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"), new_addr, new_port);
 	}
 
 	/* BINDS UNLOCK */
@@ -425,7 +406,6 @@ __attribute__((noreturn))
 static void* app_loop(void* app_v) {
 	struct ch_app* app = (struct ch_app*)app_v;
 	struct ch_server* cur_server = NULL;
-	struct timeval cur_time;
 	struct timespec ts;
 	int i;
 
@@ -497,20 +477,22 @@ static void* app_loop(void* app_v) {
 				ts.tv_sec += CALLHOME_PERIODIC_LINGER_CHECK;
 				i = pthread_cond_timedwait(&app->ch_st->ch_cond, &app->ch_st->ch_lock, &ts);
 				if (i == ETIMEDOUT) {
-					if (app->client->tls == NULL) {
-						/* very weird */
-						app->client->to_free = 1;
-					} else {
-						gettimeofday(&cur_time, NULL);
-						if (timeval_diff(cur_time, app->client->last_rpc_time) >= app->rep_linger) {
-
-							/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
-							nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
-							app->client->callhome_st = NULL;
-							app->client->to_free = 1;
-							sleep(app->rep_timeout*60);
-							break;
-						}
+					switch (app->client->transport) {
+#ifdef NP_SSH
+					case NC_TRANSPORT_SSH:
+						i = np_ssh_chapp_linger_check(app);
+						break;
+#endif
+#ifdef NP_TLS
+					case NC_TRANSPORT_TLS:
+						i =  np_tls_chapp_linger_check(app);
+						break;
+#endif
+					default:
+						nc_verb_error("%s: unknown client transport", __func__);
+					}
+					if (i) {
+						break;
 					}
 				}
 			}
@@ -531,14 +513,14 @@ static void* app_loop(void* app_v) {
 	}
 }
 
-static int app_create(xmlNodePtr node, struct nc_err** error, int ssh) {
+static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT transport) {
 	struct ch_app* new;
 	struct ch_server* srv, *del_srv;
 	xmlNodePtr auxnode, servernode, childnode;
 	xmlChar* auxstr;
 
 	new = calloc(1, sizeof(struct ch_app));
-	new->ssh = ssh;
+	new->transport = transport;
 
 	/* get name */
 	auxnode = find_node(node, BAD_CAST "name");
@@ -570,9 +552,9 @@ static int app_create(xmlNodePtr node, struct nc_err** error, int ssh) {
 				if (!srv->address) {
 					srv->address = strdup((char*)xmlNodeGetContent(childnode));
 				} else {
-					nc_verb_error("%s: duplicated address element", __func__);
+					nc_verb_error("%s: duplicated %s address element", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"));
 					*error = nc_err_new(NC_ERR_BAD_ELEM);
-					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/" (ssh ? "ssh" : "tls") "/call-home/applications/application/servers/address");
+					nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/*/call-home/applications/application/servers/address");
 					nc_err_set(*error, NC_ERR_PARAM_MSG, "Duplicated address element");
 					goto fail;
 				}
@@ -581,9 +563,9 @@ static int app_create(xmlNodePtr node, struct nc_err** error, int ssh) {
 			}
 		}
 		if (srv->address == NULL || srv->port == 0) {
-			nc_verb_error("%s: invalid address specification (host: %s, port: %s)", __func__, srv->address, srv->port);
+			nc_verb_error("%s: invalid %s address specification (host: %s, port: %s)", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"), srv->address, srv->port);
 			*error = nc_err_new(NC_ERR_BAD_ELEM);
-			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/" (ssh ? "ssh" : "tls") "/call-home/applications/application/servers/address");
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netconf/*/call-home/applications/application/servers/address");
 			goto fail;
 		}
 	}
@@ -679,7 +661,7 @@ fail:
 	return EXIT_FAILURE;
 }
 
-static struct ch_app* app_get(const char* name, int ssh) {
+static struct ch_app* app_get(const char* name, NC_TRANSPORT transport) {
 	struct ch_app *iter;
 
 	if (name == NULL) {
@@ -687,7 +669,7 @@ static struct ch_app* app_get(const char* name, int ssh) {
 	}
 
 	for (iter = callhome_apps; iter != NULL; iter = iter->next) {
-		if (iter->ssh == ssh && strcmp(iter->name, name) == 0) {
+		if (iter->transport == transport && strcmp(iter->name, name) == 0) {
 			break;
 		}
 	}
@@ -695,11 +677,11 @@ static struct ch_app* app_get(const char* name, int ssh) {
 	return (iter);
 }
 
-static int app_rm(const char* name, int ssh) {
+static int app_rm(const char* name, NC_TRANSPORT transport) {
 	struct ch_app* app;
 	struct ch_server* srv, *del_srv;
 
-	if ((app = app_get(name, ssh)) == NULL) {
+	if ((app = app_get(name, transport)) == NULL) {
 		return EXIT_FAILURE;
 	}
 
@@ -742,23 +724,23 @@ static int app_rm(const char* name, int ssh) {
 
 #endif
 
-int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, int ssh) {
+int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport) {
 	char* name;
 
 	switch (op) {
 	case XMLDIFF_ADD:
-		app_create(new_node, error, ssh);
+		app_create(new_node, error, transport);
 		break;
 	case XMLDIFF_REM:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, ssh);
+		app_rm(name, transport);
 		free(name);
 		break;
 	case XMLDIFF_MOD:
 		name = (char*)xmlNodeGetContent(find_node(old_node, BAD_CAST "name"));
-		app_rm(name, ssh);
+		app_rm(name, transport);
 		free(name);
-		app_create(new_node, error, ssh);
+		app_create(new_node, error, transport);
 		break;
 	default:
 		;/* do nothing */
@@ -766,9 +748,6 @@ int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_
 
 	return EXIT_SUCCESS;
 }
-
-int server_transapi_init_ssh(void);
-int server_transapi_init_tls(void);
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
@@ -788,33 +767,36 @@ int server_transapi_init_tls(void);
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int server_transapi_init(xmlDocPtr* UNUSED(running)) {
+#ifdef NP_SSH
 	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh") &&
 			server_transapi_init_ssh() != EXIT_SUCCESS) {
 		return EXIT_FAILURE;
 	}
-
+#endif
+#ifdef NP_TLS
 	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-tls") &&
 			server_transapi_init_tls() != EXIT_SUCCESS) {
 		return EXIT_FAILURE;
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
-
-void server_transapi_close_ssh(void);
-void server_transapi_close_tls(void);
 
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void server_transapi_close(void) {
+#ifdef NP_TLS
 	if (ncds_feature_isenabled("ietf-netconf-server", "tls") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-tls")) {
 		server_transapi_close_tls();
 	}
-
+#endif
+#ifdef NP_SSH
 	if (ncds_feature_isenabled("ietf-netconf-server", "ssh") &&	ncds_feature_isenabled("ietf-netconf-server", "inbound-ssh")) {
 		server_transapi_close_ssh();
 	}
+#endif
 
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 	free_all_bind_addr(&netopeer_options.binds);
@@ -829,7 +811,14 @@ void server_transapi_close(void) {
 struct transapi_data_callbacks server_clbks =  {
 	.callbacks_count = 0,
 	.data = NULL,
-	.callbacks = NULL
+	.callbacks = {
+		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = NULL},
+		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = NULL},
+		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = NULL},
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = NULL},
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = NULL},
+		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = NULL}
+	}
 };
 
 /*

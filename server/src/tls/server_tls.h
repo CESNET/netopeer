@@ -14,7 +14,7 @@
 
 /* for each client */
 struct client_struct_tls {
-	int ssh;
+	NC_TRANSPORT transport;
 
 	int sock;
 	struct sockaddr_storage saddr;
