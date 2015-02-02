@@ -5095,7 +5095,14 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: generating validation files..." >&5
 $as_echo "$as_me: generating validation files..." >&6;}
 lnctool --model ./config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+if test "$?" != "0"; then
+	as_fn_error $? "Generating validation files failed." "$LINENO" 5
+fi
+
 lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+if test "$?" != "0"; then
+	as_fn_error $? "Generating validation files failed." "$LINENO" 5
+fi
 
 ######################### Checks for header files ##############################
 ac_ext=c

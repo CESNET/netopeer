@@ -348,7 +348,14 @@ fi
 # Generate correct validation files
 AC_MSG_NOTICE([generating validation files...])
 lnctool --model ./config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+if test "$?" != "0"; then
+	AC_MSG_ERROR([Generating validation files failed.])
+fi
+
 lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+if test "$?" != "0"; then
+	AC_MSG_ERROR([Generating validation files failed.])
+fi
 
 ######################### Checks for header files ##############################
 AC_CHECK_HEADERS([stdlib.h string.h sys/time.h unistd.h])
