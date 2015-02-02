@@ -52,7 +52,7 @@ static inline void _chan_free(struct chan_struct* chan) {
 	close(chan->chan_out[1]);
 }
 
-static inline void _client_free(struct client_struct_ssh* client) {
+void client_free_ssh(struct client_struct_ssh* client) {
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
@@ -134,7 +134,7 @@ static void client_remove(struct client_struct** root, struct client_struct_ssh*
 		prev_client->next = client->next;
 	}
 
-	_client_free(client);
+	client_free_ssh(client);
 	free(client);
 }
 

@@ -193,7 +193,7 @@ xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(runnin
 struct ns_pair server_namespace_mapping[] = {{"srv", "urn:ietf:params:xml:ns:yang:ietf-netconf-server"}, {NULL, NULL}};
 
 int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport) {
-	unsigned int port, new_port;
+	unsigned int port = 0, new_port = 0;
 	char* content;
 
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
@@ -536,6 +536,8 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 			new->servers = calloc(1, sizeof(struct ch_server));
 			srv = new->servers;
 		} else {
+			for (srv = new->servers; srv->next != NULL; srv = srv->next);
+
 			/* srv is the last server */
 			srv->next = calloc(1, sizeof(struct ch_server));
 			srv->next->prev = srv;

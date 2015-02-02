@@ -222,7 +222,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 				break;
 #endif
 			default:
-				; /* TODO */
+				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 			}
 		}
 
@@ -266,7 +266,7 @@ void* data_thread(void* UNUSED(arg)) {
 				break;
 #endif
 			default:
-				;/* TODO free client? */
+				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 			}
 
 			/* we removed a client, maybe the last so quit the loop */
@@ -532,7 +532,22 @@ void listen_loop(int do_init) {
 
 				if (ret > netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
-					/* TODO new_client leaks */
+					switch (new_client->transport) {
+#ifdef NP_SSH
+					case NC_TRANSPORT_SSH:
+						client_free_ssh((struct client_struct_ssh*)new_client);
+						break;
+#endif
+#ifdef NP_TLS
+					case NC_TRANSPORT_TLS:
+						client_free_tls((struct client_struct_tls*)new_client);
+						break;
+#endif
+					default:
+						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+					}
+					free(new_client);
+
 					/* sleep to prevent clients from immediate connection retry */
 					usleep(netopeer_options.response_time*1000);
 					continue;
@@ -543,22 +558,27 @@ void listen_loop(int do_init) {
 #ifdef NP_SSH
 			case NC_TRANSPORT_SSH:
 				ret = np_ssh_create_client((struct client_struct_ssh*)new_client, sshbind);
+				if (ret != 0) {
+					client_free_ssh((struct client_struct_ssh*)new_client);
+				}
 				break;
 #endif
 #ifdef NP_TLS
 			case NC_TRANSPORT_TLS:
 				ret = np_tls_create_client((struct client_struct_tls*)new_client);
+				if (ret != 0) {
+					client_free_tls((struct client_struct_tls*)new_client);
+				}
 				break;
 #endif
 			default:
 				nc_verb_error("Client with an unknown transport protocol, dropping it.");
-				/* TODO new_client leaks */
 				ret = 1;
 			}
 
 			/* client is not valid, some error occured */
 			if (ret != 0) {
-				/* TODO free new_client, it leaks here as well */
+				free(new_client);
 				continue;
 			}
 

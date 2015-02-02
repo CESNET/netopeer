@@ -66,4 +66,6 @@ int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind)
 
 void np_ssh_cleanup(void);
 
+void client_free_ssh(struct client_struct_ssh* client);
+
 #endif /* _SERVER_SSH_H_ */

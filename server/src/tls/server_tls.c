@@ -32,7 +32,7 @@ extern int quit, restart_soft;
 
 extern struct np_options netopeer_options;
 
-static inline void _client_free(struct client_struct* client) {
+void client_free_tls(struct client_struct* client) {
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
@@ -89,7 +89,7 @@ static void client_remove(struct client_struct** root, struct client_struct* del
 		prev_client->next = client->next;
 	}
 
-	_client_free(client);
+	client_free_tls(client);
 	free(client);
 }
 
@@ -1187,7 +1187,7 @@ int np_tls_create_client(struct client_struct* new_client) {
 		if (ret >= netopeer_options.max_sessions) {
 			nc_verb_error("Maximum number of sessions reached, droppping the new client.");
 			new_client->to_free = 1;
-			_client_free(new_client);
+			client_free_tls(new_client);
 			/* sleep to prevent clients from immediate connection retry */
 			usleep(netopeer_options.response_time*1000);
 			continue;
@@ -1198,7 +1198,7 @@ int np_tls_create_client(struct client_struct* new_client) {
 	if (new_client->tls == NULL) {
 		nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
 		new_client->to_free = 1;
-		_client_free(new_client);
+		client_free_tls(new_client);
 		continue;
 	}
 
@@ -1215,7 +1215,7 @@ int np_tls_create_client(struct client_struct* new_client) {
 	if (SSL_accept(new_client->tls) != 1) {
 		nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 		new_client->to_free = 1;
-		_client_free(new_client);
+		client_free_tls(new_client);
 		continue;
 	}
 
@@ -1224,14 +1224,14 @@ int np_tls_create_client(struct client_struct* new_client) {
 	if ((ret = pipe(new_client->tls_in)) != 0 || (ret = pipe(new_client->tls_out)) != 0) {
 		nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
 		new_client->to_free = 1;
-		_client_free(new_client);
+		client_free_tls(new_client);
 		continue;
 	}
 	if (fcntl(new_client->tls_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_in[1], F_SETFL, O_NONBLOCK) != 0 ||
 			fcntl(new_client->tls_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_out[1], F_SETFL, O_NONBLOCK) != 0) {
 		nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
 		new_client->to_free = 1;
-		_client_free(new_client);
+		client_free_tls(new_client);
 		continue;
 	}
 
@@ -1241,7 +1241,7 @@ int np_tls_create_client(struct client_struct* new_client) {
 	if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
 		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
 		new_client->to_free = 1;
-		_client_free(new_client);
+		client_free_tls(new_client);
 		continue;
 	}
 	pthread_detach(new_client->new_sess_tid);
