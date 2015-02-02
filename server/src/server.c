@@ -37,7 +37,6 @@
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
-#include <libnetconf_xml.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -45,6 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <linux/limits.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -61,8 +61,6 @@
 #include <libnetconf_xml.h>
 
 #include "server.h"
-#include "netconf_server_transapi.h"
-#include "cfgnetopeer_transapi.h"
 
 extern struct np_options netopeer_options;
 extern pthread_mutex_t callhome_lock;
@@ -212,12 +210,20 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 				continue;
 			}
 
+			switch (client->transport) {
 #ifdef NP_SSH
-			np_ssh_client_netconf_rpc(client);
+			case NC_TRANSPORT_SSH:
+				np_ssh_client_netconf_rpc((struct client_struct_ssh*)client);
+				break;
 #endif
 #ifdef NP_TLS
-			np_tls_client_netconf_rpc(client);
+			case NC_TRANSPORT_TLS:
+				np_tls_client_netconf_rpc((struct client_struct_tls*)client);
+				break;
 #endif
+			default:
+				; /* TODO */
+			}
 		}
 
 		/* GLOBAL READ UNLOCK */
@@ -234,13 +240,15 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 
 void* data_thread(void* UNUSED(arg)) {
 	struct client_struct* client;
-	int skip_sleep = 0, to_send_size;
+	int skip_sleep, to_send_size;
 	char* to_send;
 
 	to_send_size = BASE_READ_BUFFER_SIZE;
 	to_send = malloc(to_send_size);
 
 	do {
+		skip_sleep = 0;
+
 		/* GLOBAL READ LOCK */
 		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 
@@ -249,12 +257,12 @@ void* data_thread(void* UNUSED(arg)) {
 			switch (client->transport) {
 #ifdef NP_SSH
 			case NC_TRANSPORT_SSH:
-				skip_sleep = np_ssh_client_data(client, &to_send, &to_send_size);
+				skip_sleep = np_ssh_client_data((struct client_struct_ssh*)client, &to_send, &to_send_size);
 				break;
 #endif
 #ifdef NP_TLS
 			case NC_TRANSPORT_TLS:
-				skip_sleep = np_tls_client_data(client, &to_send, &to_send_size);
+				skip_sleep = np_tls_client_data((struct client_struct_tls*)client, &to_send, &to_send_size);
 				break;
 #endif
 			default:
@@ -368,8 +376,8 @@ static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned 
 
 		pollsock[*count-1].events = POLLIN;
 
-		pollsock = realloc(pollsock, (*count+1)*sizeof(struct pollfd));
-		bzero(&pollsock[*count], sizeof(struct pollfd));
+		pollsock = realloc(pollsock, (*count+1)*sizeof(struct np_pollfd));
+		bzero(&pollsock[*count], sizeof(struct np_pollfd));
 		++(*count);
 	}
 
@@ -444,6 +452,9 @@ void listen_loop(int do_init) {
 	struct np_pollfd* pollsock = NULL;
 	unsigned int pollsock_count = 0;
 	int ret;
+#ifdef NP_SSH
+	ssh_bind sshbind = NULL;
+#endif
 
 	/* Init */
 	if (do_init) {
@@ -485,7 +496,7 @@ void listen_loop(int do_init) {
 		}
 
 #ifdef NP_SSH
-		np_ssh_server_id_check();
+		sshbind = np_ssh_server_id_check(sshbind);
 #endif
 #ifdef NP_TLS
 		np_tls_server_id_check();
@@ -508,19 +519,47 @@ void listen_loop(int do_init) {
 
 		/* New client SSH session creation */
 		if (new_client != NULL) {
+
+			/* Maximum number of sessions check */
+			if (netopeer_options.max_sessions > 0) {
+				ret = 0;
+#ifdef NP_SSH
+				ret += np_ssh_session_count();
+#endif
+#ifdef NP_TLS
+				ret += np_tls_session_count();
+#endif
+
+				if (ret > netopeer_options.max_sessions) {
+					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
+					/* TODO new_client leaks */
+					/* sleep to prevent clients from immediate connection retry */
+					usleep(netopeer_options.response_time*1000);
+					continue;
+				}
+			}
+
 			switch (new_client->transport) {
 #ifdef NP_SSH
 			case NC_TRANSPORT_SSH:
-				np_ssh_create_client();
+				ret = np_ssh_create_client((struct client_struct_ssh*)new_client, sshbind);
 				break;
 #endif
 #ifdef NP_TLS
 			case NC_TRANSPORT_TLS:
-				np_tls_create_client();
+				ret = np_tls_create_client((struct client_struct_tls*)new_client);
 				break;
 #endif
 			default:
-				;/* TODO free client? */
+				nc_verb_error("Client with an unknown transport protocol, dropping it.");
+				/* TODO new_client leaks */
+				ret = 1;
+			}
+
+			/* client is not valid, some error occured */
+			if (ret != 0) {
+				/* TODO free new_client, it leaks here as well */
+				continue;
 			}
 
 			/* add the client into the global clients structure */
@@ -535,6 +574,12 @@ void listen_loop(int do_init) {
 
 	/* Cleanup */
 	sock_cleanup(pollsock, pollsock_count);
+#ifdef NP_SSH
+	ssh_bind_free(sshbind);
+#endif
+#ifdef NP_TLS
+	SSL_free...
+#endif
 	if (!restart_soft) {
 		/* TODO a total timeout after which we cancel and free clients by force? */
 		/* wait for all the clients to exit nicely themselves */

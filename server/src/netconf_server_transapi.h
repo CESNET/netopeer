@@ -1,10 +1,19 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_H_
 #define _NETCONF_SERVER_TRANSAPI_H_
 
+#include <libnetconf.h>
+
 #define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
 
 /* every number-of-secs will the last sent or received data timestamp be checked */
 #define CALLHOME_PERIODIC_LINGER_CHECK 5
+
+struct np_bind_addr {
+	NC_TRANSPORT transport;
+	char* addr;
+	unsigned int port;
+	struct np_bind_addr* next;
+};
 
 struct client_ch_struct {
 	int freed;
@@ -35,11 +44,10 @@ struct ch_app {
 	struct ch_app *prev;
 };
 
-struct np_bind_addr {
-	NC_TRANSPORT transport;
-	char* addr;
-	unsigned int port;
-	struct np_bind_addr* next;
-};
+int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
 
-#endif
+int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
+
+int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
+
+#endif /* _NETCONF_SERVER_TRANSAPI_H_ */

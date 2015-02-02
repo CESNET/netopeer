@@ -1,6 +1,8 @@
 #ifndef _CFGNETOPEER_TRANSAPI_H_
 #define _CFGNETOPEER_TRANSAPI_H_
 
+#include "netconf_server_transapi.h"
+
 #ifdef __GNUC__
 #	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
 #else

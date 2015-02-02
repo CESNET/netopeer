@@ -49,11 +49,21 @@ struct client_struct_ssh {
 
 struct ncsess_thread_config {
 	struct chan_struct* chan;
-	struct client_struct* client;
+	struct client_struct_ssh* client;
 };
 
-unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
+void np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
 
-void ssh_listen_loop(int do_init);
+int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to_send_size);
+
+void np_ssh_init(void);
+
+ssh_bind np_ssh_server_id_check(ssh_bind sshbind);
+
+int np_ssh_session_count(void);
+
+int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind);
+
+void np_ssh_cleanup(void);
 
 #endif /* _SERVER_SSH_H_ */

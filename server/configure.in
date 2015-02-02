@@ -219,8 +219,11 @@ REQS="$REQS libxml2"
 
 if test "$ssh" = "yes"; then
 	# libssh
-	AC_SEARCH_LIBS([ssh_init], [ssh], [], [AC_MSG_ERROR([Missing the libssh library.])])
+	AC_SEARCH_LIBS([ssh_pki_key_ecdsa_name], [ssh], [], [AC_MSG_ERROR([Missing the libssh library (>= 0.6.4).])])
 	AC_SEARCH_LIBS([ssh_threads_get_pthread], [ssh_threads], [], [AC_MSG_ERROR([Missing the libssh_threads library.])])
+
+	# libcrypt
+	AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the libcrypt library.])])
 fi
 
 if test "$tls" = "yes"; then
@@ -266,7 +269,6 @@ SERVER_LIBS=$LIBS
 
 # pthread
 AX_PTHREAD([
-	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
 	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 	CC="$PTHREAD_CC"],
 	AC_MSG_ERROR([Missing POSIX threads support.])
@@ -289,6 +291,11 @@ rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 
+SERVER_TRANSPORT_SRCS=""
+SERVER_TRANSPORT_HDRS=""
+
+CLIENT_STRUCT_SIZE=""
+
 NCSERVER_FEATURES=""
 NETOPEER_FEATURES=""
 
@@ -296,6 +303,13 @@ IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
 NETOPEER_CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
 
 if test "$ssh" = "yes"; then
+	CFLAGS="$CFLAGS -DNP_SSH"
+
+	SERVER_TRANSPORT_SRCS="src/ssh/server_ssh.c src/ssh/cfgnetopeer_transapi_ssh.c src/ssh/netconf_server_transapi_ssh.c"
+	SERVER_TRANSPORT_HDRS="src/ssh/server_ssh.h src/ssh/cfgnetopeer_transapi_ssh.h src/ssh/netconf_server_transapi_ssh.h"
+
+	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_ssh)"
+
 	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
 	NETOPEER_FEATURES="<feature>ssh</feature>"
 
@@ -308,6 +322,13 @@ if test "$ssh" = "yes"; then
 	fi
 fi
 if test "$tls" = "yes"; then
+	CFLAGS="$CFLAGS -DNP_TLS"
+
+	SERVER_TRANSPORT_SRCS="$SERVER_TRANSPORT_SRCS src/tls/server_tls.c src/tls/cfgnetopeer_transapi_tls.c src/tls/netconf_server_transapi_tls.c"
+	SERVER_TRANSPORT_HDRS="$SERVER_TRANSPORT_HDRS src/tls/server_tls.h src/tls/cfgnetopeer_transapi_tls.h src/tls/netconf_server_transapi_tls.h"
+
+	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
+
 	NCSERVER_FEATURES="$NCSERVER_FEATURES<feature>tls</feature><feature>inbound-tls</feature>"
 	NETOPEER_FEATURES="$NETOPEER_FEATURES<feature>tls</feature>"
 
@@ -320,7 +341,12 @@ if test "$tls" = "yes"; then
 	fi
 fi
 
+if (test "$ssh" = "no") && (test "$tls" = "no"); then
+	AC_MSG_ERROR([Cannot compile without any transport protocol!])
+fi
+
 # Generate correct validation files
+AC_MSG_NOTICE([generating validation files...])
 lnctool --model ./config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
 lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
 
@@ -345,6 +371,9 @@ AC_SUBST(LIBNETCONF_DATADIR)
 AC_SUBST(DISTRO)
 AC_SUBST(SERVER_LIBS)
 AC_SUBST(MODULESDIR)
+AC_SUBST(SERVER_TRANSPORT_SRCS)
+AC_SUBST(SERVER_TRANSPORT_HDRS)
+AC_SUBST(CLIENT_STRUCT_SIZE)
 AC_SUBST(NCSERVER_FEATURES)
 AC_SUBST(NETOPEER_FEATURES)
 
@@ -357,6 +386,7 @@ AC_CONFIG_FILES(Makefile)
 AC_CONFIG_FILES(manager/netopeer-manager.tmp:manager/netopeer-manager.in)
 AC_CONFIG_FILES(config/Netopeer.xml.tmp:config/Netopeer.xml.in)
 AC_CONFIG_FILES(config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in)
+AC_CONFIG_FILES(src/config.h)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
 AC_CONFIG_FILES(configurator/netopeer/config.py)

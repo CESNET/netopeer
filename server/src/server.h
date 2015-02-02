@@ -5,6 +5,9 @@
 #include <sys/socket.h>
 #include <libnetconf.h>
 
+#include "netconf_server_transapi.h"
+#include "cfgnetopeer_transapi.h"
+
 #include "config.h"
 
 /* for each client */
@@ -18,7 +21,7 @@ struct client_struct {
 	volatile int to_free;
 	struct client_struct* next;
 
-	char __padding[(((CLIENT_STRUCT_MAX_SIZE - 2*sizeof(int)) - sizeof(struct sockaddr_storage)) - 3*sizeof(void*)) - sizeof(NC_TRANSPORT)];
+	char __padding[((((CLIENT_STRUCT_MAX_SIZE) - 2*sizeof(int)) - sizeof(struct sockaddr_storage)) - 3*sizeof(void*)) - sizeof(NC_TRANSPORT)];
 };
 
 /* one global structure */
@@ -50,5 +53,7 @@ struct np_pollfd {
 unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void tls_listen_loop(int do_init);
+
+void* client_notif_thread(void* arg);
 
 #endif /* _SERVER_H_ */

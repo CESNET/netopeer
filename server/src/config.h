@@ -7,8 +7,20 @@
 #	define UNUSED(x) UNUSED_ ## x
 #endif
 
+#ifdef NP_SSH
+#	include "./ssh/server_ssh.h"
+#	include "./ssh/cfgnetopeer_transapi_ssh.h"
+#	include "./ssh/netconf_server_transapi_ssh.h"
+#endif
+
+#ifdef NP_TLS
+#	include "./tls/server_tls.h"
+#	include "./tls/cfgnetopeer_transapi_tls.h"
+#	include "./tls/netconf_server_transapi_tls.h"
+#endif
+
 /* maximal value from the sizes of specific client implementations */
-#define CLIENT_STRUCT_MAX_SIZE 256
+#define CLIENT_STRUCT_MAX_SIZE sizeof(struct client_struct_ssh)
 
 /* the initial size of the reading buffer */
 #define BASE_READ_BUFFER_SIZE 2048

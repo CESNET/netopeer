@@ -66,10 +66,12 @@ SERVER = netopeer-server
 SERVER_LIBS = @SERVER_LIBS@
 SERVER_SRCS =  src/server.c \
 	src/cfgnetopeer_transapi.c \
-	src/netconf_server_transapi.c
+	src/netconf_server_transapi.c \
+	@SERVER_TRANSPORT_SRCS@
 SERVER_HDRS = src/server.h \
 	src/cfgnetopeer_transapi.h \
-	src/netconf_server_transapi.h
+	src/netconf_server_transapi.h \
+	@SERVER_TRANSPORT_HDRS@
 SERVER_MODULES_CONF = config/Netopeer.xml \
 	config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)

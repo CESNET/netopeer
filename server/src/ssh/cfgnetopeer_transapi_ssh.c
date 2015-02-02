@@ -51,7 +51,7 @@
 #include <libxml/xpathInternals.h>
 #include <string.h>
 
-#include "cfgnetopeer_transapi.h"
+#include "../server.h"
 
 #ifndef MODULES_CFG_DIR
 #	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
@@ -107,9 +107,9 @@ int callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(void** UNUSED(data), XMLDI
 	char* content = NULL;
 
 	if (op & XMLDIFF_REM) {
-		free(netopeer_options.rsa_key);
-		netopeer_options.rsa_key = strdup("/etc/ssh/ssh_host_rsa_key");
-		netopeer_options.server_key_change_flag = 1;
+		free(netopeer_options.ssh_opts->rsa_key);
+		netopeer_options.ssh_opts->rsa_key = strdup("/etc/ssh/ssh_host_rsa_key");
+		netopeer_options.ssh_opts->server_key_change_flag = 1;
 		return EXIT_SUCCESS;
 	}
 
@@ -120,9 +120,9 @@ int callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key(void** UNUSED(data), XMLDI
 		return EXIT_FAILURE;
 	}
 
-	free(netopeer_options.rsa_key);
-	netopeer_options.rsa_key = strdup(content);
-	netopeer_options.server_key_change_flag = 1;
+	free(netopeer_options.ssh_opts->rsa_key);
+	netopeer_options.ssh_opts->rsa_key = strdup(content);
+	netopeer_options.ssh_opts->server_key_change_flag = 1;
 	return EXIT_SUCCESS;
 }
 
@@ -141,9 +141,9 @@ int callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key(void** UNUSED(data), XMLDI
 	char* content = NULL;
 
 	if (op & XMLDIFF_REM) {
-		free(netopeer_options.dsa_key);
-		netopeer_options.dsa_key = NULL;
-		netopeer_options.server_key_change_flag = 1;
+		free(netopeer_options.ssh_opts->dsa_key);
+		netopeer_options.ssh_opts->dsa_key = NULL;
+		netopeer_options.ssh_opts->server_key_change_flag = 1;
 		return EXIT_SUCCESS;
 	}
 
@@ -154,9 +154,9 @@ int callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key(void** UNUSED(data), XMLDI
 		return EXIT_FAILURE;
 	}
 
-	free(netopeer_options.dsa_key);
-	netopeer_options.dsa_key = strdup(content);
-	netopeer_options.server_key_change_flag = 1;
+	free(netopeer_options.ssh_opts->dsa_key);
+	netopeer_options.ssh_opts->dsa_key = strdup(content);
+	netopeer_options.ssh_opts->server_key_change_flag = 1;
 	return EXIT_SUCCESS;
 }
 
@@ -198,7 +198,7 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
 	}
 
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
-		for (key = netopeer_options.client_auth_keys; key != NULL; key = key->next) {
+		for (key = netopeer_options.ssh_opts->client_auth_keys; key != NULL; key = key->next) {
 			if (strcmp(key->path, path) == 0) {
 				break;
 			}
@@ -211,17 +211,17 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
 		}
 
 		/* CLIENT KEYS LOCK */
-		pthread_mutex_lock(&netopeer_options.client_keys_lock);
+		pthread_mutex_lock(&netopeer_options.ssh_opts->client_keys_lock);
 
 		/* remove the key */
 		if (op & XMLDIFF_REM) {
 			if (key->prev == NULL) {
-				netopeer_options.client_auth_keys = key->next;
+				netopeer_options.ssh_opts->client_auth_keys = key->next;
 				free(key->path);
 				free(key->username);
 				free(key);
-				if (netopeer_options.client_auth_keys != NULL) {
-					netopeer_options.client_auth_keys->prev = NULL;
+				if (netopeer_options.ssh_opts->client_auth_keys != NULL) {
+					netopeer_options.ssh_opts->client_auth_keys->prev = NULL;
 				}
 			} else {
 				key->prev->next = key->next;
@@ -240,20 +240,20 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
 		}
 
 		/* CLIENT KEYS UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
+		pthread_mutex_unlock(&netopeer_options.ssh_opts->client_keys_lock);
 
 	} else if (op & XMLDIFF_ADD) {
 
 		/* CLIENT KEYS LOCK */
-		pthread_mutex_lock(&netopeer_options.client_keys_lock);
+		pthread_mutex_lock(&netopeer_options.ssh_opts->client_keys_lock);
 
 		/* add the key */
-		if (netopeer_options.client_auth_keys == NULL) {
-			netopeer_options.client_auth_keys = calloc(1, sizeof(struct np_auth_key));
-			netopeer_options.client_auth_keys->path = strdup(path);
-			netopeer_options.client_auth_keys->username = strdup(username);
+		if (netopeer_options.ssh_opts->client_auth_keys == NULL) {
+			netopeer_options.ssh_opts->client_auth_keys = calloc(1, sizeof(struct np_auth_key));
+			netopeer_options.ssh_opts->client_auth_keys->path = strdup(path);
+			netopeer_options.ssh_opts->client_auth_keys->username = strdup(username);
 		} else {
-			for (key = netopeer_options.client_auth_keys; key->next != NULL; key = key->next) {
+			for (key = netopeer_options.ssh_opts->client_auth_keys; key->next != NULL; key = key->next) {
 				key->next = calloc(1, sizeof(struct np_auth_key));
 				key->path = strdup(path);
 				key->username = strdup(username);
@@ -262,7 +262,7 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
 		}
 
 		/* CLIENT KEYS UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.client_keys_lock);
+		pthread_mutex_unlock(&netopeer_options.ssh_opts->client_keys_lock);
 	}
 
 
@@ -284,7 +284,7 @@ int callback_n_netopeer_n_ssh_n_password_auth_enabled(void** UNUSED(data), XMLDI
 	char* content = NULL;
 
 	if (op & XMLDIFF_REM) {
-		netopeer_options.password_auth_enabled = 1;
+		netopeer_options.ssh_opts->password_auth_enabled = 1;
 		return EXIT_SUCCESS;
 	}
 
@@ -296,9 +296,9 @@ int callback_n_netopeer_n_ssh_n_password_auth_enabled(void** UNUSED(data), XMLDI
 	}
 
 	if (strcmp(content, "false") == 0) {
-		netopeer_options.password_auth_enabled = 0;
+		netopeer_options.ssh_opts->password_auth_enabled = 0;
 	} else {
-		netopeer_options.password_auth_enabled = 1;
+		netopeer_options.ssh_opts->password_auth_enabled = 1;
 	}
 	return EXIT_SUCCESS;
 }
@@ -319,7 +319,7 @@ int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op
 	uint8_t num;
 
 	if (op & XMLDIFF_REM) {
-		netopeer_options.auth_attempts = 3;
+		netopeer_options.ssh_opts->auth_attempts = 3;
 		return EXIT_SUCCESS;
 	}
 
@@ -339,7 +339,7 @@ int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op
 		return EXIT_FAILURE;
 	}
 
-	netopeer_options.auth_attempts = num;
+	netopeer_options.ssh_opts->auth_attempts = num;
 	return EXIT_SUCCESS;
 }
 
@@ -359,7 +359,7 @@ int callback_n_netopeer_n_ssh_n_auth_timeout(void** UNUSED(data), XMLDIFF_OP op,
 	uint16_t num;
 
 	if (op & XMLDIFF_REM) {
-		netopeer_options.auth_timeout = 10;
+		netopeer_options.ssh_opts->auth_timeout = 10;
 		return EXIT_SUCCESS;
 	}
 
@@ -379,38 +379,19 @@ int callback_n_netopeer_n_ssh_n_auth_timeout(void** UNUSED(data), XMLDIFF_OP op,
 		return EXIT_FAILURE;
 	}
 
-	netopeer_options.auth_timeout = num;
+	netopeer_options.ssh_opts->auth_timeout = num;
 	return EXIT_SUCCESS;
 }
-
-extern struct transapi_data_callbacks netopeer_clbks;
-
-const int netopeer_clbks_count_ssh = 6;
 
 int netopeer_transapi_init_ssh(void) {
 	xmlDocPtr doc;
 	struct nc_err* error = NULL;
 	const char* str_err;
 
+	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module SSH...");
+
 	netopeer_options.ssh_opts = calloc(1, sizeof(struct np_options_ssh));
 	pthread_mutex_init(&netopeer_options.ssh_opts->client_keys_lock, NULL);
-
-	netopeer_clbks.callbacks = realloc(netopeer_clbks.callbacks, (netopeer_clbks.callbacks_count + netopeer_clbks_count_ssh)*sizeof(struct clbk));
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:ssh/n:server-keys/n:rsa-key");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+1].path = strdup("/n:netopeer/n:ssh/n:server-keys/n:dsa-key");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+1].func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+2].path = strdup("/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+2].func = callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+3].path = strdup("/n:netopeer/n:ssh/n:password-auth-enabled");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+3].func = callback_n_netopeer_n_ssh_n_password_auth_enabled;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+4].path = strdup("/n:netopeer/n:ssh/n:auth-attempts");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+4].func = callback_n_netopeer_n_ssh_n_auth_attempts;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+5].path = strdup("/n:netopeer/n:ssh/n:auth-timeout");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count+5].func = callback_n_netopeer_n_ssh_n_auth_timeout;
-	netopeer_clbks.callbacks_count += netopeer_clbks_count_ssh;
-
-	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module SSH...");
 
 	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><ssh><server-keys><rsa-key>/etc/ssh/ssh_host_rsa_key</rsa-key></server-keys><password-auth-enabled>true</password-auth-enabled><auth-attempts>3</auth-attempts><auth-timeout>10</auth-timeout></ssh></netopeer>",
 		NULL, NULL, 0);
@@ -474,24 +455,19 @@ int netopeer_transapi_init_ssh(void) {
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void netopeer_transapi_close(void) {
-	int i;
+void netopeer_transapi_close_ssh(void) {
 	struct np_auth_key* key, *del_key;
 
 	nc_verb_verbose("Netopeer SSH cleanup.");
 
-	free(netopeer_options.rsa_key);
-	free(netopeer_options.dsa_key);
-	for (key = netopeer_options.client_auth_keys; key != NULL;) {
+	free(netopeer_options.ssh_opts->rsa_key);
+	free(netopeer_options.ssh_opts->dsa_key);
+	for (key = netopeer_options.ssh_opts->client_auth_keys; key != NULL;) {
 		del_key = key;
 		key = key->next;
 		free(del_key->path);
 		free(del_key->username);
 		free(del_key);
-	}
-
-	for (i = netopeer_clbks.callbacks_count; i > netopeer_clbks_count_ssh; --i) {
-		free(netopeer_clbks.callbacks[i].path);
 	}
 
 	pthread_mutex_destroy(&netopeer_options.ssh_opts->client_keys_lock);

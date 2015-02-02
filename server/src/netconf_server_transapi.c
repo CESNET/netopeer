@@ -74,8 +74,6 @@
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
 
-#include "netconf_server_transapi.h"
-#include "cfgnetopeer_transapi.h"
 #include "server.h"
 
 extern struct np_options netopeer_options;
@@ -809,15 +807,23 @@ void server_transapi_close(void) {
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks server_clbks =  {
-	.callbacks_count = 0,
+#if defined(NP_SSH) && defined(NP_TLS)
+	.callbacks_count = 6,
+#else
+	.callbacks_count = 3,
+#endif
 	.data = NULL,
 	.callbacks = {
-		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = NULL},
-		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = NULL},
-		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = NULL},
+#ifdef NP_SSH
+		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:port", .func = callback_srv_netconf_srv_ssh_srv_listen_srv_port},
+		{.path = "/srv:netconf/srv:ssh/srv:listen/srv:interface", .func = callback_srv_netconf_srv_ssh_srv_listen_srv_interface},
+		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application},
+#endif
+#ifdef NP_TLS
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = NULL},
 		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = NULL},
 		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = NULL}
+#endif
 	}
 };
 

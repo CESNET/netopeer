@@ -51,7 +51,7 @@
 #include <libxml/xpathInternals.h>
 #include <string.h>
 
-#include "cfgnetopeer_transapi.h"
+#include "server.h"
 
 #ifndef MODULES_CFG_DIR
 #	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
@@ -760,14 +760,17 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 
 	return EXIT_SUCCESS;
 }
-
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks netopeer_clbks = {
-	.callbacks_count = 7,
+#if defined(NP_SSH) && defined(NP_TLS)
+	.callbacks_count = 19,
+#else
+	.callbacks_count = 13,
+#endif
 	.data = NULL,
 	.callbacks = {
 		{.path = "/n:netopeer/n:hello-timeout", .func = callback_n_netopeer_n_hello_timeout},
@@ -777,18 +780,22 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
 		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
 		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled},
-		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = NULL},
-		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = NULL},
-		{.path = "/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key", .func = NULL},
-		{.path = "/n:netopeer/n:ssh/n:password-auth-enabled", .func = NULL},
-		{.path = "/n:netopeer/n:ssh/n:auth-attempts", .func = NULL},
-		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = NULL},
-		{.path = "/n:netopeer/n:tls/n:server-cert", .func = NULL},
+#ifdef NP_SSH
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key},
+		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key},
+		{.path = "/n:netopeer/n:ssh/n:client-auth-keys/n:client-auth-key", .func = callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key},
+		{.path = "/n:netopeer/n:ssh/n:password-auth-enabled", .func = callback_n_netopeer_n_ssh_n_password_auth_enabled},
+		{.path = "/n:netopeer/n:ssh/n:auth-attempts", .func = callback_n_netopeer_n_ssh_n_auth_attempts},
+		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = callback_n_netopeer_n_ssh_n_auth_timeout},
+#endif
+#ifdef NP_TLS
+		{.path = "/n:netopeer/n:tls/n:server-cert", .func = TODO},
 		{.path = "/n:netopeer/n:tls/n:server-key", .func = NULL},
 		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = NULL},
 		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = NULL},
 		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = NULL},
 		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = NULL}
+#endif
 	}
 };
 

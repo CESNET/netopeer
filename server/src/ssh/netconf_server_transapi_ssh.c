@@ -74,9 +74,7 @@
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
 
-#include "netconf_server_transapi.h"
-#include "server_ssh.h"
-#include "cfgnetopeer_transapi.h"
+#include "../server.h"
 
 extern struct np_options netopeer_options;
 
@@ -120,7 +118,7 @@ extern NC_EDIT_ERROPT_TYPE server_erropt;
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_ssh_srv_listen_srv_port(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	return callback_srv_netconf_srv_listen_srv_port(op,old_node, new_node, error, 1);
+	return callback_srv_netconf_srv_listen_srv_port(op,old_node, new_node, error, NC_TRANSPORT_SSH);
 }
 
 /**
@@ -135,7 +133,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_srv_port(void** UNUSED(data), XMLDIF
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_ssh_srv_listen_srv_interface(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	return callback_srv_netconf_srv_listen_srv_interface(op, old_node, new_node, error, 1);
+	return callback_srv_netconf_srv_listen_srv_interface(op, old_node, new_node, error, NC_TRANSPORT_SSH);
 }
 
 /**
@@ -151,7 +149,7 @@ int callback_srv_netconf_srv_ssh_srv_listen_srv_interface(void** UNUSED(data), X
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 #ifndef DISABLE_CALLHOME
-	return callback_srv_netconf_srv_call_home_srv_applications_srv_application(op, old_node, new_node, error, ssh);
+	return callback_srv_netconf_srv_call_home_srv_applications_srv_application(op, old_node, new_node, error, NC_TRANSPORT_SSH);
 #else
 	(void)op;
 	(void)old_node;
@@ -167,32 +165,22 @@ int np_ssh_chapp_linger_check(struct ch_app* app) {
 	struct timeval cur_time;
 
 	gettimeofday(&cur_time, NULL);
-	if (timeval_diff(cur_time, app->client->ssh_chans->last_rpc_time) >= app->rep_linger) {
-
+	if (timeval_diff(cur_time, ((struct client_struct_ssh*)app->client)->ssh_chans->last_rpc_time) >= app->rep_linger) {
 		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
 		app->client->callhome_st = NULL;
-		app->client->ssh_chans->to_free = 1;
+		((struct client_struct_ssh*)app->client)->ssh_chans->to_free = 1;
 		sleep(app->rep_timeout*60);
-		break;
+		return 1;
 	}
-}
 
-const static int server_clbks_count_ssh = 3;
+	return 0;
+}
 
 int server_transapi_init_ssh(void) {
 	xmlDocPtr doc;
 	struct nc_err* error = NULL;
 	const char* str_err;
-
-	server_clbks.callbacks = realloc(server_clbks.callbacks, (server_clbks.callbacks_count + server_clbks_count_ssh)*sizeof(struct clbk));
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:ssh/srv:listen/srv:port");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_ssh_srv_listen_srv_port;
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:ssh/srv:listen/srv:interface");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_ssh_srv_listen_srv_interface;
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application;
-	server_clbks.callbacks_count += server_clbks_count_ssh;
 
 	/* set device according to defaults */
 	nc_verb_verbose("Setting the default SSH configuration for the ietf-netconf-server module...");
@@ -224,9 +212,5 @@ int server_transapi_init_ssh(void) {
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
 void server_transapi_close_ssh(void) {
-	int i;
 
-	for (i = server_clbks.callbacks_count; i > server_clbks_count_ssh; --i) {
-		free(server_clbks.callbacks[i].path);
-	}
 }
