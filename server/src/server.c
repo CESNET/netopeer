@@ -67,7 +67,7 @@ extern pthread_mutex_t callhome_lock;
 extern struct client_struct* callhome_client;
 
 /* one global structure holding all the client information */
-struct state_struct netopeer_state = {
+struct np_state netopeer_state = {
 	.global_lock = PTHREAD_RWLOCK_INITIALIZER
 };
 
@@ -168,6 +168,44 @@ static void client_append(struct client_struct** root, struct client_struct* cli
 	for (cur = *root; cur->next != NULL; cur = cur->next);
 
 	cur->next = clients;
+}
+
+void np_client_remove(struct client_struct** root, struct client_struct* del_client) {
+	struct client_struct* client, *prev_client = NULL;
+
+	for (client = *root; client != NULL; client = client->next) {
+		if (client == del_client) {
+			break;
+		}
+		prev_client = client;
+	}
+
+	if (client == NULL) {
+		nc_verb_error("%s: internal error: client not found (%s:%d)", __func__, __FILE__, __LINE__);
+		return;
+	}
+
+	if (prev_client == NULL) {
+		*root = (*root)->next;
+	} else {
+		prev_client->next = client->next;
+	}
+
+	switch (client->transport) {
+#ifdef NP_SSH
+	case NC_TRANSPORT_SSH:
+		client_free_ssh((struct client_struct_ssh*)client);
+		break;
+#endif
+#ifdef NP_TLS
+	case NC_TRANSPORT_TLS:
+		client_free_tls((struct client_struct_tls*)client);
+		break;
+#endif
+	default:
+		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+	}
+	free(client);
 }
 
 /* return seconds rounded down */
@@ -455,6 +493,9 @@ void listen_loop(int do_init) {
 #ifdef NP_SSH
 	ssh_bind sshbind = NULL;
 #endif
+#ifdef NP_TLS
+	SSL_CTX* tlsctx = NULL;
+#endif
 
 	/* Init */
 	if (do_init) {
@@ -499,7 +540,7 @@ void listen_loop(int do_init) {
 		sshbind = np_ssh_server_id_check(sshbind);
 #endif
 #ifdef NP_TLS
-		np_tls_server_id_check();
+		tlsctx = np_tls_server_id_check(tlsctx);
 #endif
 
 		/* Callhome client check */
@@ -565,7 +606,7 @@ void listen_loop(int do_init) {
 #endif
 #ifdef NP_TLS
 			case NC_TRANSPORT_TLS:
-				ret = np_tls_create_client((struct client_struct_tls*)new_client);
+				ret = np_tls_create_client((struct client_struct_tls*)new_client, tlsctx);
 				if (ret != 0) {
 					client_free_tls((struct client_struct_tls*)new_client);
 				}
@@ -598,7 +639,7 @@ void listen_loop(int do_init) {
 	ssh_bind_free(sshbind);
 #endif
 #ifdef NP_TLS
-	SSL_free...
+	SSL_CTX_free(tlsctx);
 #endif
 	if (!restart_soft) {
 		/* TODO a total timeout after which we cancel and free clients by force? */

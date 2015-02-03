@@ -62,6 +62,8 @@ ssh_bind np_ssh_server_id_check(ssh_bind sshbind);
 
 int np_ssh_session_count(void);
 
+int np_ssh_kill_session(const char* sid, struct client_struct_ssh* cur_client);
+
 int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind);
 
 void np_ssh_cleanup(void);

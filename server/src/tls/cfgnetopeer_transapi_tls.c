@@ -51,7 +51,7 @@
 #include <libxml/xpathInternals.h>
 #include <string.h>
 
-#include "cfgnetopeer_transapi.h"
+#include "../server.h"
 
 #ifndef MODULES_CFG_DIR
 #	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
@@ -69,7 +69,7 @@ extern int server_start;
  * 0 - data not modified
  * 1 - data have been modified
  */
-extern int netopeer_config_modified = 0;
+extern int netopeer_config_modified;
 
 /* Do not modify or set! This variable is set by libnetconf to announce edit-config's error-option
 Feel free to use it to distinguish module behavior for different error-option values.
@@ -80,7 +80,7 @@ Feel free to use it to distinguish module behavior for different error-option va
  * NC_EDIT_ERROPT_ROLLBACK - After failure, following callbacks are not executed, but previous successful callbacks are
                          executed again with previous configuration data to roll it back.
  */
-extern NC_EDIT_ERROPT_TYPE netopeer_erropt = NC_EDIT_ERROPT_NOTSET;
+extern NC_EDIT_ERROPT_TYPE netopeer_erropt;
 
 extern struct np_options netopeer_options;
 
@@ -285,17 +285,17 @@ int callback_n_netopeer_n_tls_n_server_cert(void** UNUSED(data), XMLDIFF_OP op, 
 	}
 
 	/* TLS_CTX LOCK */
-	pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-	free(netopeer_options.server_cert);
-	netopeer_options.server_cert = NULL;
+	free(netopeer_options.tls_opts->server_cert);
+	netopeer_options.tls_opts->server_cert = NULL;
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
-		netopeer_options.server_cert = strdup(content);
+		netopeer_options.tls_opts->server_cert = strdup(content);
 	}
-	netopeer_options.tls_ctx_change_flag = 1;
+	netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 
 	/* TLS_CTX UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 
 	return EXIT_SUCCESS;
 }
@@ -340,22 +340,22 @@ int callback_n_netopeer_n_tls_n_server_key(void** UNUSED(data), XMLDIFF_OP op, x
 	}
 
 	/* TLS_CTX LOCK */
-	pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-	free(netopeer_options.server_key);
-	netopeer_options.server_key = NULL;
+	free(netopeer_options.tls_opts->server_key);
+	netopeer_options.tls_opts->server_key = NULL;
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
-		netopeer_options.server_key = strdup(key);
+		netopeer_options.tls_opts->server_key = strdup(key);
 		if (strcmp(type, "RSA") == 0) {
-			netopeer_options.server_key_type = 1;
+			netopeer_options.tls_opts->server_key_type = 1;
 		} else {
-			netopeer_options.server_key_type = 0;
+			netopeer_options.tls_opts->server_key_type = 0;
 		}
 	}
-	netopeer_options.tls_ctx_change_flag = 1;
+	netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 
 	/* TLS_CTX UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 
 	return EXIT_SUCCESS;
 }
@@ -383,16 +383,16 @@ int callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert(void** UNUSED
 		}
 
 		/* TLS_CTX LOCK */
-		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-		if (del_trusted_cert(&netopeer_options.trusted_certs, content, 0) != 0) {
+		if (del_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 0) != 0) {
 			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
 		} else {
-			netopeer_options.tls_ctx_change_flag = 1;
+			netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 		}
 
 		/* TLS_CTX UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 	}
 
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
@@ -404,13 +404,13 @@ int callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert(void** UNUSED
 		}
 
 		/* TLS_CTX LOCK */
-		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-		add_trusted_cert(&netopeer_options.trusted_certs, content, 0);
-		netopeer_options.tls_ctx_change_flag = 1;
+		add_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 0);
+		netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 
 		/* TLS_CTX UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 	}
 
 	return EXIT_SUCCESS;
@@ -439,16 +439,16 @@ int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void*
 		}
 
 		/* TLS_CTX LOCK */
-		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-		if (del_trusted_cert(&netopeer_options.trusted_certs, content, 1) != 0) {
+		if (del_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 1) != 0) {
 			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
 		} else {
-			netopeer_options.tls_ctx_change_flag = 1;
+			netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 		}
 
 		/* TLS_CTX UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 	}
 
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
@@ -460,13 +460,13 @@ int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void*
 		}
 
 		/* TLS_CTX LOCK */
-		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-		add_trusted_cert(&netopeer_options.trusted_certs, content, 1);
-		netopeer_options.tls_ctx_change_flag = 1;
+		add_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 1);
+		netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 
 		/* TLS_CTX UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 	}
 
 	return EXIT_SUCCESS;
@@ -496,16 +496,16 @@ int callback_n_netopeer_n_tls_n_crl_dir(void** UNUSED(data), XMLDIFF_OP op, xmlN
 	}
 
 	/* CRL_DIR LOCK */
-	pthread_mutex_lock(&netopeer_options.crl_dir_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->crl_dir_lock);
 
-	free(netopeer_options.crl_dir);
-	netopeer_options.crl_dir = NULL;
+	free(netopeer_options.tls_opts->crl_dir);
+	netopeer_options.tls_opts->crl_dir = NULL;
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
-		netopeer_options.crl_dir = strdup(content);
+		netopeer_options.tls_opts->crl_dir = strdup(content);
 	}
 
 	/* CRL_DIR UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.crl_dir_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 
 	return EXIT_SUCCESS;
 }
@@ -565,26 +565,26 @@ callback_restart:
 	}
 
 	/* CTN_MAP LOCK */
-	pthread_mutex_lock(&netopeer_options.ctn_map_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->ctn_map_lock);
 
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
-		if (del_ctn_item(&netopeer_options.ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name) != 0) {
+		if (del_ctn_item(&netopeer_options.tls_opts->ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name) != 0) {
 			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
 		}
 
 		if (op & XMLDIFF_MOD) {
 			/* CTN_MAP UNLOCK */
-			pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+			pthread_mutex_unlock(&netopeer_options.tls_opts->ctn_map_lock);
 			op = XMLDIFF_ADD;
 			goto callback_restart;
 		}
 	}
 	if (op & XMLDIFF_ADD) {
-		add_ctn_item(&netopeer_options.ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name);
+		add_ctn_item(&netopeer_options.tls_opts->ctn_map, atoi(id), fingerprint, ctn_type_parse(map_type), name);
 	}
 
 	/* CTN_MAP UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->ctn_map_lock);
 
 	return EXIT_SUCCESS;
 }
@@ -594,30 +594,16 @@ callback_restart:
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
-extern struct transapi_data_callbacks netopeer_clbks;
-
-cont int netopeer_clbks_count_tls = 6;
 
 int netopeer_transapi_init_tls(void) {
+
+	/* there is no default configuration, but what the heck */
+	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module SSH...");
+
 	netopeer_options.tls_opts = calloc(1, sizeof(struct np_options_tls));
 	pthread_mutex_init(&netopeer_options.tls_opts->tls_ctx_lock, NULL);
 	pthread_mutex_init(&netopeer_options.tls_opts->crl_dir_lock, NULL);
 	pthread_mutex_init(&netopeer_options.tls_opts->ctn_map_lock, NULL);
-
-	netopeer_clbks.callbacks = realloc(netopeer_clbks.callbacks, (netopeer_clbks.callbacks_count + netopeer_clbks_count_tls)*sizeof(struct clbk));
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:server-cert");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_server_cert;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:server-key");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_server_key;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:crl-dir");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_crl_dir;
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].path = strdup("/n:netopeer/n:tls/n:cert-maps/n:cert-to-name");
-	netopeer_clbks.callbacks[netopeer_clbks.callbacks_count].func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name;
-	netopeer_clbks.callbacks_count += netopeer_clbks_count_tls;
 
 	return EXIT_SUCCESS;
 }
@@ -625,32 +611,27 @@ int netopeer_transapi_init_tls(void) {
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void netopeer_transapi_close(void) {
-	int i;
+void netopeer_transapi_close_tls(void) {
 	struct np_trusted_cert* cert, *del_cert;
 	struct np_ctn_item* item, *del_item;
 
 	nc_verb_verbose("Netopeer TLS cleanup.");
 
-	free(netopeer_options.server_cert);
-	free(netopeer_options.server_key);
-	for (cert = netopeer_options.trusted_certs; cert != NULL;) {
+	free(netopeer_options.tls_opts->server_cert);
+	free(netopeer_options.tls_opts->server_key);
+	for (cert = netopeer_options.tls_opts->trusted_certs; cert != NULL;) {
 		del_cert = cert;
 		cert = cert->next;
 		free(del_cert->cert);
 		free(del_cert);
 	}
-	free(netopeer_options.crl_dir);
-	for (item = netopeer_options.ctn_map; item != NULL;) {
+	free(netopeer_options.tls_opts->crl_dir);
+	for (item = netopeer_options.tls_opts->ctn_map; item != NULL;) {
 		del_item = item;
 		item = item->next;
 		free(del_item->fingerprint);
 		free(del_item->name);
 		free(del_item);
-	}
-
-	for (i = netopeer_clbks.callbacks_count; i > netopeer_clbks_count_ssh; --i) {
-		free(netopeer_clbks.callbacks[i].path);
 	}
 
 	pthread_mutex_destroy(&netopeer_options.tls_opts->tls_ctx_lock);

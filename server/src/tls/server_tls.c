@@ -24,15 +24,14 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
-#include "server_tls.h"
-#include "netconf_server_transapi.h"
-#include "cfgnetopeer_transapi.h"
+#include "../server.h"
 
 extern int quit, restart_soft;
 
 extern struct np_options netopeer_options;
+extern struct np_state netopeer_state;
 
-void client_free_tls(struct client_struct* client) {
+void client_free_tls(struct client_struct_tls* client) {
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
@@ -66,51 +65,6 @@ void client_free_tls(struct client_struct* client) {
 		pthread_cond_signal(&client->callhome_st->ch_cond);
 		pthread_mutex_unlock(&client->callhome_st->ch_lock);
 	}
-}
-
-static void client_remove(struct client_struct** root, struct client_struct* del_client) {
-	struct client_struct* client, *prev_client = NULL;
-
-	for (client = *root; client != NULL; client = client->next) {
-		if (client == del_client) {
-			break;
-		}
-		prev_client = client;
-	}
-
-	if (client == NULL) {
-		nc_verb_error("%s: internal error: client not found (%s:%d)", __func__, __FILE__, __LINE__);
-		return;
-	}
-
-	if (prev_client == NULL) {
-		*root = (*root)->next;
-	} else {
-		prev_client->next = client->next;
-	}
-
-	client_free_tls(client);
-	free(client);
-}
-
-static struct client_struct* client_find_by_sid(struct client_struct* root, const char* sid) {
-	struct client_struct* client;
-
-	if (sid == NULL) {
-		return NULL;
-	}
-
-	for (client = root; client != NULL; client = client->next) {
-		if (client->nc_sess == NULL) {
-			continue;
-		}
-
-		if (strcmp(sid, nc_session_get_id(client->nc_sess)) == 0) {
-			break;
-		}
-	}
-
-	return client;
 }
 
 static char* asn1time_to_str(ASN1_TIME *t) {
@@ -255,9 +209,9 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 	}
 
 	/* CTN_MAP LOCK */
-	pthread_mutex_lock(&netopeer_options.ctn_map_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->ctn_map_lock);
 
-	for (ctn = netopeer_options.ctn_map; ctn != NULL; ctn = ctn->next) {
+	for (ctn = netopeer_options.tls_opts->ctn_map; ctn != NULL; ctn = ctn->next) {
 		/* MD5 */
 		if (strncmp(ctn->fingerprint, "01", 2) == 0) {
 			if (digest_md5 == NULL) {
@@ -385,7 +339,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 	}
 
 	/* CTN_MAP UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->ctn_map_lock);
 
 	free(digest_md5);
 	free(digest_sha1);
@@ -398,7 +352,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 fail:
 	/* CTN_MAP UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.ctn_map_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->ctn_map_lock);
 
 	free(digest_md5);
 	free(digest_sha1);
@@ -422,13 +376,13 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	X509_REVOKED* revoked;
 	EVP_PKEY* pubkey;
 	SSL* cur_tls;
-	struct client_struct* new_client;
+	struct client_struct_tls* new_client;
 	long serial;
 	int i, n, rc;
 	char* cp;
 	unsigned char* digest1, *digest2;
 	unsigned int dig_len;
-	CTN_MAP_TYPE map_type;
+	CTN_MAP_TYPE map_type = 0;
 	ASN1_TIME* last_update = NULL, *next_update = NULL;
 
 	/* standard certificate verification failed */
@@ -438,9 +392,9 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 
 	/* check for revocation if set */
 	/* CRL_DIR LOCK */
-	pthread_mutex_lock(&netopeer_options.crl_dir_lock);
+	pthread_mutex_lock(&netopeer_options.tls_opts->crl_dir_lock);
 
-	if (netopeer_options.crl_dir != NULL) {
+	if (netopeer_options.tls_opts->crl_dir != NULL) {
 		store = X509_STORE_new();
 		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
 		if (lookup == NULL) {
@@ -449,10 +403,10 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 			return 0; // FAILED
 		}
 
-		i = X509_LOOKUP_add_dir(lookup, netopeer_options.crl_dir, X509_FILETYPE_PEM);
+		i = X509_LOOKUP_add_dir(lookup, netopeer_options.tls_opts->crl_dir, X509_FILETYPE_PEM);
 
 		/* CRL_DIR UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.crl_dir_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 
 		if (i == 0) {
 			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
@@ -547,11 +501,11 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		X509_STORE_free(store);
 	}
 	/* CRL_DIR UNLOCK */
-	pthread_mutex_unlock(&netopeer_options.crl_dir_lock);
+	pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 
 	/* get the new client structure */
 	cur_tls = X509_STORE_CTX_get_ex_data(x509_ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
-	new_client = (struct client_struct*)SSL_get_ex_data(cur_tls, netopeer_state.last_tls_idx);
+	new_client = (struct client_struct_tls*)SSL_get_ex_data(cur_tls, netopeer_state.tls_state->last_tls_idx);
 	if (new_client == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return 0;
@@ -623,7 +577,7 @@ fail:
 
 /* separate thread because nc_session_accept_inout is blocking */
 void* netconf_session_thread(void* arg) {
-	struct client_struct* client = (struct client_struct*)arg;
+	struct client_struct_tls* client = (struct client_struct_tls*)arg;
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
@@ -651,7 +605,7 @@ void* netconf_session_thread(void* arg) {
 }
 
 /* returns how much of the data was processed */
-static int check_tls_data_to_nc(struct client_struct* client) {
+static int check_tls_data_to_nc(struct client_struct_tls* client) {
 	char* end_rpc;
 	int ret;
 	unsigned int rpc_len;
@@ -771,7 +725,33 @@ static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
 	return out;
 }
 
-void np_tls_client_netconf_rpc(struct client_struct* client) {
+int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {
+	struct client_struct_tls* kill_client;
+
+	if (sid == NULL) {
+		return 1;
+	}
+
+	for (kill_client = (struct client_struct_tls*)netopeer_state.clients; kill_client != NULL; kill_client = (struct client_struct_tls*)kill_client->next) {
+		if (kill_client->transport != NC_TRANSPORT_TLS || kill_client == cur_client) {
+			continue;
+		}
+
+		if (strcmp(sid, nc_session_get_id(kill_client->nc_sess)) == 0) {
+			break;
+		}
+	}
+
+	if (kill_client == NULL) {
+		return 1;
+	}
+
+	kill_client->to_free = 1;
+
+	return 0;
+}
+
+void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	nc_rpc* rpc = NULL;
 	nc_reply* rpc_reply = NULL;
 	NC_MSG_TYPE rpc_type;
@@ -783,7 +763,7 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 	rpc_type = nc_session_recv_rpc(client->nc_sess, 0, &rpc);
 	if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
 		/* no RPC, or processed internally */
-		continue;
+		return;
 	}
 
 	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
@@ -795,7 +775,7 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 			client->to_free = 1;
 		}
 		/* ignore */
-		continue;
+		return;
 	}
 
 	if (rpc_type != NC_MSG_RPC) {
@@ -803,7 +783,7 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 		nc_verb_warning("%s: received a %s RPC from session %s, ignoring", __func__,
 						(rpc_type == NC_MSG_HELLO ? "hello" : (rpc_type == NC_MSG_REPLY ? "reply" : "notification")),
 						nc_session_get_id(client->nc_sess));
-		continue;
+		return;
 	}
 
 	/* process the new RPC */
@@ -833,8 +813,8 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 		}
 
 		/* block-local variables */
-		struct client_struct* kill_client;
 		char* sid;
+		int ret;
 
 		sid = (char*)xmlNodeGetContent(op->children);
 		xmlFreeNodeList(op);
@@ -848,10 +828,11 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 			break;
 		}
 
-		/* find the requested session */
-		kill_client = client_find_by_sid(netopeer_state.clients, sid);
-		if (kill_client == NULL) {
-			nc_verb_error("%s: no session with ID %s found", sid);
+		ret = 1;
+#ifdef NP_SSH
+		ret = np_ssh_kill_session(sid, client);
+#endif
+		if (ret != 0 && np_tls_kill_session(sid, client) != 0) {
 			free(sid);
 			err = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(err, NC_ERR_PARAM_MSG, "No session with the requested ID found.");
@@ -859,9 +840,7 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 			break;
 		}
 
-		kill_client->to_free = 1;
-
-		nc_verb_verbose("Session of the user '%s' with the ID %s killed.", kill_client->username, sid);
+		nc_verb_verbose("Session with the ID %s killed.", sid);
 		rpc_reply = nc_reply_ok();
 
 		free(sid);
@@ -945,10 +924,11 @@ void np_tls_client_netconf_rpc(struct client_struct* client) {
 	}
 }
 
-int np_tls_client_data(struct client_struct* client, char** to_send, int* to_send_size) {
+/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep), 2 - client deleted */
+int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size) {
 	struct timeval cur_time;
 	struct timespec ts;
-	int ret, to_send_len, skip_sleep = 0;
+	int ret, to_send_len;
 
 	if (quit) {
 		client->to_free = 1;
@@ -959,74 +939,75 @@ int np_tls_client_data(struct client_struct* client, char** to_send, int* to_sen
 		nc_verb_warning("Failed to read from the client '%s', it has probably disconnected.", client->username);
 		/* this invalid socket may have been reused and we would close
 		 * it during cleanup */
-		cur_client->sock = -1;
-		cur_client->to_free = 1;
+		client->sock = -1;
+		client->to_free = 1;
 	}
 
 	gettimeofday(&cur_time, NULL);
 
 	/* check the ncsession for hello timeout */
-	if (cur_client->nc_sess == NULL && timeval_diff(cur_time, cur_client->last_rpc_time) >= netopeer_options.hello_timeout) {
-		if (cur_client->new_sess_tid == 0) {
+	if (client->nc_sess == NULL && timeval_diff(cur_time, client->last_rpc_time) >= netopeer_options.hello_timeout) {
+		if (client->new_sess_tid == 0) {
 			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		} else {
-			pthread_cancel(cur_client->new_sess_tid);
-			cur_client->new_sess_tid = 0;
+			pthread_cancel(client->new_sess_tid);
+			client->new_sess_tid = 0;
 		}
-		cur_client->to_free = 1;
+		client->to_free = 1;
 	}
 
 	/* check the session for idle timeout */
-	if (timeval_diff(cur_time, cur_client->last_rpc_time) >= netopeer_options.idle_timeout) {
+	if (timeval_diff(cur_time, client->last_rpc_time) >= netopeer_options.idle_timeout) {
 		/* check for active event subscriptions, in that case we can never disconnect an idle session */
-		if (cur_client->nc_sess == NULL || !ncntf_session_get_active_subscription(cur_client->nc_sess)) {
+		if (client->nc_sess == NULL || !ncntf_session_get_active_subscription(client->nc_sess)) {
 			nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.");
-			cur_client->to_free = 1;
+			client->to_free = 1;
 		}
 	}
 
 	errno = 0;
 	to_send_len = 0;
 	while (1) {
-		to_send_len += (ret = read(cur_client->tls_in[0], to_send+to_send_len, to_send_size-to_send_len));
+		to_send_len += (ret = read(client->tls_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len));
 		if (ret == -1) {
 			break;
 		}
 
 		/* double the buffer size if too small */
-		if (to_send_len == to_send_size) {
-			to_send_size *= 2;
-			to_send = realloc(to_send, to_send_size);
+		if (to_send_len == *to_send_size) {
+			*to_send_size *= 2;
+			*to_send = realloc(*to_send, *to_send_size);
 		} else {
 			break;
 		}
 	}
 
 	/* nothing to send, just free it */
-	if (ret == -1 && cur_client->to_free) {
+	if (ret == -1 && client->to_free) {
 		goto free_client;
 	}
 
 	if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-		continue;
+		return 0;
 	}
 
 	if (ret == -1) {
 		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-		cur_client->to_free = 1;
+		client->to_free = 1;
 	}
 
-	ret = SSL_write(cur_client->tls, to_send, to_send_len);
+	/* TODO ret error handling */
+	ret = SSL_write(client->tls, *to_send, to_send_len);
 	if (ret != to_send_len) {
-	ret = SSL_get_error(cur_client->tls, ret);
+		ret = SSL_get_error(client->tls, ret);
 		nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
-		cur_client->to_free = 1;
+		client->to_free = 1;
 	}
 
 free_client:
 	/* check whether the client shouldn't be freed */
-	if (cur_client->to_free) {
-		SSL_shutdown(cur_client->tls);
+	if (client->to_free) {
+		SSL_shutdown(client->tls);
 
 		clock_gettime(CLOCK_REALTIME, &ts);
 		ts.tv_nsec += netopeer_options.client_removal_time*1000000;
@@ -1040,10 +1021,10 @@ free_client:
 			/* GLOBAL READ LOCK */
 			pthread_rwlock_rdlock(&netopeer_state.global_lock);
 			/* continue with the next client again holding the read lock */
-			continue;
+			return 1;
 		}
 
-		client_remove(&netopeer_state.clients, cur_client);
+		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
 
 		/* GLOBAL WRITE UNLOCK */
 		pthread_rwlock_unlock(&netopeer_state.global_lock);
@@ -1052,14 +1033,10 @@ free_client:
 
 		/* do not sleep, we may be exiting based on a signal received,
 		 * so remove all the clients without wasting time */
-		skip_sleep = 1;
-
-		/* we do not know what we actually removed, maybe the last client, so quit the loop */
-		break;
+		return 2;
 	}
 
-	/* we had some data, there may be more, sleeping may be a waste of response time */
-	skip_sleep = 1;
+	return 1;
 }
 
 void np_tls_thread_cleanup(void) {
@@ -1071,9 +1048,9 @@ void np_tls_thread_cleanup(void) {
 
 static void tls_thread_locking_func(int mode, int n, const char* UNUSED(file), int UNUSED(line)) {
 	if (mode & CRYPTO_LOCK) {
-		pthread_mutex_lock(netopeer_state.tls_mutex_buf+n);
+		pthread_mutex_lock(netopeer_state.tls_state->tls_mutex_buf+n);
 	} else {
-		pthread_mutex_unlock(netopeer_state.tls_mutex_buf+n);
+		pthread_mutex_unlock(netopeer_state.tls_state->tls_mutex_buf+n);
 	}
 }
 
@@ -1084,70 +1061,74 @@ static unsigned long tls_thread_id_func() {
 static void tls_thread_setup(void) {
 	int i;
 
-	netopeer_state.tls_mutex_buf = malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
+	netopeer_state.tls_state->tls_mutex_buf = malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
 	for (i = 0; i < CRYPTO_num_locks(); ++i) {
-		pthread_mutex_init(netopeer_state.tls_mutex_buf+i, NULL);
+		pthread_mutex_init(netopeer_state.tls_state->tls_mutex_buf+i, NULL);
 	}
 
 	CRYPTO_set_id_callback(tls_thread_id_func);
 	CRYPTO_set_locking_callback(tls_thread_locking_func);
 }
 
-void tls_thread_cleanup(void) {
+static void tls_thread_cleanup(void) {
 	int i;
 
 	CRYPTO_set_id_callback(NULL);
 	CRYPTO_set_locking_callback(NULL);
 	for (i = 0; i < CRYPTO_num_locks(); ++i) {
-		pthread_mutex_destroy(netopeer_state.tls_mutex_buf+i);
+		pthread_mutex_destroy(netopeer_state.tls_state->tls_mutex_buf+i);
 	}
-	free(netopeer_state.tls_mutex_buf);
+	free(netopeer_state.tls_state->tls_mutex_buf);
 }
 
-void np_tls_init() {
+void np_tls_init(void) {
 	SSL_load_error_strings();
 	SSL_library_init();
 
 	tls_thread_setup();
 }
 
-SSL_CTX* np_tls_server_id_check(SSL_CTX* ctx) {
+SSL_CTX* np_tls_server_id_check(SSL_CTX* tlsctx) {
 	SSL_CTX* ret;
+	X509* cert;
+	EVP_PKEY* key;
+	X509_STORE* trusted_store;
+	struct np_trusted_cert* trusted_cert;
 
 	/* Check server keys for a change */
-	if (netopeer_options.tls_ctx_change_flag) {
-		SSL_CTX_free(ctx);
-		if ((tls_ctx = SSL_CTX_new(TLSv1_2_server_method())) == NULL) {
+	if (netopeer_options.tls_opts->tls_ctx_change_flag) {
+		SSL_CTX_free(tlsctx);
+		if ((ret = SSL_CTX_new(TLSv1_2_server_method())) == NULL) {
 			nc_verb_error("%s: failed to create SSL context", __func__);
-			return;
+			return NULL;
 		}
-		SSL_CTX_set_verify(tls_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, tls_verify_callback);
+		SSL_CTX_set_verify(ret, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, tls_verify_callback);
 
 		/* TLS_CTX LOCK */
-		pthread_mutex_lock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
-		if (netopeer_options.server_cert == NULL || netopeer_options.server_key == NULL) {
+		if (netopeer_options.tls_opts->server_cert == NULL || netopeer_options.tls_opts->server_key == NULL) {
 			nc_verb_warning("Server certificate and/or private key not set, client TLS verification will fail.");
 		} else {
-			cert = base64der_to_cert(netopeer_options.server_cert);
-			if (cert == NULL || SSL_CTX_use_certificate(tls_ctx, cert) != 1) {
+			cert = base64der_to_cert(netopeer_options.tls_opts->server_cert);
+			if (cert == NULL || SSL_CTX_use_certificate(ret, cert) != 1) {
 				nc_verb_error("Loading the server certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
 			}
 			X509_free(cert);
 
-			key = base64der_to_privatekey(netopeer_options.server_key, netopeer_options.server_key_type);
-			if (key == NULL || SSL_CTX_use_PrivateKey(tls_ctx, key) != 1) {
+			key = base64der_to_privatekey(netopeer_options.tls_opts->server_key, netopeer_options.tls_opts->server_key_type);
+			if (key == NULL || SSL_CTX_use_PrivateKey(ret, key) != 1) {
 				nc_verb_error("Loading the server key failed (%s).", ERR_reason_error_string(ERR_get_error()));
 			}
 			EVP_PKEY_free(key);
 		}
 
-		if (netopeer_options.trusted_certs == NULL) {
+		if (netopeer_options.tls_opts->trusted_certs == NULL) {
 			nc_verb_warning("No trusted certificates set, for TLS verification to pass at least the server certificate CA chain must be trusted.");
 		} else {
 			trusted_store = X509_STORE_new();
 
-			for (trusted_cert = netopeer_options.trusted_certs; trusted_cert != NULL; trusted_cert = trusted_cert->next) {
+			for (trusted_cert = netopeer_options.tls_opts->trusted_certs; trusted_cert != NULL; trusted_cert = trusted_cert->next) {
 				cert = base64der_to_cert(trusted_cert->cert);
 				if (cert == NULL) {
 					nc_verb_error("Loading a trusted certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));
@@ -1157,82 +1138,73 @@ SSL_CTX* np_tls_server_id_check(SSL_CTX* ctx) {
 				X509_free(cert);
 			}
 
-			SSL_CTX_set_cert_store(tls_ctx, trusted_store);
+			SSL_CTX_set_cert_store(ret, trusted_store);
 			trusted_store = NULL;
 		}
 
-		netopeer_options.tls_ctx_change_flag = 0;
+		netopeer_options.tls_opts->tls_ctx_change_flag = 0;
 
 		/* TLS_CTX UNLOCK */
-		pthread_mutex_unlock(&netopeer_options.tls_ctx_lock);
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
 	} else {
-		ret = ctx;
+		ret = tlsctx;
 	}
 
 	return ret;
 }
 
-int np_tls_create_client(struct client_struct* new_client) {
-	/* Maximum number of sessions check */
-	if (netopeer_options.max_sessions > 0) {
-		ret = 0;
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-		for (cur_client = netopeer_state.clients; cur_client != NULL; cur_client = cur_client->next) {
-			++ret;
-		}
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
+int np_tls_session_count(void) {
+	struct client_struct_tls* client;
+	int count = 0;
 
-		if (ret >= netopeer_options.max_sessions) {
-			nc_verb_error("Maximum number of sessions reached, droppping the new client.");
-			new_client->to_free = 1;
-			client_free_tls(new_client);
-			/* sleep to prevent clients from immediate connection retry */
-			usleep(netopeer_options.response_time*1000);
+	/* GLOBAL READ LOCK */
+	pthread_rwlock_rdlock(&netopeer_state.global_lock);
+	for (client = (struct client_struct_tls*)netopeer_state.clients; client != NULL; client = (struct client_struct_tls*)client->next) {
+		if (client->transport != NC_TRANSPORT_TLS) {
 			continue;
 		}
+		++count;
 	}
+	/* GLOBAL READ UNLOCK */
+	pthread_rwlock_unlock(&netopeer_state.global_lock);
 
-	new_client->tls = SSL_new(tls_ctx);
+	return count;
+}
+
+int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) {
+	int ret;
+
+	new_client->tls = SSL_new(tlsctx);
 	if (new_client->tls == NULL) {
 		nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
-		new_client->to_free = 1;
-		client_free_tls(new_client);
-		continue;
+		return 1;
 	}
 
 	SSL_set_fd(new_client->tls, new_client->sock);
 	SSL_set_mode(new_client->tls, SSL_MODE_AUTO_RETRY);
 
 	/* generate new index for TLS-specific data, for the verify callback */
-	netopeer_state.last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
-	SSL_set_ex_data(new_client->tls, netopeer_state.last_tls_idx, new_client);
+	netopeer_state.tls_state->last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+	SSL_set_ex_data(new_client->tls, netopeer_state.tls_state->last_tls_idx, new_client);
 
 	new_client->tls_buf_size = BASE_READ_BUFFER_SIZE;
 	new_client->tls_buf = malloc(new_client->tls_buf_size);
 
 	if (SSL_accept(new_client->tls) != 1) {
 		nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
-		new_client->to_free = 1;
-		client_free_tls(new_client);
-		continue;
+		return 1;
 	}
 
 	fcntl(new_client->sock, F_SETFL, O_NONBLOCK);
 
 	if ((ret = pipe(new_client->tls_in)) != 0 || (ret = pipe(new_client->tls_out)) != 0) {
 		nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
-		new_client->to_free = 1;
-		client_free_tls(new_client);
-		continue;
+		return 1;
 	}
 	if (fcntl(new_client->tls_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_in[1], F_SETFL, O_NONBLOCK) != 0 ||
 			fcntl(new_client->tls_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_out[1], F_SETFL, O_NONBLOCK) != 0) {
 		nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
-		new_client->to_free = 1;
-		client_free_tls(new_client);
-		continue;
+		return 1;
 	}
 
 	gettimeofday((struct timeval*)&new_client->last_rpc_time, NULL);
@@ -1240,14 +1212,16 @@ int np_tls_create_client(struct client_struct* new_client) {
 	/* start a separate thread for NETCONF session accept */
 	if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
 		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
-		new_client->to_free = 1;
-		client_free_tls(new_client);
-		continue;
+		return 1;
 	}
 	pthread_detach(new_client->new_sess_tid);
+
+	return 0;
 }
 
-void np_tls_cleanup(int do_init) {
+void np_tls_cleanup(void) {
+	CRYPTO_THREADID crypto_tid;
+
 	EVP_cleanup();
 	CRYPTO_cleanup_all_ex_data();
 	ERR_free_strings();

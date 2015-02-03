@@ -327,16 +327,20 @@ if test "$tls" = "yes"; then
 	SERVER_TRANSPORT_SRCS="$SERVER_TRANSPORT_SRCS src/tls/server_tls.c src/tls/cfgnetopeer_transapi_tls.c src/tls/netconf_server_transapi_tls.c"
 	SERVER_TRANSPORT_HDRS="$SERVER_TRANSPORT_HDRS src/tls/server_tls.h src/tls/cfgnetopeer_transapi_tls.h src/tls/netconf_server_transapi_tls.h"
 
-	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
+	if test "$ssh" = "yes"; then
+		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
+	else
+		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls)"
+	fi
 
-	NCSERVER_FEATURES="$NCSERVER_FEATURES<feature>tls</feature><feature>inbound-tls</feature>"
-	NETOPEER_FEATURES="$NETOPEER_FEATURES<feature>tls</feature>"
+	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
+	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
 
 	IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:tls --feature ietf-netconf-server:inbound-tls"
 	CFGNETOPEER_FEATURES="$CFGNETOPEER_FEATURES --feature netopeer-cfgnetopeer:tls"
 
 	if test "$callhome" = "yes"; then
-		NCSERVER_FEATURES="$(NCSERVER_FEATURES)<feature>outbound-tls</feature>"
+		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
 		IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:outbound-tls"
 	fi
 fi

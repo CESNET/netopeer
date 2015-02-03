@@ -74,9 +74,7 @@
 #include <libnetconf_xml.h>
 #include <libnetconf_ssh.h>
 
-#include "netconf_server_transapi.h"
-#include "server_tls.h"
-#include "cfgnetopeer_transapi.h"
+#include "../server.h"
 
 extern struct np_options netopeer_options;
 extern int server_config_modified;
@@ -106,7 +104,7 @@ extern NC_EDIT_ERROPT_TYPE server_erropt;
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_listen_srv_port(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	return callback_srv_netconf_srv_listen_srv_port(op, old_node, new_node, error, 0);
+	return callback_srv_netconf_srv_listen_srv_port(op, old_node, new_node, error, NC_TRANSPORT_TLS);
 }
 
 /**
@@ -121,7 +119,7 @@ int callback_srv_netconf_srv_tls_srv_listen_srv_port(void** UNUSED(data), XMLDIF
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_listen_srv_interface(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	return callback_srv_netconf_srv_listen_srv_interface(op, old_node, new_node, error, 0);
+	return callback_srv_netconf_srv_listen_srv_interface(op, old_node, new_node, error, NC_TRANSPORT_TLS);
 }
 
 /**
@@ -137,7 +135,7 @@ int callback_srv_netconf_srv_tls_srv_listen_srv_interface(void** UNUSED(data), X
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
 #ifndef DISABLE_CALLHOME
-	return callback_srv_netconf_srv_call_home_srv_applications_srv_application(op, old_node, new_node, error, 0);
+	return callback_srv_netconf_srv_call_home_srv_applications_srv_application(op, old_node, new_node, error, NC_TRANSPORT_TLS);
 #else
 	(void)op;
 	(void)old_node;
@@ -153,7 +151,7 @@ int np_tls_chapp_linger_check(struct ch_app* app) {
 	struct timeval cur_time;
 
 	gettimeofday(&cur_time, NULL);
-	if (timeval_diff(cur_time, app->client->last_rpc_time) >= app->rep_linger) {
+	if (timeval_diff(cur_time, ((struct client_struct_tls*)app->client)->last_rpc_time) >= app->rep_linger) {
 
 		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
@@ -166,21 +164,10 @@ int np_tls_chapp_linger_check(struct ch_app* app) {
 	return 0;
 }
 
-const static int server_clbks_count_tls = 3;
-
 int server_transapi_init_tls(void) {
 	xmlDocPtr doc = NULL;
 	struct nc_err* error = NULL;
 	const char* str_err;
-
-	server_clbks.callbacks = realloc(server_clbks.callbacks, (server_clbks.callbacks_count + server_clbks_count_tls)*sizeof(struct clbk));
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:tls/srv:listen/srv:port");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_tls_srv_listen_srv_port;
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:tls/srv:listen/srv:interface");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_tls_srv_listen_srv_interface;
-	server_clbks.callbacks[server_clbks.callbacks_count].path = strdup("/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application");
-	server_clbks.callbacks[server_clbks.callbacks_count].func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application;
-	server_clbks.callbacks_count += server_clbks_count_tls;
 
 	/* set device according to defaults */
 	nc_verb_verbose("Setting the default TLS configuration for the ietf-netconf-server module...");
@@ -211,10 +198,6 @@ int server_transapi_init_tls(void) {
 /**
  * @brief Free all resources allocated on plugin runtime and prepare plugin for removal.
  */
-void server_transapi_close(void) {
-	int i;
+void server_transapi_close_tls(void) {
 
-	for (i = server_clbks.callbacks_count; i > server_clbks_count_tls; --i) {
-		free(server_clbks.callbacks[i].path);
-	}
 }

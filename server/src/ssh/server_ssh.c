@@ -28,8 +28,7 @@
 extern int quit, restart_soft;
 
 /* one global structure holding all the client information */
-struct state_struct netopeer_state;
-
+extern struct np_state netopeer_state;
 extern struct np_options netopeer_options;
 
 static inline void _chan_free(struct chan_struct* chan) {
@@ -85,14 +84,14 @@ void client_free_ssh(struct client_struct_ssh* client) {
 	}
 }
 
-static struct client_struct_ssh* client_find_by_sshsession(struct client_struct_ssh* root, ssh_session sshsession) {
+static struct client_struct_ssh* client_find_by_sshsession(struct client_struct* root, ssh_session sshsession) {
 	struct client_struct_ssh* client;
 
 	if (sshsession == NULL) {
 		return NULL;
 	}
 
-	for (client = root; client != NULL; client = (struct client_struct_ssh*)client->next) {
+	for (client = (struct client_struct_ssh*)root; client != NULL; client = (struct client_struct_ssh*)client->next) {
 		if (client->transport == NC_TRANSPORT_SSH && client->ssh_sess == sshsession) {
 			break;
 		}
@@ -111,31 +110,6 @@ static struct chan_struct* client_find_channel_by_sshchan(struct client_struct_s
 	}
 
 	return chan;
-}
-
-static void client_remove(struct client_struct** root, struct client_struct_ssh* del_client) {
-	struct client_struct_ssh* client, *prev_client = NULL;
-
-	for (client = (struct client_struct_ssh*)*root; client != NULL; client = (struct client_struct_ssh*)client->next) {
-		if (client == del_client) {
-			break;
-		}
-		prev_client = client;
-	}
-
-	if (client == NULL) {
-		nc_verb_error("%s: internal error: client not found (%s:%d)", __func__, __FILE__, __LINE__);
-		return;
-	}
-
-	if (prev_client == NULL) {
-		*root = (*root)->next;
-	} else {
-		prev_client->next = client->next;
-	}
-
-	client_free_ssh(client);
-	free(client);
 }
 
 static struct chan_struct* client_free_channel(struct client_struct_ssh* client, struct chan_struct* chan) {
@@ -167,27 +141,20 @@ static struct chan_struct* client_free_channel(struct client_struct_ssh* client,
 	return prev_chan;
 }
 
-static struct chan_struct* client_find_channel_by_sid(struct client_struct_ssh* root, const char* sid) {
-	struct client_struct_ssh* client;
+static struct chan_struct* client_find_channel_by_sid(struct client_struct_ssh* client, const char* sid) {
 	struct chan_struct* chan = NULL;
 
-	if (sid == NULL) {
+	if (client == NULL || sid == NULL) {
 		return NULL;
 	}
 
-	for (client = root; client != NULL; client = (struct client_struct_ssh*)client->next) {
-		if (client->transport != NC_TRANSPORT_SSH) {
+	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
+		if (chan->nc_sess == NULL) {
 			continue;
 		}
 
-		for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-			if (chan->nc_sess == NULL) {
-				continue;
-			}
-
-			if (strcmp(sid, nc_session_get_id(chan->nc_sess)) == 0) {
-				break;
-			}
+		if (strcmp(sid, nc_session_get_id(chan->nc_sess)) == 0) {
+			break;
 		}
 	}
 
@@ -230,7 +197,7 @@ static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UN
 	struct client_struct_ssh* client;
 	struct chan_struct* chan;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return;
 	}
@@ -246,7 +213,7 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 	static uint32_t prev_read = 0;
 	int ret;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return 0;
 	}
@@ -294,7 +261,7 @@ static int sshcb_channel_subsystem(ssh_session session, ssh_channel channel, con
 	struct ncsess_thread_config* nstc;
 	int ret;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_ERROR;
 	}
@@ -392,7 +359,7 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	struct client_struct_ssh* client;
 	char* pass_hash;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_AUTH_DENIED;
 	}
@@ -460,7 +427,7 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 	struct client_struct_ssh* client;
 	char* username;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return SSH_AUTH_DENIED;
 	}
@@ -512,7 +479,7 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 	struct client_struct_ssh* client;
 	struct chan_struct* cur_chan;
 
-	if ((client = client_find_by_sshsession((struct client_struct_ssh*)netopeer_state.clients, session)) == NULL) {
+	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return NULL;
 	}
@@ -551,6 +518,10 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 int np_ssh_kill_session(const char* sid, struct client_struct_ssh* cur_client) {
 	struct client_struct_ssh* kill_client;
 	struct chan_struct* kill_chan;
+
+	if (sid == NULL) {
+		return 1;
+	}
 
 	/* find the requested session (channel) */
 	for (kill_client = (struct client_struct_ssh*)netopeer_state.clients; kill_client != NULL; kill_client = (struct client_struct_ssh*)kill_client->next) {
@@ -769,8 +740,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 	struct chan_struct* chan;
 	struct timeval cur_time;
 	struct timespec ts;
-	int ret, skip_sleep = 0;
-	int to_send_len;
+	int ret, to_send_len, skip_sleep = 0;
 
 	/* check whether the client shouldn't be freed */
 	if (client->to_free) {
@@ -789,7 +759,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			return 0;
 		}
 
-		client_remove(&netopeer_state.clients, client);
+		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
 
 		/* GLOBAL WRITE UNLOCK */
 		pthread_rwlock_unlock(&netopeer_state.global_lock);
@@ -813,7 +783,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			}
 		} else {
 			client->to_free = 1;
-			return 0;
+			return 1;
 		}
 	}
 

@@ -34,9 +34,29 @@ struct client_struct_tls {
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 };
 
-struct state_struct_tls {
+struct np_state_tls {
 	int last_tls_idx;
 	pthread_mutex_t* tls_mutex_buf;
 };
+
+void np_tls_client_netconf_rpc(struct client_struct_tls* client);
+
+int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size);
+
+void np_tls_thread_cleanup(void);
+
+void np_tls_init(void);
+
+SSL_CTX* np_tls_server_id_check(SSL_CTX* ctx);
+
+int np_tls_session_count(void);
+
+int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client);
+
+int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx);
+
+void np_tls_cleanup(void);
+
+void client_free_tls(struct client_struct_tls* client);
 
 #endif /* _SERVER_TLS_H_ */

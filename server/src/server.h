@@ -25,7 +25,7 @@ struct client_struct {
 };
 
 /* one global structure */
-struct state_struct {
+struct np_state {
 	pthread_t data_tid;
 	pthread_t netconf_rpc_tid;
 	/*
@@ -34,7 +34,7 @@ struct state_struct {
 	 */
 	pthread_rwlock_t global_lock;
 	struct client_struct* clients;
-	struct state_struct_tls* tls_state;
+	struct np_state_tls* tls_state;
 };
 
 struct ntf_thread_config {
@@ -52,8 +52,8 @@ struct np_pollfd {
 
 unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
-void tls_listen_loop(int do_init);
-
 void* client_notif_thread(void* arg);
+
+void np_client_remove(struct client_struct** root, struct client_struct* del_client);
 
 #endif /* _SERVER_H_ */

@@ -789,12 +789,12 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:ssh/n:auth-timeout", .func = callback_n_netopeer_n_ssh_n_auth_timeout},
 #endif
 #ifdef NP_TLS
-		{.path = "/n:netopeer/n:tls/n:server-cert", .func = TODO},
-		{.path = "/n:netopeer/n:tls/n:server-key", .func = NULL},
-		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = NULL},
-		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = NULL},
-		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = NULL},
-		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = NULL}
+		{.path = "/n:netopeer/n:tls/n:server-cert", .func = callback_n_netopeer_n_tls_n_server_cert},
+		{.path = "/n:netopeer/n:tls/n:server-key", .func = callback_n_netopeer_n_tls_n_server_key},
+		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert},
+		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert},
+		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = callback_n_netopeer_n_tls_n_crl_dir},
+		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name}
 #endif
 	}
 };

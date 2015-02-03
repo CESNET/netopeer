@@ -1,12 +1,6 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_SSH_H_
 #define _NETCONF_SERVER_TRANSAPI_SSH_H_
 
-#define NETCONF_DEFAULT_PORT 830
-#define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
-
-/* every number-of-secs will the last sent or received data timestamp be checked */
-#define CALLHOME_PERIODIC_LINGER_CHECK 5
-
 int np_ssh_chapp_linger_check(struct ch_app* app);
 
 int server_transapi_init_ssh(void);

@@ -43,4 +43,20 @@ struct np_options_tls {
 	} *ctn_map;
 };
 
+int netopeer_transapi_init_tls(void);
+
+int callback_n_netopeer_n_tls_n_server_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error);
+
+int callback_n_netopeer_n_tls_n_server_key(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error);
+
+int callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error);
+
+int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error);
+
+int callback_n_netopeer_n_tls_n_crl_dir(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error);
+
+int callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error);
+
+void netopeer_transapi_close_tls(void);
+
 #endif /* _CFGNETOPEER_TRANSAPI_TLS_H_ */

@@ -822,9 +822,9 @@ struct transapi_data_callbacks server_clbks =  {
 		{.path = "/srv:netconf/srv:ssh/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application},
 #endif
 #ifdef NP_TLS
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = NULL},
-		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = NULL},
-		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = NULL}
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:port", .func = callback_srv_netconf_srv_tls_srv_listen_srv_port},
+		{.path = "/srv:netconf/srv:tls/srv:listen/srv:interface", .func = callback_srv_netconf_srv_tls_srv_listen_srv_interface},
+		{.path = "/srv:netconf/srv:tls/srv:call-home/srv:applications/srv:application", .func = callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application}
 #endif
 	}
 };
