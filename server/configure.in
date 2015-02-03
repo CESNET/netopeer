@@ -127,7 +127,12 @@ AC_ARG_ENABLE([ssh],
 # --enable-tls
 AC_ARG_ENABLE([tls],
 	AC_HELP_STRING([--enable-tls], [Compile with TLS transport]),
-	tls=yes,
+	if test "$enableval" = "no"; then
+		tls=no
+	else
+		tls=yes
+	fi
+	,
 	tls=no
 )
 

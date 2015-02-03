@@ -2633,7 +2633,12 @@ fi
 # --enable-tls
 # Check whether --enable-tls was given.
 if test "${enable_tls+set}" = set; then :
-  enableval=$enable_tls; tls=yes
+  enableval=$enable_tls; if test "$enableval" = "no"; then
+		tls=no
+	else
+		tls=yes
+	fi
+
 else
   tls=no
 
