@@ -57,8 +57,6 @@
 #	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
 #endif
 
-#define CFGNETOPEER_NAMESPACE "urn:cesnet:tmc:netopeer:1.0"
-
 extern int quit, restart_soft, restart_hard;
 extern int server_start;
 

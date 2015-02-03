@@ -3,8 +3,8 @@
 	<data-models>
 		<model-main>
 			<path>@sysconfdir@/netopeer/cfgnetopeer/netopeer-cfgnetopeer.yin</path>
+			@NETOPEER_FEATURES@
 		</model-main>
-		@NETOPEER_FEATURES@
 	</data-models>
 	<repo>
 		<type>file</type>

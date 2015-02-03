@@ -306,7 +306,7 @@ NCSERVER_FEATURES=""
 NETOPEER_FEATURES=""
 
 IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
-NETOPEER_CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
+CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
 
 if test "$ssh" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_SSH"
@@ -319,12 +319,12 @@ if test "$ssh" = "yes"; then
 	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
 	NETOPEER_FEATURES="<feature>ssh</feature>"
 
-	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh --feature ietf-netconf-server:inbound-ssh"
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh"
 	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES}ssh"
 
 	if test "$callhome" = "yes"; then
 		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
-		IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:outbound-ssh"
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-ssh"
 	fi
 fi
 if test "$tls" = "yes"; then
@@ -343,12 +343,17 @@ if test "$tls" = "yes"; then
 	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
 
-	IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:tls --feature ietf-netconf-server:inbound-tls"
-	CFGNETOPEER_FEATURES="$CFGNETOPEER_FEATURES --feature netopeer-cfgnetopeer:tls"
+	if test "$ssh" = "yes"; then
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
+		CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},"
+	fi
+
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES}tls"
 
 	if test "$callhome" = "yes"; then
 		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
-		IETF_NETCONF_SERVER_FEATURES="$IETF_NETCONF_SERVER_FEATURES --feature ietf-netconf-server:outbound-tls"
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-tls"
 	fi
 fi
 
@@ -363,7 +368,7 @@ if test "$?" != "0"; then
 	AC_MSG_ERROR([Generating validation files failed.])
 fi
 
-lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
 if test "$?" != "0"; then
 	AC_MSG_ERROR([Generating validation files failed.])
 fi
