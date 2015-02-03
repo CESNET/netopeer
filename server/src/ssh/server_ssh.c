@@ -565,7 +565,7 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 	pthread_mutex_lock(&client->client_lock);
 
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->to_free || chan->nc_sess == NULL) {
+		if (chan->to_free || chan->last_send || chan->nc_sess == NULL) {
 			continue;
 		}
 
@@ -640,7 +640,7 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 
 			ret = 1;
 #ifdef NP_TLS
-			ret = np_tls_kill_session(sid, client);
+			ret = np_tls_kill_session(sid, (struct client_struct_tls*)client);
 #endif
 			if (ret != 0 && np_ssh_kill_session(sid, client) != 0) {
 				free(sid);
@@ -726,7 +726,7 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 		nc_rpc_free(rpc);
 
 		if (closing) {
-			chan->to_free = 1;
+			chan->last_send = 1;
 			closing = 0;
 		}
 	}
@@ -808,8 +808,30 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 
 	/* check every channel of the client for pending data */
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (quit) {
-			chan->to_free = 1;
+		if (quit || chan->to_free) {
+			/* CLIENT LOCK */
+			pthread_mutex_lock(&client->client_lock);
+
+			/* don't sleep, we may have been asked to quit */
+			skip_sleep = 1;
+			nc_session_free(chan->nc_sess);
+			chan->nc_sess = NULL;
+
+			/* make sure the channel iteration continues correctly */
+			chan = client_free_channel(client, chan);
+			if (chan == NULL) {
+				/* last channel removed, remove client */
+				if (client->ssh_chans == NULL) {
+					client->to_free = 1;
+				}
+
+				/* CLIENT UNLOCK */
+				pthread_mutex_unlock(&client->client_lock);
+				break;
+			}
+
+			/* CLIENT UNLOCK */
+			pthread_mutex_unlock(&client->client_lock);
 		}
 
 		/* check the channel for hello timeout */
@@ -851,39 +873,16 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 		if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
 			nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 			chan->to_free = 1;
+			skip_sleep = 1;
 		} else if (ret != -1) {
 			/* we had some data, there may be more, sleeping may be a waste of response time */
 			skip_sleep = 1;
-
 			ssh_channel_write(chan->ssh_chan, *to_send, to_send_len);
 		}
 
-		/* free the channel here, if requested */
-		if (chan->to_free) {
-
-			/* CLIENT LOCK */
-			pthread_mutex_lock(&client->client_lock);
-
-			/* again, don't sleep, we may have been asked to quit */
+		if (chan->last_send) {
+			chan->to_free = 1;
 			skip_sleep = 1;
-			nc_session_free(chan->nc_sess);
-			chan->nc_sess = NULL;
-
-			/* make sure the channel iteration continues correctly */
-			chan = client_free_channel(client, chan);
-			if (chan == NULL) {
-				/* last channel removed, remove client */
-				if (client->ssh_chans == NULL) {
-					client->to_free = 1;
-				}
-
-				/* CLIENT UNLOCK */
-				pthread_mutex_unlock(&client->client_lock);
-				break;
-			}
-
-			/* CLIENT UNLOCK */
-			pthread_mutex_unlock(&client->client_lock);
 		}
 	}
 

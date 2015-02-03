@@ -759,6 +759,10 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	int closing = 0;
 	struct nc_err* err;
 
+	if (client->to_free || client->last_send || client->nc_sess == NULL) {
+		return;
+	}
+
 	/* receive a new RPC */
 	rpc_type = nc_session_recv_rpc(client->nc_sess, 0, &rpc);
 	if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
@@ -830,7 +834,7 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 
 		ret = 1;
 #ifdef NP_SSH
-		ret = np_ssh_kill_session(sid, client);
+		ret = np_ssh_kill_session(sid, (struct client_struct_ssh*)client);
 #endif
 		if (ret != 0 && np_tls_kill_session(sid, client) != 0) {
 			free(sid);
@@ -919,7 +923,7 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	 * this reply gets sent
 	 */
 	if (closing) {
-		client->to_free = 1;
+		client->last_send = 1;
 		closing = 0;
 	}
 }
@@ -928,14 +932,40 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size) {
 	struct timeval cur_time;
 	struct timespec ts;
-	int ret, to_send_len;
+	int ret, to_send_len, skip_sleep = 0;
 
-	if (quit) {
-		client->to_free = 1;
+	if (client->to_free || quit) {
+		SSL_shutdown(client->tls);
+
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_nsec += netopeer_options.client_removal_time*1000000;
+		/* GLOBAL READ UNLOCK */
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
+		/* GLOBAL WRITE LOCK */
+		if ((ret = pthread_rwlock_timedwrlock(&netopeer_state.global_lock, &ts)) != 0) {
+			if (ret != ETIMEDOUT) {
+				nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
+			}
+			/* GLOBAL READ LOCK */
+			pthread_rwlock_rdlock(&netopeer_state.global_lock);
+			/* continue with the next client again holding the read lock */
+			return 1;
+		}
+
+		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
+
+		/* GLOBAL WRITE UNLOCK */
+		pthread_rwlock_unlock(&netopeer_state.global_lock);
+		/* GLOBAL READ LOCK */
+		pthread_rwlock_rdlock(&netopeer_state.global_lock);
+
+		/* do not sleep, we may be exiting based on a signal received,
+		 * so remove all the clients without wasting time */
+		return 2;
 	}
 
 	/* check if there aren't some TLS data pending */
-	if (!client->to_free && check_tls_data_to_nc(client) != 0) {
+	if (check_tls_data_to_nc(client) != 0) {
 		nc_verb_warning("Failed to read from the client '%s', it has probably disconnected.", client->username);
 		/* this invalid socket may have been reused and we would close
 		 * it during cleanup */
@@ -982,61 +1012,27 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		}
 	}
 
-	/* nothing to send, just free it */
-	if (ret == -1 && client->to_free) {
-		goto free_client;
-	}
-
-	if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-		return 0;
-	}
-
-	if (ret == -1) {
+	if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
 		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 		client->to_free = 1;
-	}
-
-	/* TODO ret error handling */
-	ret = SSL_write(client->tls, *to_send, to_send_len);
-	if (ret != to_send_len) {
-		ret = SSL_get_error(client->tls, ret);
-		nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
-		client->to_free = 1;
-	}
-
-free_client:
-	/* check whether the client shouldn't be freed */
-	if (client->to_free) {
-		SSL_shutdown(client->tls);
-
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_nsec += netopeer_options.client_removal_time*1000000;
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-		/* GLOBAL WRITE LOCK */
-		if ((ret = pthread_rwlock_timedwrlock(&netopeer_state.global_lock, &ts)) != 0) {
-			if (ret != ETIMEDOUT) {
-				nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
-			}
-			/* GLOBAL READ LOCK */
-			pthread_rwlock_rdlock(&netopeer_state.global_lock);
-			/* continue with the next client again holding the read lock */
-			return 1;
+		skip_sleep = 1;
+	} else if (ret != -1) {
+		skip_sleep = 1;
+		/* TODO ret error handling */
+		ret = SSL_write(client->tls, *to_send, to_send_len);
+		if (ret != to_send_len) {
+			ret = SSL_get_error(client->tls, ret);
+			nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
+			client->to_free = 1;
 		}
-
-		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
-
-		/* GLOBAL WRITE UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-
-		/* do not sleep, we may be exiting based on a signal received,
-		 * so remove all the clients without wasting time */
-		return 2;
 	}
 
-	return 1;
+	if (client->last_send) {
+		client->to_free = 1;
+		return 1;
+	}
+
+	return skip_sleep;
 }
 
 void np_tls_thread_cleanup(void) {

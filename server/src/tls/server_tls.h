@@ -32,6 +32,7 @@ struct client_struct_tls {
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
+	volatile int last_send;
 };
 
 struct np_state_tls {

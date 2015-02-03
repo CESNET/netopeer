@@ -21,6 +21,7 @@ struct chan_struct {
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	volatile int to_free;		// is this channel valid?
+	volatile int last_send;
 	struct chan_struct* next;
 };
 
