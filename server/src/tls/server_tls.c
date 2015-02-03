@@ -1081,6 +1081,7 @@ void np_tls_init(void) {
 	SSL_load_error_strings();
 	SSL_library_init();
 
+	netopeer_state.tls_state = calloc(1, sizeof(struct np_state_tls));
 	tls_thread_setup();
 }
 
@@ -1226,4 +1227,6 @@ void np_tls_cleanup(void) {
 	ERR_remove_thread_state(&crypto_tid);
 
 	tls_thread_cleanup();
+	free(netopeer_state.tls_state);
+	netopeer_state.tls_state = NULL;
 }
