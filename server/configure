@@ -622,6 +622,7 @@ ac_subst_vars='LTLIBOBJS
 NETOPEER_FEATURES
 NCSERVER_FEATURES
 CLIENT_STRUCT_SIZE
+SERVER_TLS_CFGS
 SERVER_TRANSPORT_HDRS
 SERVER_TRANSPORT_SRCS
 MODULESDIR
@@ -5044,6 +5045,7 @@ rm -f config/NETCONF-server.xml.orig
 
 SERVER_TRANSPORT_SRCS=""
 SERVER_TRANSPORT_HDRS=""
+SERVER_TLS_CFGS=""
 
 CLIENT_STRUCT_SIZE=""
 
@@ -5077,6 +5079,7 @@ if test "$tls" = "yes"; then
 
 	SERVER_TRANSPORT_SRCS="$SERVER_TRANSPORT_SRCS src/tls/server_tls.c src/tls/cfgnetopeer_transapi_tls.c src/tls/netconf_server_transapi_tls.c"
 	SERVER_TRANSPORT_HDRS="$SERVER_TRANSPORT_HDRS src/tls/server_tls.h src/tls/cfgnetopeer_transapi_tls.h src/tls/netconf_server_transapi_tls.h"
+	SERVER_TLS_CFGS="config/datastore.xml"
 
 	if test "$ssh" = "yes"; then
 		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
@@ -5647,6 +5650,7 @@ done
 
 
 ############################### Set output #####################################
+
 
 
 
