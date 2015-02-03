@@ -72,7 +72,6 @@
 
 #include <libxml/tree.h>
 #include <libnetconf_xml.h>
-#include <libnetconf_ssh.h>
 
 #include "../server.h"
 

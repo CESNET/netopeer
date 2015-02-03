@@ -1093,7 +1093,7 @@ SSL_CTX* np_tls_server_id_check(SSL_CTX* tlsctx) {
 	struct np_trusted_cert* trusted_cert;
 
 	/* Check server keys for a change */
-	if (netopeer_options.tls_opts->tls_ctx_change_flag) {
+	if (netopeer_options.tls_opts->tls_ctx_change_flag || tlsctx == NULL) {
 		SSL_CTX_free(tlsctx);
 		if ((ret = SSL_CTX_new(TLSv1_2_server_method())) == NULL) {
 			nc_verb_error("%s: failed to create SSL context", __func__);

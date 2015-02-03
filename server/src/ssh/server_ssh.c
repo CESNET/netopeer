@@ -909,7 +909,7 @@ ssh_bind np_ssh_server_id_check(ssh_bind sshbind) {
 	ssh_bind ret;
 
 	/* Check server keys for a change */
-	if (netopeer_options.ssh_opts->server_key_change_flag) {
+	if (netopeer_options.ssh_opts->server_key_change_flag || sshbind == NULL) {
 		ssh_bind_free(sshbind);
 		if ((ret = ssh_bind_new()) == NULL) {
 			nc_verb_error("%s: failed to create SSH bind", __func__);

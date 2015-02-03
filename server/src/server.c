@@ -600,6 +600,7 @@ void listen_loop(int do_init) {
 			case NC_TRANSPORT_SSH:
 				ret = np_ssh_create_client((struct client_struct_ssh*)new_client, sshbind);
 				if (ret != 0) {
+					new_client->to_free = 1;
 					client_free_ssh((struct client_struct_ssh*)new_client);
 				}
 				break;
@@ -608,12 +609,14 @@ void listen_loop(int do_init) {
 			case NC_TRANSPORT_TLS:
 				ret = np_tls_create_client((struct client_struct_tls*)new_client, tlsctx);
 				if (ret != 0) {
+					new_client->to_free = 1;
 					client_free_tls((struct client_struct_tls*)new_client);
 				}
 				break;
 #endif
 			default:
 				nc_verb_error("Client with an unknown transport protocol, dropping it.");
+				new_client->to_free = 1;
 				ret = 1;
 			}
 

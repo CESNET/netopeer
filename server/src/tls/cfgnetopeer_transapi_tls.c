@@ -598,7 +598,7 @@ callback_restart:
 int netopeer_transapi_init_tls(void) {
 
 	/* there is no default configuration, but what the heck */
-	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module SSH...");
+	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module TLS...");
 
 	netopeer_options.tls_opts = calloc(1, sizeof(struct np_options_tls));
 	pthread_mutex_init(&netopeer_options.tls_opts->tls_ctx_lock, NULL);
