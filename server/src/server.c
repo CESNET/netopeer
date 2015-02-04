@@ -577,16 +577,15 @@ void listen_loop(int do_init) {
 
 				if (ret >= netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
+					new_client->to_free = 1;
 					switch (new_client->transport) {
 #ifdef NP_SSH
 					case NC_TRANSPORT_SSH:
-						new_client->to_free = 1;
 						client_free_ssh((struct client_struct_ssh*)new_client);
 						break;
 #endif
 #ifdef NP_TLS
 					case NC_TRANSPORT_TLS:
-						new_client->to_free = 1;
 						client_free_tls((struct client_struct_tls*)new_client);
 						break;
 #endif

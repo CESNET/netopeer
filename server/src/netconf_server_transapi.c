@@ -184,7 +184,7 @@ static char* get_node_content(xmlNodePtr node) {
 
 xmlDocPtr server_get_state_data(xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **UNUSED(err)) {
 	/* model doesn't contain any status data */
-	return(NULL);
+	return NULL;
 }
 /*
  * Mapping prefixes with namespaces.
@@ -322,16 +322,16 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name) {
 	xmlNodePtr child;
 
-	for (child = parent->children; child != NULL; child= child->next) {
+	for (child = parent->children; child != NULL; child = child->next) {
 		if (child->type != XML_ELEMENT_NODE) {
 			continue;
 		}
 		if (xmlStrcmp(name, child->name) == 0) {
-			return (child);
+			return child;
 		}
 	}
 
-	return (NULL);
+	return NULL;
 }
 
 static struct client_struct* sock_connect(const char* address, uint16_t port) {
