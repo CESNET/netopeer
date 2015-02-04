@@ -493,6 +493,7 @@ void listen_loop(int do_init) {
 	struct client_struct* new_client;
 	struct np_sock npsock = {.count = 0};
 	int ret;
+	struct timespec ts;
 #ifdef NP_SSH
 	ssh_bind sshbind = NULL;
 #endif
@@ -648,13 +649,21 @@ void listen_loop(int do_init) {
 	SSL_CTX_free(tlsctx);
 #endif
 	if (!restart_soft) {
-		/* TODO a total timeout after which we cancel and free clients by force? */
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_nsec += THREAD_JOIN_QUIT_TIMEOUT*1000000;
+
 		/* wait for all the clients to exit nicely themselves */
-		if ((ret = pthread_join(netopeer_state.netconf_rpc_tid, NULL)) != 0) {
+		if ((ret = pthread_timedjoin_np(netopeer_state.netconf_rpc_tid, NULL, &ts)) != 0) {
 			nc_verb_warning("%s: failed to join the netconf RPC thread (%s)", __func__, strerror(ret));
+			if (ret == ETIMEDOUT) {
+				pthread_cancel(netopeer_state.netconf_rpc_tid);
+			}
 		}
-		if ((ret = pthread_join(netopeer_state.data_tid, NULL)) != 0) {
+		if ((ret = pthread_timedjoin_np(netopeer_state.data_tid, NULL, &ts)) != 0) {
 			nc_verb_warning("%s: failed to join the SSH data thread (%s)", __func__, strerror(ret));
+			if (ret == ETIMEDOUT) {
+				pthread_cancel(netopeer_state.data_tid);
+			}
 		}
 
 #ifdef NP_SSH
