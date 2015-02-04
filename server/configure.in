@@ -175,6 +175,12 @@ case $target_cpu in
         ;;
 esac
 
+#Check for pyang
+AC_CHECK_PROG([PYANG], [pyang], [yes], [no])
+if test "$PYANG" = "no"; then
+	AC_MSG_ERROR(["pyang not found!"])
+fi
+
 # Check for lnctool
 AC_CHECK_PROG([LNCTOOL], [lnctool], [yes], [no])
 if test "$LNCTOOL" = "no"; then
