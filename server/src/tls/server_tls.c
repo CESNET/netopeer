@@ -983,6 +983,7 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 			pthread_cancel(client->new_sess_tid);
 			client->new_sess_tid = 0;
 		}
+		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
 		client->to_free = 1;
 	}
 
@@ -990,7 +991,7 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 	if (timeval_diff(cur_time, client->last_rpc_time) >= netopeer_options.idle_timeout) {
 		/* check for active event subscriptions, in that case we can never disconnect an idle session */
 		if (client->nc_sess == NULL || !ncntf_session_get_active_subscription(client->nc_sess)) {
-			nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.");
+			nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.", client->username);
 			client->to_free = 1;
 		}
 	}
