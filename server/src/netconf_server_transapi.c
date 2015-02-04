@@ -43,12 +43,6 @@
  * Do NOT alter function signatures or any structures unless you know exactly what you are doing.
  */
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -736,8 +730,6 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 	return EXIT_SUCCESS;
 }
 
-#endif
-
 int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport) {
 	char* name;
 
@@ -762,6 +754,8 @@ int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_
 
 	return EXIT_SUCCESS;
 }
+
+#endif
 
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.

@@ -155,6 +155,8 @@ int callback_srv_netconf_srv_ssh_srv_call_home_srv_applications_srv_application(
 #endif
 }
 
+#ifndef DISABLE_CALLHOME
+
 int np_ssh_chapp_linger_check(struct ch_app* app) {
 	struct timeval cur_time;
 
@@ -170,6 +172,8 @@ int np_ssh_chapp_linger_check(struct ch_app* app) {
 
 	return 0;
 }
+
+#endif
 
 int server_transapi_init_ssh(void) {
 	xmlDocPtr doc;

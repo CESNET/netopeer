@@ -75,6 +75,7 @@ void client_free_ssh(struct client_struct_ssh* client) {
 
 	free(client->username);
 
+#ifndef DISABLE_CALLHOME
 	/* let the callhome thread know the client was freed */
 	if (client->callhome_st != NULL) {
 		pthread_mutex_lock(&client->callhome_st->ch_lock);
@@ -82,6 +83,7 @@ void client_free_ssh(struct client_struct_ssh* client) {
 		pthread_cond_signal(&client->callhome_st->ch_cond);
 		pthread_mutex_unlock(&client->callhome_st->ch_lock);
 	}
+#endif
 }
 
 static struct client_struct_ssh* client_find_by_sshsession(struct client_struct* root, ssh_session sshsession) {

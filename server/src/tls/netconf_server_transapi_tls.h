@@ -1,9 +1,13 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_TLS_H_
 #define _NETCONF_SERVER_TRANSAPI_TLS_H_
 
-int server_transapi_init_tls(void);
+#ifndef DISABLE_CALLHOME
 
 int np_tls_chapp_linger_check(struct ch_app* app);
+
+#endif
+
+int server_transapi_init_tls(void);
 
 int callback_srv_netconf_srv_tls_srv_listen_srv_port(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error);
 

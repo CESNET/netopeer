@@ -58,6 +58,7 @@ void client_free_tls(struct client_struct_tls* client) {
 	close(client->tls_out[1]);
 	free(client->username);
 
+#ifndef DISABLE_CALLHOME
 	/* let the callhome thread know the client was freed */
 	if (client->callhome_st != NULL) {
 		pthread_mutex_lock(&client->callhome_st->ch_lock);
@@ -65,6 +66,7 @@ void client_free_tls(struct client_struct_tls* client) {
 		pthread_cond_signal(&client->callhome_st->ch_cond);
 		pthread_mutex_unlock(&client->callhome_st->ch_lock);
 	}
+#endif
 }
 
 static char* asn1time_to_str(ASN1_TIME *t) {

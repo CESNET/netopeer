@@ -10,6 +10,8 @@ struct np_bind_addr {
 	struct np_bind_addr* next;
 };
 
+#ifndef DISABLE_CALLHOME
+
 struct client_ch_struct {
 	int freed;
 	pthread_mutex_t ch_lock;
@@ -39,10 +41,12 @@ struct ch_app {
 	struct ch_app *prev;
 };
 
+int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
+
+#endif
+
 int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
 
 int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
-
-int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
 
 #endif /* _NETCONF_SERVER_TRANSAPI_H_ */

@@ -63,8 +63,11 @@
 #include "server.h"
 
 extern struct np_options netopeer_options;
+
+#ifndef DISABLE_CALLHOME
 extern pthread_mutex_t callhome_lock;
 extern struct client_struct* callhome_client;
+#endif
 
 /* one global structure holding all the client information */
 struct np_state netopeer_state = {
@@ -547,6 +550,7 @@ void listen_loop(int do_init) {
 		tlsctx = np_tls_server_id_check(tlsctx);
 #endif
 
+#ifndef DISABLE_CALLHOME
 		/* Callhome client check */
 		if (callhome_client != NULL) {
 			/* CALLHOME LOCK */
@@ -556,6 +560,7 @@ void listen_loop(int do_init) {
 			/* CALLHOME UNLOCK */
 			pthread_mutex_unlock(&callhome_lock);
 		}
+#endif
 
 		/* Listen client check */
 		if (new_client == NULL) {
