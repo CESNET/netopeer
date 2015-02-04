@@ -43,12 +43,6 @@
  * Do NOT alter function signatures or any structures unless you know exactly what you are doing.
  */
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>

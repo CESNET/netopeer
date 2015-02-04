@@ -712,11 +712,11 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 		switch (app->client->transport) {
 #ifdef NP_SSH
 		case NC_TRANSPORT_SSH:
-			app->client->ssh_chans->to_free = 1;
+			((struct client_struct_ssh*)app->client)->ssh_chans->to_free = 1;
 			break;
 #endif
 #ifdef NP_TLS
-		case NC_TRANSPORT_SSH:
+		case NC_TRANSPORT_TLS:
 			app->client->to_free = 1;
 			break;
 #endif

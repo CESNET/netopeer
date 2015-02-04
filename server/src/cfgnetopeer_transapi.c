@@ -53,10 +53,6 @@
 
 #include "server.h"
 
-#ifndef MODULES_CFG_DIR
-#	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
-#endif
-
 extern int quit, restart_soft, restart_hard;
 extern int server_start;
 

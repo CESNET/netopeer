@@ -19,6 +19,10 @@
 #	include "./tls/netconf_server_transapi_tls.h"
 #endif
 
+#ifndef MODULES_CFG_DIR
+#	define MODULES_CFG_DIR "/etc/netopeer/modules.conf.d/"
+#endif
+
 /* maximal value from the sizes of specific client implementations */
 #define CLIENT_STRUCT_MAX_SIZE @CLIENT_STRUCT_SIZE@
 
