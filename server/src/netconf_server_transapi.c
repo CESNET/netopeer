@@ -709,7 +709,21 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 	/* a valid client running, mark it for deletion */
 	if (app->ch_st->freed == 0) {
 		app->client->callhome_st = NULL;
-		app->client->to_free = 1;
+		switch (app->client->transport) {
+#ifdef NP_SSH
+		case NC_TRANSPORT_SSH:
+			app->client->ssh_chans->to_free = 1;
+			break;
+#endif
+#ifdef NP_TLS
+		case NC_TRANSPORT_SSH:
+			app->client->to_free = 1;
+			break;
+#endif
+		default:
+			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+			app->client->to_free = 1;
+		}
 	}
 
 	pthread_mutex_destroy(&app->ch_st->ch_lock);
