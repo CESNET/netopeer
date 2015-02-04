@@ -574,7 +574,7 @@ void listen_loop(int do_init) {
 				ret += np_tls_session_count();
 #endif
 
-				if (ret > netopeer_options.max_sessions) {
+				if (ret >= netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
 					switch (new_client->transport) {
 #ifdef NP_SSH
