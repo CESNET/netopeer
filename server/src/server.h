@@ -42,12 +42,10 @@ struct ntf_thread_config {
 	nc_rpc* subscribe_rpc;
 };
 
-struct np_pollfd {
-	int fd;
-	short events;
-	short revents;
-
-	NC_TRANSPORT transport;
+struct np_sock {
+	struct pollfd* pollsock;
+	NC_TRANSPORT* transport;
+	unsigned int count;
 };
 
 unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);

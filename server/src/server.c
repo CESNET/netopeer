@@ -329,18 +329,38 @@ void* data_thread(void* UNUSED(arg)) {
 	return NULL;
 }
 
-static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned int* count) {
+static void sock_cleanup(struct np_sock* npsock) {
+	unsigned int i;
+
+	if (npsock == NULL) {
+		return;
+	}
+
+	for (i = 0; i < npsock->count; ++i) {
+		close(npsock->pollsock[i].fd);
+	}
+	free(npsock->pollsock);
+	npsock->pollsock = NULL;
+	free(npsock->transport);
+	npsock->transport = NULL;
+	npsock->count = 0;
+}
+
+static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock) {
 	const int optVal = 1;
 	const socklen_t optLen = sizeof(optVal);
 	char is_ipv4;
-	struct np_pollfd* pollsock;
 	struct sockaddr_storage saddr;
 
 	struct sockaddr_in* saddr4;
 	struct sockaddr_in6* saddr6;
 
-	if (addrs == NULL) {
-		return NULL;
+	if (addrs == NULL || npsock == NULL) {
+		return;
+	}
+
+	if (npsock->count > 0) {
+		sock_cleanup(npsock);
 	}
 
 	/*
@@ -349,12 +369,13 @@ static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned 
 	 * every time an error occurs during its
 	 * modification.
 	 */
-	*count = 1;
-	pollsock = calloc(1, sizeof(struct np_pollfd));
+	npsock->count = 1;
+	npsock->pollsock = calloc(1, sizeof(struct pollfd));
+	npsock->transport = calloc(1, sizeof(NC_TRANSPORT));
 
 	/* for every address and port a pollfd struct is created */
 	for (;addrs != NULL; addrs = addrs->next) {
-		pollsock[*count-1].transport = addrs->transport;
+		npsock->transport[npsock->count-1] = addrs->transport;
 
 		if (strchr(addrs->addr, ':') == NULL) {
 			is_ipv4 = 1;
@@ -362,13 +383,13 @@ static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned 
 			is_ipv4 = 0;
 		}
 
-		pollsock[*count-1].fd = socket((is_ipv4 ? AF_INET : AF_INET6), SOCK_STREAM, 0);
-		if (pollsock[*count-1].fd == -1) {
+		npsock->pollsock[npsock->count-1].fd = socket((is_ipv4 ? AF_INET : AF_INET6), SOCK_STREAM, 0);
+		if (npsock->pollsock[npsock->count-1].fd == -1) {
 			nc_verb_error("%s: could not create socket (%s)", __func__, strerror(errno));
 			continue;
 		}
 
-		if (setsockopt(pollsock[*count-1].fd, SOL_SOCKET, SO_REUSEADDR, (void*) &optVal, optLen) != 0) {
+		if (setsockopt(npsock->pollsock[npsock->count-1].fd, SOL_SOCKET, SO_REUSEADDR, (void*) &optVal, optLen) != 0) {
 			nc_verb_error("%s: could not set socket SO_REUSEADDR option (%s)", __func__, strerror(errno));
 			continue;
 		}
@@ -385,7 +406,7 @@ static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned 
 				continue;
 			}
 
-			if (bind(pollsock[*count-1].fd, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
+			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
 				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
 				continue;
 			}
@@ -401,47 +422,43 @@ static struct np_pollfd* sock_listen(const struct np_bind_addr* addrs, unsigned 
 				continue;
 			}
 
-			if (bind(pollsock[*count-1].fd, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
+			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
 				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
 				continue;
 			}
 		}
 
-		if (listen(pollsock[*count-1].fd, 5) == -1) {
+		if (listen(npsock->pollsock[npsock->count-1].fd, 5) == -1) {
 			nc_verb_error("%s: unable to start listening on \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
 			continue;
 		}
 
-		pollsock[*count-1].events = POLLIN;
+		npsock->pollsock[npsock->count-1].events = POLLIN;
 
-		pollsock = realloc(pollsock, (*count+1)*sizeof(struct np_pollfd));
-		bzero(&pollsock[*count], sizeof(struct np_pollfd));
-		++(*count);
+		npsock->pollsock = realloc(npsock->pollsock, (npsock->count+1)*sizeof(struct pollfd));
+		bzero(npsock->pollsock+npsock->count, sizeof(struct pollfd));
+		npsock->transport = realloc(npsock->transport, (npsock->count+1)*sizeof(NC_TRANSPORT));
+		++npsock->count;
 	}
 
 	/* the last pollsock is not valid */
-	--(*count);
-	if (*count == 0) {
-		free(pollsock);
-		pollsock = NULL;
-	}
-	return pollsock;
+	--npsock->count;
 }
 
 /* always returns only a single new connection */
-static struct client_struct* sock_accept(struct np_pollfd* pollsock, unsigned int pollsock_count) {
+static struct client_struct* sock_accept(const struct np_sock* npsock) {
 	int r;
 	unsigned int i;
 	socklen_t client_saddr_len;
 	struct client_struct* ret;
 
-	if (pollsock == NULL) {
+	if (npsock == NULL) {
 		return NULL;
 	}
 
 	/* poll for a new connection */
 	errno = 0;
-	r = poll((struct pollfd*)pollsock, pollsock_count, netopeer_options.response_time);
+	r = poll(npsock->pollsock, npsock->count, netopeer_options.response_time);
 	if (r == 0 || (r == -1 && errno == EINTR)) {
 		/* we either timeouted or going to exit or restart */
 		return NULL;
@@ -455,16 +472,16 @@ static struct client_struct* sock_accept(struct np_pollfd* pollsock, unsigned in
 	client_saddr_len = sizeof(struct sockaddr_storage);
 
 	/* accept the first polled connection */
-	for (i = 0; i < pollsock_count; ++i) {
-		if (pollsock[i].revents & POLLIN) {
-			ret->sock = accept(pollsock[i].fd, (struct sockaddr*)&ret->saddr, &client_saddr_len);
+	for (i = 0; i < npsock->count; ++i) {
+		if (npsock->pollsock[i].revents & POLLIN) {
+			ret->sock = accept(npsock->pollsock[i].fd, (struct sockaddr*)&ret->saddr, &client_saddr_len);
 			if (ret->sock == -1) {
 				nc_verb_error("%s: accept failed (%s)", __func__, strerror(errno));
 				free(ret);
 				return NULL;
 			}
-			ret->transport = pollsock[i].transport;
-			pollsock[i].revents = 0;
+			ret->transport = npsock->transport[i];
+			npsock->pollsock[i].revents = 0;
 			break;
 		}
 	}
@@ -472,23 +489,9 @@ static struct client_struct* sock_accept(struct np_pollfd* pollsock, unsigned in
 	return ret;
 }
 
-static void sock_cleanup(struct np_pollfd* pollsock, unsigned int pollsock_count) {
-	unsigned int i;
-
-	if (pollsock == NULL) {
-		return;
-	}
-
-	for (i = 0; i < pollsock_count; ++i) {
-		close(pollsock[i].fd);
-	}
-	free(pollsock);
-}
-
 void listen_loop(int do_init) {
 	struct client_struct* new_client;
-	struct np_pollfd* pollsock = NULL;
-	unsigned int pollsock_count = 0;
+	struct np_sock npsock = {.count = 0};
 	int ret;
 #ifdef NP_SSH
 	ssh_bind sshbind = NULL;
@@ -524,14 +527,14 @@ void listen_loop(int do_init) {
 			/* BINDS LOCK */
 			pthread_mutex_lock(&netopeer_options.binds_lock);
 
-			sock_cleanup(pollsock, pollsock_count);
-			pollsock = sock_listen(netopeer_options.binds, &pollsock_count);
+			sock_cleanup(&npsock);
+			sock_listen(netopeer_options.binds, &npsock);
 
 			netopeer_options.binds_change_flag = 0;
 			/* BINDS UNLOCK */
 			pthread_mutex_unlock(&netopeer_options.binds_lock);
 
-			if (pollsock == NULL) {
+			if (npsock.count == 0) {
 				nc_verb_warning("Server is not listening on any address!");
 			}
 		}
@@ -555,7 +558,7 @@ void listen_loop(int do_init) {
 
 		/* Listen client check */
 		if (new_client == NULL) {
-			new_client = sock_accept(pollsock, pollsock_count);
+			new_client = sock_accept(&npsock);
 		}
 
 		/* New client SSH session creation */
@@ -637,7 +640,7 @@ void listen_loop(int do_init) {
 	} while (!quit && !restart_soft);
 
 	/* Cleanup */
-	sock_cleanup(pollsock, pollsock_count);
+	sock_cleanup(&npsock);
 #ifdef NP_SSH
 	ssh_bind_free(sshbind);
 #endif
