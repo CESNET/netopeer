@@ -10,9 +10,6 @@
 
 #include "config.h"
 
-/* msecs the server is going to wait on exiting for all the threads to finish */
-#define THREAD_JOIN_QUIT_TIMEOUT 100
-
 /* for each client */
 struct client_struct {
 	NC_TRANSPORT transport;

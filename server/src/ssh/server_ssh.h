@@ -5,12 +5,6 @@
 #include <libssh/callbacks.h>
 #include <libssh/server.h>
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 /* for each SSH channel of each SSH session */
 struct chan_struct {
 	ssh_channel ssh_chan;

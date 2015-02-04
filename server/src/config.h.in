@@ -25,7 +25,21 @@
 /* the initial size of the reading buffer */
 #define BASE_READ_BUFFER_SIZE 2048
 
+/* end tags of NETCONF messages */
 #define NC_V10_END_MSG "]]>]]>"
 #define NC_V11_END_MSG "\n##\n"
+
+/* environment variable with verbose level */
+#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
+
+/* names of the 2 base netopeer static transapi modules */
+#define NETOPEER_MODULE_NAME "Netopeer"
+#define NCSERVER_MODULE_NAME "NETCONF-server"
+
+/* every number-of-secs will the last sent or received data timestamp be checked */
+#define CALLHOME_PERIODIC_LINGER_CHECK 5
+
+/* msecs the server is going to wait on exiting for all the threads to finish */
+#define THREAD_JOIN_QUIT_TIMEOUT 100
 
 #endif /* _CONFIG_H_ */

@@ -3,20 +3,6 @@
 
 #include "netconf_server_transapi.h"
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
-/**
- * Environment variable with settings for verbose level
- */
-#define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
-
-#define NETOPEER_MODULE_NAME "Netopeer"
-#define NCSERVER_MODULE_NAME "NETCONF-server"
-
 struct np_options {
 	uint8_t verbose;
 	uint32_t hello_timeout;

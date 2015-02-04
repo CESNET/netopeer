@@ -1,12 +1,6 @@
 #ifndef _CFGNETOPEER_TRANSAPI_SSH_H_
 #define _CFGNETOPEER_TRANSAPI_SSH_H_
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 struct np_options_ssh {
 	uint8_t server_key_change_flag;		// flag to communicate server key change
 	char* rsa_key;

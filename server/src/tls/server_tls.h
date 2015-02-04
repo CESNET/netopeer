@@ -6,12 +6,6 @@
 #include <sys/socket.h>
 #include <libnetconf.h>
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 /* for each client */
 struct client_struct_tls {
 	NC_TRANSPORT transport;

@@ -1,12 +1,6 @@
 #ifndef _CFGNETOPEER_TRANSAPI_TLS_H_
 #define _CFGNETOPEER_TRANSAPI_TLS_H_
 
-#ifdef __GNUC__
-#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#	define UNUSED(x) UNUSED_ ## x
-#endif
-
 typedef enum {
 	CTN_MAP_TYPE_SPECIFIED,
 	CTN_MAP_TYPE_SAN_RFC822_NAME,

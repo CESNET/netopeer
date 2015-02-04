@@ -3,11 +3,6 @@
 
 #include <libnetconf.h>
 
-#define LISTEN_THREAD_CANCEL_TIMEOUT 500 // in msec
-
-/* every number-of-secs will the last sent or received data timestamp be checked */
-#define CALLHOME_PERIODIC_LINGER_CHECK 5
-
 struct np_bind_addr {
 	NC_TRANSPORT transport;
 	char* addr;
