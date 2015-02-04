@@ -1019,11 +1019,25 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		skip_sleep = 1;
 	} else if (ret != -1) {
 		skip_sleep = 1;
-		/* TODO ret error handling */
 		ret = SSL_write(client->tls, *to_send, to_send_len);
 		if (ret != to_send_len) {
-			ret = SSL_get_error(client->tls, ret);
-			nc_verb_error("%s: %s: %s", __func__, ERR_func_error_string(ret), ERR_reason_error_string(ret));
+			if (ret == -1) {
+				ret = SSL_get_error(client->tls, ret);
+				if (ret < 2 || (ret > 4 && ret < 7) || ret > 8) {
+					/*
+					* 2 - SSL_ERROR_WANT_READ
+					* 3 - SSL_ERROR_WANT_WRITE
+					* 4 - SSL_ERROR_WANT_X509_LOOKUP
+					* 7 - SSL_ERROR_WANT_CONNECT
+					* 8 - SSL_ERROR_WANT_ACCEPT
+					*
+					* errors caused by the non-blocking socket, ignore
+					*/
+				}
+				return 1;
+			}
+
+			nc_verb_error("%s: SSL write failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
 			client->to_free = 1;
 		}
 	}
