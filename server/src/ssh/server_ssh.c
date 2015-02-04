@@ -368,7 +368,7 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 		return SSH_AUTH_DENIED;
 	}
 
-	if (client->authenticated) {
+	if (client->username != NULL) {
 		nc_verb_warning("User '%s' authenticated, but requested password authentication.", client->username);
 		return SSH_AUTH_DENIED;
 	}
@@ -376,7 +376,6 @@ static int sshcb_auth_password(ssh_session session, const char* user, const char
 	pass_hash = auth_password_get_pwd_hash(user);
 	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, pass) == 0) {
 		client->username = strdup(user);
-		client->authenticated = 1;
 		nc_verb_verbose("User '%s' authenticated.", user);
 		return SSH_AUTH_SUCCESS;
 	}
@@ -436,14 +435,13 @@ static int sshcb_auth_pubkey(ssh_session session, const char* user, struct ssh_k
 		return SSH_AUTH_DENIED;
 	}
 
-	if (client->authenticated) {
+	if (client->username != NULL) {
 		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication.", client->username);
 		return SSH_AUTH_DENIED;
 	}
 
 	if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
 		client->username = strdup(user);
-		client->authenticated = 1;
 		nc_verb_verbose("User '%s' authenticated.", user);
 		return SSH_AUTH_SUCCESS;
 
@@ -790,7 +788,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 	gettimeofday(&cur_time, NULL);
 
 	/* check the client for authentication timeout and failed attempts */
-	if (!client->authenticated) {
+	if (client->username == NULL) {
 		if (timeval_diff(cur_time, client->conn_time) >= netopeer_options.ssh_opts->auth_timeout) {
 			nc_verb_warning("Failed to authenticate for too long, dropping a client.");
 
