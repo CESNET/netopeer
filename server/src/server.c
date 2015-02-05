@@ -51,6 +51,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 #include <shadow.h>
 #include <pwd.h>
 #include <stdarg.h>
@@ -655,7 +656,9 @@ void listen_loop(int do_init) {
 	SSL_CTX_free(tlsctx);
 #endif
 	if (!restart_soft) {
-		clock_gettime(CLOCK_REALTIME, &ts);
+		if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+			nc_verb_warning("%s: failed to get time (%s)", strerror(errno));
+		}
 		ts.tv_nsec += THREAD_JOIN_QUIT_TIMEOUT*1000000;
 
 		/* wait for all the clients to exit nicely themselves */
