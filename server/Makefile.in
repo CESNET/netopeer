@@ -120,6 +120,8 @@ CFGS_TAR = $(CFGS) \
 	config/org.liberouter.netopeer.conf.in \
 	config/org.liberouter.netopeer.server.service.in \
 	config/Netopeer.xml.in \
+	config/ietf-netconf-server-data.rng.in \
+	config/netopeer-cfgnetopeer-data.rng.in \
 	stunnel/stunnel.conf.in
 
 H_IN = src/config.h.in
