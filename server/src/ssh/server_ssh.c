@@ -808,7 +808,9 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 
 	/* check every channel of the client for pending data */
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (quit || chan->to_free) {
+		if (chan->to_free || quit) {
+			chan->to_free = 1;
+
 			/* CLIENT LOCK */
 			pthread_mutex_lock(&client->client_lock);
 

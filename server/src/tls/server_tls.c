@@ -937,6 +937,7 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 	int ret, to_send_len, skip_sleep = 0;
 
 	if (client->to_free || quit) {
+		client->to_free = 1;
 		SSL_shutdown(client->tls);
 
 		clock_gettime(CLOCK_REALTIME, &ts);
