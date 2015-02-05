@@ -113,23 +113,6 @@ module netopeer-cfgnetopeer {
           maximum response time.";
     }
 
-    container modules {
-      list module {
-        key "name";
-        leaf name {
-          type string;
-          description
-            "Name of a module.";
-        }
-        leaf enabled {
-          type boolean;
-          default false;
-          description
-            "Specify whether or not the module is allowed to be managed over server.";
-        }
-      }
-    }
-
     container ssh {
       if-feature ssh;
       description
@@ -281,6 +264,23 @@ module netopeer-cfgnetopeer {
         found, then the NETCONF server MUST close the connection,
         and MUST NOT accept NETCONF messages over it.";
         uses x509c2n:cert-to-name;
+      }
+    }
+
+    container modules {
+      list module {
+        key "name";
+        leaf name {
+          type string;
+          description
+            "Name of a module.";
+        }
+        leaf enabled {
+          type boolean;
+          default false;
+          description
+            "Specify whether or not the module is allowed to be managed over server.";
+        }
       }
     }
   }

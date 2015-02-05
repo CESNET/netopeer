@@ -772,8 +772,6 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:max-sessions", .func = callback_n_netopeer_n_max_sessions},
 		{.path = "/n:netopeer/n:response-time", .func = callback_n_netopeer_n_response_time},
 		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
-		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
-		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled},
 #ifdef NP_SSH
 		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key},
 		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key},
@@ -788,8 +786,10 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:tls/n:trusted-ca-certs/n:trusted-ca-cert", .func = callback_n_netopeer_n_tls_n_trusted_ca_certs_n_trusted_ca_cert},
 		{.path = "/n:netopeer/n:tls/n:trusted-client-certs/n:trusted-client-cert", .func = callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert},
 		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = callback_n_netopeer_n_tls_n_crl_dir},
-		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name}
+		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name},
 #endif
+		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
+		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled}
 	}
 };
 
