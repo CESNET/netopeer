@@ -659,7 +659,7 @@ void listen_loop(int do_init) {
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
 			nc_verb_warning("%s: failed to get time (%s)", strerror(errno));
 		}
-		ts.tv_nsec += THREAD_JOIN_QUIT_TIMEOUT*1000000;
+		ts.tv_sec += THREAD_JOIN_QUIT_TIMEOUT;
 
 		/* wait for all the clients to exit nicely themselves */
 		if ((ret = pthread_timedjoin_np(netopeer_state.netconf_rpc_tid, NULL, &ts)) != 0) {

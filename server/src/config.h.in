@@ -43,7 +43,7 @@
 /* every number-of-secs will the last sent or received data timestamp be checked */
 #define CALLHOME_PERIODIC_LINGER_CHECK 5
 
-/* msecs the server is going to wait on exiting for all the threads to finish */
-#define THREAD_JOIN_QUIT_TIMEOUT 100
+/* secs the server is going to wait on exiting for all the threads to finish */
+#define THREAD_JOIN_QUIT_TIMEOUT 1
 
 #endif /* _CONFIG_H_ */
