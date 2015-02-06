@@ -544,7 +544,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 			}
 			if (xmlStrcmp(childnode->name, BAD_CAST "address") == 0) {
 				if (!srv->address) {
-					srv->address = strdup((char*)xmlNodeGetContent(childnode));
+					srv->address = strdup(get_node_content(childnode));
 				} else {
 					nc_verb_error("%s: duplicated %s address element", __func__, (transport == NC_TRANSPORT_SSH ? "SSH" : "TLS"));
 					*error = nc_err_new(NC_ERR_BAD_ELEM);
@@ -553,7 +553,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 					goto fail;
 				}
 			} else if (xmlStrcmp(childnode->name, BAD_CAST "port") == 0) {
-				srv->port = atoi((char*)xmlNodeGetContent(childnode));
+				srv->port = atoi(get_node_content(childnode));
 			}
 		}
 		if (srv->address == NULL || srv->port == 0) {
@@ -701,7 +701,7 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 	}
 
 	/* a valid client running, mark it for deletion */
-	if (app->ch_st->freed == 0) {
+	if (app->ch_st->freed == 0 && app->client != NULL) {
 		app->client->callhome_st = NULL;
 		switch (app->client->transport) {
 #ifdef NP_SSH
@@ -809,6 +809,12 @@ void server_transapi_close(void) {
 	pthread_mutex_lock(&netopeer_options.binds_lock);
 	free_all_bind_addr(&netopeer_options.binds);
 	pthread_mutex_unlock(&netopeer_options.binds_lock);
+
+#ifndef DISABLE_CALLHOME
+	while (callhome_apps != NULL) {
+		app_rm(callhome_apps->name, callhome_apps->transport);
+	}
+#endif
 }
 
 /*
