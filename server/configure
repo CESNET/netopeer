@@ -677,6 +677,7 @@ TLS
 DBUSPOLICY
 GROUPDEFINE
 GROUP
+RPMCREATE
 SSHD_EXEC
 ROFF2HTML
 PKG_CONFIG
@@ -726,6 +727,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_sshd
+with_rpm
 with_distro
 enable_debug
 with_group
@@ -1377,6 +1379,7 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-sshd=PATH        Set absolute path to the SSH daemon (searched in
                           PATH by default)
+
   --with-distro=DISTRO    Compile for specific Linux distribution
   --with-group=GROUP      Limit access to Netopeer server only to the
                           specified group of users
@@ -2670,6 +2673,18 @@ expanded_libdir=`(
 	esac
 	eval echo $libdir
 )`
+
+# hack for expanding paths in lnctool in case of building RPM package
+
+# Check whether --with-rpm was given.
+if test "${with_rpm+set}" = set; then :
+  withval=$with_rpm; RPMCREATE="rpm"
+else
+  RPMCREATE=""
+
+fi
+
+
 
 # check for Linux distribution
 

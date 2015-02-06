@@ -101,6 +101,13 @@ expanded_libdir=`(
 	eval echo $libdir
 )`
 
+# hack for expanding paths in lnctool in case of building RPM package
+AC_ARG_WITH([rpm], [],
+	[RPMCREATE="rpm"],
+	[RPMCREATE=""]
+)
+AC_SUBST(RPMCREATE)
+
 # check for Linux distribution
 AC_ARG_WITH([distro],
 	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),

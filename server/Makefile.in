@@ -251,18 +251,20 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	done
 	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
 	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	@if test ! -f $(CFGDIR)/sshd_config; then \
-		if test -f /etc/ssh/sshd_config; then \
-			grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
-		else \
-			touch $(CFGDIR)/sshd_config; \
+	if test -z "@RPMCREATE@"; then \
+		if test ! -f $(CFGDIR)/sshd_config; then \
+			if test -f /etc/ssh/sshd_config; then \
+				grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > $(CFGDIR)/sshd_config; \
+			else \
+				touch $(CFGDIR)/sshd_config; \
+			fi; \
+			echo "" >> $(CFGDIR)/sshd_config; \
+			echo "# NETCONF SSH Subsystem settings" >> $(CFGDIR)/sshd_config; \
+			echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
 		fi; \
-		echo "" >> $(CFGDIR)/sshd_config; \
-		echo "# NETCONF SSH Subsystem settings" >> $(CFGDIR)/sshd_config; \
-		echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
+		chmod 600 $(CFGDIR)/sshd_config; \
+		echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration."; \
 	fi
-	chmod 600 $(CFGDIR)/sshd_config;
-	@echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration.";
 	@if test -n "@TLS@"; then \
 		awk '{sub(/{CFGDIR}/, "'$(CFGDIR)'/stunnel"); sub(/{BINDIR}/, "'$(BINDIR)'"); sub(/{AGENT}/, "'$(AGENT)'"); print}' config/stunnel_config.in > config/stunnel_config; \
 		$(INSTALL) -d $(CFGDIR)/stunnel/; \
