@@ -143,7 +143,7 @@ endef
 
 define PYINSTALL
 cd $(dir $(1)); \
-python setup.py install; \
+python setup.py install --prefix=$(2); \
 cd -;
 endef
 
@@ -232,7 +232,7 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(AGENT) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
-	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool)))
+	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix)))
 	if test -n "$(dbusconfdir)"; then \
 		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
 		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \

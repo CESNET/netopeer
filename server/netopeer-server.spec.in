@@ -22,7 +22,7 @@ network devices. This package contains its server part.
 %setup
 
 %build
-./configure --with-distro=@DISTRO@ --prefix=%{_prefix} --with-rpm @CONFIGURE_PARAMS@ --sysconfdir=%{_sysconfdir};
+./configure --with-distro=@DISTRO@ --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --with-rpm @CONFIGURE_PARAMS@;
 make
 make doc
 
@@ -46,6 +46,8 @@ echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/ss
 %{_bindir}/netopeer-server
 %{_bindir}/netopeer-agent
 %{_bindir}/netopeer-manager
+%{_bindir}/netopeer-configurator
+%{_prefix}/lib/python*/site-packages/netopeer*
 %{_sysconfdir}/netopeer/*
 %{_sysconfdir}/init.d/netopeer.rc
 %{_mandir}/man1/*

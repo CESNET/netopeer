@@ -287,6 +287,8 @@ if test "$tls" = "yes"; then
 	AX_PYTHON_MODULE(shutil, fatal)
 	AX_PYTHON_MODULE(signal, fatal)
 fi
+BUILDREQS="$BUILDREQS python"
+REQS="$REQS python"
 
 # Check for rpmbuil
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)

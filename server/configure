@@ -3289,6 +3289,8 @@ $as_echo "no" >&6; }
 	fi
 
 fi
+BUILDREQS="$BUILDREQS python"
+REQS="$REQS python"
 
 # Check for rpmbuil
 # Extract the first word of "rpmbuild", so it can be a program name with args.
