@@ -71,6 +71,7 @@
 #include "server.h"
 
 extern struct np_options netopeer_options;
+extern int quit;
 
 #ifndef DISABLE_CALLHOME
 
@@ -410,8 +411,6 @@ static void* app_loop(void* app_v) {
 	for (;;) {
 		pthread_testcancel();
 
-		app->ch_st->freed = 0;
-
 		/* get last connected server if any */
 		for (cur_server = app->servers; cur_server != NULL && cur_server->active == 0; cur_server = cur_server->next);
 		if (cur_server == NULL) {
@@ -429,6 +428,7 @@ static void* app_loop(void* app_v) {
 		for (;;) {
 			for (i = 0; i < app->rec_count; ++i) {
 				if ((app->client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
+					app->ch_st->freed = 0;
 					break;
 				}
 				sleep(app->rec_interval);
@@ -489,9 +489,7 @@ static void* app_loop(void* app_v) {
 				}
 			}
 			pthread_mutex_unlock(&app->ch_st->ch_lock);
-			if (app->ch_st->freed == 1) {
-				nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
-			}
+			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
 
 		} else {
 			/* persistent connection */
@@ -501,6 +499,10 @@ static void* app_loop(void* app_v) {
 			}
 			pthread_mutex_unlock(&app->ch_st->ch_lock);
 			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
+		}
+
+		if (quit) {
+			pthread_exit(NULL);
 		}
 	}
 }
@@ -701,7 +703,7 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 	}
 
 	/* a valid client running, mark it for deletion */
-	if (app->ch_st->freed == 0 && app->client != NULL) {
+	if (app->ch_st->freed == 0 && app->client != NULL && !quit) {
 		app->client->callhome_st = NULL;
 		switch (app->client->transport) {
 #ifdef NP_SSH
@@ -811,6 +813,7 @@ void server_transapi_close(void) {
 	pthread_mutex_unlock(&netopeer_options.binds_lock);
 
 #ifndef DISABLE_CALLHOME
+	nc_verb_verbose("NETCONF Call Home cleanup.");
 	while (callhome_apps != NULL) {
 		app_rm(callhome_apps->name, callhome_apps->transport);
 	}
