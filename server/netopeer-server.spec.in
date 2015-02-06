@@ -18,15 +18,6 @@ Requires: @REQS@
 Netopeer project implements NETCONF protocol for remote configuration of
 network devices. This package contains its server part.
 
-%package devel
-Summary: Netopeer server development package.
-Group: Liberouter
-Requires: netopeer-server = %{version}-%{release}
-
-%description devel
-This package contains header files for netopeer server. Install this package
-if you want to develop your own device modules.
-
 %prep
 %setup
 
