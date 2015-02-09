@@ -137,8 +137,7 @@ int main(int argc, char** argv)
 	}
 
 	/* add imports and augments */
-	if (ncds_add_model("./model/ietf-x509-cert-to-name.yin") != 0 || ncds_add_model("./model/ietf-yang-types.yin") != 0 ||
-			ncds_add_model("./model/ietf-netconf-acm.yin") != 0 || ncds_add_model("./model/ietf-system-tls-auth.yin") != 0) {
+	if (ncds_add_model("./model/ietf-yang-types.yin") != 0 || ncds_add_model("./model/ietf-netconf-acm.yin") != 0) {
 		nc_verb_error("Could not add import and augment models.");
 		nc_close();
 		return 1;
@@ -146,8 +145,7 @@ int main(int argc, char** argv)
 
 	/* enable features */
 	for (i = 2; i < argc; ++i) {
-		if (strcmp(argv[i], "tls-map-certificates") == 0 ? ncds_feature_enable("ietf-system-tls-auth", argv[i]) != 0 :
-				ncds_feature_enable("ietf-system", argv[i]) != 0) {
+		if (ncds_feature_enable("ietf-system", argv[i]) != 0) {
 			nc_verb_error("Could not enable feature \"%s\".", argv[i]);
 			nc_close();
 			return 1;

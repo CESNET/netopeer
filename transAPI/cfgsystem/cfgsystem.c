@@ -21,10 +21,6 @@
 #include "base/shutdown.h"
 #include "base/local_users.h"
 
-#ifdef ENABLE_TLS
-#	include "base/cert.h"
-#endif
-
 #ifndef PUBLIC
 #	define PUBLIC
 #endif
@@ -171,17 +167,6 @@ PUBLIC int transapi_init(xmlDocPtr *running)
 			xmlFreeDoc(*running); *running = NULL;
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
-
-#ifdef ENABLE_TLS
-		/* tls */
-		if ((cur =  cert_getconfig("urn:ietf:params:xml:ns:yang:ietf-system-tls-auth", &msg)) != NULL) {
-			xmlAddChild(auth_root, cur);
-		} else if (msg != NULL) {
-			augeas_close();
-			xmlFreeDoc(*running); *running = NULL;
-			return fail(NULL, msg, EXIT_FAILURE);
-		}
-#endif
 	}
 
 	/* Reset REORDER flags */
@@ -247,9 +232,6 @@ PUBLIC xmlDocPtr get_state_data(xmlDocPtr model, xmlDocPtr running, struct nc_er
  */
 PUBLIC struct ns_pair namespace_mapping[] = {
 		{"systemns", "urn:ietf:params:xml:ns:yang:ietf-system"},
-#ifdef ENABLE_TLS
-		{"tlsns", "urn:ietf:params:xml:ns:yang:ietf-system-tls-auth"},
-#endif
 		{NULL, NULL}
 };
 
@@ -1048,97 +1030,13 @@ PUBLIC int callback_systemns_system_systemns_authentication_systemns_auth_order(
 	return (EXIT_SUCCESS);
 }
 
-#ifdef ENABLE_TLS
-/**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	char* msg = NULL;
-
-	if (op & XMLDIFF_ADD) {
-		if (export_cert(new_node, 1, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(old_node, 1, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the \"%s\".", op, __func__);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	char* msg = NULL;
-
-	if (op & XMLDIFF_ADD) {
-		if (export_cert(new_node, 0, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else if (op & XMLDIFF_REM) {
-		if (remove_cert(old_node, 0, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
-		}
-	} else {
-		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the \"%s\".", op, __func__);
-		return fail(error, msg, EXIT_FAILURE);
-	}
-
-	return EXIT_SUCCESS;
-}
-
-/**
- * @brief This callback will be run when node in path /systemns:system/systemns:authentication/tlsns:tls/tlsns:cert-maps changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-PUBLIC int callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_cert_maps(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-{
-	/* just to have a callback, to prevent transAPI from complaining */
-	nc_verb_verbose("cert-maps configuration change.");
-	return EXIT_SUCCESS;
-}
-#endif /* ENABLE_TLS */
-
 /*
  * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
  * It is used by libnetconf library to decide which callbacks will be run.
  * DO NOT alter this structure
  */
 PUBLIC struct transapi_data_callbacks clbks = {
-#ifdef ENABLE_TLS
-	.callbacks_count = 17,
-#else
 	.callbacks_count = 14,
-#endif
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname",
@@ -1168,15 +1066,7 @@ PUBLIC struct transapi_data_callbacks clbks = {
 		{.path = "/systemns:system/systemns:authentication/systemns:user",
 			.func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order",
-			.func = callback_systemns_system_systemns_authentication_systemns_auth_order },
-#ifdef ENABLE_TLS
-		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert",
-			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_ca_certs_tlsns_trusted_ca_cert },
-		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert",
-			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_trusted_client_certs_tlsns_trusted_client_cert },
-		{.path = "/systemns:system/systemns:authentication/tlsns:tls/tlsns:cert-maps",
-			.func = callback_systemns_system_systemns_authentication_tlsns_tls_tlsns_cert_maps }
-#endif
+			.func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}
 };
 
@@ -1357,8 +1247,6 @@ PUBLIC struct transapi_rpc_callbacks rpc_clbks = {
 		}
 };
 
-extern char NETOPEER_SSHD_CONF[];
-
 PUBLIC int cfgsystem_file_change_cb(const char *filepath, xmlDocPtr *edit_config, int *exec)
 {
 	char* msg = NULL;
@@ -1379,7 +1267,7 @@ PUBLIC int cfgsystem_file_change_cb(const char *filepath, xmlDocPtr *edit_config
 	xmlSetNs(root, ns);
 	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", BAD_CAST "ncop");
 
-	if (strcmp(filepath, NETOPEER_SSHD_CONF) == 0 || strcmp(filepath, "/etc/passwd") == 0 || strcmp(filepath, "/etc/shadow") == 0) {
+	if (strcmp(filepath, "/etc/passwd") == 0 || strcmp(filepath, "/etc/shadow") == 0) {
 		config = users_getxml(ns, &msg);
 	} else if (strcmp(filepath, AUGEAS_NTP_CONF) == 0) {
 		config = ntp_getconfig(ns, &msg);
@@ -1400,9 +1288,8 @@ PUBLIC int cfgsystem_file_change_cb(const char *filepath, xmlDocPtr *edit_config
 }
 
 PUBLIC struct transapi_file_callbacks file_clbks = {
-	.callbacks_count = 5,
+	.callbacks_count = 4,
 	.callbacks = {
-		{.path = NETOPEER_SSHD_CONF, .func = cfgsystem_file_change_cb},
 		{.path = "/etc/passwd", .func = cfgsystem_file_change_cb},
 		{.path = "/etc/shadow", .func = cfgsystem_file_change_cb},
 		{.path = AUGEAS_NTP_CONF, .func = cfgsystem_file_change_cb},

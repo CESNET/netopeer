@@ -13,7 +13,3 @@ systemns=urn:ietf:params:xml:ns:yang:ietf-system
 /systemns:system/systemns:authentication/systemns:user/systemns:authorized-key
 /systemns:system/systemns:authentication/systemns:user
 /systemns:system/systemns:authentication/systemns:user-authentication-order
-tlsns=urn:ietf:params:xml:ns:yang:ietf-system-tls-auth
-/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-ca-certs/tlsns:trusted-ca-cert
-/systemns:system/systemns:authentication/tlsns:tls/tlsns:trusted-client-certs/tlsns:trusted-client-cert
-/systemns:system/systemns:authentication/tlsns:tls/tlsns:cert-maps
