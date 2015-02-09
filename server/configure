@@ -2625,6 +2625,7 @@ $as_echo "$GROUP" >&6; }
 if test "${enable_ssh+set}" = set; then :
   enableval=$enable_ssh; if test "$enableval" = "no"; then
 		ssh=no
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-ssh"
 	else
 		ssh=yes
 	fi
@@ -2643,6 +2644,7 @@ if test "${enable_tls+set}" = set; then :
 		tls=no
 	else
 		tls=yes
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --enable-tls"
 	fi
 
 else
@@ -5159,14 +5161,14 @@ fi
 # Generate correct validation files
 { $as_echo "$as_me:${as_lineno-$LINENO}: generating validation files..." >&5
 $as_echo "$as_me: generating validation files..." >&6;}
-lnctool --model ./config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+lnctool --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
-	as_fn_error $? "Generating validation files failed." "$LINENO" 5
+	as_fn_error $? "Generating validation files for ietf-netconf-server failed." "$LINENO" 5
 fi
 
-lnctool --model ./config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path ./config/ --output-dir ./config/ validation;
+lnctool --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
-	as_fn_error $? "Generating validation files failed." "$LINENO" 5
+	as_fn_error $? "Generating validation files for netopeer-cfgnetopeer failed." "$LINENO" 5
 fi
 
 ######################### Checks for header files ##############################
@@ -5720,8 +5722,8 @@ done
 
 
 if test -z "$RPMBUILD"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&5
-$as_echo "$as_me: WARNING: Due to missing rpmbuild you will not able to generate RPM package." >&2;}
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not be able to generate RPM package." >&5
+$as_echo "$as_me: WARNING: Due to missing rpmbuild you will not be able to generate RPM package." >&2;}
 fi
 
 ac_config_files="$ac_config_files Makefile"

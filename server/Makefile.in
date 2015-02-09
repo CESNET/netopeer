@@ -104,6 +104,9 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 	@SERVER_TLS_CFGS@
 
 CFGS_TAR = $(CFGS) \
+	config/netopeer-cfgnetopeer.yang \
+	config/ietf-netconf-server.yang \
+	src/config.h.in \
 	config/Netopeer.xml.in \
 	config/NETCONF-server.xml.in \
 	config/Netopeer.xml.in

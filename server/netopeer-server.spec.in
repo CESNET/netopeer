@@ -29,22 +29,10 @@ make doc
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 
-%post
-#SSHD config
-if test -f /etc/ssh/sshd_config; then \
-        grep -Ev "^Subsystem|^Port" /etc/ssh/sshd_config > %{_sysconfdir}/netopeer/sshd_config; \
-else \
-        touch %{_sysconfdir}/netopeer/sshd_config; \
-fi; \
-echo "" >> %{_sysconfdir}/netopeer/sshd_config; \
-echo "# NETCONF SSH Subsystem settings" >> %{_sysconfdir}/netopeer/sshd_config; \
-echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/sshd_config; \
-
 %postun
 
 %files
 %{_bindir}/netopeer-server
-%{_bindir}/netopeer-agent
 %{_bindir}/netopeer-manager
 %{_bindir}/netopeer-configurator
 %{_prefix}/lib/python*/site-packages/netopeer*
@@ -53,6 +41,4 @@ echo "Subsystem netconf %{_bindir}/netopeer-agent" >> %{_sysconfdir}/netopeer/ss
 %{_mandir}/man1/*
 %{_mandir}/man8/*
 %{_datadir}/netopeer/*.html
-@DBUSCONFFILE@
-@DBUSSERVICESFILE@
 
