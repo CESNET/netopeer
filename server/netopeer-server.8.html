@@ -1,5 +1,5 @@
-<!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Thu Jul 31 09:37:46 2014 -->
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Mon Feb  9 12:28:13 2015 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -127,97 +127,6 @@ refers to various files in other locations.</p>
 validators for the <b>netopeer-server</b> internal
 modules.</p>
 
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/sshd_config</i></p>
-
-<p style="margin-left:22%;">Template configuration for the
-<b>sshd(8)</b> instance used for accepting incoming NETCONF
-over SSH connections. Note, that the template doesn&rsquo;t
-contain the listening address/port specification since they
-are set automatically by the <b>netopeer-server</b>
-according to the configuration following
-<i>ietf-netconf-server</i> data model.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel_config</i></p>
-
-<p style="margin-left:22%;">Template configuration for the
-<b>stunnel(8)</b> instance used for accepting incoming
-NETCONF over TLS connections. Note, that the template
-doesn&rsquo;t contain the listening address/port
-specification since they are set automatically by the
-<b>netopeer-server</b> according to the configuration
-following <i>ietf-netconf-server</i> data model.</p>
-
-<p style="margin-left:22%; margin-top: 1em">This file is
-installed only if the <b>netopeer-server</b> is compiled
-with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/server.[crt|key|pem]</i></p>
-
-<p style="margin-left:22%;">Server certificate for the
-netopeer <b>stunnel(8)</b> instance. This certificate is
-sent to a client during the TLS handshake.</p>
-
-<p style="margin-left:22%; margin-top: 1em">These files are
-installed only if the <b>netopeer-server</b> is compiled
-with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/certs</i></p>
-
-<p style="margin-left:22%;">Directory with the trusted
-Certificate Authority certificates for the netopeer
-<b>stunnel(8)</b> instance. These certificates are used for
-client certificate TLS verification.</p>
-
-<p style="margin-left:22%; margin-top: 1em">This directory
-is installed only if the <b>netopeer-server</b> is compiled
-with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/netopeer/stunnel/crl</i></p>
-
-<p style="margin-left:22%;">Directory with Certificate
-Revocation Lists for the netopeer <b>stunnel(8)</b>
-instance. These CRLs are used during client certificate TLS
-verification when checking if the certificate was not
-revocated by its issuer.</p>
-
-<p style="margin-left:22%; margin-top: 1em">This directory
-is installed only if the <b>netopeer-server</b> is compiled
-with the <b>&minus;&minus;enable&minus;tls</b> option.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/etc/dbus-1/system.d/org.liberouter.netopeer.conf</i></p>
-
-<p style="margin-left:22%;">D-Bus configuration file for
-the services used by the <b>netopeer-agent(1)</b>. The
-location of the D-Bus configuration files can differ on
-different Linux distributions, so the location can be
-changed by
-<b>&minus;&minus;with&minus;dbus&minus;config&minus;dir</b>
-configure option.</p>
-
-<p style="margin-left:22%; margin-top: 1em">This file is
-not installed if the <b>netopeer-server</b> is compiled with
-the <b>&minus;&minus;disable&minus;dbus</b> option.</p>
-
-
-<p style="margin-left:11%; margin-top: 1em"><i>/usr/share/dbus-1/system-services/org.liberouter.netopeer.server.service</i></p>
-
-<p style="margin-left:22%;">D-Bus service file for
-automatic start of the <b>netopeer-server</b>.</p>
-
-<p style="margin-left:22%; margin-top: 1em">This file is
-not installed if the <b>netopeer-server</b> is compiled with
-the <b>&minus;&minus;disable&minus;dbus</b> and without
-<b>&minus;&minus;with&minus;dbus&minus;services</b> option.
-Specifying the value of the second option, one can correct
-the default location of the D-Bus service configuration
-files that can differ on different Linux distributions.</p>
-
 <p style="margin-left:11%; margin-top: 1em"><b>libnetconf
 files</b> <i><br>
 /var/lib/libnetconf/datastore-acm.xml</i></p>
@@ -259,10 +168,9 @@ release the locks manually removing the
 
 
 
-<p style="margin-left:11%; margin-top: 1em"><b>netopeer-agent(1)</b>,
-<b>netopeer-cli(1)</b>, <b>netopeer-configurator(1)</b>,
-<b>netopeer-manager(1)</b>, <b>sshd(8)</b>,
-<b>stunnel(8)</b>,</p>
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-cli(1)</b>,
+<b>netopeer-configurator(1)</b>,
+<b>netopeer-manager(1)</b>,</p>
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>Homepage</b>
@@ -302,7 +210,7 @@ the issue tracker at
 
 
 <p style="margin-left:11%; margin-top: 1em">Copyright
-&copy; 2014 CESNET, z.s.p.o.</p>
+&copy; 2015 CESNET, z.s.p.o.</p>
 <hr>
 </body>
 </html>

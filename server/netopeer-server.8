@@ -59,82 +59,6 @@ Datastores, data models and validators for the
 .B netopeer-server
 internal modules.
 .RE
-.PP
-.I /etc/netopeer/sshd_config
-.RS
-Template configuration for the
-.B sshd(8)
-instance used for accepting incoming NETCONF over SSH connections. Note, that
-the template doesn't contain the listening address/port specification since
-they are set automatically by the \fBnetopeer-server\fR according to the
-configuration following \fIietf-netconf-server\fR data model.
-.RE
-.PP
-.I /etc/netopeer/stunnel_config
-.RS
-Template configuration for the
-.B stunnel(8)
-instance used for accepting incoming NETCONF over TLS connections. Note, that
-the template doesn't contain the listening address/port specification since
-they are set automatically by the \fBnetopeer-server\fR according to the
-configuration following \fIietf-netconf-server\fR data model.
-.PP
-This file is installed only if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-enable\-tls\fR option.
-.RE
-.PP
-.I /etc/netopeer/stunnel/server.[crt|key|pem]
-.RS
-Server certificate for the netopeer
-.B stunnel(8)
-instance. This certificate is sent to a client during the TLS handshake.
-.PP
-These files are installed only if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-enable\-tls\fR option.
-.RE
-.PP
-.I /etc/netopeer/stunnel/certs
-.RS
-Directory with the trusted Certificate Authority certificates for the netopeer
-.B stunnel(8)
-instance. These certificates are used for client certificate TLS verification.
-.PP
-This directory is installed only if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-enable\-tls\fR option.
-.RE
-.PP
-.I /etc/netopeer/stunnel/crl
-.RS
-Directory with Certificate Revocation Lists for the netopeer
-.B stunnel(8)
-instance. These CRLs are used during client certificate TLS verification when
-checking if the certificate was not revocated by its issuer.
-.PP
-This directory is installed only if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-enable\-tls\fR option.
-.RE
-.PP
-.I /etc/dbus-1/system.d/org.liberouter.netopeer.conf
-.RS
-D-Bus configuration file for the services used by the \fBnetopeer-agent(1)\fR.
-The location of the D-Bus configuration files can differ on different Linux
-distributions, so the location can be changed by
-\fB\-\-with\-dbus\-config\-dir\fR configure option.
-.PP
-This file is not installed if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-disable\-dbus\fR option.
-.RE
-.PP
-.I /usr/share/dbus-1/system-services/org.liberouter.netopeer.server.service
-.RS
-D-Bus service file for automatic start of the \fBnetopeer-server\fR.
-.PP
-This file is not installed if the \fBnetopeer-server\fR is compiled with the
-\fB\-\-disable\-dbus\fR and without \fB\-\-with\-dbus\-services\fR option.
-Specifying the value of the second option, one can correct the default location
-of the D-Bus service configuration files that can differ on different Linux
-distributions.
-.RE
 .SS libnetconf files
 .I /var/lib/libnetconf/datastore-acm.xml
 .RS
@@ -159,12 +83,9 @@ removing the
 .I /dev/shm/sem.NCDS_FLOCK_*
 files.
 .SH "SEE ALSO"
-.BR netopeer-agent(1) ,
 .BR netopeer-cli(1) ,
 .BR netopeer-configurator(1) ,
 .BR netopeer-manager(1) ,
-.BR sshd(8) ,
-.BR stunnel(8) ,
 .SS Homepage
 https://netopeer.googlecode.com
 .SH MAILING LIST
@@ -176,6 +97,6 @@ Report bugs to the issue tracker at <https://code.google.com/p/netopeer/issues/l
 .SH AUTHORS
 Radek Krejci <rkrejci@cesnet.cz>
 .SH COPYRIGHT
-Copyright \(co 2014 CESNET, z.s.p.o.
+Copyright \(co 2015 CESNET, z.s.p.o.
 
 
