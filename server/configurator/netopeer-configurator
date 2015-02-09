@@ -33,12 +33,6 @@ class netopeer_configuration:
 
 		for fil in files:
 			if fil[:3] == 'nc_' and fil[-3:] == '.py':
-				if config.options['dbus'] and fil[:-3] == 'nc_sock':
-					continue
-				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
-					continue
-				if not config.options['tls'] and (fil[:-3] == 'nc_servcert' or fil[:-3] == 'nc_cacerts' or fil[:-3] == 'nc_crls'):
-					continue
 				try:
 					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
 					if getattr(module, fil[:-3]).name != None:
@@ -52,7 +46,6 @@ class netopeer_configuration:
 			print('Failed to load any module.')
 			exit(1)
 
-		tls_modules = []
 		i = 0
 		while i < len(self.ncmodules)-1:
 			module_name = self.ncmodules[i].__class__.__name__
@@ -62,14 +55,7 @@ class netopeer_configuration:
 				class_ins = self.ncmodules.pop(i)
 				self.ncmodules.insert(0, class_ins);
 
-			# remember TLS modules, append them at the end
-			if module_name == 'nc_crls' or module_name == 'nc_cacerts' or module_name == 'nc_servcert':
-				tls_modules.append(self.ncmodules.pop(i))
-				i -= 1
-
 			i += 1
-
-		self.ncmodules += tls_modules
 
 	def save_all(self):
 		for ncmodule in self.ncmodules:
