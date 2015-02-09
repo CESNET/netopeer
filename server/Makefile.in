@@ -97,6 +97,7 @@ CFGS =	config/netopeer-cfgnetopeer.yin \
 	config/netopeer-cfgnetopeer-schematron.xsl \
 	config/ietf-netconf-server.yin \
 	config/ietf-x509-cert-to-name.yin \
+	config/ietf-netconf-acm.yin \
 	config/ietf-netconf-server-data.rng \
 	config/ietf-netconf-server-gdefs.rng \
 	config/ietf-netconf-server-schematron.xsl \
