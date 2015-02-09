@@ -207,19 +207,7 @@ install: $(SERVER) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
-<<<<<<< HEAD
-	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool)))
-=======
 	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix)))
-	if test -n "$(dbusconfdir)"; then \
-		$(INSTALL) -d $(DESTDIR)/$(dbusconfdir)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.conf $(DESTDIR)/$(dbusconfdir)/; \
-	fi
-	if test -n "$(dbusservices)"; then \
-		$(INSTALL) -d $(DESTDIR)/$(dbusservices)/; \
-		$(INSTALL_DATA) config/org.liberouter.netopeer.server.service $(DESTDIR)/$(dbusservices)/; \
-	fi
->>>>>>> f5dd4c7... server: BUILD: fix install prefix of the netopeer-configurator
 	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
 	for i in $(SERVER_MODULES_CONF); do \
 		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
