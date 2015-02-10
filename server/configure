@@ -627,6 +627,7 @@ SERVER_TRANSPORT_HDRS
 SERVER_TRANSPORT_SRCS
 MODULESDIR
 SERVER_LIBS
+NPCONF
 DISTRO
 LIBNETCONF_DATADIR
 CONFIGURE_PARAMS
@@ -719,6 +720,7 @@ enable_option_checking
 with_distro
 enable_debug
 with_group
+enable_configurator
 enable_ssh
 enable_tls
 with_libnetconf
@@ -1352,6 +1354,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
+  --disable-configurator  Compile without netopeer-configurator (python not
+                          required)
   --disable-ssh           Compile without SSH transport
   --enable-tls            Compile with TLS transport
 
@@ -2618,6 +2622,22 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GROUP" >&5
 $as_echo "$GROUP" >&6; }
 
+
+
+# --enable-configurator
+# Check whether --enable-configurator was given.
+if test "${enable_configurator+set}" = set; then :
+  enableval=$enable_configurator; if test "$enableval" = "no"; then
+		NPCONF=no
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-configurator"
+	else
+		NPCONF=yes
+	fi
+
+else
+  NPCONF=yes
+
+fi
 
 
 # --enable-ssh
@@ -5721,6 +5741,7 @@ done
 
 
 
+
 if test -z "$RPMBUILD"; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Due to missing rpmbuild you will not be able to generate RPM package." >&5
 $as_echo "$as_me: WARNING: Due to missing rpmbuild you will not be able to generate RPM package." >&2;}
@@ -5740,8 +5761,10 @@ ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
 
-ac_config_files="$ac_config_files configurator/netopeer/config.py"
+if test "$NPCONF" = "yes"; then
+	ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
+fi
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure

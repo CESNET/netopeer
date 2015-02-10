@@ -207,11 +207,13 @@ distclean:
 	rm -rf $(RPMDIR)
 
 .PHONY: install
-install: $(SERVER) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
+install: $(SERVER) $(TOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 	$(INSTALL) -d $(DESTDIR)/$(bindir);
 	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
 	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
-	$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix)))
+	if test "@NPCONF@" = "yes"; then \
+		$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix))) \
+	fi
 	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
 	for i in $(SERVER_MODULES_CONF); do \
 		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
