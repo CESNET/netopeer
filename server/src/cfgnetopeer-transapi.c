@@ -538,7 +538,7 @@ int callback_n_netopeer_n_modules_n_module (void ** UNUSED(data), XMLDIFF_OP op,
 			tmp = tmp->next;
 		}
 
-	} else if (op & XMLDIFF_REM) {
+	} else if ((op & XMLDIFF_REM) && (op & XMLDIFF_CHAIN) == 0) {
 		free(module_name);
 		if (module == NULL) {
 			return(EXIT_FAILURE);
