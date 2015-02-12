@@ -24,7 +24,7 @@ struct ch_app {
 	struct ch_server {
 		char* address;
 		uint16_t port;
-		volatile uint8_t active;
+		uint8_t active;
 		struct ch_server* next;
 		struct ch_server* prev;
 	} *servers;
