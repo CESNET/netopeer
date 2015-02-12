@@ -277,7 +277,7 @@ module netopeer-cfgnetopeer {
         }
         leaf enabled {
           type boolean;
-          default false;
+          mandatory true;
           description
             "Specify whether or not the module is allowed to be managed over server.";
         }

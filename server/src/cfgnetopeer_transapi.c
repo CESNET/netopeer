@@ -604,102 +604,7 @@ int callback_n_netopeer_n_client_removal_time(void** UNUSED(data), XMLDIFF_OP op
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:modules/n:module changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_modules_n_module(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-	xmlNodePtr tmp, node;
-	char* module_name = NULL, *module_allowed;
-	struct np_module* module = netopeer_options.modules;
-
-	node = (op & XMLDIFF_REM ? old_node : new_node);
-
-	if (node == NULL) {
-		return(EXIT_FAILURE);
-	}
-
-	tmp = node->children;
-	while(tmp) {
-		if (xmlStrEqual(tmp->name, BAD_CAST "name")) {
-			module_name = (char*)xmlNodeGetContent(tmp);
-			break;
-		}
-		tmp = tmp->next;
-	}
-
-	if (module_name == NULL) {
-		*error = nc_err_new(NC_ERR_MISSING_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "name");
-		nc_verb_error("%s: Missing key element 'name'.", __FUNCTION__);
-		return(EXIT_FAILURE);
-	}
-
-	while (module) {
-		if (strcmp(module->name, module_name) == 0) {
-			break;
-		}
-		module = module->next;
-	}
-
-	if (((op & XMLDIFF_CHAIN) || (op & XMLDIFF_ADD)) && ((op & XMLDIFF_REM) == 0)) {
-		if (module) {
-			free(module_name);
-			/* change was reflected */
-			return(EXIT_SUCCESS);
-		}
-
-		if ((module = calloc(1, sizeof(struct np_module))) == NULL) {
-			free(module_name);
-			*error = nc_err_new(NC_ERR_RES_DENIED);
-			return(EXIT_FAILURE);
-		}
-
-		module->name = module_name;
-		module_name = NULL;
-
-		tmp = node->children;
-		while(tmp) {
-			if (xmlStrEqual(tmp->name, BAD_CAST "enabled")) {
-				module_allowed = (char*)xmlNodeGetContent(tmp);
-				if (strcmp(module_allowed, "true") == 0) {
-					if (module_enable(module, 1)) {
-						free(module_allowed);
-						free(module->name);
-						free(module);
-						return(EXIT_FAILURE);
-					}
-				} else {
-					free(module->name);
-					free(module);
-				}
-				free(module_allowed);
-				break;
-			}
-			tmp = tmp->next;
-		}
-
-	} else if (op & XMLDIFF_REM) {
-		free(module_name);
-		if (module == NULL) {
-			return(EXIT_FAILURE);
-		}
-		if (module_disable(module, 1)) {
-			return(EXIT_FAILURE);
-		}
-	}
-
-	return(EXIT_SUCCESS);
-}
-
-/**
- * @brief This callback will be run when node in path /n:netopeer/n:modules/n:module/n:module-allowed changes
+ * @brief This callback will be run when node in path /n:netopeer/n:modules/n:module/n:module/n:enabled changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
  * @param[in] op	Observed change in path. XMLDIFF_OP type.
@@ -711,22 +616,30 @@ int callback_n_netopeer_n_modules_n_module(void** UNUSED(data), XMLDIFF_OP op, x
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** UNUSED(error)) {
 	xmlNodePtr tmp, node;
-	char* module_name = NULL;
+	char* module_name = NULL, *module_enabled = NULL;
 	struct np_module* module = netopeer_options.modules;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
-
 	if (node == NULL) {
-		return(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	tmp = node->parent->children;
-	while(tmp) {
+	for (tmp = node->parent->children; tmp != NULL; tmp = tmp->next) {
 		if (xmlStrEqual(tmp->name, BAD_CAST "name")) {
-			module_name = (char*)xmlNodeGetContent(tmp);
+			module_name = get_node_content(tmp);
 			break;
 		}
-		tmp = tmp->next;
+	}
+	module_enabled = get_node_content(node);
+
+	if (module_name == NULL || module_enabled == NULL) {
+		nc_verb_error("%s: missing module \"name\" or \"enabled\" node", __func__);
+		return EXIT_FAILURE;
+	}
+
+	if (op & (XMLDIFF_REM | XMLDIFF_ADD) && strcmp(module_enabled, "false") == 0) {
+		/* module is/was not enabled, nothing to enable/disable */
+		return EXIT_SUCCESS;
 	}
 
 	while (module) {
@@ -736,19 +649,25 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 		module = module->next;
 	}
 
-	free(module_name);
-
-	if (op & XMLDIFF_REM) {
+	if (op & XMLDIFF_REM || (op & XMLDIFF_MOD && strcmp(module_enabled, "false") == 0)) {
 		if (module == NULL) {
-			return(EXIT_FAILURE);
+			nc_verb_error("%s: internal error: module to disable not found", __func__);
+			return EXIT_FAILURE;
 		}
 
 		if (module_disable(module, 1)) {
-			return(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
-	} else if ((op & XMLDIFF_MOD) && module) {
-		if (module_disable(module, 1)) {
-			return(EXIT_FAILURE);
+	} else if (op & XMLDIFF_ADD || (op & XMLDIFF_MOD && strcmp(module_enabled, "true") == 0)) {
+		if (module != NULL) {
+			nc_verb_error("%s: internal error: module to enable already exists", __func__);
+			return EXIT_FAILURE;
+		}
+
+		module = calloc(1, sizeof(struct np_module));
+		module->name = strdup(module_name);
+		if (module_enable(module, 1)) {
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -761,9 +680,9 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 */
 struct transapi_data_callbacks netopeer_clbks = {
 #if defined(NP_SSH) && defined(NP_TLS)
-	.callbacks_count = 19,
+	.callbacks_count = 18,
 #else
-	.callbacks_count = 13,
+	.callbacks_count = 12,
 #endif
 	.data = NULL,
 	.callbacks = {
@@ -788,7 +707,6 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:tls/n:crl-dir", .func = callback_n_netopeer_n_tls_n_crl_dir},
 		{.path = "/n:netopeer/n:tls/n:cert-maps/n:cert-to-name", .func = callback_n_netopeer_n_tls_n_cert_maps_n_cert_to_name},
 #endif
-		{.path = "/n:netopeer/n:modules/n:module", .func = callback_n_netopeer_n_modules_n_module},
 		{.path = "/n:netopeer/n:modules/n:module/n:enabled", .func = callback_n_netopeer_n_modules_n_module_n_enabled}
 	}
 };
