@@ -264,6 +264,41 @@ int callback_srv_netconf_srv_ssh_srv_listen_manyports (void ** UNUSED(data), XML
 	return (ret);
 }
 
+static int
+copyfile(int in_fd, int out_fd, size_t size)
+{
+	char buf[4096], *buf_ptr;
+	ssize_t n_in, n_out;
+
+	if (sendfile(out_fd, in_fd, 0, size) == -1) {
+		/* try read/write instead of sendfile, useful for older kernels that
+		 * do not support regular file as out_fd
+		 */
+		errno = 0;
+		while ((n_in = read(in_fd, buf, sizeof buf)) > 0 || errno == EINTR) {
+			if (n_in == -1) { /* EINTR */
+				errno = 0;
+				continue;
+			}
+			buf_ptr = buf;
+			do {
+				if ((n_out = write(out_fd, buf_ptr, n_in)) >= 0) {
+					n_in = n_in - n_out;
+					buf_ptr = buf_ptr + n_out;
+				} else if (errno != EINTR) {
+					return errno;
+				}
+				errno = 0;
+			} while (n_in > 0);
+		}
+		if (n_in == -1) {
+			return errno;
+		}
+	}
+
+	return 0;
+}
+
 /**
  * @brief This callback will be run when node in path /srv:netconf/srv:ssh/srv:listen changes
  *
@@ -308,34 +343,9 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		nc_verb_error("Unable to get info about SSH server configuration template file (%s)", strerror(errno));
 		goto err_return;
 	}
-	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
-		/* try read/write instead of sendfile, useful for older kernels that
-		 * do not support regular file as out_fd
-		 */
-		char buf[4096], *buf_ptr;
-		ssize_t n_in, n_out;
-		errno = 0;
-		while ((n_in = read(cfgfile, buf, sizeof buf)) > 0 || errno == EINTR) {
-			if (n_in == -1) { /* EINTR */
-				errno = 0;
-				continue;
-			}
-			buf_ptr = buf;
-			do {
-				if ((n_out = write(running_cfgfile, buf_ptr, n_in)) >= 0) {
-					n_in = n_in - n_out;
-					buf_ptr = buf_ptr + n_out;
-				} else if (errno != EINTR) {
-					goto copyerror;
-				}
-				errno = 0;
-			} while (n_in > 0);
-		}
-		if (n_in == -1) {
-copyerror:
-			nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
-			goto err_return;
-		}
+	if ((errno = copyfile(cfgfile, running_cfgfile, stbuf.st_size)) != 0) {
+		nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
+		goto err_return;
 	}
 
 	/* append listening settings */
@@ -889,7 +899,7 @@ int callback_srv_netconf_srv_tls_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		nc_verb_error("Unable to get info about TLS server configuration template file (%s)", strerror(errno));
 		goto err_return;
 	}
-	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
+	if ((errno = copyfile(cfgfile, running_cfgfile, stbuf.st_size)) != 0) {
 		nc_verb_error("Duplicating TLS server configuration template failed (%s)", strerror(errno));
 		goto err_return;
 	}
