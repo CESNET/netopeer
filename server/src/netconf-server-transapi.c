@@ -309,8 +309,33 @@ int callback_srv_netconf_srv_ssh_srv_listen (void ** UNUSED(data), XMLDIFF_OP op
 		goto err_return;
 	}
 	if (sendfile(running_cfgfile, cfgfile, 0, stbuf.st_size) == -1) {
-		nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
-		goto err_return;
+		/* try read/write instead of sendfile, useful for older kernels that
+		 * do not support regular file as out_fd
+		 */
+		char buf[4096], *buf_ptr;
+		ssize_t n_in, n_out;
+		errno = 0;
+		while ((n_in = read(cfgfile, buf, sizeof buf)) > 0 || errno == EINTR) {
+			if (n_in == -1) { /* EINTR */
+				errno = 0;
+				continue;
+			}
+			buf_ptr = buf;
+			do {
+				if ((n_out = write(running_cfgfile, buf_ptr, n_in)) >= 0) {
+					n_in = n_in - n_out;
+					buf_ptr = buf_ptr + n_out;
+				} else if (errno != EINTR) {
+					goto copyerror;
+				}
+				errno = 0;
+			} while (n_in > 0);
+		}
+		if (n_in == -1) {
+copyerror:
+			nc_verb_error("Duplicating SSH server configuration template failed (%s)", strerror(errno));
+			goto err_return;
+		}
 	}
 
 	/* append listening settings */
