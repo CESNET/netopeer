@@ -568,7 +568,7 @@ void listen_loop(int do_init) {
 			new_client = sock_accept(&npsock);
 		}
 
-		/* New client SSH session creation */
+		/* New client full structure creation */
 		if (new_client != NULL) {
 
 			/* Maximum number of sessions check */
