@@ -57,6 +57,7 @@ void client_free_tls(struct client_struct_tls* client) {
 	close(client->tls_out[0]);
 	close(client->tls_out[1]);
 	free(client->username);
+	X509_free(client->cert);
 
 #ifndef DISABLE_CALLHOME
 	/* let the callhome thread know the client was freed */
@@ -103,6 +104,77 @@ static void digest_to_str(const unsigned char* digest, unsigned int dig_len, cha
 		sprintf((*str)+(i*3), "%02x:", digest[i]);
 	}
 	sprintf((*str)+(i*3), "%02x", digest[i]);
+}
+
+/* return NULL - SSL error can be retrieved */
+static X509* base64der_to_cert(const char* in) {
+	X509* out;
+	char* buf;
+	BIO* bio;
+
+	if (in == NULL) {
+		return NULL;
+	}
+
+	asprintf(&buf, "%s%s%s", "-----BEGIN CERTIFICATE-----\n", in, "\n-----END CERTIFICATE-----");
+	bio = BIO_new_mem_buf(buf, strlen(buf));
+	if (bio == NULL) {
+		free(buf);
+		return NULL;
+	}
+
+	out = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	if (out == NULL) {
+		free(buf);
+		BIO_free(bio);
+		return NULL;
+	}
+
+	free(buf);
+	BIO_free(bio);
+	return out;
+}
+
+static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
+	EVP_PKEY* out;
+	char* buf;
+	BIO* bio;
+
+	if (in == NULL) {
+		return NULL;
+	}
+
+	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----");
+	bio = BIO_new_mem_buf(buf, strlen(buf));
+	if (bio == NULL) {
+		free(buf);
+		return NULL;
+	}
+
+	out = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+	if (out == NULL) {
+		free(buf);
+		BIO_free(bio);
+		return NULL;
+	}
+
+	free(buf);
+	BIO_free(bio);
+	return out;
+}
+
+static int cert_pubkey_match(X509* cert1, X509* cert2) {
+	ASN1_BIT_STRING* bitstr1, *bitstr2;
+
+    bitstr1 = X509_get0_pubkey_bitstr(cert1);
+	bitstr2 = X509_get0_pubkey_bitstr(cert2);
+
+    if (bitstr1 == NULL || bitstr2 == NULL || bitstr1->length != bitstr2->length ||
+            memcmp(bitstr1->data, bitstr2->data, bitstr1->length)) {
+        return 0;
+    }
+
+    return 1;
 }
 
 /* return: 0 - username assigned, 1 - error occured, username unchanged */
@@ -197,7 +269,7 @@ static int tls_ctn_get_username_from_cert(X509* client_cert, CTN_MAP_TYPE map_ty
 	return 0;
 }
 
-/* return: 0 - result assigned, 1 - result unchanged (no match), 2 - error occured, result unchanged */
+/* return: 0 - result assigned, 1 - result unchanged (no match or some error occured) */
 static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 	char* digest_md5 = NULL, *digest_sha1 = NULL, *digest_sha224 = NULL;
 	char* digest_sha256 = NULL, *digest_sha384 = NULL, *digest_sha512 = NULL;
@@ -373,24 +445,89 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	X509_OBJECT obj;
 	X509_NAME* subject;
 	X509_NAME* issuer;
-	X509* cert, *peer_cert;
+	X509* cert;
 	X509_CRL* crl;
 	X509_REVOKED* revoked;
+	STACK_OF(X509)* cert_chain_stack;
 	EVP_PKEY* pubkey;
 	SSL* cur_tls;
 	struct client_struct_tls* new_client;
+	struct np_trusted_cert* trusted_cert;
 	long serial;
-	int i, n, rc;
+	int i, n, rc, depth;
 	char* cp;
-	unsigned char* digest1, *digest2;
-	unsigned int dig_len;
 	CTN_MAP_TYPE map_type = 0;
 	ASN1_TIME* last_update = NULL, *next_update = NULL;
 
-	/* standard certificate verification failed */
-	if (!preverify_ok) {
+	/* get the new client structure */
+	cur_tls = X509_STORE_CTX_get_ex_data(x509_ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+	new_client = (struct client_struct_tls*)SSL_get_ex_data(cur_tls, netopeer_state.tls_state->last_tls_idx);
+	if (new_client == NULL) {
+		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		return 0;
 	}
+
+	/* get the last certificate, that is the peer (client) certificate */
+	if (new_client->cert == NULL) {
+		cert_chain_stack = X509_STORE_CTX_get1_chain(x509_ctx);
+		while ((cert = sk_X509_pop(cert_chain_stack)) != NULL) {
+			X509_free(new_client->cert);
+			new_client->cert = cert;
+		}
+		sk_X509_pop_free(cert_chain_stack, X509_free);
+	}
+
+	/* standard certificate verification failed, so a local client cert must match to continue */
+	if (!preverify_ok) {
+		/* TLS_CTX LOCK */
+		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
+
+		for (trusted_cert = netopeer_options.tls_opts->trusted_certs; trusted_cert != NULL; trusted_cert = trusted_cert->next) {
+			if (!trusted_cert->client_cert) {
+				continue;
+			}
+			cert = base64der_to_cert(trusted_cert->cert);
+			if (cert == NULL) {
+				nc_verb_error("%s: loading a trusted client certificate failed (%s).", __func__, ERR_reason_error_string(ERR_get_error()));
+				continue;
+			}
+
+			if (cert_pubkey_match(new_client->cert, cert)) {
+				X509_free(cert);
+				break;
+			}
+			X509_free(cert);
+		}
+
+		/* TLS_CTX UNLOCK */
+		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
+
+		if (trusted_cert == NULL) {
+			nc_verb_error("Cert verify: fail (%s).", X509_verify_cert_error_string(X509_STORE_CTX_get_error(x509_ctx)));
+			return 0;
+		}
+
+		/* we are just overriding the failed standard certificate verification (preverify_ok == 0),
+		 * this callback will be called again with the same current certificate and preverify_ok == 1 */
+		nc_verb_warning("Cert verify: fail (%s), but the client certificate is trusted, continuing.", X509_verify_cert_error_string(X509_STORE_CTX_get_error(x509_ctx)));
+		X509_STORE_CTX_set_error(x509_ctx, X509_V_OK);
+		return 1;
+	}
+
+	/* print cert verify info */
+	depth = X509_STORE_CTX_get_error_depth(x509_ctx);
+	nc_verb_verbose("Cert verify: depth %d", depth);
+
+	cert = X509_STORE_CTX_get_current_cert(x509_ctx);
+	subject = X509_get_subject_name(cert);
+	issuer = X509_get_issuer_name(cert);
+
+	cp = X509_NAME_oneline(subject, NULL, 0);
+	nc_verb_verbose("Cert verify: subject: %s", cp);
+	OPENSSL_free(cp);
+	cp = X509_NAME_oneline(issuer, NULL, 0);
+	nc_verb_verbose("Cert verify: issuer:  %s", cp);
+	OPENSSL_free(cp);
 
 	/* check for revocation if set */
 	/* CRL_DIR LOCK */
@@ -505,34 +642,12 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 	/* CRL_DIR UNLOCK */
 	pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 
-	/* get the new client structure */
-	cur_tls = X509_STORE_CTX_get_ex_data(x509_ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
-	new_client = (struct client_struct_tls*)SSL_get_ex_data(cur_tls, netopeer_state.tls_state->last_tls_idx);
-	if (new_client == NULL) {
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		return 0;
-	}
-
 	/* cert-to-name already successful */
 	if (new_client->username != NULL) {
 		return 1;
 	}
 
-	/* get the peer (client) certificate */
-	peer_cert = SSL_get_peer_certificate(cur_tls);
-
 	/* cert-to-name */
-	cert = X509_STORE_CTX_get_current_cert(x509_ctx);
-	subject = X509_get_subject_name(cert);
-	issuer = X509_get_issuer_name(cert);
-
-	cp = X509_NAME_oneline(subject, NULL, 0);
-	nc_verb_verbose("%s: CTN cert: subject: %s", __func__, cp);
-	OPENSSL_free(cp);
-	cp = X509_NAME_oneline(issuer, NULL, 0);
-	nc_verb_verbose("%s: CTN cert: issuer:  %s", __func__, cp);
-	OPENSSL_free(cp);
-
 	if (tls_cert_to_name(cert, &map_type, &cp) != 0) {
 		/* cert-to-name was not successful on this certificate */
 		goto fail;
@@ -540,35 +655,16 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 
 	if (map_type == CTN_MAP_TYPE_SPECIFIED) {
 		new_client->username = cp;
-	} else if (tls_ctn_get_username_from_cert(peer_cert, map_type, &new_client->username) != 0) {
+	} else if (tls_ctn_get_username_from_cert(new_client->cert, map_type, &new_client->username) != 0) {
 		goto fail;
 	}
-	X509_free(peer_cert);
 
-	nc_verb_verbose("Cert-to-name success, the new client username recognized as '%s'.", new_client->username);
+	nc_verb_verbose("Cert verify CTN: new client username recognized as '%s'.", new_client->username);
 	return 1;
 
 fail:
-	dig_len = 16;
-	digest1 = malloc(dig_len);
-	digest2 = malloc(dig_len);
-	X509_digest(cert, EVP_md5(), digest1, &dig_len);
-	X509_digest(peer_cert, EVP_md5(), digest2, &dig_len);
-	X509_free(peer_cert);
-
-	/* Compare the peer cert with the currently examined cert,
-	 * if they match, this was the last chance for CTN to succeed.
-	 */
-	for (i = 0; i < (signed)dig_len; ++i) {
-		if (digest1[i] != digest2[i]) {
-			break;
-		}
-	}
-	free(digest1);
-	free(digest2);
-
-	if (i < (signed)dig_len) {
-		nc_verb_verbose("%s: CTN cert fail: cert-to-name will continue on the next cert in chain", __func__);
+	if (depth > 0) {
+		nc_verb_verbose("Cert verify CTN: cert fail: cert-to-name will continue on the next cert in chain");
 		return 1;
 	}
 
@@ -668,63 +764,6 @@ static int check_tls_data_to_nc(struct client_struct_tls* client) {
 	client->tls_buf[client->tls_buf_len] = '\0';
 
 	return 0;
-}
-
-/* return NULL - SSL error can be retrieved */
-static X509* base64der_to_cert(const char* in) {
-	X509* out;
-	char* buf;
-	BIO* bio;
-
-	if (in == NULL) {
-		return NULL;
-	}
-
-	asprintf(&buf, "%s%s%s", "-----BEGIN CERTIFICATE-----\n", in, "\n-----END CERTIFICATE-----");
-	bio = BIO_new_mem_buf(buf, strlen(buf));
-	if (bio == NULL) {
-		free(buf);
-		return NULL;
-	}
-
-	out = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-	if (out == NULL) {
-		free(buf);
-		BIO_free(bio);
-		return NULL;
-	}
-
-	free(buf);
-	BIO_free(bio);
-	return out;
-}
-
-static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
-	EVP_PKEY* out;
-	char* buf;
-	BIO* bio;
-
-	if (in == NULL) {
-		return NULL;
-	}
-
-	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----");
-	bio = BIO_new_mem_buf(buf, strlen(buf));
-	if (bio == NULL) {
-		free(buf);
-		return NULL;
-	}
-
-	out = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
-	if (out == NULL) {
-		free(buf);
-		BIO_free(bio);
-		return NULL;
-	}
-
-	free(buf);
-	BIO_free(bio);
-	return out;
 }
 
 int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {

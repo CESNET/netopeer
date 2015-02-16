@@ -23,6 +23,7 @@ struct client_struct_tls {
 	char* tls_buf;
 	uint32_t tls_buf_size;
 	uint32_t tls_buf_len;
+	X509* cert;
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
