@@ -1144,6 +1144,9 @@ SSL_CTX* np_tls_server_id_check(SSL_CTX* tlsctx) {
 			trusted_store = X509_STORE_new();
 
 			for (trusted_cert = netopeer_options.tls_opts->trusted_certs; trusted_cert != NULL; trusted_cert = trusted_cert->next) {
+				if (trusted_cert->client_cert) {
+					continue;
+				}
 				cert = base64der_to_cert(trusted_cert->cert);
 				if (cert == NULL) {
 					nc_verb_error("Loading a trusted certificate failed (%s).", ERR_reason_error_string(ERR_get_error()));

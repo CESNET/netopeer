@@ -437,8 +437,6 @@ int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void*
 
 		if (del_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 1) != 0) {
 			nc_verb_error("%s: inconsistent state (%s:%d)", __func__, __FILE__, __LINE__);
-		} else {
-			netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 		}
 
 		/* TLS_CTX UNLOCK */
@@ -457,7 +455,6 @@ int callback_n_netopeer_n_tls_n_trusted_client_certs_n_trusted_client_cert(void*
 		pthread_mutex_lock(&netopeer_options.tls_opts->tls_ctx_lock);
 
 		add_trusted_cert(&netopeer_options.tls_opts->trusted_certs, content, 1);
-		netopeer_options.tls_opts->tls_ctx_change_flag = 1;
 
 		/* TLS_CTX UNLOCK */
 		pthread_mutex_unlock(&netopeer_options.tls_opts->tls_ctx_lock);
