@@ -298,7 +298,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_md5) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -318,7 +318,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha1) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -338,7 +338,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha224) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -358,7 +358,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha256) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -378,7 +378,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha384) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -398,7 +398,7 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 
 			if (strcasecmp(ctn->fingerprint+3, digest_sha512) == 0) {
 				/* we got ourselves a winner! */
-				nc_verb_verbose("%s: entry with a matching fingerprint found", __func__);
+				nc_verb_verbose("Cert verify CTN: entry with a matching fingerprint found");
 				*map_type = ctn->map_type;
 				if (ctn->map_type == CTN_MAP_TYPE_SPECIFIED) {
 					*name = strdup(ctn->name);
@@ -539,7 +539,7 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		if (lookup == NULL) {
 			nc_verb_error("%s: failed to add lookup method", __func__);
 			X509_STORE_free(store);
-			return 0; // FAILED
+			return 0;
 		}
 
 		i = X509_LOOKUP_add_dir(lookup, netopeer_options.tls_opts->crl_dir, X509_FILETYPE_PEM);
@@ -566,29 +566,29 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		crl = obj.data.crl;
 		if (rc > 0 && crl) {
 			cp = X509_NAME_oneline(subject, NULL, 0);
-			nc_verb_verbose("%s: CRL issuer: %s", __func__, cp);
+			nc_verb_verbose("Cert verify CRL: issuer: %s", cp);
 			OPENSSL_free(cp);
 
 			last_update = X509_CRL_get_lastUpdate(crl);
 			next_update = X509_CRL_get_nextUpdate(crl);
 			cp = asn1time_to_str(last_update);
-			nc_verb_verbose("%s: CRL last update: %s", __func__, cp);
+			nc_verb_verbose("Cert verify CRL: last update: %s", cp);
 			free(cp);
 			cp = asn1time_to_str(next_update);
-			nc_verb_verbose("%s: CRL next update: %s", __func__, cp);
+			nc_verb_verbose("Cert verify CRL: next update: %s", cp);
 			free(cp);
 
 			/* verify the signature on this CRL */
 			pubkey = X509_get_pubkey(cert);
 			if (X509_CRL_verify(crl, pubkey) <= 0) {
-				nc_verb_error("%s: CRL invalid signature", __func__);
+				nc_verb_error("Cert verify CRL: invalid signature.");
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CRL_SIGNATURE_FAILURE);
 				X509_OBJECT_free_contents(&obj);
 				if (pubkey) {
 					EVP_PKEY_free(pubkey);
 				}
 				X509_STORE_free(store);
-				return 0; /* fail */
+				return 0;
 			}
 			if (pubkey) {
 				EVP_PKEY_free(pubkey);
@@ -596,18 +596,18 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 
 			/* check date of CRL to make sure it's not expired */
 			if (next_update == NULL) {
-				nc_verb_error("%s: CRL invalid nextUpdate field", __func__);
+				nc_verb_error("Cert verify CRL: invalid nextUpdate field.");
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD);
 				X509_OBJECT_free_contents(&obj);
 				X509_STORE_free(store);
-				return 0; /* fail */
+				return 0;
 			}
 			if (X509_cmp_current_time(next_update) < 0) {
-				nc_verb_error("%s: CRL expired - revoking all certificates", __func__);
+				nc_verb_error("Cert verify CRL: expired - revoking all certificates.");
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CRL_HAS_EXPIRED);
 				X509_OBJECT_free_contents(&obj);
 				X509_STORE_free(store);
-				return 0; /* fail */
+				return 0;
 			}
 			X509_OBJECT_free_contents(&obj);
 		}
@@ -627,12 +627,12 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 				if (ASN1_INTEGER_cmp(revoked->serialNumber, X509_get_serialNumber(cert)) == 0) {
 					serial = ASN1_INTEGER_get(revoked->serialNumber);
 					cp = X509_NAME_oneline(issuer, NULL, 0);
-					nc_verb_error("%s: certificate with serial %ld (0x%lX) revoked per CRL from issuer %s", __func__, serial, serial, cp);
+					nc_verb_error("Cert verify CRL: certificate with serial %ld (0x%lX) revoked per CRL from issuer %s", serial, serial, cp);
 					OPENSSL_free(cp);
 					X509_STORE_CTX_set_error(x509_ctx, X509_V_ERR_CERT_REVOKED);
 					X509_OBJECT_free_contents(&obj);
 					X509_STORE_free(store);
-					return 0; /* fail */
+					return 0;
 				}
 			}
 			X509_OBJECT_free_contents(&obj);
