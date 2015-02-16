@@ -554,12 +554,8 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		if (i == 0) {
 			nc_verb_error("%s: failed to add revocation lookup directory", __func__);
 			X509_STORE_free(store);
-			return 0; // FAILED
+			return 0;
 		}
-
-		cert = X509_STORE_CTX_get_current_cert(x509_ctx);
-		subject = X509_get_subject_name(cert);
-		issuer = X509_get_issuer_name(cert);
 
 		/* try to retrieve a CRL corresponding to the _subject_ of
 		* the current certificate in order to verify it's integrity */
