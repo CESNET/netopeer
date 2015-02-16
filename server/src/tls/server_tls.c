@@ -412,6 +412,10 @@ static int tls_cert_to_name(X509* cert, CTN_MAP_TYPE* map_type, char** name) {
 		}
 	}
 
+	if (ctn == NULL) {
+		goto fail;
+	}
+
 	/* CTN_MAP UNLOCK */
 	pthread_mutex_unlock(&netopeer_options.tls_opts->ctn_map_lock);
 
