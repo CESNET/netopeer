@@ -51,6 +51,7 @@
 #include <libxml/tree.h>
 
 #include <libnetconf_xml.h>
+#include <libnetconf.h>
 
 #include "common.c"
 #include "comm.h"
@@ -64,6 +65,14 @@
  */
 #define ENVIRONMENT_VERBOSE "NETOPEER_VERBOSE"
 
+/* Define max string size + 1 of session id */
+/* to hold "restconf-dummy-[pid of 5 numbers][5 number buffer] */
+#define RC_SID_SIZE 26
+
+/* Buffer size when receiving RESTCONF messages*/
+#define RC_MSG_BUFF_SIZE 500
+#define RC_MSG_BUFF_SIZE_MAX 500
+
 volatile int done = 0;
 
 typedef int model_t;
@@ -73,31 +82,13 @@ struct ntf_thread_config {
 	nc_rpc *subscribe_rpc;
 };
 
-typedef struct rc_session {
-	struct nc_session *netconf_session;
-	int infd;
-	int outfd;
-} rc_session;
-
 // RESTCONF FUNCTIONS - START
-NC_MSG_TYPE rc_session_recv_rpc(struct nc_session* session, nc_rpc** rpc);
-void return_error(int status);
-void test_rpc(struct rc_session* session, nc_rpc* request);
+NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc);
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc);
-int rc_process_message(nc_rpc* rpc, rc_session* session);
+void rc_send_error(int status, int fd);
+
+int rc_send_reply(int outfd, nc_reply* reply);
 // RESTCONF FUNCTIONS - END
-
-
-static void* notification_thread(void* arg)
-{
-	struct ntf_thread_config *config = (struct ntf_thread_config*)arg;
-
-	ncntf_dispatch_send(config->session, config->subscribe_rpc);
-	nc_rpc_free(config->subscribe_rpc);
-	free(config);
-
-	return (NULL);
-}
 
 /*!
  * \brief Signal handler
@@ -132,137 +123,6 @@ void signal_handler(int sig)
 		exit(EXIT_FAILURE);
 		break;
 	}
-}
-
-static struct nc_cpblts* get_server_capabilities(conn_t* conn)
-{
-	struct nc_cpblts* srv_cpblts;
-	char **cpblts_list = NULL;
-	int i;
-
-	if ((cpblts_list = comm_get_srv_cpblts(conn)) == NULL) {
-		clb_print(NC_VERB_ERROR, "Cannot get server capabilities!");
-		return (NULL);
-	}
-
-	/* Fill server capabilities structure */
-	srv_cpblts = nc_cpblts_new((const char* const*)cpblts_list);
-
-	/* cleanup */
-	for (i = 0; cpblts_list != NULL && cpblts_list[i] != NULL; i++) {
-		free(cpblts_list[i]);
-	}
-	free(cpblts_list);
-
-	return srv_cpblts;
-}
-
-int process_message(struct nc_session *session, conn_t *conn, const nc_rpc *rpc)
-{
-	nc_reply * reply = NULL;
-	struct nc_err * err;
-	pthread_t thread;
-	struct ntf_thread_config * ntf_config;
-	xmlNodePtr op;
-	char * sid;
-
-	if (rpc == NULL) {
-		nc_verb_error("Invalid RPC to process.");
-		return (EXIT_FAILURE);
-	}
-
-	/* close-session message */
-	switch (nc_rpc_get_op(rpc)) {
-	case NC_OP_CLOSESESSION:
-		/*TODO*/clb_print(NC_VERB_ERROR, "Unexpected rpc operation received: NC_OP_CLOSESESSION");
-		if (comm_close(conn) != EXIT_SUCCESS) {
-			err = nc_err_new(NC_ERR_OP_FAILED);
-			reply = nc_reply_error(err);
-		} else {
-			reply = nc_reply_ok();
-		}
-		done = 1;
-		break;
-	case NC_OP_KILLSESSION:
-		/*TODO*/clb_print(NC_VERB_ERROR, "Unexpected rpc operation received: NC_OP_KILLSESSION");
-		if ((op = ncxml_rpc_get_op_content(rpc)) == NULL || op->name == NULL ||
-				xmlStrEqual(op->name, BAD_CAST "kill-session") == 0) {
-			clb_print(NC_VERB_ERROR, "Corrupted RPC message.");
-			reply = nc_reply_error(nc_err_new(NC_ERR_OP_FAILED));
-			xmlFreeNodeList(op);
-			goto send_reply;
-		}
-		if (op->children == NULL || xmlStrEqual(op->children->name, BAD_CAST "session-id") == 0) {
-			clb_print(NC_VERB_ERROR, "No session id found.");
-			err = nc_err_new(NC_ERR_MISSING_ELEM);
-			nc_err_set(err, NC_ERR_PARAM_INFO_BADELEM, "session-id");
-			reply = nc_reply_error(err);
-			xmlFreeNodeList(op);
-			goto send_reply;
-		}
-		sid = (char *)xmlNodeGetContent(op->children);
-		reply = comm_kill_session(conn, sid);
-		xmlFreeNodeList(op);
-		free(sid);
-		break;
-	case NC_OP_CREATESUBSCRIPTION:
-		/*TODO*/clb_print(NC_VERB_ERROR, "Unexpected rpc operation received: NC_OP_CREATESUBSCRIPTION");
-		/* create-subscription message */
-		if (nc_cpblts_enabled(session, "urn:ietf:params:netconf:capability:notification:1.0") == 0) {
-			reply = nc_reply_error(nc_err_new(NC_ERR_OP_NOT_SUPPORTED));
-			goto send_reply;
-		}
-
-		/* check if notifications are allowed on this session */
-		if (nc_session_notif_allowed(session) == 0) {
-			clb_print(NC_VERB_ERROR, "Notification subscription is not allowed on this session.");
-			err = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(err, NC_ERR_PARAM_TYPE, "protocol");
-			nc_err_set(err, NC_ERR_PARAM_MSG, "Another notification subscription is currently active on this session.");
-			reply = nc_reply_error(err);
-			goto send_reply;
-		}
-
-		reply = ncntf_subscription_check(rpc);
-		if (nc_reply_get_type(reply) != NC_REPLY_OK) {
-			goto send_reply;
-		}
-
-		if ((ntf_config = malloc(sizeof(struct ntf_thread_config))) == NULL) {
-			clb_print(NC_VERB_ERROR, "Memory allocation failed.");
-			err = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(err, NC_ERR_PARAM_MSG, "Memory allocation failed.");
-			reply = nc_reply_error(err);
-			err = NULL;
-			goto send_reply;
-		}
-		ntf_config->session = session;
-		ntf_config->subscribe_rpc = nc_rpc_dup(rpc);
-
-		/* perform notification sending */
-		if ((pthread_create(&thread, NULL, notification_thread, ntf_config)) != 0) {
-			nc_reply_free(reply);
-			err = nc_err_new(NC_ERR_OP_FAILED);
-			nc_err_set(err, NC_ERR_PARAM_MSG, "Creating thread for sending Notifications failed.");
-			reply = nc_reply_error(err);
-			err = NULL;
-			goto send_reply;
-		}
-		pthread_detach(thread);
-		break;
-	default:
-		/* other messages */
-		/*TODO*/clb_print(NC_VERB_ERROR, "Correct rpc operation received: default");
-		reply = comm_operation(conn, rpc);
-		break;
-	}
-
-send_reply:
-//	nc_session_send_reply(session->netconf_session, rpc, reply);
-	/*TODO*/clb_print(NC_VERB_ERROR, "Reply data:");
-	/*TODO*/clb_print(NC_VERB_ERROR, nc_reply_get_data(reply));
-	nc_reply_free(reply);
-	return EXIT_SUCCESS;
 }
 
 #ifdef ENABLE_TLS
@@ -382,19 +242,22 @@ static void print_usage (char * progname)
 
 int main (int argc, char** argv)
 {
-	conn_t *con;
-//	struct rc_session* restconf_con = NULL;
-	struct nc_session* netconf_con = NULL;
-	nc_rpc * rpc = NULL;
-	struct nc_cpblts * capabilities = NULL;
+	conn_t *con;							/* connection to NETCONF server */
+	char* nc_session_id;					/* session if of NETCONF session */
+	int infd, outfd;						/* file descriptors for receiving RESTCONF messages and sending RESTCONF messages */
+	nc_rpc * rpc = NULL;					/* RPC message to server once it has been converted from RESTCONF */
+
 	int ret;
-	NC_MSG_TYPE rpc_type;
-	int timeout = 500; /* ms, poll timeout */
+	NC_MSG_TYPE msg_type;
+	int timeout = 500;						/* ms, poll timeout */
 	struct pollfd fds;
 	struct sigaction action;
 	int next_option;
 	int verbose;
 	char *aux_string = NULL;
+
+	infd = STDIN_FILENO;
+	outfd = STDOUT_FILENO;
 
 	if ((aux_string = getenv(ENVIRONMENT_VERBOSE)) == NULL) {
 		verbose = NC_VERB_ERROR;
@@ -420,11 +283,11 @@ int main (int argc, char** argv)
 	sigfillset(&action.sa_mask);
 	action.sa_handler = signal_handler;
 	action.sa_flags = 0;
-	sigaction(SIGINT, &action, NULL );
-	sigaction(SIGQUIT, &action, NULL );
-	sigaction(SIGABRT, &action, NULL );
-	sigaction(SIGTERM, &action, NULL );
-	sigaction(SIGKILL, &action, NULL );
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGABRT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
+	sigaction(SIGKILL, &action, NULL);
 
 	openlog("restapeer-agent", LOG_PID, LOG_DAEMON);
 	nc_callback_print(clb_print);
@@ -451,62 +314,50 @@ int main (int argc, char** argv)
 	}
 	clb_print(NC_VERB_VERBOSE, "Connected with Netopeer server");
 
-	/* get server capabilities */
-	if ((capabilities = get_server_capabilities(con)) == NULL) {
-		clb_print(NC_VERB_ERROR, "Cannot get server capabilities.");
-		return EXIT_FAILURE;
-	}
-
-	/*
-	 * Are we running with the TLS transport? If yes, the TLS server should
-	 * provide SSL_CLIENT_DN environment variable for us.
-	 * And since this is RESTCONF agent, TLS transport is required.
-	 */
-
 #ifndef ENABLE_TLS
 
-	// there is probably SSH transport but
-	// restconf expects stunnel or some other TLS transport
-
+	/* restconf expects stunnel or some other TLS transport */
 	clb_print(NC_VERB_ERROR, "Restconf agent expects TLS to be enabled.");
-	nc_cpblts_free(capabilities);
 	return EXIT_FAILURE;
 
 #endif
 
-	if (getenv("SSL_CLIENT_DN")) {
-		// accept client session and handle capabilities
-		// the username is always root for restconf client, at least for now
-//		restconf_con = rc_session_accept_username("root", capabilities);
-		netconf_con = nc_session_accept_username(capabilities, "root");
-		nc_cpblts_free(capabilities);
-	} else {
+	if (!getenv("SSL_CLIENT_DN")) {
 		clb_print(NC_VERB_ERROR, "Restconf agent expects SSL_CLIENT_DN environment variable to be set.");
+		return EXIT_FAILURE;
+	}
+
+	/* create session id */
+	nc_session_id = malloc(sizeof(char) * RC_SID_SIZE);
+
+	if (nc_session_id == NULL) {
+		clb_print(NC_VERB_ERROR, "Unable to allocate memory for restconf session id.");
+		return EXIT_FAILURE;
+	}
+
+	memset(nc_session_id, 0, RC_SID_SIZE - 1);
+	snprintf(nc_session_id, RC_SID_SIZE - 1, "rc-dummy-%d", getpid());
+
+	/* send information about our would be session to the server */
+	struct nc_cpblts* capabilities = nc_session_get_cpblts_default();
+
+	/* TODO: the username is always root for now, use get_tls_username later */
+	if (comm_session_info_send(con, "root", nc_session_id, nc_cpblts_count(capabilities), capabilities)) {
+		clb_print(NC_VERB_ERROR, "Failed to communicate with server.");
 		nc_cpblts_free(capabilities);
 		return EXIT_FAILURE;
 	}
 
-//	if (restconf_con->netconf_session == NULL) {
-	if (netconf_con == NULL) {
-		clb_print(NC_VERB_ERROR, "Failed to connect agent.");
-		return EXIT_FAILURE;
-	}
-
-	/* monitor this session and build statistics */
-//	nc_session_monitor(restconf_con->netconf_session);
-	nc_session_monitor(netconf_con);
-
-	/* create the session */
-//	if (comm_session_info(con, restconf_con->netconf_session)) {
-	if (comm_session_info(con, netconf_con)) {
-		clb_print(NC_VERB_ERROR, "Failed to communicate with server.");
+	struct nc_session* netconf_con_dummy = nc_session_dummy(nc_session_id, "root", NULL, capabilities);
+	if (netconf_con_dummy == NULL) {
+		clb_print(NC_VERB_ERROR, "Could not get dummy netconf session");
+		nc_cpblts_free(capabilities);
 		return EXIT_FAILURE;
 	}
 
 	clb_print(NC_VERB_VERBOSE, "Handshake finished");
 
-//	fds.fd = restconf_con->infd;
-	fds.fd = nc_session_get_eventfd(netconf_con);
+	fds.fd = infd;
 	fds.events = POLLIN;
 
 	while (!done) {
@@ -526,61 +377,44 @@ int main (int argc, char** argv)
 				goto cleanup;
 			} else if (fds.revents & POLLIN) { /* data ready */
 				/* read data from input */
-//				/*TODO*/clb_print(NC_VERB_ERROR, "starting rc_session_recv_rpc");
-//				test_rpc(restconf_con, nc_rpc_get(NULL));
-//				goto cleanup;
-				rpc_type = rc_session_recv_rpc(netconf_con, &rpc);
-//				rpc_type = rc_session_recv_rpc_new(netconf_con, &rpc);
-				/*TODO*/sleep(3);
-				if (rpc_type != NC_MSG_RPC) {
-					switch (rpc_type) {
-					case NC_MSG_NONE:
-						// the message has already been processed or there is nothing to do about it
-						// don't continue the loop, this is restconf and NONE should not be returned by rc_session_recv_rpc
-						/*TODO*/clb_print(NC_VERB_ERROR, "Could not parse clients message, message type is NONE");
-						/*TODO*/goto cleanup;
-						break;
-					case NC_MSG_UNKNOWN:
-						// the message could not be parsed properly, we have to quit
-						clb_print(NC_VERB_ERROR, "Could not parse clients message, message type is UNKNOWN");
-//						test_rpc(restconf_con, nc_rpc_get(NULL));
-//						test_write(restconf_con);
-						goto cleanup;
-						break;
-					default:
-						// all other message types are unsupported by restconf, we can only communicate through rpcs
-						clb_print(NC_VERB_ERROR, "Unknown message type received");
-						goto cleanup;
-						break;
-					}
-				} else {
+				clb_print(NC_VERB_DEBUG, "Reading message from client.");
+				msg_type = rc_recv_rpc(fds, infd, outfd, &rpc);
+				switch (msg_type) {
+				case NC_MSG_NONE:
+					clb_print(NC_VERB_VERBOSE, "A message has been process without sending to the server");
+					/* TODO: log the message somewhere */
+					break;
+				case NC_MSG_UNKNOWN:
+					clb_print(NC_VERB_ERROR, "Could not parse clients message");
+					/* TODO: log the message somewhere (but somewhere else than a processed message would be) */
+					break;
+				case NC_MSG_RPC:
 					clb_print(NC_VERB_VERBOSE, "Processing client message");
-					/*TODO*/clb_print(NC_VERB_ERROR, "Processing client message");
-					if (rpc_type == NC_MSG_RPC) {
-						/*TODO*/clb_print(NC_VERB_ERROR, "Message type is RPC");
-					} else {
-						/*TODO*/clb_print(NC_VERB_ERROR, "Message type is NONE");
-					}
-					if (process_message(netconf_con, con, rpc) != EXIT_SUCCESS) {
+					/* TODO: there are a number of operation types that should never come out of rc_session_recv_rpc, check for these and end with error */
+					nc_reply* reply = comm_operation(con, rpc);
+					if (reply == NULL) {
 						clb_print(NC_VERB_WARNING, "Message processing failed");
+						rc_send_error(-2, outfd);
+						break;
 					}
-//					if (rc_process_message(rpc, restconf_con)) {
-//						clb_print(NC_VERB_WARNING, "Message processing failed");
-//					}
-					goto cleanup; // end, don't restart loop
-//					nc_rpc_free(rpc);
-//					rpc = NULL;
+					if (rc_send_reply(outfd, reply)) {
+						clb_print(NC_VERB_WARNING, "Sending reply failed.");
+					}
+					break;
+				default:
+					clb_print(NC_VERB_ERROR, "Illegal state reached, received unsupported NC_MSG_TYPE");
+					break;
 				}
+				goto cleanup;
 			}
 		}
 	}
 
 cleanup:
-	clb_print(NC_VERB_ERROR, "Freeing rpc");
+	comm_close(con);
+	nc_cpblts_free(capabilities);
 	nc_rpc_free(rpc);
-	clb_print(NC_VERB_ERROR, "Freeing session");
-	nc_session_free(netconf_con);
-	clb_print(NC_VERB_ERROR, "Closing netconf connection");
+	nc_session_free(netconf_con_dummy);
 	nc_close();
 
 	return (EXIT_SUCCESS);
@@ -591,94 +425,48 @@ cleanup:
 // 3, if the message can be processed without sending to server, processes it and replies
 // 4, if the message has to be sent to the server, it is converted to nc_rpc and the function returns NC_MSG_RPC
 // 4.5, the rpc then has to be sent to the server and a reply has to be sent but that is done in another function
-NC_MSG_TYPE rc_session_recv_rpc(struct nc_session* session, nc_rpc** rpc) {
+NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc) {
+	/* TODO: make this scalable */
+	char buffer[RC_MSG_BUFF_SIZE_MAX];
+	int ptr = 0;
+	ssize_t rc;
 
-	int chunk_size = 500, iteration = 0;
-	char* string = malloc(chunk_size);
-	if (string == NULL) {
-		clb_print(NC_VERB_ERROR, "Could not reserve memory for HTTP message.");
-		return NC_MSG_UNKNOWN;
-	}
+	while (fds.revents & POLLIN) {
+		rc = read(infd, buffer + ptr, sizeof(buffer) - ptr);
 
-	memset(string, 0, chunk_size);
-	int count = 0;
-
-	while ((count = read(nc_session_get_eventfd(session), string, chunk_size - 1)) > 0) {
-		string = realloc(string, chunk_size * ++iteration);
-
-		if (string == NULL) {
-			clb_print(NC_VERB_ERROR, "Could not reserve memory for HTTP message.");
-			return NC_MSG_UNKNOWN;
+		if (rc <= 0) {
+			break;
 		}
+
+		ptr += rc;
+		poll(&fds, 1, 0);
 	}
 
-	if (count < 0) {
+	if (ptr <= 0) {
 		clb_print(NC_VERB_ERROR, "Reading HTTP message ended in error.");
 	} else {
 		clb_print(NC_VERB_VERBOSE, "Done reading HTTP message.");
 	}
 
-	// parse HTTP message, how it looks:
-	// method and HTTP protocol version until first CRLF - read method (first word until whitespace), ignore rest
-	// headers for all next CRLF until empty line
-	// body until EOF
+	httpmsg* msg = parse_req(buffer);
 
-	/*TODO*/clb_print(NC_VERB_ERROR,
-			"rc_session_recv_rpc message read, printing some information (method, resource locator and body)");
-	httpmsg* msg = parse_req(string);
-	/*TODO*/clb_print(NC_VERB_ERROR, msg->method);
-	/*TODO*/clb_print(NC_VERB_ERROR, msg->resource_locator);
-	/*TODO*/clb_print(NC_VERB_ERROR, strcmp(msg->body, "") == 0 ? "<empty>" : msg->body);
-
-	if (string != NULL) {
-		free(string);
-	}
-
-	// validate if request can be translated into netconf rpc
-	// translate http request into netconf rpc
 	int status = rc_create_rpc(msg, rpc);
 	if (status < 0) {
-		return_error(status);
+		rc_send_error(status, outfd);
 	}
 
-	return (status != 0 || *rpc == NULL) ? NC_MSG_UNKNOWN : NC_MSG_RPC;
-}
-
-void return_error(int status) {
-	switch(status) {
-	case -1:
-	{
-		char string[50];
-		memset(string, 0, 50);
-		snprintf(string, 49, "HTTP/1.1 501 Not Implemented\r\n"
-				"\r\n\r\n");
-		int count = write(STDOUT_FILENO, string, strlen(string));
-		if (count < 0) {
-			clb_print(NC_VERB_ERROR, "Write failed.");
-		}
-		break;
-	}
-	default:
-		clb_print(NC_VERB_ERROR, "return_error: received unknown status");
-		break;
-	}
-}
-
-void test_rpc(struct rc_session* session, nc_rpc* request) {
-	nc_rpc* reply;
-	nc_session_send_recv(session->netconf_session, request, &reply);
-	/*TODO*/clb_print(NC_VERB_ERROR, "Received nc_reply, dumping...");
-	/*TODO*/clb_print(NC_VERB_ERROR, nc_reply_dump(reply));
+	return (status != 0 || *rpc == NULL) ? NC_MSG_NONE : NC_MSG_RPC;
 }
 
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc) {
 	if (!strcmp(msg->method, "GET")) {
 		if (!strcmp(msg->resource_locator, "/restconf/data")) {
-			*rpc = nc_rpc_get(NULL);
-//			char* name = nc_rpc_get_op_name(rpc); // TODO: check if this sets message type
+//			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
+			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get-config><source><running/></source></get-config></rpc>", NULL);
+			if (*rpc == NULL) {
+				return -2; // internal error
+			}
 		} else {
-			/*TODO*/clb_print(NC_VERB_ERROR, "rc_create_rpc: resource locator is:");
-			/*TODO*/clb_print(NC_VERB_ERROR, msg->resource_locator);
 			return -1; // not implemented
 		}
 	} else if (!strcmp(msg->method, "OPTIONS")) {
@@ -698,15 +486,83 @@ int rc_create_rpc(httpmsg* msg, nc_rpc** rpc) {
 	return 0;
 }
 
-int rc_process_message(nc_rpc* rpc, rc_session* session) {
-	nc_rpc* reply = NULL;
-	/*TODO*/clb_print(NC_VERB_ERROR, "rc_process_message, sending rpc to server");
-	nc_session_send_recv(session->netconf_session, rpc, &reply);
-	if (reply != NULL) {
-		/*TODO*/clb_print(NC_VERB_ERROR, "received reply from server:");
-		/*TODO*/clb_print(NC_VERB_ERROR, nc_reply_dump(reply));
-	} else {
-		/*TODO*/clb_print(NC_VERB_ERROR, "rc_process_message, received no reply from server");
+void rc_send_error(int status, int fd) {
+	switch(status) {
+	case -1:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 501 Not Implemented\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
 	}
-	return 0;
+	case -2:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 500 Internal Error\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
+	}
+	default:
+		clb_print(NC_VERB_ERROR, "rc_send_error: received unknown status");
+		break;
+	}
+}
+
+int rc_send_reply(int outfd, nc_reply* reply) {
+	clb_print(NC_VERB_VERBOSE, "Replying to client");
+	/* prepare message */
+	int payload_size = strlen(nc_reply_get_data(reply));
+	char* status_line = "HTTP/1.1 200 OK\r\n";
+	char* headers = malloc(50); /* enough to hold "Content-Length: <number>\r\n\r\n" */
+	if (headers == NULL) {
+		clb_print(NC_VERB_ERROR, "Could not allocate memory for headers");
+		return EXIT_FAILURE;
+	}
+	memset(headers, 0, 50);
+	int ret = snprintf(headers, 49, "Content-Length: %d\r\n\r\n", payload_size);
+	if (ret < 0) {
+		clb_print(NC_VERB_ERROR, "Could not print headers");
+		free(headers);
+		return EXIT_FAILURE;
+	}
+	int message_size = strlen(status_line) + strlen(headers) + payload_size + 1;
+	char* message = malloc(message_size + 1);
+	if (message == NULL) {
+		clb_print(NC_VERB_ERROR, "Could not allocate memory for message");
+		free(headers);
+		return EXIT_FAILURE;
+	}
+	memset(message, 0, message_size + 1);
+	ret = snprintf(message, message_size, "%s%s%s", status_line, headers, nc_reply_get_data(reply));
+	if (ret < 0) {
+		clb_print(NC_VERB_ERROR, "Could not print message");
+		free(headers);
+		free(message);
+		return EXIT_FAILURE;
+	}
+
+	/* send message */
+	int count = write(outfd, message, message_size);
+	close(outfd);
+	free(headers);
+	free(message);
+
+	if (count < 0) {
+		clb_print(NC_VERB_ERROR, "Writing message failed.");
+		return EXIT_FAILURE;
+	} else {
+		clb_print(NC_VERB_ERROR, "Writing response was successful");
+	}
+
+	return EXIT_SUCCESS;
 }
