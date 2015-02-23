@@ -756,7 +756,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			/* GLOBAL READ LOCK */
 			pthread_rwlock_rdlock(&netopeer_state.global_lock);
 			/* continue with the next client again holding the read lock */
-			return 0;
+			return 1;
 		}
 
 		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
