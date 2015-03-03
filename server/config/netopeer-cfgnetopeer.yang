@@ -8,7 +8,8 @@ module netopeer-cfgnetopeer {
 
   organization "CESNET, z.s.p.o.";
   contact
-    "mvasko@cesnet.cz";
+    "mvasko@cesnet.cz,
+      dkupka@cesnet.cz";
   description
     "Module specifying Netopeer module data model and RPC operation.";
 
