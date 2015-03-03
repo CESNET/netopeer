@@ -877,14 +877,13 @@ nc_reply* rpc_netopeer_reboot(xmlNodePtr input) {
 
 	if (type_str == NULL || strcmp(type_str, "soft") == 0) {
 		restart_soft = 1;
-	} else if (strcmp (type_str, "hard")) {
+	} else if (strcmp(type_str, "hard") == 0) {
 		quit = 1;
 		restart_hard = 1;
 	} else {
 		free(type_str);
 		return nc_reply_error(nc_err_new(NC_ERR_INVALID_VALUE));
 	}
-
 	free(type_str);
 
 	return nc_reply_ok();
