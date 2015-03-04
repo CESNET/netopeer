@@ -351,6 +351,15 @@ module* read_module_from_file(FILE* file) {
 	return mod;
 }
 
+module* read_module_from_string(char* string) {
+	FILE* tmp_file = tmpfile();
+	fprintf(tmp_file, "%s", string);
+	rewind(tmp_file);
+	module* mod = read_module_from_file(tmp_file);
+	fclose(tmp_file);
+	return mod;
+}
+
 grouping* read_grouping_from_file(FILE* file, module* mod) {
 	dprint(D_TRACE, "Entered read_grouping_from_file.\n");
 	if (file == NULL) {

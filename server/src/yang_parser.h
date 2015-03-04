@@ -212,8 +212,15 @@ void print_module_with_indentation(const module* mod, int indentation_level);
  * reads a yang module from a file
  *   expects groupings first, then reads the structures in module itself
  *   returns NULL and does not move fpos if no module has been found in the file
+ *   creates special structures for augments
  */
 module* read_module_from_file(FILE* file);
+
+/*
+ * reads a yang module from string
+ *   utilizes read_module_from_file TODO: reverse
+ */
+module* read_module_from_string(char* string);
 
 /*
  * reads a grouping from a file

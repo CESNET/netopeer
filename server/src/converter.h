@@ -23,8 +23,15 @@ typedef struct unique_list {
 
 void print_jansson_error(json_error_t j_error);
 xmlNodePtr json_to_xml(json_t* root, int indentation_level, const char* array_name);
-json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod);
+/*
+ * TODO: split this function so that internal variables are not part of the API
+ * namespace - set this to the namespace of root element, the function will try to find out by itself if null
+ * augmented - internal, set to 0 at the start, 1 means the module we're getting is only augmenting and we should ask it for augments only
+ * con - connection so that the converter can ask for schemas from the server
+ */
+json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con);
 tuple* query_yang(char* path, const module* mod);
+tuple* query_yang_augmented(char* path, const module* mod); // TODO
 yang_node* find_by_name(char* name, yang_node** node_list);
 char* read_until_colon(char* string);
 json_data_types map_to_json_data_type(char* yang_data_type);

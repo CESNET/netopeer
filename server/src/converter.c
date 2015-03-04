@@ -157,7 +157,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 	return NULL;
 }
 
-json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod) {
+json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con) {
 
 	json_t* parent = NULL;
 	json_t* json_node = NULL;
@@ -167,14 +167,27 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod) {
 		parent = json_object();
 	}
 
-//	if (p != NULL && p->string != NULL && strlen(p->string) > 0) {
-//		// check xmlns to see if we're dealing with something augmented
-//		char* model_name = strrchr(node->ns->href, ':') == NULL ? node->ns->href : strrchr(node->ns->href, ':') + 1;
-//		// request yang model from server through con
-//	}
-
 	append_to_path(p, (char*) node->name);
-	tuple* t = query_yang(p->string, mod);
+	int namespace_changed = 0;
+
+	// first try, if we didn't receive namespace name, we're going to find out or fail
+	if (namespace_name == NULL && (p == NULL || p->string == NULL || strlen(p->string) <= 0)) {
+		if (node == NULL || node->ns == NULL || node->ns->href == NULL) {
+			error_and_quit(EXIT_FAILURE, "xml_to_json: could not find out namespace of root element");
+		}
+		namespace_name = strrchr(node->ns->href, ':') == NULL ? node->ns->href : strrchr(node->ns->href, ':') + 1;
+	} else if (strcmp(node->ns->href, namespace_name)) {
+		// check xmlns to see if we're dealing with something augmented
+		namespace_name = strrchr(node->ns->href, ':') == NULL ? node->ns->href : strrchr(node->ns->href, ':') + 1;
+		augmented = 1;
+		namespace_changed = 1;
+		char* schema = get_schema(namespace_name, con);
+		mod = read_module_from_string(schema);
+		free(schema);
+		// request yang model from server through con
+	}
+
+	tuple* t = augmented ? query_yang_augmented(p->string, mod) : query_yang(p->string, mod);
 
 	switch (t->container_type) {
 	case LIST: // TODO: what if list is first in the structure?
@@ -289,7 +302,47 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod) {
 	}
 
 	free_tuple(t);
+	if (namespace_changed) {
+		destroy_module(mod);
+	}
 	return json_node;
+}
+
+char* get_schema(char* identifier, conn_t* con) {
+	// TODO get this working
+	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
+	nc_rpc* schema_rpc = nc_rpc_build("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+			"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+			  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
+			    "<identifier>ietf-system-tls-auth</identifier>"
+			    "<version>1,0</version>"
+			    "<format>yang</format>"
+			  "</get-schema>"
+			"</rpc>"
+//							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+//							"<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
+//							"<identifier>ietf-system-tls-auth</identifier>"
+//							"<version>1.0</version>"
+//							"<format>yang</format>"
+//							"</get-schema>"
+//							"</rpc>"
+			, NULL);
+//					nc_rpc* schema_rpc = nc_rpc_getschema("ietf-system-tls-auth", "1,0", "yang");
+	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
+	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
+	free(str_schema_rpc);
+	nc_reply* schema_reply = comm_operation(con, schema_rpc);
+	if (schema_reply == NULL) {
+		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
+		fprintf(rjanik_log, "Schema request sending failed.");
+	}
+	char* str_reply = nc_rpc_dump(schema_reply);
+	clb_print(NC_VERB_DEBUG, str_reply);
+	fprintf(rjanik_log, "%s", str_reply);
+	fclose(rjanik_log);
+	nc_rpc_free(schema_rpc);
+	nc_rpc_free(schema_reply);
+	return str_reply;
 }
 
 // accepted path format: "name1:name2:name3"
