@@ -286,12 +286,6 @@ restart:
 		nc_close ();
 	}
 
-	/*
-	 *Free the global variables that may
-	 *have been allocated by the parser.
-	 */
-	xmlCleanupParser ();
-
 	if (restart_soft) {
 		nc_verb_verbose("Server is going to soft restart.");
 		restart_soft = 0;
@@ -301,8 +295,15 @@ restart:
 		nc_verb_verbose("Server is going to hard restart.");
 		len = readlink("/proc/self/exe", path, PATH_MAX);
 		path[len] = 0;
+		xmlCleanupParser ();
 		execv(path, argv);
 	}
+
+	/*
+         *Free the global variables that may
+         *have been allocated by the parser.
+         */
+        xmlCleanupParser ();
 
 	return (EXIT_SUCCESS);
 }
