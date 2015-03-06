@@ -1,5 +1,5 @@
-<!-- Creator     : groff version 1.21 -->
-<!-- CreationDate: Mon Jul 28 09:49:06 2014 -->
+<!-- Creator     : groff version 1.22.2 -->
+<!-- CreationDate: Fri Mar  6 15:49:40 2015 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -1089,7 +1089,7 @@ stored in the <i>~/.netopeer-cli/crl</i> directory.</p>
 available only when <b>netopeer-cli</b> is compiled with
 configure&rsquo;s &minus;&minus;enable-tls option.</p>
 
-<p style="margin-left:11%; margin-top: 1em"><b>cert</b>
+<p style="margin-left:11%; margin-top: 1em"><b>crl</b>
 [&minus;&minus;help | display | add <i>crl_path</i> | remove
 <i>crl_name</i>]</p>
 
@@ -1119,6 +1119,30 @@ CRL from the <i>~/.netopeer-cli/crl</i> dir and recalculates
 hashes of all the CRLs. <i>crl_name</i> is the CRL file
 name, as displayed in the <b>crl display</b> command
 output.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>editor</b>
+<br>
+Manage the external editor used for modifying raw input
+data.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>editor</b>
+[&minus;&minus;help | <i>path/name_of_the_editor</i> |
+&minus;&minus;default]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>path/name_of_the_editor</i></p>
+
+<p style="margin-left:23%;">The full path or just the name
+of the editor to be used.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;default</b></p>
+
+<p style="margin-left:23%;">Sets back the default editor,
+which is either <b>vi</b> or if any of the environment
+variables <b>NETOPEER_CLI_EDITOR</b> or <b>EDITOR</b> are
+defined, with this priority, then those editors are
+used.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>status</b>
 <br>
