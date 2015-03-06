@@ -73,11 +73,11 @@ endif
 SRCS =  main.c \
 	commands.c \
 	configuration.c \
-	mreadline.c
+	readinput.c
 
 HDRS = 	commands.h \
 	configuration.h \
-	mreadline.h
+	readinput.h
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
