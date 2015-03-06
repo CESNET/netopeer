@@ -509,7 +509,9 @@ void store_config(struct nc_cpblts *cpblts) {
 		}
 	}
 
+	if (done) {
+		free(config_editor);
+	}
 	free(netconf_dir);
 	free(config_file);
-	free(config_editor);
 }
