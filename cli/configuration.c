@@ -64,6 +64,8 @@
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 char* config_editor = NULL;
 
+extern int done;
+
 /* NetConf Client home (appended to ~/) */
 #define NCC_DIR ".netopeer-cli"
 /* all these appended to NCC_DIR */
