@@ -123,7 +123,7 @@ COMMAND commands[] = {
 		{"verbose", cmd_verbose, "Enable/disable verbose messages"},
 		{"quit", cmd_quit, "Quit the program"},
 		{"capability", cmd_capability, "Add/remove capability to/from the list of supported capabilities"},
-		{"editor", cmd_editor, "Set an editor to be used for manual XML pasting/writing"},
+		{"editor", cmd_editor, "Manage the editor to be used for manual XML pasting/writing"},
 /* synonyms for previous commands */
 		{"debug", cmd_debug, NULL},
 		{"?", cmd_help, NULL},
@@ -2927,7 +2927,7 @@ int cmd_subscribe(const char *arg)
 
 void cmd_editor_help()
 {
-	fprintf(stdout, "editor <path/name_of_the_editor>\n");
+	fprintf(stdout, "editor [--help] [<path/name_of_the_editor> | --default]\n");
 }
 
 int cmd_editor(const char *arg)
@@ -2936,8 +2936,13 @@ int cmd_editor(const char *arg)
 
 	cmd = strtok_r(args, " ", &ptr);
 	cmd = strtok_r(NULL, " ", &ptr);
-	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+	if (cmd == NULL) {
+		fprintf(stdout, "Current editor: %s\n", (config_editor == NULL ? "(default)" : config_editor));
+	} else if (strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
 		cmd_editor_help();
+	} else if (strcmp(cmd, "--default") == 0) {
+		free(config_editor);
+		config_editor = NULL;
 	} else {
 		free(config_editor);
 		config_editor = strdup(cmd);
