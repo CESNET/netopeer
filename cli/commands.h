@@ -41,6 +41,7 @@ int cmd_commit(const char* arg);
 int cmd_getschema(const char* arg);
 int cmd_discardchanges(const char* arg);
 int cmd_capability(const char *arg);
+int cmd_editor(const char *arg);
 
 typedef struct
 {

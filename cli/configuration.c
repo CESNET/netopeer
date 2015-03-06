@@ -62,6 +62,7 @@
 #include "commands.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
+char* config_editor = NULL;
 
 /* NetConf Client home (appended to ~/) */
 #define NCC_DIR ".netopeer-cli"
@@ -72,8 +73,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 #define CERT_PEM "client.pem"
 #define CERT_KEY "client.key"
 
-char* get_netconf_dir(void)
-{
+char* get_netconf_dir(void) {
 	int ret;
 	struct passwd * pw;
 	char* user_home, *netconf_dir;
@@ -109,8 +109,7 @@ char* get_netconf_dir(void)
 	return netconf_dir;
 }
 
-void get_default_client_cert(char** cert, char** key)
-{
+void get_default_client_cert(char** cert, char** key) {
 	char* netconf_dir;
 	struct stat st;
 	int ret;
@@ -185,8 +184,7 @@ void get_default_client_cert(char** cert, char** key)
 	return;
 }
 
-char* get_default_trustedCA_dir(DIR** ret_dir)
-{
+char* get_default_trustedCA_dir(DIR** ret_dir) {
 	char* netconf_dir, *cert_dir;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
@@ -218,8 +216,7 @@ char* get_default_trustedCA_dir(DIR** ret_dir)
 	return cert_dir;
 }
 
-char* get_default_CRL_dir(DIR** ret_dir)
-{
+char* get_default_CRL_dir(DIR** ret_dir) {
 	char* netconf_dir, *crl_dir;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
@@ -251,8 +248,7 @@ char* get_default_CRL_dir(DIR** ret_dir)
 	return crl_dir;
 }
 
-void load_config(struct nc_cpblts **cpblts)
-{
+void load_config(struct nc_cpblts **cpblts) {
 	char * netconf_dir, *history_file, *config_file;
 #ifdef ENABLE_TLS
 	struct stat st;
@@ -384,6 +380,9 @@ void load_config(struct nc_cpblts **cpblts)
 								free(tmp_cap);
 								config_cap = config_cap->next;
 							}
+						} else if (xmlStrEqual(tmp_node->name, BAD_CAST "editor")) {
+							/* doc -> <netconf-client> -> <editor> */
+							config_editor = (char*) xmlNodeGetContent(tmp_node);
 						}
 #ifndef DISABLE_LIBSSH
 						else if (xmlStrEqual(tmp_node->name, BAD_CAST "authentication")) {
@@ -443,10 +442,9 @@ void load_config(struct nc_cpblts **cpblts)
 /**
  * \brief Store configuration and history
  */
-void store_config(struct nc_cpblts *cpblts)
-{
-	char *netconf_dir, *history_file, *config_file;
-	const char * cap;
+void store_config(struct nc_cpblts *cpblts) {
+	char* netconf_dir, *history_file, *config_file;
+	const char* cap;
 	int history_fd, ret;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_caps;
@@ -485,26 +483,21 @@ void store_config(struct nc_cpblts *cpblts)
 		ERROR("store_config", "Unable to store configuration due to the previous error.");
 		config_file = NULL;
 	} else {
-		if (eaccess(config_file, R_OK | W_OK) == -1 || (config_doc = xmlReadFile(config_file, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN | XML_PARSE_NOERROR)) == NULL) {
-			config_doc = xmlNewDoc(BAD_CAST "1.0");
-			config_doc->children = xmlNewDocNode(config_doc, NULL, BAD_CAST "netconf-client", NULL);
-		}
+		config_doc = xmlNewDoc(BAD_CAST "1.0");
+		config_doc->children = xmlNewDocNode(config_doc, NULL, BAD_CAST "netconf-client", NULL);
 		if (config_doc != NULL) {
-			if (config_doc->children != NULL && xmlStrEqual(config_doc->children->name, BAD_CAST "netconf-client")) {
-				config_caps = config_doc->children->children;
-				while (config_caps != NULL && !xmlStrEqual(config_caps->name, BAD_CAST "capabilities")) {
-					config_caps = config_caps->next;
-				}
-				if (config_caps != NULL) {
-					xmlUnlinkNode(config_caps);
-					xmlFreeNode(config_caps);
-				}
-				config_caps = xmlNewChild(config_doc->children, NULL, BAD_CAST "capabilities", NULL);
-				nc_cpblts_iter_start(cpblts);
-				while ((cap = nc_cpblts_iter_next(cpblts)) != NULL) {
-					xmlNewChild(config_caps, NULL, BAD_CAST "capability", BAD_CAST cap);
-				}
+			/* capabilities */
+			config_caps = xmlNewChild(config_doc->children, NULL, BAD_CAST "capabilities", NULL);
+			nc_cpblts_iter_start(cpblts);
+			while ((cap = nc_cpblts_iter_next(cpblts)) != NULL) {
+				xmlNewChild(config_caps, NULL, BAD_CAST "capability", BAD_CAST cap);
 			}
+
+			/* editor */
+			if (config_editor != NULL) {
+				xmlNewChild(config_doc->children, NULL, BAD_CAST "editor", BAD_CAST config_editor);
+			}
+
 			if ((config_f = fopen(config_file, "w")) == NULL || xmlDocFormatDump(config_f, config_doc, 1) < 0) {
 				ERROR("store_config", "Cannot write configuration to file %s", config_file);
 			} else {
@@ -518,4 +511,5 @@ void store_config(struct nc_cpblts *cpblts)
 
 	free(netconf_dir);
 	free(config_file);
+	free(config_editor);
 }

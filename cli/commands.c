@@ -83,6 +83,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 extern int done;
 extern struct nc_cpblts * client_supported_cpblts;
+extern char* config_editor;
 volatile int verb_level = 0;
 
 void print_version ();
@@ -122,6 +123,7 @@ COMMAND commands[] = {
 		{"verbose", cmd_verbose, "Enable/disable verbose messages"},
 		{"quit", cmd_quit, "Quit the program"},
 		{"capability", cmd_capability, "Add/remove capability to/from the list of supported capabilities"},
+		{"editor", cmd_editor, "Set an editor to be used for manual XML pasting/writing"},
 /* synonyms for previous commands */
 		{"debug", cmd_debug, NULL},
 		{"?", cmd_help, NULL},
@@ -391,6 +393,7 @@ userinput:
 
 	return (retval);
 }
+
 static NCWD_MODE get_withdefaults(const char* operation, const char* mode)
 {
 	NCWD_MODE retval = NCWD_MODE_NOTSET;
@@ -2921,6 +2924,27 @@ int cmd_subscribe(const char *arg)
 	return (EXIT_SUCCESS);
 }
 #endif /* DISABLE_NOTIFICATIONS */
+
+void cmd_editor_help()
+{
+	fprintf(stdout, "editor <path/name_of_the_editor>\n");
+}
+
+int cmd_editor(const char *arg)
+{
+	char* cmd, *args = strdupa(arg), *ptr;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_editor_help();
+	} else {
+		free(config_editor);
+		config_editor = strdup(cmd);
+	}
+
+	return EXIT_SUCCESS;
+}
 
 void cmd_userrpc_help()
 {
