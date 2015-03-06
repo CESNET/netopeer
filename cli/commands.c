@@ -69,7 +69,7 @@
 
 #include "commands.h"
 #include "configuration.h"
-#include "mreadline.h"
+#include "readinput.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
@@ -462,8 +462,7 @@ static struct nc_filter *set_filter(const char* operation, const char *file)
 		close(filter_fd);
 	} else {
 		/* let user write filter interactively */
-		INSTRUCTION("Type the filter (close editor by Ctrl-D):\n");
-		filter_s = mreadline(NULL);
+		filter_s = readinput("Type the filter.");
 
 		/* create the filter according to the file content */
 		filter = nc_filter_new(NC_FILTER_SUBTREE, filter_s);
@@ -722,8 +721,7 @@ int cmd_editconfig (const char *arg)
 	/* check if edit configuration data were specified */
 	if (config == NULL) {
 		/* let user write edit data interactively */
-		INSTRUCTION("Type the edit configuration data (close editor by Ctrl-D):\n");
-		config = mreadline(NULL);
+		config = readinput("Type the edit configuration data.");
 		if (config == NULL) {
 			ERROR("edit-config", "reading edit data failed.");
 			return (EXIT_FAILURE);
@@ -810,8 +808,7 @@ int cmd_validate (const char *arg)
 		case 'c':
 			if (optarg == NULL) {
 				/* let user write edit data interactively */
-				INSTRUCTION("Type the content of a configuration datastore (close editor by Ctrl-D):\n");
-				config = mreadline(NULL);
+				config = readinput("Type the content of a configuration datastore.");
 				if (config == NULL) {
 					ERROR("validate", "reading configuration data failed.");
 					return (EXIT_FAILURE);
@@ -1043,8 +1040,7 @@ int cmd_copyconfig (const char *arg)
 	/* check if edit configuration data were specified */
 	if (source == NC_DATASTORE_ERROR && config == NULL) {
 		/* let user write edit data interactively */
-		INSTRUCTION("Type the content of a configuration datastore (close editor by Ctrl-D):\n");
-		config = mreadline(NULL);
+		config = readinput("Type the content of a configuration datastore.");
 		if (config == NULL) {
 			ERROR("copy-config", "reading configuration data failed.");
 			return (EXIT_FAILURE);
@@ -3004,8 +3000,7 @@ int cmd_userrpc(const char *arg)
 	clear_arglist(&cmd);
 
 	if (config == NULL) {
-		INSTRUCTION("Type the content of a RPC operation (close editor by Ctrl-D):\n");
-		config = mreadline(NULL);
+		config = readinput("Type the content of a RPC operation.");
 		if (config == NULL) {
 			ERROR("copy-config", "reading filter failed.");
 			return (EXIT_FAILURE);

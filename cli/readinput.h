@@ -1,9 +1,8 @@
 /**
- * \file mreadline.h
- * \author <name> <email>
- * \brief <Idea of what it does>
+ * \file readinput.h
+ * \author <Michal Vasko> <mvasko@cesnet.cz>
  *
- * Copyright (C) 2012 CESNET, z.s.p.o.
+ * Copyright (C) 2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,10 +36,10 @@
  *
  */
 
-#ifndef MREADLINE_H_
-#define MREADLINE_H_
+#ifndef READINPUT_H_
+#define READINPUT_H_
 
-void initialize_readline();
-char *mreadline(const char * prompt);
+void initialize_readline(void);
+char* readinput(const char* instruction);
 
-#endif /* MREADLINE_H_ */
+#endif /* READINPUT_H_ */

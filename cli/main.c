@@ -47,7 +47,7 @@
 #include <libnetconf_ssh.h>
 
 #include "commands.h"
-#include "mreadline.h"
+#include "readinput.h"
 #include "configuration.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
