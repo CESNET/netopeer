@@ -664,7 +664,7 @@ This command is available only when
 .B netopeer-cli
 is compiled with configure's \-\-enable-tls option.
 .PP
-.B cert
+.B crl
 [\-\-help | display | add \fIcrl_path\fR | remove \fIcrl_name\fR]
 .PP
 .RS 4
@@ -685,6 +685,29 @@ Adds the \fIcrl_path\fR CRL to the \fI~/.netopeer-cli/crl\fR dir and recalculate
 Removes the \fIcert_name\fR CRL from the \fI~/.netopeer-cli/crl\fR dir and recalculates hashes of all the CRLs. \fIcrl_name\fR is the CRL file name, as displayed in the
 .B crl display
 command output.
+.RE
+.PP
+.SS  editor
+Manage the external editor used for modifying raw input data.
+.PP
+.B editor
+[\-\-help | \fIpath/name_of_the_editor\fR | \-\-default]
+.PP
+.RS 4
+\fIpath/name_of_the_editor\fR
+.RS 4
+The full path or just the name of the editor to be used.
+.RE
+.PP
+.B \-\-default
+.RS 4
+Sets back the default editor, which is either
+.BR vi
+or if any of the environment variables
+.BR NETOPEER_CLI_EDITOR
+or
+.BR EDITOR
+are defined, with this priority, then those editors are used.
 .RE
 .PP
 .SS  status
