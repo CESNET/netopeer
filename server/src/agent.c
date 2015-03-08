@@ -240,6 +240,8 @@ static void print_usage (char * progname)
 	exit (0);
 }
 
+/* TODO */ extern char **environ;
+
 int main (int argc, char** argv)
 {
 	conn_t *con;							/* connection to NETCONF server */
@@ -255,6 +257,13 @@ int main (int argc, char** argv)
 	int next_option;
 	int verbose;
 	char *aux_string = NULL;
+
+	/* TODO remove this */
+	char **var;
+	for (var = environ; *var != NULL; ++var) {
+		clb_print(NC_VERB_DEBUG, *var);
+	}
+	/* TODO until here */
 
 	infd = STDIN_FILENO;
 	outfd = STDOUT_FILENO;
@@ -341,6 +350,27 @@ int main (int argc, char** argv)
 	/* send information about our would be session to the server */
 	struct nc_cpblts* capabilities = nc_session_get_cpblts_default();
 
+	nc_cpblts_add(capabilities, "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring");
+
+	clb_print(NC_VERB_VERBOSE, "Opening log");
+	FILE* log = fopen("/home/rjanik/agent_cap.log", "w");
+	if (log == NULL) {
+		clb_print(NC_VERB_ERROR, "Could not open log");
+		nc_cpblts_free(capabilities);
+		return EXIT_FAILURE;
+
+	}
+	clb_print(NC_VERB_VERBOSE, "Starting iteration");
+	nc_cpblts_iter_start(capabilities);
+	const char* cpblt = NULL;
+	clb_print(NC_VERB_VERBOSE, "Iterating");
+	while (NULL != (cpblt = nc_cpblts_iter_next(capabilities))) {
+		fprintf(log, "%s\n", cpblt);
+	}
+	clb_print(NC_VERB_VERBOSE, "Closing log");
+	fclose(log);
+	nc_cpblts_iter_start(capabilities);
+
 	/* TODO: the username is always root for now, use get_tls_username later */
 	if (comm_session_info_send(con, "root", nc_session_id, nc_cpblts_count(capabilities), capabilities)) {
 		clb_print(NC_VERB_ERROR, "Failed to communicate with server.");
@@ -391,15 +421,54 @@ int main (int argc, char** argv)
 				case NC_MSG_RPC:
 					clb_print(NC_VERB_VERBOSE, "Processing client message");
 					/* TODO: there are a number of operation types that should never come out of rc_session_recv_rpc, check for these and end with error */
-					nc_reply* reply = comm_operation(con, rpc);
-					if (reply == NULL) {
-						clb_print(NC_VERB_WARNING, "Message processing failed");
-						rc_send_error(-2, outfd);
-						break;
+//					nc_reply* reply = comm_operation(con, rpc);
+//
+//					if (reply == NULL) {
+//						clb_print(NC_VERB_WARNING, "Message processing failed");
+//						rc_send_error(-2, outfd);
+//						break;
+//					}
+//					if (rc_send_reply(outfd, reply)) {
+//						clb_print(NC_VERB_WARNING, "Sending reply failed.");
+//					}
+
+					/*TODO: remove this*/
+					FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
+					nc_rpc* schema_rpc = nc_rpc_build("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+							  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
+							    "<identifier>ietf-system-tls-auth</identifier>"
+							    /*"<version>1,0</version>"*/
+							    /*"<format>yang</format>"*/
+							  "</get-schema>"
+							"</rpc>"
+//							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+//							"<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
+//							"<identifier>ietf-system-tls-auth</identifier>"
+//							"<version>1.0</version>"
+//							"<format>yang</format>"
+//							"</get-schema>"
+//							"</rpc>"
+							, NULL);
+//					nc_rpc* schema_rpc = nc_rpc_getschema("ietf-system-tls-auth", "1,0", "yang");
+					char* str_schema_rpc = nc_rpc_dump(schema_rpc);
+					fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
+					free(str_schema_rpc);
+					nc_reply* schema_reply = comm_operation(con, schema_rpc);
+					if (schema_reply == NULL) {
+						clb_print(NC_VERB_WARNING, "Schema request sending failed.");
+						fprintf(rjanik_log, "Schema request sending failed.");
 					}
-					if (rc_send_reply(outfd, reply)) {
-						clb_print(NC_VERB_WARNING, "Sending reply failed.");
-					}
+					char* str_reply = nc_rpc_dump(schema_reply);
+					clb_print(NC_VERB_DEBUG, str_reply);
+					fprintf(rjanik_log, "%s", str_reply);
+					free(str_reply);
+					fclose(rjanik_log);
+					nc_rpc_free(schema_rpc);
+					nc_rpc_free(schema_reply);
+					/*TODO: remove this*/
+
+
 					break;
 				default:
 					clb_print(NC_VERB_ERROR, "Illegal state reached, received unsupported NC_MSG_TYPE");
@@ -461,8 +530,8 @@ NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc) {
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc) {
 	if (!strcmp(msg->method, "GET")) {
 		if (!strcmp(msg->resource_locator, "/restconf/data")) {
-//			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
-			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get-config><source><running/></source></get-config></rpc>", NULL);
+			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
+//			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get-config><source><running/></source></get-config></rpc>", NULL);
 			if (*rpc == NULL) {
 				return -2; // internal error
 			}

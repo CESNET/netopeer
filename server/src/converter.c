@@ -413,6 +413,10 @@ tuple* query_yang(char* path, const module* mod) {
 	return NULL;
 }
 
+tuple* query_yang_augmented(char* path, const module* mod) {
+
+}
+
 yang_node* find_by_name(char* name, yang_node** node_list) {
 	int i = 0;
 	yang_node* current = node_list[i];

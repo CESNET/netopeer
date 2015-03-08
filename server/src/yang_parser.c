@@ -102,6 +102,19 @@ int get_grouping_yang_node_count(grouping* grp) {
 	return children_count;
 }
 
+int get_augment_yang_node_count(augment* a) {
+	if (a== NULL || a->node_list == NULL || a->node_list[0] == NULL) {
+		return 0;
+	}
+	int children_count = 0;
+	yang_node* current_node = a->node_list[0];
+	while (current_node != NULL) {
+		children_count++;
+		current_node = a->node_list[children_count];
+	}
+	return children_count;
+}
+
 int get_module_grouping_count(module* mod) {
 	dprint(D_TRACE, "Entered get_module_grouping_count(module name: %s).\n", (mod != NULL && mod->name != NULL) ? mod->name : "NULL");
 	if (mod == NULL || mod->grouping_list == NULL || mod->grouping_list[0] == NULL) {
@@ -115,6 +128,19 @@ int get_module_grouping_count(module* mod) {
 		current_grouping = mod->grouping_list[children_count];
 	}
 	dprint(D_TRACE, "Leaving get_module_grouping_count(result: %d).\n", children_count);
+	return children_count;
+}
+
+int get_module_augment_count(module* mod) {
+	if (mod == NULL || mod->augment_list == NULL || mod->augment_list[0] == NULL) {
+		return 0;
+	}
+	int children_count = 0;
+	augment* current_augment = mod->augment_list[0];
+	while (current_augment != NULL) {
+		children_count++;
+		current_augment = mod->augment_list[children_count];
+	}
 	return children_count;
 }
 
@@ -188,6 +214,21 @@ grouping* create_grouping(char* name) {
 	return grp;
 }
 
+augment* create_augment(char* name) {
+	augment* a = malloc(sizeof(augment));
+	if (a == NULL) {
+		error_and_quit(EXIT_FAILURE, "Could not allocate memory for augment.");
+	}
+	copy_string(&a->name, name);
+	a->node_list = malloc(sizeof(yang_node*));
+	if (a->node_list == NULL) {
+		error_and_quit(EXIT_FAILURE, "Could not allocate memory for list of yang_nodes.");
+	}
+	a->node_list[0] = NULL;
+	dprint(D_TRACE, "Leaving create_grouping.\n");
+	return a;
+}
+
 void destroy_grouping(grouping* grp) {
 	dprint(D_TRACE, "Entering destroy_grouping(grouping name: %s).\n", (grp != NULL && grp->name != NULL) ? grp->name : "NULL");
 	dprint(D_DEBUG, "Destroying grouping on address %p with name %s.\n", grp, (grp != NULL && grp->name != NULL) ? grp->name : "NULL");
@@ -210,10 +251,34 @@ void destroy_grouping(grouping* grp) {
 	dprint(D_TRACE, "Leaving destroy_grouping.\n");
 }
 
+void destroy_augment(augment* a) {
+	if (a == NULL) {
+		dprint(D_TRACE, "Leaving destroy_augment.\n");
+		return;
+	}
+	if (a->node_list != NULL) {
+		int node_index = 0;
+		yang_node* current_node = a->node_list[node_index];
+		while (current_node != NULL) {
+			destroy_yang_node(current_node, 1);
+			node_index++;
+			current_node = a->node_list[node_index];
+		}
+		free(a->node_list);
+	}
+	destroy_string(a->name);
+	free(a);
+	dprint(D_TRACE, "Leaving destroy_augment.\n");
+}
+
 void print_grouping(grouping* grp) {
 	dprint(D_TRACE, "Entered print_grouping(grouping name: %s).\n", grp->name);
 	print_grouping_with_indentation(grp, 0);
 	dprint(D_TRACE, "Leaving print_grouping.\n", grp->name);
+}
+
+void print_augment(augment* a) {
+	print_augment_with_indentation(a, 0);
 }
 
 void print_grouping_with_indentation(grouping* grp, int indentation_level) {
@@ -243,6 +308,31 @@ void print_grouping_with_indentation(grouping* grp, int indentation_level) {
 	dprint(D_TRACE, "Leaving print_grouping_with_indentation.\n");
 }
 
+void print_augment_with_indentation(augment* a, int indentation_level) {
+	char* indentation = prepare_indentation(indentation_level);
+
+	if (a== NULL) {
+		printf("%sNULL\n", indentation);
+		dprint(D_TRACE, "Leaving print_grouping_with_indentation.\n");
+		return;
+	}
+
+	printf("%saugment name: %s\n", indentation, a->name);
+	printf("%saugment yang nodes: {\n", indentation);
+
+	int node_index = 0;
+	yang_node* current_node = a->node_list[node_index];
+	while (current_node != NULL) {
+		print_yang_node_with_indentation(current_node, indentation_level + 1);
+		node_index++;
+		current_node = a->node_list[node_index];
+	}
+
+	printf("%s}\n", indentation);
+
+	destroy_string(indentation);
+}
+
 module* create_module(char* name) {
 	dprint(D_TRACE, "Entered create_module(name: %s).\n", name);
 	module* mod = malloc(sizeof(module));
@@ -252,6 +342,7 @@ module* create_module(char* name) {
 	copy_string(&mod->name, name);
 	mod->grouping_list = NULL;
 	mod->node = NULL;
+	mod->augment_list = NULL;
 	dprint(D_TRACE, "Leaving create_module.\n");
 	return mod;
 }
@@ -275,6 +366,16 @@ void destroy_module(module* mod) {
 	}
 	if (mod->node != NULL) {
 		destroy_yang_node(mod->node, 1);
+	}
+	if (mod->augment_list != NULL) {
+		int augment_index = 0;
+		augment* current_augment = mod->augment_list[augment_index];
+		while (current_augment != NULL) {
+			destroy_augment(current_augment);
+			augment_index++;
+			current_augment = mod->augment_list[augment_index];
+		}
+		free(mod->augment_list);
 	}
 	destroy_string(mod->name);
 	free(mod);
@@ -315,6 +416,24 @@ void print_module_with_indentation(const module* mod, int indentation_level) {
 
 	printf("%s}\n", indentation);
 
+	printf("%smodule augments: {\n", indentation);
+
+	if (mod->augment_list == NULL) {
+		printf("%sNULL\n", indentation);
+	} else {
+
+		int a_index = 0;
+		augment* current_augment = mod->augment_list[a_index];
+		while (current_augment != NULL) {
+			print_augment_with_indentation(current_augment,
+					indentation_level + 1);
+			a_index++;
+			current_augment = mod->augment_list[a_index];
+		}
+	}
+
+	printf("%s}\n", indentation);
+
 	destroy_string(indentation);
 	dprint(D_TRACE, "Leaving print_module_with_indentation.\n");
 }
@@ -343,6 +462,8 @@ module* read_module_from_file(FILE* file) {
 
 	fill_module(file, mod);
 	mod->node = read_yang_node_from_file(file, mod);
+
+
 
 	if (read_words_on_this_level_until(file, "}") <= 0) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '}' after module.\n");
@@ -448,8 +569,8 @@ yang_node* read_yang_node_from_file(FILE* file, module* mod) {
 				// copy yang node
 				yang_node* new_child = copy_yang_node(ynp);
 				int new_children_count = get_yang_node_children_count(new_node) + 1;
-				void* ret = realloc(new_node->node_list, (new_children_count + 1) * sizeof(yang_node*));
-				if (ret == NULL) {
+				new_node->node_list = realloc(new_node->node_list, (new_children_count + 1) * sizeof(yang_node*));
+				if (new_node->node_list == NULL) {
 					error_and_quit(EXIT_FAILURE, "read_yang_node_from_file: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(yang_node*));
 				}
 				new_node->node_list[new_children_count - 1] = new_child;
@@ -518,11 +639,17 @@ char* find_attribute(FILE* file, char* attr_name) {
 		error_and_quit(EXIT_FAILURE, "find_attribute: fgetpos: %s", strerror(errno));
 	}
 
-	int words_read = 0;
-	if (-1 == (words_read = read_words_on_this_level_until(file, attr_name))) {
-		// this shouldn't happen, attributes should never be on the lowest level
-		error_and_quit(EXIT_FAILURE, "find_attribute: got EOF before \"%s\"", attr_name);
-	} else if (words_read > 0) {
+	// TODO: screws us up, needs functionality of find_first_of_tl, e.g. incrementing level on \" as well
+	int /*words_read = 0, */status = -1;
+//	if (-1 == (words_read = read_words_on_this_level_until(file, attr_name))) {
+	if (-1 == (status = find_first_of_tl(file, &attr_name, 1))) {
+		 // this shouldn't happen, attributes should never be on the lowest level
+//		error_and_quit(EXIT_FAILURE, "find_attribute: got EOF before \"%s\"", attr_name);
+
+		// didn't find
+
+//	} else if (words_read > 0) {
+	} else {
 		char* attribute_value = read_word_dyn(file);
 		if (attribute_value[strlen(attribute_value) - 1] == ';') { // get rid of ; on the end of the word
 			attribute_value[strlen(attribute_value) - 1] = '\0'; // if there is none it won't be expected
@@ -740,12 +867,13 @@ int read_words_on_this_level_until_one_of(FILE* file, const char** const words, 
 	}
 	while ((wrd = read_word_dyn(file)) != NULL) {
 		read++;
-		if (!strcmp("{", wrd)) {
+		if (!strcmp("{", wrd)/* || !strncmp("\"", wrd, 1)*/) {
 			if (!level && !check_words(words, wrd, num_of_words)) {
 				goto found_word;
 			}
 			level++;
-		} else if (!strcmp("}", wrd)) {
+		} else if (!strcmp("}", wrd)/* || !strncmp("\"", wrd + (strlen(wrd) - 1), 1) ||
+				((strlen(wrd) > 2) && !strncmp("\"", wrd + (strlen(wrd) - 2), 1))*/) {
 			if (!level && !check_words(words, wrd, num_of_words)) {
 				goto found_word;
 			}
@@ -859,10 +987,26 @@ void fill_grouping(FILE* file, grouping* grp, module* mod) {
 	}
 }
 
+void fill_augment(FILE* file, augment* a, module* mod) {
+	yang_node* new_node = NULL;
+	while (NULL != (new_node = read_yang_node_from_file(file, mod))) {
+		int new_children_count = get_augment_yang_node_count(a) + 1;
+		if (NULL == (a->node_list = realloc(a->node_list, (new_children_count + 1) * sizeof(yang_node*)))) {
+			error_and_quit(EXIT_FAILURE, "fill_yang_node: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(yang_node*));
+		}
+		a->node_list[new_children_count - 1] = new_node;
+		a->node_list[new_children_count] = NULL;
+	}
+}
+
 void fill_module(FILE* file, module* mod) {
 	grouping* new_grouping = NULL;
-	mod->grouping_list = malloc(sizeof(grouping**));
-	mod->grouping_list[0] = new_grouping;
+	if (mod->grouping_list == NULL) {
+			mod->grouping_list = malloc(sizeof(grouping*));
+			mod->grouping_list[0] = NULL;
+		}
+//	mod->grouping_list = malloc(sizeof(grouping**));
+//	mod->grouping_list[0] = new_grouping;
 	while (NULL != (new_grouping = read_grouping_from_file(file, mod))) {
 		int new_children_count = get_module_grouping_count(mod) + 1;
 		// TODO: memory leak in case of error in realloc
@@ -873,6 +1017,53 @@ void fill_module(FILE* file, module* mod) {
 		mod->grouping_list[new_children_count] = NULL;
 	}
 }
+
+augment* read_augment_from_file(FILE* file, module* mod) {
+	if (file == NULL) {
+		return NULL;
+	}
+
+	if (read_words_on_this_level_until(file, "augment") <= 0) {
+		return NULL;
+	}
+
+	char* augment_name = read_word_dyn(file);
+//	printf("Found %s.\n-------------", augment_name);
+	char* bracket = read_word_dyn(file); // expecting {
+	if (strcmp(bracket, "{")) {
+		error_and_quit(EXIT_FAILURE, "read_augment_from_file: Corrupt file, expected '{' after %s (augment name).\n", augment_name);
+	}
+	augment* a = create_augment(augment_name);
+	destroy_string(augment_name);
+
+	fill_augment(file, a, mod);
+
+	if (0 >= read_words_on_this_level_until(file, "}")) {
+		error_and_quit(EXIT_FAILURE, "read_augment_from_file: Corrupt file, expected '}' after augment.\n");
+	}
+	return a;
+}
+
+void fill_module_with_augments(FILE* file, module* mod) {
+	augment* new_a = NULL;
+	if (mod->augment_list == NULL) {
+			mod->augment_list = malloc(sizeof(augment*));
+			mod->augment_list[0] = NULL;
+		}
+//	mod->grouping_list = malloc(sizeof(grouping**));
+//	mod->grouping_list[0] = new_grouping;
+	while (NULL != (new_a = read_augment_from_file(file, mod))) {
+		int new_children_count = get_module_augment_count(mod) + 1;
+		// TODO: memory leak in case of error in realloc
+		if (NULL == (mod->augment_list = realloc(mod->augment_list, (new_children_count + 1) * sizeof(augment*)))) {
+			error_and_quit(EXIT_FAILURE, "fill_module: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(augment*));
+		}
+		mod->augment_list[new_children_count - 1] = new_a;
+		mod->augment_list[new_children_count] = NULL;
+	}
+}
+
+
 
 /* ------------------------------------------------------------------------------------------------ */
 /* ------------------------------------ OTHER USEFUL FUNCTIONS ------------------------------------ */
@@ -959,4 +1150,86 @@ void print_file_and_reset(FILE* file) {
 		error_and_quit(EXIT_FAILURE, "print_file_and_reset: fsetpos: %s", strerror(errno));
 	}
 	dprint(D_TRACE, "Leaving print_file_and_reset.\n");
+}
+
+int add_groupings(module* to_this, module* from_this) {
+	int i = 0;
+	grouping* grp = from_this->grouping_list[i];
+
+	if (to_this->grouping_list == NULL) {
+		to_this->grouping_list = malloc(sizeof(grouping*));
+		to_this->grouping_list[0] = NULL;
+	}
+
+	while (grp != NULL) {
+		char* to_free = grp->name;
+		// TODO: get this from prefix (it is currently not parsed, easyfix)
+		int len = strlen("x509c2n:") + strlen(grp->name) + 1;
+		grp->name = malloc(len);
+		memset(grp->name, 0, len);
+		strncat(grp->name, "x509c2n:", 8);
+		strncat(grp->name, to_free, strlen(to_free));
+		printf("name is %s\n", grp->name);
+		free(to_free);
+
+		int new_children_count = get_module_grouping_count(to_this) + 1;
+		if (NULL == (to_this->grouping_list = realloc(to_this->grouping_list, (new_children_count + 1) * sizeof(grouping*)))) {
+			error_and_quit(EXIT_FAILURE, "add_grouping: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(grouping*));
+		}
+		to_this->grouping_list[new_children_count - 1] = grp;
+		to_this->grouping_list[new_children_count] = NULL;
+
+//		grouping* new_grouping = NULL;
+//		mod->grouping_list = malloc(sizeof(grouping**));
+//		mod->grouping_list[0] = new_grouping;
+//		while (NULL != (new_grouping = read_grouping_from_file(file, mod))) {
+//			int new_children_count = get_module_grouping_count(mod) + 1;
+//			// TODO: memory leak in case of error in realloc
+//			if (NULL == (mod->grouping_list = realloc(mod->grouping_list, (new_children_count + 1) * sizeof(grouping*)))) {
+//				error_and_quit(EXIT_FAILURE, "fill_module: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(grouping*));
+//			}
+//			mod->grouping_list[new_children_count - 1] = new_grouping;
+//			mod->grouping_list[new_children_count] = NULL;
+//		}
+
+		i++;
+		grp = from_this->grouping_list[i];
+	}
+	return 0;
+}
+
+
+module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_this) {
+	if (file == NULL || groupings_from_this == NULL) {
+		dprint(D_TRACE, "Invalid arguments.\n");
+		return NULL;
+	}
+	if (read_words_on_this_level_until(file, Y_MODULE) <= 0) {
+		dprint(D_TRACE, "Leaving read_module_from_file(read no module).\n");
+		return NULL;
+	}
+	char* module_name = read_word_dyn(file);
+	char* bracket = read_word_dyn(file); // expecting {
+	if (strcmp(bracket, "{")) {
+		error_and_quit(EXIT_FAILURE, "read_module_from_file_with_groupings: Corrupt file, expected '{' after %s (module name).\n", module_name);
+	}
+	module* mod = create_module(module_name);
+	destroy_string(module_name);
+
+	int res = add_groupings(mod, groupings_from_this);
+		if (res != 0) {
+			error_and_quit(EXIT_FAILURE, "error in adding groupings from module");
+		}
+
+	fill_module(file, mod);
+
+	mod->node = read_yang_node_from_file(file, mod);
+
+	fill_module_with_augments(file, mod);
+
+	if (read_words_on_this_level_until(file, "}") <= 0) {
+		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '}' after module.\n");
+	}
+	dprint(D_TRACE, "Leaving read_module_from_file(read module).\n");
+	return mod;
 }
