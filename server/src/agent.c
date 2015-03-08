@@ -56,6 +56,7 @@
 #include "common.c"
 #include "comm.h"
 #include "http_parser.h"
+#include "converter.h"
 
 /* Define libnetconf submodules necessary for the NETCONF agent */
 #define NC_INIT_AGENT (NC_INIT_NOTIF | NC_INIT_MONITORING | NC_INIT_WD | NC_INIT_SINGLELAYER)
@@ -86,6 +87,7 @@ struct ntf_thread_config {
 NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc);
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc);
 void rc_send_error(int status, int fd);
+void save(const char* str, const char* file);
 
 int rc_send_reply(int outfd, nc_reply* reply);
 // RESTCONF FUNCTIONS - END
@@ -232,7 +234,7 @@ cleanup:
 
 static void print_usage (char * progname)
 {
-	fprintf(stdout, "This program is not supposed for manual use, it should be\n");
+	fprintf(stdout, "This program is not meant for manual use, it should be\n");
 	fprintf(stdout, "started automatically as an SSH Subsystem by an SSH daemon.\n\n");
 	fprintf(stdout, "Usage: %s [-h] [-v level]\n", progname);
 	fprintf(stdout, " -h                  display help\n");
@@ -352,24 +354,7 @@ int main (int argc, char** argv)
 
 	nc_cpblts_add(capabilities, "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring");
 
-	clb_print(NC_VERB_VERBOSE, "Opening log");
-	FILE* log = fopen("/home/rjanik/agent_cap.log", "w");
-	if (log == NULL) {
-		clb_print(NC_VERB_ERROR, "Could not open log");
-		nc_cpblts_free(capabilities);
-		return EXIT_FAILURE;
 
-	}
-	clb_print(NC_VERB_VERBOSE, "Starting iteration");
-	nc_cpblts_iter_start(capabilities);
-	const char* cpblt = NULL;
-	clb_print(NC_VERB_VERBOSE, "Iterating");
-	while (NULL != (cpblt = nc_cpblts_iter_next(capabilities))) {
-		fprintf(log, "%s\n", cpblt);
-	}
-	clb_print(NC_VERB_VERBOSE, "Closing log");
-	fclose(log);
-	nc_cpblts_iter_start(capabilities);
 
 	/* TODO: the username is always root for now, use get_tls_username later */
 	if (comm_session_info_send(con, "root", nc_session_id, nc_cpblts_count(capabilities), capabilities)) {
@@ -384,6 +369,27 @@ int main (int argc, char** argv)
 		nc_cpblts_free(capabilities);
 		return EXIT_FAILURE;
 	}
+
+	clb_print(NC_VERB_VERBOSE, "Opening log");
+	/*TODO remove this, debug*/FILE* log = fopen("/home/rjanik/agent_cap.log", "w");
+	if (log == NULL) {
+		clb_print(NC_VERB_ERROR, "Could not open log");
+//		nc_cpblts_free(capabilities);
+		return EXIT_FAILURE;
+	}
+	clb_print(NC_VERB_VERBOSE, "Getting capabilities from session.");
+	struct nc_cpblts* cpb2 = nc_session_get_cpblts(netconf_con_dummy);
+	clb_print(NC_VERB_VERBOSE, "Starting iteration");
+	nc_cpblts_iter_start(cpb2);
+	const char* cpblt = NULL;
+	clb_print(NC_VERB_VERBOSE, "Iterating");
+	while (NULL != (cpblt = nc_cpblts_iter_next(cpb2))) {
+		fprintf(log, "%s\n", cpblt);
+	}
+	clb_print(NC_VERB_VERBOSE, "Closing log");
+	fclose(log);
+	nc_cpblts_free(cpb2);
+//	nc_cpblts_iter_start(capabilities);
 
 	clb_print(NC_VERB_VERBOSE, "Handshake finished");
 
@@ -422,6 +428,21 @@ int main (int argc, char** argv)
 					clb_print(NC_VERB_VERBOSE, "Processing client message");
 					/* TODO: there are a number of operation types that should never come out of rc_session_recv_rpc, check for these and end with error */
 					nc_reply* reply = comm_operation(con, rpc);
+
+					// TODO: testing
+					char* ietf_system = get_schema("ietf-system", con, "2");
+					save(ietf_system, "ietf-system.log");
+					char* ietf_system_tls_auth = get_schema("ietf-system-tls-auth", con, "3");
+					save(ietf_system_tls_auth, "ietf-system-tls-auth.log");
+					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
+					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
+
+					// TODO: copy_string strikes again, there's a bug hidden somewhere, can't successfully read the file
+//					read_module_from_string(ietf_system);
+
+					destroy_string(ietf_system);
+					destroy_string(ietf_system_tls_auth);
+					destroy_string(ietf_x509_cert_to_name);
 
 					if (reply == NULL) {
 						clb_print(NC_VERB_WARNING, "Message processing failed");
@@ -597,4 +618,19 @@ int rc_send_reply(int outfd, nc_reply* reply) {
 	}
 
 	return EXIT_SUCCESS;
+}
+
+void save(const char* str, const char* file) {
+	if (str == NULL || file == NULL) {
+		clb_print(NC_VERB_WARNING, "save: str or file is NULL");
+		return;
+	}
+	char buffer[1000];
+	snprintf(buffer, 1000, "/home/rjanik/Documents/%s", file);
+	FILE* f = fopen(buffer, "w");
+	if (f == NULL) {
+		return;
+	}
+	fprintf(f, "%s", str);
+	fclose(f);
 }

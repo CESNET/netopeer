@@ -233,7 +233,12 @@ module* read_module_from_file(FILE* file);
  * reads a yang module from string
  *   utilizes read_module_from_file TODO: reverse
  */
-module* read_module_from_string(char* string);
+module* read_module_from_string(const char* string);
+
+/*
+ * same sa above with groupings
+ */
+module* read_module_from_string_with_groupings(char* string, module* groupings_from_this);
 
 /*
  * reads a grouping from a file
@@ -398,7 +403,7 @@ int error_and_quit(int exit_code, char* error_format, ...);
  *   where _has to_ be destroyed afterwards
  *   where _has to_ be NULL
  */
-void copy_string(char** where, char* what);
+void copy_string(char** where, const char* what);
 
 /*
  * destroys a string

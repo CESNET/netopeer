@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <limits.h>
 #include "yang_parser.h"
+#include "comm.h"
 
 extern int debug_level;
 extern int errno;
@@ -455,7 +456,9 @@ module* read_module_from_file(FILE* file) {
 		dprint(D_TRACE, "Leaving read_module_from_file(read no module).\n");
 		return NULL;
 	}
+	clb_print(NC_VERB_VERBOSE, "module name is");
 	char* module_name = read_word_dyn(file);
+	clb_print(NC_VERB_VERBOSE, module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '{' after %s (module name).\n", module_name);
@@ -475,11 +478,30 @@ module* read_module_from_file(FILE* file) {
 	return mod;
 }
 
-module* read_module_from_string(char* string) {
+module* read_module_from_string(const char* string) {
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: started");
+	FILE* tmp_file = tmpfile();
+	if (tmp_file == NULL) {
+		clb_print(NC_VERB_ERROR, "read_module_from_string: returning NULL, could not get file");
+		return NULL;
+	}
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: writing file");
+	fprintf(tmp_file, "%s", string);
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: rewinding");
+	rewind(tmp_file);
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: reading");
+	module* mod = read_module_from_file(tmp_file);
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: closing");
+	fclose(tmp_file);
+	clb_print(NC_VERB_VERBOSE, "read_module_from_string: finished");
+	return mod;
+}
+
+module* read_module_from_string_with_groupings(char* string, module* groupings_from_this) {
 	FILE* tmp_file = tmpfile();
 	fprintf(tmp_file, "%s", string);
 	rewind(tmp_file);
-	module* mod = read_module_from_file(tmp_file);
+	module* mod = read_module_from_file_with_groupings(tmp_file, groupings_from_this);
 	fclose(tmp_file);
 	return mod;
 }
@@ -515,6 +537,7 @@ grouping* read_grouping_from_file(FILE* file, module* mod) {
 
 yang_node* read_yang_node_from_file(FILE* file, module* mod) {
 	dprint(D_TRACE, "Entered read_yang_node_from_file(is module NULL?: %s).\n", mod == NULL ? "yes" : "no");
+	clb_print(NC_VERB_VERBOSE, "started reading yang nodes");
 	if (file == NULL) {
 		dprint(D_TRACE, "Leaving read_yang_node_from_file(file is NULL).\n");
 		return NULL;
@@ -536,7 +559,7 @@ yang_node* read_yang_node_from_file(FILE* file, module* mod) {
 	}
 	destroy_string(bracket);
 
-	yang_node* new_node;
+	yang_node* new_node = NULL;
 
 	char* value = NULL;
 	switch(type) {
@@ -1089,18 +1112,46 @@ int error_and_quit(int exit_code, char* error_format, ...) {
 	exit(exit_code);
 }
 
-void copy_string(char** where, char* what) {
+void copy_string(char** where, const char* what) {
 	dprint(D_TRACE, "Entered copy_string(where: %s, what: %s).\n", *where, what);
-	if (what == NULL) {
-		*where = NULL;
+
+	if (where == NULL) {
+		dprint(D_INFO, "Didn't receive a valid destination.");
 		return;
 	}
+
+	if (*where == NULL && what == NULL) {
+		clb_print(NC_VERB_VERBOSE, "copy_string: not copying");
+		dprint(D_TRACE, "Leaving copy_string, didn't copy, both NULL.\n");
+		return;
+	}
+	if (*where == NULL && what != NULL) {
+		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying");
+		*where = malloc(strlen(what) + 1);
+		if (*where == NULL) {
+			error_and_quit(EXIT_FAILURE, "copy_string: Could not allocate memory for new string location. Memory amount requested (in bytes): %d.", strlen(what) + 1);
+		}
+		strncpy(*where, what, strlen(what) + 1);
+		dprint(D_TRACE, "Leaving copy_string, created destination and copied.\n");
+		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying - all ok");
+		return;
+	}
+	if (what == NULL) {
+		clb_print(NC_VERB_VERBOSE, "copy_string: freeing");
+		free(*where);
+		*where = NULL;
+		dprint(D_TRACE, "Leaving copy_string, freed destination, source NULL.\n");
+		return;
+	}
+	clb_print(NC_VERB_VERBOSE, "copy_string: freeing and copying");
+	free(*where);
 	*where = malloc(strlen(what) + 1);
 	if (*where == NULL) {
 		error_and_quit(EXIT_FAILURE, "copy_string: Could not allocate memory for new string location. Memory amount requested (in bytes): %d.", strlen(what) + 1);
 	}
 	strncpy(*where, what, strlen(what) + 1);
-	dprint(D_TRACE, "Leaving copy_string.\n");
+	dprint(D_TRACE, "Leaving copy_string, freed destination and copied.\n");
+	return;
 }
 
 void destroy_string(char* what) {
@@ -1108,6 +1159,8 @@ void destroy_string(char* what) {
 	if (what != NULL) {
 		dprint(D_TRACE, "destroy_string: Calling free() on \"what\", pointer is: %p, string is: %s.\n", what, what);
 		free(what);
+	} else {
+		dprint(D_TRACE, "destroy_string: Received NULL string, not freeing anything.\n");
 	}
 	dprint(D_TRACE, "Leaving destroy_string.\n");
 }

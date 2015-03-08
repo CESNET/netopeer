@@ -2,6 +2,7 @@
 #define CONVERTER_H_
 
 #include <libxml2/libxml/parser.h>
+#include <jansson.h>
 #include "yang_parser.h"
 #include "comm.h"
 
@@ -48,7 +49,7 @@ int list_contains(const unique_list* list, const char* string);
 int add_to_list(unique_list* list, char* string);
 void destroy_list(unique_list* list);
 
-char* get_schema(char* identifier, conn_t* con);
+char* get_schema(const char* identifier, conn_t* con, const char* message_id);
 /*
  * returns data from netconf rpc response in a newly allocated string
  */

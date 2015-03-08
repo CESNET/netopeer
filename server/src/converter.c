@@ -158,32 +158,43 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 	return NULL;
 }
 
-char* get_schema(char* identifier, conn_t* con) {
-	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
+char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
+//	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
 	char buffer[1000];
 	snprintf(buffer, 1000,
 			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-			"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+			"<rpc message-id=\"%s\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
 			  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
 			    "<identifier>%s</identifier>"
 			  "</get-schema>"
-			"</rpc>", identifier);
+			"</rpc>", message_id, identifier);
 	nc_rpc* schema_rpc = nc_rpc_build(buffer , NULL);
 	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
-	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
-	free(str_schema_rpc);
+//	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
+	if (NULL != str_schema_rpc) {
+		clb_print(NC_VERB_WARNING, "Could not dump rpc for get_schema!");
+		free(str_schema_rpc);
+	}
 	nc_reply* schema_reply = comm_operation(con, schema_rpc);
 	if (schema_reply == NULL) {
 		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
-		fprintf(rjanik_log, "Schema request sending failed.");
+		return NULL;
+//		fprintf(rjanik_log, "Schema request sending failed.");
 	}
 	char* str_reply = nc_rpc_dump(schema_reply);
-	clb_print(NC_VERB_DEBUG, str_reply);
-	fprintf(rjanik_log, "%s", str_reply);
-	fclose(rjanik_log);
+	clb_print(NC_VERB_VERBOSE, "Getting data from schema.");
+	char* schema = get_data(str_reply);
+//	clb_print(NC_VERB_DEBUG, schema); // DANGEROUS! big chunk of text into syslog
+//	fprintf(rjanik_log, "%s", str_reply);
+//	fclose(rjanik_log);
+	clb_print(NC_VERB_VERBOSE, "get_schema: sending schema back");
+	if (str_reply != NULL) {
+		clb_print(NC_VERB_WARNING, "get_schema: str_reply is NULL when freeing");
+		free(str_reply);
+	}
 	nc_rpc_free(schema_rpc);
 	nc_rpc_free(schema_reply);
-	return str_reply;
+	return schema;
 }
 
 json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con) {
@@ -210,7 +221,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
 		augmented = 1;
 		namespace_changed = 1;
-		char* schema = get_schema(namespace_name, con);
+		char* schema = get_schema(namespace_name, con, "1");
 		mod = read_module_from_string(schema);
 		free(schema);
 		// request yang model from server through con
@@ -621,32 +632,46 @@ void destroy_list(unique_list* list) {
 }
 
 char* get_data(const char* resp) {
-	char* ret = NULL;
+	if (resp == NULL) {
+		clb_print(NC_VERB_WARNING, "get_data: resp is NULL");
+		return NULL;
+	}
+
 	xmlDocPtr doc = xmlParseDoc((xmlChar*)resp);
 	if (doc == NULL) { // could not parse xml
 		// TODO: syslog, TODO, this is required for all instances where the program ends, it should never end
+		clb_print(NC_VERB_WARNING, "get_data: could not parse xml");
 		return NULL;
 	}
 	xmlNodePtr root = xmlDocGetRootElement(doc);
 	if (root == NULL) { // there is no root element
+		clb_print(NC_VERB_WARNING, "get_data: there is no valid root element");
 		xmlFreeDoc(doc);
 		return NULL;
 	}
 	if (strcmp((char*)root->name, "rpc-reply")) { // the root element is not rpc-reply
+		clb_print(NC_VERB_WARNING, "get_data: the root element is not rpc-reply");
+		xmlFreeDoc(doc);
+		xmlFreeNode(root);
 		return NULL;
 	}
 	xmlNodePtr data = root->xmlChildrenNode;
-	while(strcmp((char*)data->name, "data") && data != NULL) {
+	while(data != NULL && data->name != NULL && strcmp((char*)data->name, "data")) {
 		data = xmlNextElementSibling(data);
 	}
 	if (data == NULL) { // there is no data element in rpc-reply
+		clb_print(NC_VERB_WARNING, "get_data: there is no data element in rpc-reply element");
+		xmlFreeDoc(doc);
+		xmlFreeNode(root);
 		return NULL;
 	}
 
-	return (char*) data->xmlChildrenNode->content;
+	clb_print(NC_VERB_VERBOSE, "get_data: all ok, copying data");
+	char* ret = NULL;
+	copy_string(&ret, (char*) data->xmlChildrenNode->content);
 
+//	xmlFreeNode(root);
 	xmlFreeDoc(doc);
-	xmlFreeNode(root);
 
 	return ret;
 }
