@@ -5,16 +5,16 @@
 
 #include "http_parser.h"
 
-int strlen_until_whitespace(const char* string) {
-	int len = 0;
-	while (string[len] != '\0') {
-		if (isspace(string[len])) {
-			break;
-		}
-		len++;
-	}
-	return len;
-}
+//int strlen_until_whitespace(const char* string) {
+//	int len = 0;
+//	while (string[len] != '\0') {
+//		if (isspace(string[len])) {
+//			break;
+//		}
+//		len++;
+//	}
+//	return len;
+//}
 
 char* read_until_space(const char* string) {
 	int word_len = strlen_until_whitespace(string);

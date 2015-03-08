@@ -35,6 +35,7 @@ extern char* y_types[NUM_OF_TYPES];
 typedef struct yang_node yang_node;
 typedef struct grouping grouping;
 typedef struct module module;
+typedef struct augment augment;
 
 int debug_level;
 #define D_NO 0
@@ -95,6 +96,13 @@ struct module {
 	grouping** grouping_list;
 	/* the single yang_node in a module */
 	yang_node* node;
+
+	augment** augment_list;
+};
+
+struct augment {
+	char* name;
+	yang_node** node_list;
 };
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -203,6 +211,11 @@ void print_module(const module* mod);
  *   useful for debugging purposes
  */
 void print_module_with_indentation(const module* mod, int indentation_level);
+
+augment* create_augment(char* name);
+void destroy_augment();
+void print_augment(augment* grp);
+void print_augment_with_indentation(augment* grp, int indentation_level);
 
 /* ----------------------------------------------------------------------------------------------- */
 /* ------------------------------------ FUNCTIONS FOR PARSING ------------------------------------ */
@@ -368,6 +381,7 @@ void fill_grouping(FILE* file, grouping* grp, module* mod);
  * as fill_yang_node but fills module with groupings
  */
 void fill_module(FILE* file, module* mod);
+void fill_module_with_augments(FILE* file, module* mod);
 
 /* ------------------------------------------------------------------------------------------------ */
 /* ------------------------------------ OTHER USEFUL FUNCTIONS ------------------------------------ */
@@ -416,5 +430,7 @@ char* prepare_indentation(int indentation_level);
  *   resets fpos
  */
 void print_file_and_reset(FILE* file);
+
+module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_this);
 
 #endif // YANG_PARSER_H_

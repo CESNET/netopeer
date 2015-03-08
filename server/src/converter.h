@@ -3,6 +3,7 @@
 
 #include <libxml2/libxml/parser.h>
 #include "yang_parser.h"
+#include "comm.h"
 
 typedef enum {J_STRING, J_INTEGER, J_REAL, J_BOOLEAN, J_NULL, J_NUM_OF_TYPES} json_data_types;
 
@@ -46,5 +47,11 @@ unique_list* create_unique_list() ;
 int list_contains(const unique_list* list, const char* string);
 int add_to_list(unique_list* list, char* string);
 void destroy_list(unique_list* list);
+
+char* get_schema(char* identifier, conn_t* con);
+/*
+ * returns data from netconf rpc response in a newly allocated string
+ */
+char* get_data(const char* resp);
 
 #endif // CONVERTER_H_

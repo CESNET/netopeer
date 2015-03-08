@@ -421,53 +421,16 @@ int main (int argc, char** argv)
 				case NC_MSG_RPC:
 					clb_print(NC_VERB_VERBOSE, "Processing client message");
 					/* TODO: there are a number of operation types that should never come out of rc_session_recv_rpc, check for these and end with error */
-//					nc_reply* reply = comm_operation(con, rpc);
-//
-//					if (reply == NULL) {
-//						clb_print(NC_VERB_WARNING, "Message processing failed");
-//						rc_send_error(-2, outfd);
-//						break;
-//					}
-//					if (rc_send_reply(outfd, reply)) {
-//						clb_print(NC_VERB_WARNING, "Sending reply failed.");
-//					}
+					nc_reply* reply = comm_operation(con, rpc);
 
-					/*TODO: remove this*/
-					FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
-					nc_rpc* schema_rpc = nc_rpc_build("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
-							  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
-							    "<identifier>ietf-system-tls-auth</identifier>"
-							    /*"<version>1,0</version>"*/
-							    /*"<format>yang</format>"*/
-							  "</get-schema>"
-							"</rpc>"
-//							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
-//							"<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
-//							"<identifier>ietf-system-tls-auth</identifier>"
-//							"<version>1.0</version>"
-//							"<format>yang</format>"
-//							"</get-schema>"
-//							"</rpc>"
-							, NULL);
-//					nc_rpc* schema_rpc = nc_rpc_getschema("ietf-system-tls-auth", "1,0", "yang");
-					char* str_schema_rpc = nc_rpc_dump(schema_rpc);
-					fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
-					free(str_schema_rpc);
-					nc_reply* schema_reply = comm_operation(con, schema_rpc);
-					if (schema_reply == NULL) {
-						clb_print(NC_VERB_WARNING, "Schema request sending failed.");
-						fprintf(rjanik_log, "Schema request sending failed.");
+					if (reply == NULL) {
+						clb_print(NC_VERB_WARNING, "Message processing failed");
+						rc_send_error(-2, outfd);
+						break;
 					}
-					char* str_reply = nc_rpc_dump(schema_reply);
-					clb_print(NC_VERB_DEBUG, str_reply);
-					fprintf(rjanik_log, "%s", str_reply);
-					free(str_reply);
-					fclose(rjanik_log);
-					nc_rpc_free(schema_rpc);
-					nc_rpc_free(schema_reply);
-					/*TODO: remove this*/
-
+					if (rc_send_reply(outfd, reply)) {
+						clb_print(NC_VERB_WARNING, "Sending reply failed.");
+					}
 
 					break;
 				default:

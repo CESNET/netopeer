@@ -79,7 +79,8 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 		return dummy;
 	}
 	case JSON_ARRAY: {
-		for (unsigned int i = 0; i < json_array_size(root); i++) {
+		unsigned int i = 0;
+		for (i = 0; i < json_array_size(root); i++) {
 
 			if (json_array_get(root, i)->type > 1) {
 				xmlNodePtr child = xmlNewNode(NULL, (xmlChar*) array_name);
@@ -157,6 +158,34 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 	return NULL;
 }
 
+char* get_schema(char* identifier, conn_t* con) {
+	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
+	char buffer[1000];
+	snprintf(buffer, 1000,
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+			"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+			  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
+			    "<identifier>%s</identifier>"
+			  "</get-schema>"
+			"</rpc>", identifier);
+	nc_rpc* schema_rpc = nc_rpc_build(buffer , NULL);
+	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
+	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
+	free(str_schema_rpc);
+	nc_reply* schema_reply = comm_operation(con, schema_rpc);
+	if (schema_reply == NULL) {
+		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
+		fprintf(rjanik_log, "Schema request sending failed.");
+	}
+	char* str_reply = nc_rpc_dump(schema_reply);
+	clb_print(NC_VERB_DEBUG, str_reply);
+	fprintf(rjanik_log, "%s", str_reply);
+	fclose(rjanik_log);
+	nc_rpc_free(schema_rpc);
+	nc_rpc_free(schema_reply);
+	return str_reply;
+}
+
 json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con) {
 
 	json_t* parent = NULL;
@@ -175,10 +204,10 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 		if (node == NULL || node->ns == NULL || node->ns->href == NULL) {
 			error_and_quit(EXIT_FAILURE, "xml_to_json: could not find out namespace of root element");
 		}
-		namespace_name = strrchr(node->ns->href, ':') == NULL ? node->ns->href : strrchr(node->ns->href, ':') + 1;
-	} else if (strcmp(node->ns->href, namespace_name)) {
+		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
+	} else if (strcmp((char*)node->ns->href, namespace_name)) {
 		// check xmlns to see if we're dealing with something augmented
-		namespace_name = strrchr(node->ns->href, ':') == NULL ? node->ns->href : strrchr(node->ns->href, ':') + 1;
+		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
 		augmented = 1;
 		namespace_changed = 1;
 		char* schema = get_schema(namespace_name, con);
@@ -205,7 +234,8 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 
 		child = node->xmlChildrenNode; // reset pointer
 
-		for (int i = 0; i < listp->number; i++) {
+		int i;
+		for (i = 0; i < listp->number; i++) {
 
 			// query yang model for each child
 			append_to_path(p, (char*) listp->strings[i]);
@@ -220,7 +250,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 
 				while (child != NULL) {
 					if (!strcmp((char*) child->name, listp->strings[i])) {
-						json_object_set_new(json_node, (char*) child->name, xml_to_json(child, p, mod));
+						json_object_set_new(json_node, (char*) child->name, xml_to_json(child, p, mod, namespace_name, augmented, con));
 						break;
 					}
 					child = child->next;
@@ -235,7 +265,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 				json_t* array = json_array();
 				while (child != NULL) {
 					if (!strcmp((char*) child->name, listp->strings[i])) {
-						json_array_append(array, xml_to_json(child, p, mod));
+						json_array_append(array, xml_to_json(child, p, mod, namespace_name, augmented, con));
 					}
 					child = child->next;
 				}
@@ -308,43 +338,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 	return json_node;
 }
 
-char* get_schema(char* identifier, conn_t* con) {
-	// TODO get this working
-	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
-	nc_rpc* schema_rpc = nc_rpc_build("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-			"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
-			  "<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
-			    "<identifier>ietf-system-tls-auth</identifier>"
-			    "<version>1,0</version>"
-			    "<format>yang</format>"
-			  "</get-schema>"
-			"</rpc>"
-//							"<rpc message-id=\"2\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
-//							"<get-schema xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring\">"
-//							"<identifier>ietf-system-tls-auth</identifier>"
-//							"<version>1.0</version>"
-//							"<format>yang</format>"
-//							"</get-schema>"
-//							"</rpc>"
-			, NULL);
-//					nc_rpc* schema_rpc = nc_rpc_getschema("ietf-system-tls-auth", "1,0", "yang");
-	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
-	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
-	free(str_schema_rpc);
-	nc_reply* schema_reply = comm_operation(con, schema_rpc);
-	if (schema_reply == NULL) {
-		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
-		fprintf(rjanik_log, "Schema request sending failed.");
-	}
-	char* str_reply = nc_rpc_dump(schema_reply);
-	clb_print(NC_VERB_DEBUG, str_reply);
-	fprintf(rjanik_log, "%s", str_reply);
-	fclose(rjanik_log);
-	nc_rpc_free(schema_rpc);
-	nc_rpc_free(schema_reply);
-	return str_reply;
-}
-
 // accepted path format: "name1:name2:name3"
 tuple* query_yang(char* path, const module* mod) {
 
@@ -414,7 +407,8 @@ tuple* query_yang(char* path, const module* mod) {
 }
 
 tuple* query_yang_augmented(char* path, const module* mod) {
-
+	tuple* t = malloc(sizeof(tuple));
+	return t;
 }
 
 yang_node* find_by_name(char* name, yang_node** node_list) {
@@ -591,7 +585,8 @@ int list_contains(const unique_list* list, const char* string) {
 	if (string == NULL || list == NULL) {
 		error_and_quit(EXIT_FAILURE, "list_contains: unsupported parameters, list or string is NULL");
 	}
-	for (int i = 0; i < list->number; i++) {
+	int i = 0;
+	for (i = 0; i < list->number; i++) {
 		if (!strcmp(list->strings[i], string)) {
 			return 1; // found
 		}
@@ -617,9 +612,41 @@ void destroy_list(unique_list* list) {
 	if (list == NULL) {
 		return;
 	}
-	for (int i = 0; i < list->number; i++) {
+	int i = 0;
+	for (i = 0; i < list->number; i++) {
 		free(list->strings[i]);
 	}
 	free(list->strings);
 	free(list);
+}
+
+char* get_data(const char* resp) {
+	char* ret = NULL;
+	xmlDocPtr doc = xmlParseDoc((xmlChar*)resp);
+	if (doc == NULL) { // could not parse xml
+		// TODO: syslog, TODO, this is required for all instances where the program ends, it should never end
+		return NULL;
+	}
+	xmlNodePtr root = xmlDocGetRootElement(doc);
+	if (root == NULL) { // there is no root element
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+	if (strcmp((char*)root->name, "rpc-reply")) { // the root element is not rpc-reply
+		return NULL;
+	}
+	xmlNodePtr data = root->xmlChildrenNode;
+	while(strcmp((char*)data->name, "data") && data != NULL) {
+		data = xmlNextElementSibling(data);
+	}
+	if (data == NULL) { // there is no data element in rpc-reply
+		return NULL;
+	}
+
+	return (char*) data->xmlChildrenNode->content;
+
+	xmlFreeDoc(doc);
+	xmlFreeNode(root);
+
+	return ret;
 }

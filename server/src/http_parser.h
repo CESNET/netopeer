@@ -5,6 +5,8 @@
  * A simple http parser implementation just for our purposes.
  */
 
+#include "yang_parser.h"
+
 typedef struct httpmsg {
 	char* method; // NULL for response
 	char* resource_locator; // NULL for response
@@ -18,7 +20,7 @@ typedef struct httpmsg {
 /*
  * returns the length of the string until the first whitespace (not included)
  */
-int strlen_until_whitespace(const char* string);
+//int strlen_until_whitespace(const char* string);
 
 /*
  * returns a newly allocated string with the contents of string until the first whitespace (not included)

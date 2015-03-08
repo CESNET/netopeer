@@ -53,7 +53,8 @@ void destroy_yang_node(yang_node* node, int recursively) {
 	}
 	if (node->node_list != NULL) {
 		if (recursively) {
-			for (int i = 0; i < get_yang_node_children_count(node); i++) {
+			int i = 0;
+			for (i = 0; i < get_yang_node_children_count(node); i++) {
 				destroy_yang_node(node->node_list[i], 1);
 			}
 		}
@@ -159,7 +160,8 @@ yang_node* copy_yang_node(yang_node* node) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for copy of children list.");
 	}
 	new_node->node_list[get_yang_node_children_count(node)] = NULL;
-	for (int i = 0; i < get_yang_node_children_count(node); i++) {
+	int i = 0;
+	for (i = 0; i < get_yang_node_children_count(node); i++) {
 		new_node->node_list[i] = copy_yang_node(node->node_list[i]);
 	}
 
@@ -188,7 +190,8 @@ void print_yang_node_with_indentation(yang_node* node, int indentation_level) {
 	printf("%snode value: %s\n", indentation, node->value);
 	printf("%snode children: {\n", indentation);
 
-	for (int i = 0; i < get_yang_node_children_count(node); i++) {
+	int i = 0;
+	for (i = 0; i < get_yang_node_children_count(node); i++) {
 		print_yang_node_with_indentation(node->node_list[i], indentation_level + 1);
 	}
 
@@ -907,7 +910,8 @@ int check_words(const char** const words, const char* word, const int num_of_wor
 		dprint(D_TRACE, "Leaving check_words(NULL argument).\n");
 		return -1;
 	}
-	for (int i = 0; i < num_of_words; i++) {
+	int i = 0;
+	for (i = 0; i < num_of_words; i++) {
 		if (words[i] != NULL && !strcmp(word, words[i])) {
 			dprint(D_TRACE, "Leaving check_words(found word).\n");
 			return 0;
@@ -932,7 +936,8 @@ int find_first_of_tl(FILE* file, char* words[], const int num_of_words) {
 	char* word = NULL;
 	while (NULL != (word = read_word_dyn(file))) {
 		if (!level) {
-			for (int i = 0; i < num_of_words; i++) {
+			int i = 0;
+			for (i = 0; i < num_of_words; i++) {
 				if (!strcmp(word, words[i])) {
 					destroy_string(word);
 					dprint(D_TRACE, "Leaving find_first_of_tl(found word number: %d).\n", i);
