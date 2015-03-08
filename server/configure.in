@@ -434,7 +434,7 @@ SERVER_LIBS=$LIBS
 
 # pthread
 AX_PTHREAD([
-	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
+	AGENT_LIBS="$PTHREAD_LIBS $LIBS `pkg-config --cflags --libs jansson`"
 	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 	CC="$PTHREAD_CC"],
 	AC_MSG_ERROR([Missing POSIX threads support.])

@@ -5259,7 +5259,7 @@ fi
 # Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
 if test x"$ax_pthread_ok" = xyes; then
 
-	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
+	AGENT_LIBS="$PTHREAD_LIBS $LIBS `pkg-config --cflags --libs jansson`"
 	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 	CC="$PTHREAD_CC"
         :
