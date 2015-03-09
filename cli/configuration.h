@@ -40,6 +40,19 @@
 #include <dirent.h>
 
 /**
+ * @brief The CLI XML config options.
+ */
+struct cli_options {
+	struct nc_cpblts* cpblts;
+	char* config_editor;
+	int pubkey_auth_pref;
+	int passwd_auth_pref;
+	int inter_auth_pref;
+	char** keys;
+	int key_count;
+};
+
+/**
  * @brief Finds the current user's netconf dir
  * @return NULL on failure, dynamically allocated netconf dir path
  * otherwise
@@ -76,9 +89,9 @@ char* get_default_CRL_dir(DIR** ret_dir);
  * @brief Checks all the relevant files and directories creating any
  * that are missing, sets the saved configuration
  */
-void load_config(struct nc_cpblts **);
+void load_config(void);
 
 /**
  * @brief Saves the current configuration and command history
  */
-void store_config(struct nc_cpblts *);
+void store_config(void);

@@ -83,8 +83,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 #define NC_CAP_URL_ID       "urn:ietf:params:netconf:capability:url:1.0"
 
 extern int done;
-extern struct nc_cpblts * client_supported_cpblts;
-extern char* config_editor;
+extern struct cli_options* opts;
 volatile int verb_level = 0;
 
 void print_version ();
@@ -1392,45 +1391,45 @@ int cmd_capability (const char * arg)
 			break;
 		case CAP_ADD:
 			/* if adding first */
-			if (client_supported_cpblts == NULL) {
+			if (opts->cpblts == NULL) {
 				/* create structure */
-				client_supported_cpblts = nc_cpblts_new (NULL);
+				opts->cpblts = nc_cpblts_new (NULL);
 			}
-			if (nc_cpblts_add (client_supported_cpblts, optarg)) {
+			if (nc_cpblts_add (opts->cpblts, optarg)) {
 				ERROR ("capability", "Cannot add the capability \"%s\" to the client supported list.", optarg);
 				return EXIT_FAILURE;
 			}
-			store_config (client_supported_cpblts);
+			store_config ();
 			break;
 		case CAP_REM:
 			if (strcmp(optarg, "*") == 0) {
-				nc_cpblts_free(client_supported_cpblts);
-				client_supported_cpblts = nc_cpblts_new(NULL);
+				nc_cpblts_free(opts->cpblts);
+				opts->cpblts = nc_cpblts_new(NULL);
 			} else {
-				if (nc_cpblts_remove (client_supported_cpblts, optarg)) {
+				if (nc_cpblts_remove (opts->cpblts, optarg)) {
 					ERROR ("capability", "Cannot remove the capability \"%s\" from the client supported list.", optarg);
 					return EXIT_FAILURE;
 				}
 			}
-			if (nc_cpblts_get(client_supported_cpblts, "urn:ietf:params:netconf:base:1.0") == NULL &&
-					nc_cpblts_get(client_supported_cpblts, "urn:ietf:params:netconf:base:1.1") == NULL) {
+			if (nc_cpblts_get(opts->cpblts, "urn:ietf:params:netconf:base:1.0") == NULL &&
+					nc_cpblts_get(opts->cpblts, "urn:ietf:params:netconf:base:1.1") == NULL) {
 				ERROR ("capability", "No base capability left in the supported list. Connection to a server will be impossible.");
 			}
-			store_config (client_supported_cpblts);
+			store_config ();
 			break;
 		case CAP_LIST:
 			fprintf (stdout, "Client claims support of the following capabilities:\n");
-			nc_cpblts_iter_start (client_supported_cpblts);
-			while ((uri = nc_cpblts_iter_next (client_supported_cpblts)) != NULL) {
+			nc_cpblts_iter_start (opts->cpblts);
+			while ((uri = nc_cpblts_iter_next (opts->cpblts)) != NULL) {
 				fprintf (stdout, "%s\n", uri);
 			}
 			break;
 		case CAP_DEF:
-			if (client_supported_cpblts != NULL) {
-				nc_cpblts_free (client_supported_cpblts);
+			if (opts->cpblts != NULL) {
+				nc_cpblts_free (opts->cpblts);
 			}
-			client_supported_cpblts = nc_session_get_cpblts_default ();
-			store_config (client_supported_cpblts);
+			opts->cpblts = nc_session_get_cpblts_default ();
+			store_config ();
 			break;
 		default:
 			cmd_capability_help();
@@ -2552,7 +2551,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 		}
 
 		/* create the session */
-		session = nc_session_connect (host, port, user, client_supported_cpblts);
+		session = nc_session_connect (host, port, user, opts->cpblts);
 		if (session == NULL) {
 			ERROR(func_name, "connecting to the %s:%d as user \"%s\" failed.", host, port, user);
 			if (hostfree) {
@@ -2577,7 +2576,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 		if (verb_level == 0) {
 			fprintf(stdout, "\tWaiting 1 minute for call home on port %d...\n", port);
 		}
-		session = nc_callhome_accept(user, client_supported_cpblts, &timeout);
+		session = nc_callhome_accept(user, opts->cpblts, &timeout);
 		if (session == NULL ) {
 			if (timeout == 0) {
 				ERROR(func_name, "no call home")
@@ -2935,15 +2934,15 @@ int cmd_editor(const char *arg)
 	cmd = strtok_r(args, " ", &ptr);
 	cmd = strtok_r(NULL, " ", &ptr);
 	if (cmd == NULL) {
-		fprintf(stdout, "Current editor: %s\n", (config_editor == NULL ? "(default)" : config_editor));
+		fprintf(stdout, "Current editor: %s\n", (opts->config_editor == NULL ? "(default)" : opts->config_editor));
 	} else if (strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
 		cmd_editor_help();
 	} else if (strcmp(cmd, "--default") == 0) {
-		free(config_editor);
-		config_editor = NULL;
+		free(opts->config_editor);
+		opts->config_editor = NULL;
 	} else {
-		free(config_editor);
-		config_editor = strdup(cmd);
+		free(opts->config_editor);
+		opts->config_editor = strdup(cmd);
 	}
 
 	return EXIT_SUCCESS;

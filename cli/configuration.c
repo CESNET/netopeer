@@ -62,7 +62,8 @@
 #include "commands.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
-char* config_editor = NULL;
+
+struct cli_options* opts;
 
 extern int done;
 
@@ -250,14 +251,14 @@ char* get_default_CRL_dir(DIR** ret_dir) {
 	return crl_dir;
 }
 
-void load_config(struct nc_cpblts **cpblts) {
-	char * netconf_dir, *history_file, *config_file;
+void load_config(void) {
+	char* netconf_dir, *history_file, *config_file;
 #ifdef ENABLE_TLS
 	struct stat st;
 	char* trusted_dir, *crl_dir;
 #endif
-	char * tmp_cap;
-	int ret, history_fd, config_fd;
+	char* tmp_cap;
+	int i, ret, history_fd, config_fd;
 	xmlDocPtr config_doc;
 	xmlNodePtr config_cap, tmp_node;
 
@@ -266,13 +267,27 @@ void load_config(struct nc_cpblts **cpblts) {
 	xmlNodePtr tmp_auth, tmp_pref, tmp_key;
 #endif
 
-	assert(cpblts);
-
-	(*cpblts) = nc_session_get_cpblts_default();
-
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
 		return;
 	}
+
+	if (opts != NULL) {
+		for (i = 0; i < opts->key_count; ++i) {
+			free(opts->keys[i]);
+		}
+		nc_cpblts_free(opts->cpblts);
+		free(opts->config_editor);
+		free(opts->keys);
+		free(opts);
+	}
+	opts = calloc(1, sizeof(struct cli_options));
+	opts->cpblts = nc_session_get_cpblts_default();
+	opts->pubkey_auth_pref = 3;
+	nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, 3);
+	opts->passwd_auth_pref = 2;
+	nc_ssh_pref(NC_SSH_AUTH_PASSWORD, 2);
+	opts->inter_auth_pref = 1;
+	nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, 1);
 
 #ifdef ENABLE_TLS
 	if (asprintf (&trusted_dir, "%s/%s", netconf_dir, CA_DIR) == -1) {
@@ -373,18 +388,18 @@ void load_config(struct nc_cpblts **cpblts) {
 					while (tmp_node) {
 						if (xmlStrEqual(tmp_node->name, BAD_CAST "capabilities")) {
 							/* doc -> <netconf-client> -> <capabilities> */
-							nc_cpblts_free(*cpblts);
-							(*cpblts) = nc_cpblts_new(NULL);
+							nc_cpblts_free(opts->cpblts);
+							opts->cpblts = nc_cpblts_new(NULL);
 							config_cap = tmp_node->children;
 							while (config_cap) {
-								tmp_cap = (char *) xmlNodeGetContent(config_cap);
-								nc_cpblts_add(*cpblts, tmp_cap);
+								tmp_cap = (char*)xmlNodeGetContent(config_cap);
+								nc_cpblts_add(opts->cpblts, tmp_cap);
 								free(tmp_cap);
 								config_cap = config_cap->next;
 							}
 						} else if (xmlStrEqual(tmp_node->name, BAD_CAST "editor")) {
 							/* doc -> <netconf-client> -> <editor> */
-							config_editor = (char*) xmlNodeGetContent(tmp_node);
+							opts->config_editor = (char*)xmlNodeGetContent(tmp_node);
 						}
 #ifndef DISABLE_LIBSSH
 						else if (xmlStrEqual(tmp_node->name, BAD_CAST "authentication")) {
@@ -397,10 +412,13 @@ void load_config(struct nc_cpblts **cpblts) {
 										prio = (char*) xmlNodeGetContent(tmp_pref);
 										if (xmlStrEqual(tmp_pref->name, BAD_CAST "publickey")) {
 											nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, atoi(prio));
+											opts->pubkey_auth_pref = atoi(prio);
 										} else if (xmlStrEqual(tmp_pref->name, BAD_CAST "interactive")) {
 											nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, atoi(prio));
+											opts->inter_auth_pref = atoi(prio);
 										} else if (xmlStrEqual(tmp_pref->name, BAD_CAST "password")) {
 											nc_ssh_pref(NC_SSH_AUTH_PASSWORD, atoi(prio));
+											opts->passwd_auth_pref = atoi(prio);
 										}
 										free(prio);
 										tmp_pref = tmp_pref->next;
@@ -409,7 +427,7 @@ void load_config(struct nc_cpblts **cpblts) {
 									tmp_key = tmp_auth->children;
 									while (tmp_key) {
 										if (xmlStrEqual(tmp_key->name, BAD_CAST "key-path")) {
-											key_priv = (char*) xmlNodeGetContent(tmp_key);
+											key_priv = (char*)xmlNodeGetContent(tmp_key);
 											if (asprintf(&key_pub, "%s.pub", key_priv) == -1) {
 												ERROR("load_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 												ERROR("load_config", "Unable to set SSH keys pair due to the previous error.");
@@ -418,7 +436,10 @@ void load_config(struct nc_cpblts **cpblts) {
 												continue;
 											}
 											nc_set_keypair_path(key_priv, key_pub);
-											free(key_priv);
+											++opts->key_count;
+											opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+											opts->keys[opts->key_count-1] = key_priv;
+
 											free(key_pub);
 										}
 										tmp_key = tmp_key->next;
@@ -444,12 +465,12 @@ void load_config(struct nc_cpblts **cpblts) {
 /**
  * \brief Store configuration and history
  */
-void store_config(struct nc_cpblts *cpblts) {
-	char* netconf_dir, *history_file, *config_file;
+void store_config(void) {
+	char* netconf_dir, *history_file, *config_file, str_pref[8];
 	const char* cap;
-	int history_fd, ret;
+	int history_fd, ret, i;
 	xmlDocPtr config_doc;
-	xmlNodePtr config_caps;
+	xmlNodePtr config_node;
 	FILE *config_f;
 
 	if ((netconf_dir = get_netconf_dir()) == NULL) {
@@ -484,20 +505,48 @@ void store_config(struct nc_cpblts *cpblts) {
 		ERROR("store_config", "asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("store_config", "Unable to store configuration due to the previous error.");
 		config_file = NULL;
-	} else {
+	} else if (opts != NULL) {
 		config_doc = xmlNewDoc(BAD_CAST "1.0");
 		config_doc->children = xmlNewDocNode(config_doc, NULL, BAD_CAST "netconf-client", NULL);
 		if (config_doc != NULL) {
 			/* capabilities */
-			config_caps = xmlNewChild(config_doc->children, NULL, BAD_CAST "capabilities", NULL);
-			nc_cpblts_iter_start(cpblts);
-			while ((cap = nc_cpblts_iter_next(cpblts)) != NULL) {
-				xmlNewChild(config_caps, NULL, BAD_CAST "capability", BAD_CAST cap);
+			config_node = xmlNewChild(config_doc->children, NULL, BAD_CAST "capabilities", NULL);
+			nc_cpblts_iter_start(opts->cpblts);
+			while ((cap = nc_cpblts_iter_next(opts->cpblts)) != NULL) {
+				xmlNewChild(config_node, NULL, BAD_CAST "capability", BAD_CAST cap);
 			}
 
 			/* editor */
-			if (config_editor != NULL) {
-				xmlNewChild(config_doc->children, NULL, BAD_CAST "editor", BAD_CAST config_editor);
+			if (opts->config_editor != NULL) {
+				xmlNewChild(config_doc->children, NULL, BAD_CAST "editor", BAD_CAST opts->config_editor);
+			}
+
+			/* authentication */
+			if (opts->pubkey_auth_pref != 3 || opts->passwd_auth_pref != 2 || opts->inter_auth_pref != 1 || opts->key_count > 0) {
+				config_node = xmlNewChild(config_doc->children, NULL, BAD_CAST "authentication", NULL);
+
+				/* pref */
+				if (opts->pubkey_auth_pref != 3 || opts->passwd_auth_pref != 2 || opts->inter_auth_pref != 1) {
+					config_node = xmlNewChild(config_node, NULL, BAD_CAST "pref", NULL);
+
+					sprintf(str_pref, "%d", opts->pubkey_auth_pref);
+					xmlNewChild(config_node, NULL, BAD_CAST "publickey", BAD_CAST str_pref);
+					sprintf(str_pref, "%d", opts->passwd_auth_pref);
+					xmlNewChild(config_node, NULL, BAD_CAST "password", BAD_CAST str_pref);
+					sprintf(str_pref, "%d", opts->inter_auth_pref);
+					xmlNewChild(config_node, NULL, BAD_CAST "interactive", BAD_CAST str_pref);
+
+					config_node = config_node->parent;
+				}
+
+				/* keys */
+				if (opts->key_count > 0) {
+					config_node = xmlNewChild(config_node, NULL, BAD_CAST "keys", NULL);
+
+					for (i = 0; i < opts->key_count; ++i) {
+						xmlNewChild(config_node, NULL, BAD_CAST "key-path", BAD_CAST opts->keys[i]);
+					}
+				}
 			}
 
 			if ((config_f = fopen(config_file, "w")) == NULL || xmlDocFormatDump(config_f, config_doc, 1) < 0) {
@@ -511,9 +560,17 @@ void store_config(struct nc_cpblts *cpblts) {
 		}
 	}
 
-	if (done) {
-		free(config_editor);
+	if (done && opts != NULL) {
+		nc_cpblts_free(opts->cpblts);
+		free(opts->config_editor);
+		for (i = 0; i < opts->key_count; ++i) {
+			free(opts->keys[i]);
+		}
+		free(opts->keys);
+
+		free(opts);
 	}
+
 	free(netconf_dir);
 	free(config_file);
 }
