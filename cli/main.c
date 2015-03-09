@@ -98,9 +98,8 @@ void print_version()
 
 int main(int UNUSED(argc), char** UNUSED(argv))
 {
-	char *cmdline, *cmdstart;
+	char* cmd, *cmdline, *cmdstart, *lastcmd = NULL;
 	int i, j;
-	char *cmd;
 
 	initialize_readline();
 
@@ -152,11 +151,18 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 			/* if unknown command specified, tell it to user */
 			fprintf(stdout, "%s: no such command, type 'help' for more information.\n", cmd);
 		}
-		add_history(cmdline);
+
+		if (lastcmd == NULL || strcmp(lastcmd, cmdline) != 0) {
+			add_history(cmdline);
+		}
+
+		free(lastcmd);
+		lastcmd = cmdline;
 
 		free(cmd);
-		free(cmdline);
 	}
+
+	free(lastcmd);
 
 	store_config (client_supported_cpblts);
 	nc_cpblts_free(client_supported_cpblts);
