@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.22.2 -->
-<!-- CreationDate: Mon Mar  9 10:49:30 2015 -->
+<!-- CreationDate: Mon Mar  9 15:36:12 2015 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -1035,15 +1035,14 @@ configure&rsquo;s &minus;&minus;enable-tls option.</p>
 <i>cert_path</i> [<i>key_path</i>]]</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;display</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>display</b></p>
 
 <p style="margin-left:23%;">Displays all the recognized
 certificates in <i>~/.netopeer-cli/certs</i>. First the file
 name and serial number, then subject, issuer and validity
 are shown for each certificate.</p>
 
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;add</b>
+<p style="margin-left:17%; margin-top: 1em"><b>add</b>
 <i>cert_path</i></p>
 
 <p style="margin-left:23%;">Adds the <i>cert_path</i>
@@ -1051,8 +1050,7 @@ certificate to the trusted CA dir
 <i>~/.netopeer-cli/certs</i> and recalculates hashes of all
 the certificates.</p>
 
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;remove</b>
+<p style="margin-left:17%; margin-top: 1em"><b>remove</b>
 <i>cert_name</i></p>
 
 <p style="margin-left:23%;">Removes the <i>cert_name</i>
@@ -1063,7 +1061,7 @@ name, as displayed in the <b>cert display</b> command
 output.</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;displayown</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>displayown</b></p>
 
 <p style="margin-left:23%;">Shows information about the
 status of the default client certificates and displays
@@ -1072,7 +1070,7 @@ information about any relevant found client certificates
 <i>~/.netopeer-cli/client.pem</i>.</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;replaceown</b>
+<p style="margin-left:17%; margin-top: 1em"><b>replaceown</b>
 <i>cert_path</i> [<i>key_path</i>]</p>
 
 <p style="margin-left:23%;">Replaces the default client
@@ -1094,7 +1092,7 @@ configure&rsquo;s &minus;&minus;enable-tls option.</p>
 <i>crl_name</i>]</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;display</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>display</b></p>
 
 <p style="margin-left:23%;">Displays all the recognized
 CRLs in <i>~/.netopeer-cli/crl</i>. First the file name,
@@ -1102,16 +1100,14 @@ then issuer, last and next update dates are shown for each
 CRL followed by the serial numbers and revocation dates of
 all the revocated certificates.</p>
 
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;add</b>
+<p style="margin-left:17%; margin-top: 1em"><b>add</b>
 <i>crl_path</i></p>
 
 <p style="margin-left:23%;">Adds the <i>crl_path</i> CRL to
 the <i>~/.netopeer-cli/crl</i> dir and recalculates hashes
 of all the CRLs.</p>
 
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;remove</b>
+<p style="margin-left:17%; margin-top: 1em"><b>remove</b>
 <i>crl_name</i></p>
 
 <p style="margin-left:23%;">Removes the <i>cert_name</i>
@@ -1119,6 +1115,41 @@ CRL from the <i>~/.netopeer-cli/crl</i> dir and recalculates
 hashes of all the CRLs. <i>crl_name</i> is the CRL file
 name, as displayed in the <b>crl display</b> command
 output.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>auth</b>
+<br>
+Manage SSH authentication options - authentication
+preferences and private keys.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>auth</b>
+[&minus;&minus;help] [pref (publickey | password |
+interactive) [<i>preference</i>]] [keys [(add | remove)
+<i>path_to_the_key</i>]]</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>pref</b></p>
+
+<p style="margin-left:23%;">Manage specific authentication
+method preference.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>preference</i></p>
+
+<p style="margin-left:23%;">If specified, set it to the
+authentication method. If not, show the current preference
+of this method.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><b>keys</b></p>
+
+<p style="margin-left:23%;">Manage keys used for
+authentication.</p>
+
+
+<p style="margin-left:17%; margin-top: 1em"><i>path_to_the_key</i></p>
+
+<p style="margin-left:23%;">If specified, <b>add</b> or
+<b>delete</b> the keys. If not, show the current keys.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>editor</b>
 <br>

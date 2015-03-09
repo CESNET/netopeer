@@ -62,6 +62,9 @@ extern struct cli_options* opts;
 extern COMMAND commands[];
 extern char* cert_commands[];
 extern char* crl_commands[];
+extern char* auth_commands[];
+extern char* auth_pref_commands[];
+extern char* auth_keys_commands[];
 
 /* Generator function for command completion.  STATE lets us know whether
  to start from scratch; without any state (i.e. STATE == 0), then we
@@ -104,9 +107,14 @@ char* subcmd_generator(const char* text, int state) {
 		len = strlen(text);
 		if (strncmp(rl_line_buffer, "cert", 4) == 0) {
 			cmds = cert_commands;
-		}
-		if (strncmp(rl_line_buffer, "crl", 3) == 0) {
+		} else if (strncmp(rl_line_buffer, "crl", 3) == 0) {
 			cmds = crl_commands;
+		} else if (strncmp(rl_line_buffer, "auth pref", 9) == 0) {
+			cmds = auth_pref_commands;
+		} else if (strncmp(rl_line_buffer, "auth keys", 9) == 0) {
+			cmds = auth_keys_commands;
+		} else if (strncmp(rl_line_buffer, "auth", 4) == 0) {
+			cmds = auth_commands;
 		}
 	}
 
@@ -143,8 +151,14 @@ char** cmd_completion(const char* text, int start, int end) {
 	 directory. */
 	if (start == 0) {
 		matches = rl_completion_matches(text, cmd_generator);
-	} else if (strcmp(rl_line_buffer, "cert ") == 0 || strcmp(rl_line_buffer, "crl ") == 0 ||
-			(rl_line_buffer[end-1] != ' ' && (strncmp(rl_line_buffer, "cert ", 5) == 0 || strncmp(rl_line_buffer, "crl ", 4) == 0))) {
+	} else if (strcmp(rl_line_buffer, "cert ") == 0 || strcmp(rl_line_buffer, "crl ") == 0 || strcmp(rl_line_buffer, "auth ") == 0 ||
+			strcmp(rl_line_buffer, "auth pref ") == 0 || strcmp(rl_line_buffer, "auth keys ") == 0 ||
+				(rl_line_buffer[end-1] != ' ' &&
+					(strncmp(rl_line_buffer, "cert ", 5) == 0 ||
+					strncmp(rl_line_buffer, "crl ", 4) == 0 ||
+					strncmp(rl_line_buffer, "auth ", 5) == 0 ||
+					strncmp(rl_line_buffer, "auth pref ", 10) == 0 ||
+					strncmp(rl_line_buffer, "auth keys ", 10) == 0))) {
 		matches = rl_completion_matches(text, subcmd_generator);
 	}
 

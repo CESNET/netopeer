@@ -625,18 +625,18 @@ is compiled with configure's \-\-enable-tls option.
 [\-\-help] [display] [add \fIcert_path\fR] [remove \fIcert_name\fR] [displayown] [replaceown \fIcert_path\fR [\fIkey_path\fR]]
 .PP
 .RS 4
-.B \-\-display
+.B display
 .RS 4
 Displays all the recognized certificates in \fI~/.netopeer-cli/certs\fR. First the file name and serial number, then subject, issuer and validity are shown for each certificate.
 .RE
 .PP
-.B \-\-add
+.B add
 \fIcert_path\fR
 .RS 4
 Adds the \fIcert_path\fR certificate to the trusted CA dir \fI~/.netopeer-cli/certs\fR and recalculates hashes of all the certificates.
 .RE
 .PP
-.B \-\-remove
+.B remove
 \fIcert_name\fR
 .RS 4
 Removes the \fIcert_name\fR certificate from the trusted CA dir \fI~/.netopeer-cli/certs\fR and recalculates hashes of all the certificates. \fIcert_name\fR is the certificate file name, as displayed in the
@@ -644,12 +644,12 @@ Removes the \fIcert_name\fR certificate from the trusted CA dir \fI~/.netopeer-c
 command output.
 .RE
 .PP
-.B \-\-displayown
+.B displayown
 .RS 4
 Shows information about the status of the default client certificates and displays information about any relevant found client certificates \fI~/.netopeer-cli/client.crt\fR and \fI~/.netopeer-cli/client.pem\fR.
 .RE
 .PP
-.B \-\-replaceown
+.B replaceown
 \fIcert_path\fR [\fIkey_path\fR]
 .RS 4
 Replaces the default client certificates with the PEM certificate in \fIcert_path\fR or the CRT certificate \fIcert_path\fR and private key \fIkey_path\fR.
@@ -668,23 +668,54 @@ is compiled with configure's \-\-enable-tls option.
 [\-\-help] [display] [add \fIcrl_path\fR] [remove \fIcrl_name\fR]
 .PP
 .RS 4
-.B \-\-display
+.B display
 .RS 4
 Displays all the recognized CRLs in \fI~/.netopeer-cli/crl\fR. First the file name, then issuer, last and next update dates are shown for each CRL followed by the serial numbers and revocation dates of all the revocated certificates.
 .RE
 .PP
-.B \-\-add
+.B add
 \fIcrl_path\fR
 .RS 4
 Adds the \fIcrl_path\fR CRL to the \fI~/.netopeer-cli/crl\fR dir and recalculates hashes of all the CRLs.
 .RE
 .PP
-.B \-\-remove
+.B remove
 \fIcrl_name\fR
 .RS 4
 Removes the \fIcert_name\fR CRL from the \fI~/.netopeer-cli/crl\fR dir and recalculates hashes of all the CRLs. \fIcrl_name\fR is the CRL file name, as displayed in the
 .B crl display
 command output.
+.RE
+.PP
+.SS  auth
+Manage SSH authentication options - authentication preferences and private keys.
+.PP
+.B auth
+[\-\-help] [pref (publickey | password | interactive) [\fIpreference\fR]] [keys [(add | remove) \fIpath_to_the_key\fR]]
+.PP
+.RS 4
+.B pref
+.RS 4
+Manage specific authentication method preference.
+.RE
+.PP
+\fIpreference\fR
+.RS 4
+If specified, set it to the authentication method. If not, show the current preference of this method.
+.RE
+.PP
+.B keys
+.RS 4
+Manage keys used for authentication.
+.RE
+.PP
+\fIpath_to_the_key\fR
+.RS 4
+If specified,
+.B add
+or
+.B delete
+the keys. If not, show the current keys.
 .RE
 .PP
 .SS  editor
