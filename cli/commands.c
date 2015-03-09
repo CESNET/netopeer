@@ -626,9 +626,11 @@ int cmd_editconfig (const char *arg)
 				}
 			}
 
-			/* make a copy of the content to allow closing the file */
+			/* dump the content */
 			xmlDocDumpMemory(doc, (xmlChar**)&config, NULL);
 			source = NC_DATASTORE_CONFIG;
+
+			xmlFreeDoc(doc);
 
 			break;
 		case 'd':
