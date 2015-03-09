@@ -27,11 +27,13 @@ yang_node* create_yang_node(char* name, node_type type, char* value) {
 	if (node == NULL) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for yang_node.");
 	}
+	node->name = NULL;
 	copy_string(&node->name, name);
 	node->type = type;
 	if (value == NULL) {
 		node->value = NULL;
 	} else {
+		node->value = NULL;
 		copy_string(&node->value, value);
 	}
 
@@ -152,6 +154,8 @@ yang_node* copy_yang_node(yang_node* node) {
 	if (new_node == NULL) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for copy of yang node.");
 	}
+	new_node->name = NULL;
+	new_node->value = NULL;
 	copy_string(&new_node->name, node->name);
 	new_node->type = node->type;
 	copy_string(&new_node->value, node->value);
@@ -208,6 +212,7 @@ grouping* create_grouping(char* name) {
 	if (grp == NULL) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for grouping.");
 	}
+	grp->name = NULL;
 	copy_string(&grp->name, name);
 	grp->node_list = malloc(sizeof(yang_node*));
 	if (grp->node_list == NULL) {
@@ -223,6 +228,7 @@ augment* create_augment(char* name) {
 	if (a == NULL) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for augment.");
 	}
+	a->name = NULL;
 	copy_string(&a->name, name);
 	a->node_list = malloc(sizeof(yang_node*));
 	if (a->node_list == NULL) {
@@ -343,6 +349,7 @@ module* create_module(char* name) {
 	if (mod == NULL) {
 		error_and_quit(EXIT_FAILURE, "Could not allocate memory for module.");
 	}
+	mod->name = NULL;
 	copy_string(&mod->name, name);
 	mod->grouping_list = NULL;
 	mod->node = NULL;
@@ -490,6 +497,7 @@ module* read_module_from_string(const char* string) {
 	clb_print(NC_VERB_VERBOSE, "read_module_from_string: rewinding");
 	rewind(tmp_file);
 	clb_print(NC_VERB_VERBOSE, "read_module_from_string: reading");
+//	sleep(15);
 	module* mod = read_module_from_file(tmp_file);
 	clb_print(NC_VERB_VERBOSE, "read_module_from_string: closing");
 	fclose(tmp_file);
