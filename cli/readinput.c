@@ -50,13 +50,14 @@
 #include <readline/readline.h>
 
 #include "commands.h"
+#include "configuration.h"
 
 #define EDITOR_DEFAULT "vi"
 #define EDITOR_ENV "NETOPEER_CLI_EDITOR"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
-extern char* config_editor;
+extern struct cli_options* opts;
 
 extern COMMAND commands[];
 extern char* cert_commands[];
@@ -172,7 +173,7 @@ char* readinput(const char* instruction) {
 
 	editor = getenv(EDITOR_ENV);
 	if (editor == NULL) {
-		editor = config_editor;
+		editor = opts->config_editor;
 	}
 	if (editor == NULL) {
 		editor = getenv("EDITOR");

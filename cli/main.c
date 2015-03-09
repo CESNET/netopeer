@@ -56,7 +56,6 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 volatile int done = 0;
 extern COMMAND commands[];
-struct nc_cpblts * client_supported_cpblts;
 
 void clb_print(NC_VERB_LEVEL level, const char* msg)
 {
@@ -108,12 +107,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 	nc_callback_print(clb_print);
 	nc_callback_error_reply(clb_error_print);
 
-	/* set authentication preferences */
-	nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, 3);
-	nc_ssh_pref(NC_SSH_AUTH_PASSWORD, 2);
-	nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, 1);
-
-	load_config (&client_supported_cpblts);
+	load_config();
 
 	while (!done) {
 		/* get the command from user */
@@ -164,8 +158,7 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 
 	free(lastcmd);
 
-	store_config (client_supported_cpblts);
-	nc_cpblts_free(client_supported_cpblts);
+	store_config();
 	/* bye, bye */
 	return (EXIT_SUCCESS);
 }
