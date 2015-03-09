@@ -196,8 +196,11 @@ try:
 			try:
 				modules = startup.getElementsByTagName('modules')[0]
 			except IndexError:
-				netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
-				netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
+				try:
+					netopeer = startup.getElementsByTagName('netopeer')[0]
+				except IndexError:
+					netopeer = startup.appendChild(config.createElementNS('urn:cesnet:tmc:netopeer:1.0','netopeer'))
+					netopeer.setAttribute('xmlns', 'urn:cesnet:tmc:netopeer:1.0')
 				modules = netopeer.appendChild(config.createElement('modules'))
 
 			module = modules.appendChild(config.createElement('module'))
