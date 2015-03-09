@@ -93,58 +93,78 @@ struct nc_session* session = NULL;
 #define BUFFER_SIZE 1024
 
 COMMAND commands[] = {
-		{"help", cmd_help, "Display this text"},
-		{"connect", cmd_connect, "Connect to a NETCONF server"},
+	{"help", cmd_help, "Display this text"},
+	{"connect", cmd_connect, "Connect to a NETCONF server"},
 #ifndef DISABLE_CALLHOME
-		{"listen", cmd_listen, "Listen for a NETCONF Call Home"},
+	{"listen", cmd_listen, "Listen for a NETCONF Call Home"},
 #endif
-		{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
-		{"commit", cmd_commit, "NETCONF <commit> operation"},
-		{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
-		{"delete-config", cmd_deleteconfig, "NETCONF <delete-config> operation"},
-		{"discard-changes", cmd_discardchanges, "NETCONF <discard-changes> operation"},
-		{"edit-config", cmd_editconfig, "NETCONF <edit-config> operation"},
-		{"get", cmd_get, "NETCONF <get> operation"},
-		{"get-config", cmd_getconfig, "NETCONF <get-config> operation"},
-		{"get-schema", cmd_getschema, "NETCONF <get-schema> operation"},
-		{"kill-session", cmd_killsession, "NETCONF <kill-session> operation"},
-		{"lock", cmd_lock, "NETCONF <lock> operation"},
-		{"unlock", cmd_unlock, "NETCONF <unlock> operation"},
-		{"validate", cmd_validate, "NETCONF <validate> operation"},
+	{"disconnect", cmd_disconnect, "Disconnect from a NETCONF server"},
+	{"commit", cmd_commit, "NETCONF <commit> operation"},
+	{"copy-config", cmd_copyconfig, "NETCONF <copy-config> operation"},
+	{"delete-config", cmd_deleteconfig, "NETCONF <delete-config> operation"},
+	{"discard-changes", cmd_discardchanges, "NETCONF <discard-changes> operation"},
+	{"edit-config", cmd_editconfig, "NETCONF <edit-config> operation"},
+	{"get", cmd_get, "NETCONF <get> operation"},
+	{"get-config", cmd_getconfig, "NETCONF <get-config> operation"},
+	{"get-schema", cmd_getschema, "NETCONF <get-schema> operation"},
+	{"kill-session", cmd_killsession, "NETCONF <kill-session> operation"},
+	{"lock", cmd_lock, "NETCONF <lock> operation"},
+	{"unlock", cmd_unlock, "NETCONF <unlock> operation"},
+	{"validate", cmd_validate, "NETCONF <validate> operation"},
 #ifndef DISABLE_NOTIFICATIONS
-		{"subscribe", cmd_subscribe, "NETCONF Event Notifications <create-subscription> operation"},
+	{"subscribe", cmd_subscribe, "NETCONF Event Notifications <create-subscription> operation"},
 #endif
 #ifdef ENABLE_TLS
-		{"cert", cmd_cert, "Manage trusted or your own certificates"},
-		{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
+	{"cert", cmd_cert, "Manage trusted or your own certificates"},
+	{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
 #endif
-		{"status", cmd_status, "Print information about the current NETCONF session"},
-		{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
-		{"verbose", cmd_verbose, "Enable/disable verbose messages"},
-		{"quit", cmd_quit, "Quit the program"},
-		{"capability", cmd_capability, "Add/remove capability to/from the list of supported capabilities"},
-		{"editor", cmd_editor, "Manage the editor to be used for manual XML pasting/writing"},
+	{"status", cmd_status, "Print information about the current NETCONF session"},
+	{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
+	{"verbose", cmd_verbose, "Enable/disable verbose messages"},
+	{"quit", cmd_quit, "Quit the program"},
+	{"auth", cmd_auth, "Manage SSH autentication options"},
+	{"capability", cmd_capability, "Add/remove capability to/from the list of supported capabilities"},
+	{"editor", cmd_editor, "Manage the editor to be used for manual XML pasting/writing"},
 /* synonyms for previous commands */
-		{"debug", cmd_debug, NULL},
-		{"?", cmd_help, NULL},
-		{"exit", cmd_quit, NULL},
-		{NULL, NULL, NULL}
+	{"debug", cmd_debug, NULL},
+	{"?", cmd_help, NULL},
+	{"exit", cmd_quit, NULL},
+	{NULL, NULL, NULL}
 };
 
 char* cert_commands[] = {
-		"display",
-		"add",
-		"remove",
-		"displayown",
-		"replaceown",
-		NULL
+	"display",
+	"add",
+	"remove",
+	"displayown",
+	"replaceown",
+	NULL
 };
 
 char* crl_commands[] = {
-		"display",
-		"add",
-		"remove",
-		NULL
+	"display",
+	"add",
+	"remove",
+	NULL
+};
+
+char* auth_commands[] = {
+	"pref",
+	"keys",
+	NULL
+};
+
+char* auth_pref_commands[] = {
+	"publickey",
+	"password",
+	"interactive",
+	NULL
+};
+
+char* auth_keys_commands[] = {
+	"add",
+	"remove",
+	NULL
 };
 
 typedef enum GENERIC_OPS {
@@ -1867,6 +1887,126 @@ void parse_cert(const char* name, const char* path) {
 	X509_free(cert);
 	BIO_vfree(bio_out);
 	fclose(fp);
+}
+
+void cmd_auth_help ()
+{
+	fprintf(stdout, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
+}
+
+int cmd_auth (const char* arg)
+{
+	int i;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *pubkey;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_auth_help();
+
+	} else if (strcmp(cmd, "pref") == 0) {
+		cmd = strtok_r(NULL, " ", &ptr);
+		if (cmd == NULL) {
+			ERROR("auth pref", "Missing the SSH authentication method argument");
+			return (EXIT_FAILURE);
+		}
+
+		if (strcmp(cmd, "publickey") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'publickey' SSH authentication method preference: %d\n", opts->pubkey_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, atoi(cmd));
+				opts->pubkey_auth_pref = atoi(cmd);
+			}
+		} else if (strcmp(cmd, "interactive") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'interactive' SSH authentication method preference: %d\n", opts->inter_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, atoi(cmd));
+				opts->inter_auth_pref = atoi(cmd);
+			}
+		} else if (strcmp(cmd, "password") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'password' SSH authentication method preference: %d\n", opts->passwd_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_PASSWORD, atoi(cmd));
+				opts->passwd_auth_pref = atoi(cmd);
+			}
+		} else {
+			ERROR("auth pref", "Unknown authentication method (%s)", cmd);
+			return (EXIT_FAILURE);
+		}
+
+	} else if (strcmp(cmd, "keys") == 0) {
+		cmd = strtok_r(NULL, " ", &ptr);
+		if (cmd == NULL) {
+			fprintf(stdout, "The private keys used for SSH authentication:\n");
+			if (opts->key_count == 0) {
+				fprintf(stdout, "(default)\n");
+			} else {
+				for (i = 0; i < opts->key_count; ++i) {
+					fprintf(stdout, "%s\n", opts->keys[i]);
+				}
+			}
+		} else if (strcmp(cmd, "add") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				ERROR("auth keys add", "Missing the key path");
+				return (EXIT_FAILURE);
+			}
+
+			asprintf(&pubkey, "%s.pub", cmd);
+			nc_set_keypair_path(cmd, pubkey);
+
+			++opts->key_count;
+			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+			opts->keys[opts->key_count-1] = strdup(cmd);
+
+			if (eaccess(cmd, R_OK) != 0) {
+				ERROR("auth keys add", "The new private key is not accessible (%s), but added anyway", strerror(errno));
+			}
+			if (eaccess(pubkey, R_OK) != 0) {
+				ERROR("auth keys add", "The public key for the new private key is not accessible (%s), but added anyway", strerror(errno));
+			}
+			free(pubkey);
+
+		} else if (strcmp(cmd, "remove") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				ERROR("auth keys remove", "Missing the key path");
+				return (EXIT_FAILURE);
+			}
+
+			for (i = 0; i < opts->key_count; ++i) {
+				if (strcmp(cmd, opts->keys[i]) == 0) {
+					break;
+				}
+			}
+			if (i == opts->key_count) {
+				ERROR("auth keys remove", "Unknown key");
+				return (EXIT_FAILURE);
+			}
+
+			free(opts->keys[i]);
+			memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i)-1);
+			--opts->key_count;
+			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+
+		} else {
+			ERROR("auth keys", "Wrong argument (%s)", cmd);
+			return (EXIT_FAILURE);
+		}
+
+	} else {
+		ERROR("auth", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
 }
 
 void cmd_cert_help ()
