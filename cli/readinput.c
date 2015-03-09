@@ -164,7 +164,6 @@ void initialize_readline(void) {
 	rl_attempted_completion_function = cmd_completion;
 }
 
-/* every new line must begin with '#' (except the first) in the instruction not to be confused with the input */
 char* readinput(const char* instruction) {
 	int fd = -1, ret, size;
 	pid_t pid, wait_pid;
