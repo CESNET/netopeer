@@ -54,6 +54,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <time.h>
+#include <libxml/tree.h>
 
 #ifndef DISABLE_NOTIFICATIONS
 #include <pthread.h>
@@ -564,10 +565,10 @@ void cmd_editconfig_help()
 
 int cmd_editconfig (const char *arg)
 {
+	xmlDocPtr doc;
+	xmlNodePtr root;
 	int c;
-	char *config_m = NULL, *config = NULL;
-	int config_fd;
-	struct stat config_stat;
+	char *config = NULL;
 	NC_DATASTORE target, source = NC_DATASTORE_ERROR;
 	NC_EDIT_DEFOP_TYPE defop = 0; /* do not set this parameter by default */
 	NC_EDIT_ERROPT_TYPE erropt = 0; /* do not set this parameter by default */
@@ -607,31 +608,27 @@ int cmd_editconfig (const char *arg)
 				return (EXIT_FAILURE);
 			}
 
-			/* open edit configuration data from the file */
-			config_fd = open(optarg, O_RDONLY);
-			if (config_fd == -1) {
-				ERROR("edit-config", "unable to open the edit data file (%s).", strerror(errno));
+			/* read the configuration */
+			doc = xmlReadFile(optarg, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN|XML_PARSE_NOERROR|XML_PARSE_NOWARNING);
+			if (doc == NULL) {
+				ERROR("edit-config", "failed to parse the file.");
 				clear_arglist(&cmd);
 				return (EXIT_FAILURE);
 			}
 
-			/* map content of the file into the memory */
-			fstat(config_fd, &config_stat);
-			config_m = (char*) mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
-			if (config_m == MAP_FAILED) {
-				ERROR("edit-config", "mmapping of the edit data file failed (%s).", strerror(errno));
-				clear_arglist(&cmd);
-				close(config_fd);
-				return (EXIT_FAILURE);
+			/* remove the <config> root if included */
+			root = xmlDocGetRootElement(doc);
+			if (root != NULL) {
+				if (xmlStrEqual(root->name, BAD_CAST "config") && xmlStrEqual(root->ns->href, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0")) {
+					xmlDocSetRootElement(doc, root->children);
+					xmlUnlinkNode(root);
+					xmlFree(root);
+				}
 			}
 
 			/* make a copy of the content to allow closing the file */
-			config = strdup(config_m);
+			xmlDocDumpMemory(doc, (xmlChar**)&config, NULL);
 			source = NC_DATASTORE_CONFIG;
-
-			/* unmap edit data file and close it */
-			munmap(config_m, config_stat.st_size);
-			close(config_fd);
 
 			break;
 		case 'd':
@@ -1086,7 +1083,6 @@ void cmd_get_help ()
 	}
 	fprintf (stdout, "get [--help] %s[--filter [file]]\n", defaults);
 }
-
 
 int cmd_get (const char *arg)
 {
