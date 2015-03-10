@@ -608,11 +608,6 @@ int cmd_editconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("get", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -729,6 +724,12 @@ int cmd_editconfig (const char *arg)
 		}
 	}
 
+	if (session == NULL) {
+		ERROR("get", "NETCONF session not established, use \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
+	}
+
 	/* get what datastore is target of the operation */
 	target = get_datastore("target", "edit-config", &cmd, optind, NULL);
 
@@ -816,11 +817,6 @@ int cmd_validate (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("validate", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -874,6 +870,12 @@ int cmd_validate (const char *arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
+	}
+
+	if (session == NULL) {
+		ERROR("validate", "NETCONF session not established, use \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
 	}
 
 	/* if the config option not set, parse remaining arguments to get source */
@@ -960,11 +962,6 @@ int cmd_copyconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("copy-config", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1049,6 +1046,12 @@ int cmd_copyconfig (const char *arg)
 		}
 	}
 
+	if (session == NULL) {
+		ERROR("copy-config", "NETCONF session not established, use \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
+	}
+
 	target = get_datastore("target", "copy-config", &cmd, optind, &url_dst);
 
 	/* arglist is no more needed */
@@ -1123,11 +1126,6 @@ int cmd_get (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("get", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1164,6 +1162,11 @@ int cmd_get (const char *arg)
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
+
+	if (session == NULL) {
+		ERROR("get", "NETCONF session not established, use \'connect\' command.");
+		return (EXIT_FAILURE);
+	}
 
 	/* create requests */
 	rpc = nc_rpc_get (filter);
@@ -1235,16 +1238,6 @@ int cmd_deleteconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("delete-config", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
-	if (!nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && !nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-		ERROR ("delete-config", "operation cannot be used in the current session.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1261,6 +1254,18 @@ int cmd_deleteconfig (const char *arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
+	}
+
+	if (session == NULL) {
+		ERROR("delete-config", "NETCONF session not established, use \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
+	}
+
+	if (!nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && !nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
+		ERROR ("delete-config", "operation cannot be used in the current session.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
 	}
 
 	target = get_datastore("target", "delete-config", &cmd, optind, &url);
@@ -1308,11 +1313,6 @@ int cmd_killsession (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("kill-session", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1355,6 +1355,11 @@ int cmd_killsession (const char *arg)
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
+
+	if (session == NULL) {
+		ERROR("kill-session", "NETCONF session not established, use \'connect\' command.");
+		return (EXIT_FAILURE);
+	}
 
 	/* create requests */
 	rpc = nc_rpc_killsession(id);
@@ -1501,11 +1506,6 @@ int cmd_getconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("get-config", "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1532,6 +1532,12 @@ int cmd_getconfig (const char *arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
+	}
+
+	if (session == NULL) {
+		ERROR("get-config", "NETCONF session not established, use the \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
 	}
 
 	target = get_datastore("target", "get-config", &cmd, optind, NULL);
@@ -1584,11 +1590,6 @@ int cmd_getschema (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("get-config", "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1611,6 +1612,12 @@ int cmd_getschema (const char *arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
+	}
+
+	if (session == NULL) {
+		ERROR("get-schema", "NETCONF session not established, use the \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
 	}
 
 	if (optind == cmd.count) {
@@ -1695,11 +1702,6 @@ int cmd_un_lock (int op, const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR(operation, "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -1716,6 +1718,12 @@ int cmd_un_lock (int op, const char *arg)
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
 		}
+	}
+
+	if (session == NULL) {
+		ERROR(operation, "NETCONF session not established, use the \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
 	}
 
 	target = get_datastore("target", operation, &cmd, optind, NULL);
@@ -2941,17 +2949,6 @@ int cmd_subscribe(const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("subscribe", "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
-	/* check if notifications are allowed on this session */
-	if (nc_session_notif_allowed(session) == 0) {
-		ERROR("subscribe", "Notification subscription is not allowed on this session.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -3010,9 +3007,23 @@ int cmd_subscribe(const char *arg)
 		}
 	}
 
+	if (session == NULL) {
+		ERROR("subscribe", "NETCONF session not established, use the \'connect\' command.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
+	}
+
+	/* check if notifications are allowed on this session */
+	if (nc_session_notif_allowed(session) == 0) {
+		ERROR("subscribe", "Notification subscription is not allowed on this session.");
+		clear_arglist(&cmd);
+		return (EXIT_FAILURE);
+	}
+
 	/* check times */
 	if (start != -1 && stop != -1 && start > stop) {
 		ERROR("subscribe", "Subscription start time must be lower than the end time.");
+		clear_arglist(&cmd);
 		return (EXIT_FAILURE);
 	}
 
@@ -3114,11 +3125,6 @@ int cmd_userrpc(const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	if (session == NULL) {
-		ERROR("user-rpc", "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
-	}
-
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
@@ -3165,6 +3171,11 @@ int cmd_userrpc(const char *arg)
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
+
+	if (session == NULL) {
+		ERROR("user-rpc", "NETCONF session not established, use the \'connect\' command.");
+		return (EXIT_FAILURE);
+	}
 
 	if (config == NULL) {
 		config = readinput("Type the content of a RPC operation.");
