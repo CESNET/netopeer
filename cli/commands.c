@@ -2841,12 +2841,13 @@ int cmd_help (const char* arg)
 
 generic_help:
 		INSTRUCTION("Available commands:\n");
-
 		for (i = 0; commands[i].name; i++) {
 			if (commands[i].helpstring != NULL) {
 				fprintf (stdout, "  %-15s %s\n", commands[i].name, commands[i].helpstring);
 			}
 		}
+
+		INSTRUCTION("To delete a command history entry, use CTRL+R.\n\n");
 	} else {
 		/* print specific help for the selected command */
 

@@ -48,6 +48,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <readline/readline.h>
+#include <readline/history.h>
 
 #include "commands.h"
 #include "configuration.h"
@@ -165,6 +166,25 @@ char** cmd_completion(const char* text, int start, int end) {
 	return (matches);
 }
 
+int my_bind_del(int UNUSED(count), int UNUSED(key)) {
+	HIST_ENTRY* hent;
+
+	hent = remove_history(where_history());
+	if (hent != NULL) {
+		free(hent->line);
+		free(hent->timestamp);
+		free(hent->data);
+		free(hent);
+
+		hent = previous_history();
+		rl_extend_line_buffer(strlen(hent->line)+1);
+		strcpy(rl_line_buffer, hent->line);
+		rl_point = strlen(hent->line);
+	}
+
+	return 0;
+}
+
 /**
  * \brief Tell the GNU Readline library how to complete commands.
  *
@@ -177,6 +197,8 @@ void initialize_readline(void) {
 
 	/* Tell the completer that we want a crack first. */
 	rl_attempted_completion_function = cmd_completion;
+
+	rl_bind_key(CTRL('r'), my_bind_del);
 }
 
 char* readinput(const char* instruction) {
