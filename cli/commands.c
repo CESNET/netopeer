@@ -1999,6 +1999,10 @@ int cmd_auth (const char* arg)
 				return (EXIT_FAILURE);
 			}
 
+			asprintf(&pubkey, "%s.pub", cmd);
+			nc_del_keypair_path(cmd, pubkey);
+			free(pubkey);
+
 			free(opts->keys[i]);
 			memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i)-1);
 			--opts->key_count;
