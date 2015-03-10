@@ -97,7 +97,8 @@ void print_version()
 
 int main(int UNUSED(argc), char** UNUSED(argv))
 {
-	char* cmd, *cmdline, *cmdstart, *lastcmd = NULL;
+	HIST_ENTRY* hent;
+	char* cmd, *cmdline, *cmdstart;
 	int i, j;
 
 	initialize_readline();
@@ -146,17 +147,14 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 			fprintf(stdout, "%s: no such command, type 'help' for more information.\n", cmd);
 		}
 
-		if (lastcmd == NULL || strcmp(lastcmd, cmdline) != 0) {
+		hent = history_get(history_length);
+		if (hent == NULL || strcmp(hent->line, cmdline) != 0) {
 			add_history(cmdline);
 		}
 
-		free(lastcmd);
-		lastcmd = cmdline;
-
+		free(cmdline);
 		free(cmd);
 	}
-
-	free(lastcmd);
 
 	store_config();
 	/* bye, bye */
