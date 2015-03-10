@@ -122,7 +122,7 @@ COMMAND commands[] = {
 	{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
 	{"verbose", cmd_verbose, "Enable/disable verbose messages"},
 	{"quit", cmd_quit, "Quit the program"},
-	{"auth", cmd_auth, "Manage SSH autentication options"},
+	{"auth", cmd_auth, "Manage SSH authentication options"},
 	{"capability", cmd_capability, "Add/remove capability to/from the list of supported capabilities"},
 	{"editor", cmd_editor, "Manage the editor to be used for manual XML pasting/writing"},
 /* synonyms for previous commands */
@@ -1607,7 +1607,7 @@ int cmd_getschema (const char *arg)
 			return (EXIT_SUCCESS);
 			break;
 		default:
-			ERROR("get-config", "unknown option -%c.", c);
+			ERROR("get-schema", "unknown option -%c.", c);
 			cmd_getschema_help ();
 			clear_arglist(&cmd);
 			return (EXIT_FAILURE);
