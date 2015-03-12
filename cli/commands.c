@@ -2731,7 +2731,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 		session = nc_callhome_accept(user, opts->cpblts, &timeout);
 		if (session == NULL ) {
 			if (timeout == 0) {
-				ERROR(func_name, "no call home")
+				ERROR(func_name, "no call home");
 			} else {
 				ERROR(func_name, "receiving call Home failed.");
 			}
