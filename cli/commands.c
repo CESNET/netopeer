@@ -1763,6 +1763,130 @@ int cmd_unlock (const char *arg)
 	return cmd_un_lock (UNLOCK_OP, arg);
 }
 
+void cmd_auth_help ()
+{
+	fprintf(stdout, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
+}
+
+int cmd_auth (const char* arg)
+{
+	int i;
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr = NULL, *pubkey;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_auth_help();
+
+	} else if (strcmp(cmd, "pref") == 0) {
+		cmd = strtok_r(NULL, " ", &ptr);
+		if (cmd == NULL) {
+			ERROR("auth pref", "Missing the SSH authentication method argument");
+			return (EXIT_FAILURE);
+		}
+
+		if (strcmp(cmd, "publickey") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'publickey' SSH authentication method preference: %d\n", opts->pubkey_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, atoi(cmd));
+				opts->pubkey_auth_pref = atoi(cmd);
+			}
+		} else if (strcmp(cmd, "interactive") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'interactive' SSH authentication method preference: %d\n", opts->inter_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, atoi(cmd));
+				opts->inter_auth_pref = atoi(cmd);
+			}
+		} else if (strcmp(cmd, "password") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				fprintf(stdout, "The 'password' SSH authentication method preference: %d\n", opts->passwd_auth_pref);
+			} else {
+				nc_ssh_pref(NC_SSH_AUTH_PASSWORD, atoi(cmd));
+				opts->passwd_auth_pref = atoi(cmd);
+			}
+		} else {
+			ERROR("auth pref", "Unknown authentication method (%s)", cmd);
+			return (EXIT_FAILURE);
+		}
+
+	} else if (strcmp(cmd, "keys") == 0) {
+		cmd = strtok_r(NULL, " ", &ptr);
+		if (cmd == NULL) {
+			fprintf(stdout, "The private keys used for SSH authentication:\n");
+			if (opts->key_count == 0) {
+				fprintf(stdout, "(default)\n");
+			} else {
+				for (i = 0; i < opts->key_count; ++i) {
+					fprintf(stdout, "%s\n", opts->keys[i]);
+				}
+			}
+		} else if (strcmp(cmd, "add") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				ERROR("auth keys add", "Missing the key path");
+				return (EXIT_FAILURE);
+			}
+
+			asprintf(&pubkey, "%s.pub", cmd);
+			nc_set_keypair_path(cmd, pubkey);
+
+			++opts->key_count;
+			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+			opts->keys[opts->key_count-1] = strdup(cmd);
+
+			if (eaccess(cmd, R_OK) != 0) {
+				ERROR("auth keys add", "The new private key is not accessible (%s), but added anyway", strerror(errno));
+			}
+			if (eaccess(pubkey, R_OK) != 0) {
+				ERROR("auth keys add", "The public key for the new private key is not accessible (%s), but added anyway", strerror(errno));
+			}
+			free(pubkey);
+
+		} else if (strcmp(cmd, "remove") == 0) {
+			cmd = strtok_r(NULL, " ", &ptr);
+			if (cmd == NULL) {
+				ERROR("auth keys remove", "Missing the key path");
+				return (EXIT_FAILURE);
+			}
+
+			for (i = 0; i < opts->key_count; ++i) {
+				if (strcmp(cmd, opts->keys[i]) == 0) {
+					break;
+				}
+			}
+			if (i == opts->key_count) {
+				ERROR("auth keys remove", "Unknown key");
+				return (EXIT_FAILURE);
+			}
+
+			asprintf(&pubkey, "%s.pub", cmd);
+			nc_del_keypair_path(cmd, pubkey);
+			free(pubkey);
+
+			free(opts->keys[i]);
+			memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i)-1);
+			--opts->key_count;
+			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+
+		} else {
+			ERROR("auth keys", "Wrong argument (%s)", cmd);
+			return (EXIT_FAILURE);
+		}
+
+	} else {
+		ERROR("auth", "Unknown argument %s", cmd);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
 #ifdef ENABLE_TLS
 int cp(const char* to, const char* from) {
 	int fd_to, fd_from;
@@ -1895,130 +2019,6 @@ void parse_cert(const char* name, const char* path) {
 	X509_free(cert);
 	BIO_vfree(bio_out);
 	fclose(fp);
-}
-
-void cmd_auth_help ()
-{
-	fprintf(stdout, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
-}
-
-int cmd_auth (const char* arg)
-{
-	int i;
-	char* args = strdupa(arg);
-	char* cmd = NULL, *ptr = NULL, *pubkey;
-
-	cmd = strtok_r(args, " ", &ptr);
-	cmd = strtok_r(NULL, " ", &ptr);
-	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
-		cmd_auth_help();
-
-	} else if (strcmp(cmd, "pref") == 0) {
-		cmd = strtok_r(NULL, " ", &ptr);
-		if (cmd == NULL) {
-			ERROR("auth pref", "Missing the SSH authentication method argument");
-			return (EXIT_FAILURE);
-		}
-
-		if (strcmp(cmd, "publickey") == 0) {
-			cmd = strtok_r(NULL, " ", &ptr);
-			if (cmd == NULL) {
-				fprintf(stdout, "The 'publickey' SSH authentication method preference: %d\n", opts->pubkey_auth_pref);
-			} else {
-				nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, atoi(cmd));
-				opts->pubkey_auth_pref = atoi(cmd);
-			}
-		} else if (strcmp(cmd, "interactive") == 0) {
-			cmd = strtok_r(NULL, " ", &ptr);
-			if (cmd == NULL) {
-				fprintf(stdout, "The 'interactive' SSH authentication method preference: %d\n", opts->inter_auth_pref);
-			} else {
-				nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, atoi(cmd));
-				opts->inter_auth_pref = atoi(cmd);
-			}
-		} else if (strcmp(cmd, "password") == 0) {
-			cmd = strtok_r(NULL, " ", &ptr);
-			if (cmd == NULL) {
-				fprintf(stdout, "The 'password' SSH authentication method preference: %d\n", opts->passwd_auth_pref);
-			} else {
-				nc_ssh_pref(NC_SSH_AUTH_PASSWORD, atoi(cmd));
-				opts->passwd_auth_pref = atoi(cmd);
-			}
-		} else {
-			ERROR("auth pref", "Unknown authentication method (%s)", cmd);
-			return (EXIT_FAILURE);
-		}
-
-	} else if (strcmp(cmd, "keys") == 0) {
-		cmd = strtok_r(NULL, " ", &ptr);
-		if (cmd == NULL) {
-			fprintf(stdout, "The private keys used for SSH authentication:\n");
-			if (opts->key_count == 0) {
-				fprintf(stdout, "(default)\n");
-			} else {
-				for (i = 0; i < opts->key_count; ++i) {
-					fprintf(stdout, "%s\n", opts->keys[i]);
-				}
-			}
-		} else if (strcmp(cmd, "add") == 0) {
-			cmd = strtok_r(NULL, " ", &ptr);
-			if (cmd == NULL) {
-				ERROR("auth keys add", "Missing the key path");
-				return (EXIT_FAILURE);
-			}
-
-			asprintf(&pubkey, "%s.pub", cmd);
-			nc_set_keypair_path(cmd, pubkey);
-
-			++opts->key_count;
-			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
-			opts->keys[opts->key_count-1] = strdup(cmd);
-
-			if (eaccess(cmd, R_OK) != 0) {
-				ERROR("auth keys add", "The new private key is not accessible (%s), but added anyway", strerror(errno));
-			}
-			if (eaccess(pubkey, R_OK) != 0) {
-				ERROR("auth keys add", "The public key for the new private key is not accessible (%s), but added anyway", strerror(errno));
-			}
-			free(pubkey);
-
-		} else if (strcmp(cmd, "remove") == 0) {
-			cmd = strtok_r(NULL, " ", &ptr);
-			if (cmd == NULL) {
-				ERROR("auth keys remove", "Missing the key path");
-				return (EXIT_FAILURE);
-			}
-
-			for (i = 0; i < opts->key_count; ++i) {
-				if (strcmp(cmd, opts->keys[i]) == 0) {
-					break;
-				}
-			}
-			if (i == opts->key_count) {
-				ERROR("auth keys remove", "Unknown key");
-				return (EXIT_FAILURE);
-			}
-
-			asprintf(&pubkey, "%s.pub", cmd);
-			nc_del_keypair_path(cmd, pubkey);
-			free(pubkey);
-
-			free(opts->keys[i]);
-			memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i)-1);
-			--opts->key_count;
-			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
-
-		} else {
-			ERROR("auth keys", "Wrong argument (%s)", cmd);
-			return (EXIT_FAILURE);
-		}
-
-	} else {
-		ERROR("auth", "Unknown argument %s", cmd);
-		return (EXIT_FAILURE);
-	}
-
-	return (EXIT_SUCCESS);
 }
 
 void cmd_cert_help ()
