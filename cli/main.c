@@ -79,14 +79,27 @@ void clb_error_print(const char* tag,
 		const char* type,
 		const char* severity,
 		const char* UNUSED(apptag),
-		const char* UNUSED(path),
+		const char* path,
 		const char* message,
-		const char* UNUSED(attribute),
-		const char* UNUSED(element),
-		const char* UNUSED(ns),
-		const char* UNUSED(sid))
+		const char* attribute,
+		const char* element,
+		const char* ns,
+		const char* sid)
 {
-	fprintf(stderr, "NETCONF %s: %s (%s) - %s\n", severity, tag, type, message);
+	fprintf(stderr, "NETCONF %s: %s (%s) - %s", severity, tag, type, message);
+	if (path != NULL) {
+		fprintf(stderr, " (%s)\n", path);
+	} else if (attribute != NULL) {
+		fprintf(stderr, " (%s)\n", attribute);
+	} else if (element != NULL) {
+		fprintf(stderr, " (%s)\n", element);
+	} else if (ns != NULL) {
+		fprintf(stderr, " (%s)\n", ns);
+	} else if (sid != NULL) {
+		fprintf(stderr, " (session ID %s)\n", sid);
+	} else {
+		fprintf(stderr, "\n");
+	}
 }
 
 void print_version()
