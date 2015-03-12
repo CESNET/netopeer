@@ -498,10 +498,11 @@ static struct nc_filter *set_filter(const char* operation, const char *file)
 }
 
 /* rpc parameter is freed after the function call */
-static int send_recv_process(const char* operation, nc_rpc* rpc)
+static int send_recv_process(const char* operation, nc_rpc* rpc, const char* output_file)
 {
 	nc_reply *reply = NULL;
 	char *data = NULL;
+	FILE* out_stream;
 	int ret = EXIT_SUCCESS;
 
 	/* send the request and get the reply */
@@ -526,8 +527,19 @@ static int send_recv_process(const char* operation, nc_rpc* rpc)
 			INSTRUCTION("Result OK\n");
 			break;
 		case NC_REPLY_DATA:
-			INSTRUCTION("Result:\n");
-			fprintf(stdout, "%s\n", data = nc_reply_get_data (reply));
+			if (output_file != NULL) {
+				out_stream = fopen(output_file, "a");
+				if (out_stream == NULL) {
+					ERROR(operation, "Could not open the output file \"%s\" (%s).", output_file, strerror(errno));
+					ret = EXIT_FAILURE;
+					break;
+				}
+				fprintf(out_stream, "%s", data = nc_reply_get_data (reply));
+				fclose(out_stream);
+			} else {
+				INSTRUCTION("Result:\n");
+				fprintf(stdout, "%s\n", data = nc_reply_get_data (reply));
+			}
 			free(data);
 			break;
 		case NC_REPLY_ERROR:
@@ -760,7 +772,7 @@ int cmd_editconfig (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("edit-config", rpc));
+	return (send_recv_process("edit-config", rpc, NULL));
 }
 
 void cmd_validate_help ()
@@ -895,7 +907,7 @@ int cmd_validate (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("validate", rpc));
+	return (send_recv_process("validate", rpc, NULL));
 }
 
 void cmd_copyconfig_help ()
@@ -1093,7 +1105,7 @@ int cmd_copyconfig (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("copy-config", rpc));
+	return (send_recv_process("copy-config", rpc, NULL));
 }
 
 void cmd_get_help ()
@@ -1105,12 +1117,13 @@ void cmd_get_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get [--help] %s[--filter [file]]\n", defaults);
+	fprintf (stdout, "get [--help] %s[--filter [file]] [--out file]\n", defaults);
 }
 
 int cmd_get (const char *arg)
 {
 	int c;
+	char* output = NULL;
 	struct nc_filter *filter = NULL;
 	nc_rpc *rpc = NULL;
 	NCWD_MODE wd = NCWD_MODE_NOTSET;
@@ -1119,6 +1132,7 @@ int cmd_get (const char *arg)
 			{"defaults", 1, 0, 'd'},
 			{"filter", 2, 0, 'f'},
 			{"help", 0, 0, 'h'},
+			{"out", 1, 0, 'o'},
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1129,7 +1143,7 @@ int cmd_get (const char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -1145,6 +1159,9 @@ int cmd_get (const char *arg)
 			cmd_get_help ();
 			clear_arglist(&cmd);
 			return (EXIT_SUCCESS);
+			break;
+		case 'o':
+			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get", "unknown option -%c.", c);
@@ -1183,7 +1200,7 @@ int cmd_get (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get", rpc));
+	return (send_recv_process("get", rpc, output));
 }
 
 void cmd_deleteconfig_help ()
@@ -1290,7 +1307,7 @@ int cmd_deleteconfig (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("delete-config", rpc));
+	return (send_recv_process("delete-config", rpc, NULL));
 }
 
 void cmd_killsession_help ()
@@ -1370,7 +1387,7 @@ int cmd_killsession (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("kell-session", rpc));
+	return (send_recv_process("kill-session", rpc, NULL));
 }
 
 #define CAP_ADD 'a'
@@ -1477,7 +1494,7 @@ void cmd_getconfig_help ()
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get-config [--help] %s[--filter [file]] running", defaults);
+	fprintf (stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
 	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
 		fprintf (stdout, "|startup");
 	}
@@ -1490,6 +1507,7 @@ void cmd_getconfig_help ()
 int cmd_getconfig (const char *arg)
 {
 	int c;
+	char* output = NULL;
 	NC_DATASTORE target;
 	NCWD_MODE wd = NCWD_MODE_NOTSET;
 	struct nc_filter *filter = NULL;
@@ -1499,6 +1517,7 @@ int cmd_getconfig (const char *arg)
 			{"defaults", 1, 0, 'd'},
 			{"filter", 2, 0, 'f'},
 			{"help", 0, 0, 'h'},
+			{"out", 1, 0, 'o'},
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1509,7 +1528,7 @@ int cmd_getconfig (const char *arg)
 	init_arglist (&cmd);
 	addargs (&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f::h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
@@ -1525,6 +1544,9 @@ int cmd_getconfig (const char *arg)
 			cmd_getconfig_help ();
 			clear_arglist(&cmd);
 			return (EXIT_SUCCESS);
+			break;
+		case 'o':
+			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get-config", "unknown option -%c.", c);
@@ -1564,25 +1586,26 @@ int cmd_getconfig (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get-config", rpc));
+	return (send_recv_process("get-config", rpc, output));
 }
 
 void cmd_getschema_help ()
 {
 	/* if session not established, print complete help for all capabilities */
-	fprintf (stdout, "get-schema [--help] [--version <version>] [--format <format>] <identifier>\n");
+	fprintf (stdout, "get-schema [--help] [--version <version>] [--format <format>] [--out file] <identifier>\n");
 }
 
 int cmd_getschema (const char *arg)
 {
 	int c;
-	char *format = NULL, *version = NULL, *identifier = NULL;
+	char *format = NULL, *version = NULL, *identifier = NULL, *output = NULL;
 	nc_rpc *rpc = NULL;
 	struct arglist cmd;
 	struct option long_options[] ={
 			{"format", 1, 0, 'f'},
 			{"version", 1, 0, 'v'},
 			{"help", 0, 0, 'h'},
+			{"out", 1, 0, 'o'},
 			{0, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -1605,6 +1628,9 @@ int cmd_getschema (const char *arg)
 			cmd_getschema_help ();
 			clear_arglist(&cmd);
 			return (EXIT_SUCCESS);
+			break;
+		case 'o':
+			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get-schema", "unknown option -%c.", c);
@@ -1656,7 +1682,7 @@ int cmd_getschema (const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get-schema", rpc));
+	return (send_recv_process("get-schema", rpc, output));
 }
 
 void cmd_un_lock_help (char* operation)
@@ -1750,7 +1776,7 @@ int cmd_un_lock (int op, const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process(operation, rpc));
+	return (send_recv_process(operation, rpc, NULL));
 }
 
 int cmd_lock (const char *arg)
@@ -3052,7 +3078,7 @@ int cmd_subscribe(const char *arg)
 		return (EXIT_FAILURE);
 	}
 
-	if (send_recv_process("subscribe", rpc) != 0) {
+	if (send_recv_process("subscribe", rpc, NULL) != 0) {
 		return (EXIT_FAILURE);
 	}
 	rpc = NULL; /* just note that rpc is already freed by send_recv_process() */
@@ -3198,7 +3224,7 @@ int cmd_userrpc(const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("user-rpc", rpc));
+	return (send_recv_process("user-rpc", rpc, NULL));
 }
 
 void cmd_discardchanges_help()
@@ -3264,6 +3290,6 @@ int cmd_generic_op(GENERIC_OPS op, const char *arg)
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process(op_string, rpc));
+	return (send_recv_process(op_string, rpc, NULL));
 }
 
