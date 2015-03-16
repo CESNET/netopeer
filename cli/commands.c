@@ -3106,7 +3106,7 @@ int cmd_subscribe(const char *arg)
 
 void cmd_editor_help()
 {
-	fprintf(stdout, "editor [--help] [<path/name_of_the_editor> | --default]\n");
+	fprintf(stdout, "editor [--help] [<path/name_of_the_editor> | --default | --none]\n");
 }
 
 int cmd_editor(const char *arg)
@@ -3116,12 +3116,22 @@ int cmd_editor(const char *arg)
 	cmd = strtok_r(args, " ", &ptr);
 	cmd = strtok_r(NULL, " ", &ptr);
 	if (cmd == NULL) {
-		fprintf(stdout, "Current editor: %s\n", (opts->config_editor == NULL ? "(default)" : opts->config_editor));
+		fprintf(stdout, "Current editor: ");
+		if (opts->config_editor == NULL) {
+			fprintf(stdout, "(default)\n");
+		} else if (strcmp(opts->config_editor, "NONE") == 0) {
+			fprintf(stdout, "(none)\n");
+		} else {
+			fprintf(stdout, "%s\n", opts->config_editor);
+		}
 	} else if (strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
 		cmd_editor_help();
 	} else if (strcmp(cmd, "--default") == 0) {
 		free(opts->config_editor);
 		opts->config_editor = NULL;
+	} else if (strcmp(cmd, "--none") == 0) {
+		free(opts->config_editor);
+		opts->config_editor = strdup("NONE");
 	} else {
 		free(opts->config_editor);
 		opts->config_editor = strdup(cmd);
