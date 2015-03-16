@@ -2885,7 +2885,7 @@ generic_help:
 			}
 		}
 
-		INSTRUCTION("To delete a command history entry, use CTRL+R.\n\n");
+		INSTRUCTION("To delete a command history entry, use CTRL+X.\n\n");
 	} else {
 		/* print specific help for the selected command */
 

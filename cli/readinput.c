@@ -166,7 +166,7 @@ char** cmd_completion(const char* text, int start, int end) {
 	return (matches);
 }
 
-int my_bind_del(int UNUSED(count), int UNUSED(key)) {
+int bind_del_hent(int UNUSED(count), int UNUSED(key)) {
 	HIST_ENTRY* hent;
 
 	hent = remove_history(where_history());
@@ -203,7 +203,7 @@ void initialize_readline(void) {
 	/* Tell the completer that we want a crack first. */
 	rl_attempted_completion_function = cmd_completion;
 
-	rl_bind_key(CTRL('r'), my_bind_del);
+	rl_bind_key(CTRL('x'), bind_del_hent);
 }
 
 char* readinput(const char* instruction) {
