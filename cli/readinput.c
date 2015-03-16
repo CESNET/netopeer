@@ -177,9 +177,14 @@ int my_bind_del(int UNUSED(count), int UNUSED(key)) {
 		free(hent);
 
 		hent = previous_history();
-		rl_extend_line_buffer(strlen(hent->line)+1);
-		strcpy(rl_line_buffer, hent->line);
-		rl_point = strlen(hent->line);
+		if (hent != NULL) {
+			rl_extend_line_buffer(strlen(hent->line)+1);
+			strcpy(rl_line_buffer, hent->line);
+			rl_point = strlen(hent->line);
+		} else {
+			rl_line_buffer[0] = '\0';
+			rl_point = 0;
+		}
 	}
 
 	return 0;
