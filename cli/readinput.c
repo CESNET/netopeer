@@ -182,7 +182,7 @@ int bind_del_hent(int UNUSED(count), int UNUSED(key)) {
 		if (hent != NULL) {
 			rl_extend_line_buffer(strlen(hent->line)+1);
 			strcpy(rl_line_buffer, hent->line);
-			rl_point = strlen(hent->line);
+			rl_end = rl_point = strlen(hent->line);
 		} else {
 			rl_line_buffer[0] = '\0';
 			rl_point = 0;
