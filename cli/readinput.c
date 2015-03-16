@@ -184,6 +184,7 @@ int bind_del_hent(int UNUSED(count), int UNUSED(key)) {
 			strcpy(rl_line_buffer, hent->line);
 			rl_end = rl_point = strlen(hent->line);
 		} else {
+			history_set_pos(history_length);
 			rl_line_buffer[0] = '\0';
 			rl_point = 0;
 		}
