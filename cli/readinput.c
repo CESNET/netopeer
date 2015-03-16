@@ -58,6 +58,8 @@
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
+volatile int multiline;
+
 extern struct cli_options* opts;
 
 extern COMMAND commands[];
@@ -190,6 +192,27 @@ int bind_del_hent(int UNUSED(count), int UNUSED(key)) {
 	return 0;
 }
 
+int bind_cr(int UNUSED(count), int UNUSED(key)) {
+	if (multiline == 0) {
+		rl_point = rl_end;
+		rl_redisplay();
+		rl_done = 1;
+	}
+	printf("\n");
+
+	return 0;
+}
+
+int bind_esc(int UNUSED(count), int UNUSED(key)) {
+	if (multiline == 1) {
+		rl_point = rl_end;
+		rl_redisplay();
+		rl_done = 1;
+		printf("\n");
+	}
+	return 0;
+}
+
 /**
  * \brief Tell the GNU Readline library how to complete commands.
  *
@@ -203,6 +226,9 @@ void initialize_readline(void) {
 	/* Tell the completer that we want a crack first. */
 	rl_attempted_completion_function = cmd_completion;
 
+	rl_bind_key('\n', bind_cr);
+	rl_bind_key('\r', bind_cr);
+	rl_bind_key(CTRL('d'), bind_esc);
 	rl_bind_key(CTRL('x'), bind_del_hent);
 }
 
@@ -223,76 +249,87 @@ char* readinput(const char* instruction) {
 		editor = EDITOR_DEFAULT;
 	}
 
-	asprintf(&tmpname, "/tmp/tmpXXXXXX.xml");
+	if (strcmp(editor, "NONE") == 0) {
+		INSTRUCTION("(finish input by Ctrl-D)");
+		INSTRUCTION(instruction);
+		INSTRUCTION("\n");
 
-	fd = mkstemps(tmpname, 4);
-	if (fd == -1) {
-		ERROR("readinput", "Failed to create a temporary file (%s).", strerror(errno));
-		goto fail;
-	}
+		multiline = 1;
+		input = readline(NULL);
+		multiline = 0;
 
-	if (instruction != NULL) {
-		ret = write(fd, "\n<!--\n", 6);
-		ret += write(fd, instruction, strlen(instruction));
-		ret += write(fd, "\n-->\n", 5);
-		if (ret < 6+strlen(instruction)+5) {
-			ERROR("readinput", "Failed to write the instruction (%s).", strerror(errno));
-			goto fail;
-		}
-
-		ret = lseek(fd, 0, SEEK_SET);
-		if (ret == -1) {
-			ERROR("readinput", "Rewinding the temporary file failed (%s).", strerror(errno));
-			goto fail;
-		}
-	}
-
-	if ((pid = vfork()) == -1) {
-		ERROR("readinput", "Fork failed (%s).", strerror(errno));
-		goto fail;
-	} else if (pid == 0) {
-		/* child */
-		execlp(editor, editor, tmpname, (char*)NULL);
-
-		ERROR("readinput", "Exec failed (%s).", strerror(errno));
-		exit(1);
 	} else {
-		/* parent */
-		wait_pid = wait(&ret);
-		if (wait_pid != pid) {
-			ERROR("readinput", "Child process other than the editor exited, weird.");
+		asprintf(&tmpname, "/tmp/tmpXXXXXX.xml");
+
+		fd = mkstemps(tmpname, 4);
+		if (fd == -1) {
+			ERROR("readinput", "Failed to create a temporary file (%s).", strerror(errno));
 			goto fail;
 		}
-		if (!WIFEXITED(ret)) {
-			ERROR("readinput", "Editor exited in a non-standard way.");
+
+		if (instruction != NULL) {
+			ret = write(fd, "\n<!--\n", 6);
+			ret += write(fd, instruction, strlen(instruction));
+			ret += write(fd, "\n-->\n", 5);
+			if (ret < 6+strlen(instruction)+5) {
+				ERROR("readinput", "Failed to write the instruction (%s).", strerror(errno));
+				goto fail;
+			}
+
+			ret = lseek(fd, 0, SEEK_SET);
+			if (ret == -1) {
+				ERROR("readinput", "Rewinding the temporary file failed (%s).", strerror(errno));
+				goto fail;
+			}
+		}
+
+		if ((pid = vfork()) == -1) {
+			ERROR("readinput", "Fork failed (%s).", strerror(errno));
+			goto fail;
+		} else if (pid == 0) {
+			/* child */
+			execlp(editor, editor, tmpname, (char*)NULL);
+
+			ERROR("readinput", "Exec failed (%s).", strerror(errno));
+			exit(1);
+		} else {
+			/* parent */
+			wait_pid = wait(&ret);
+			if (wait_pid != pid) {
+				ERROR("readinput", "Child process other than the editor exited, weird.");
+				goto fail;
+			}
+			if (!WIFEXITED(ret)) {
+				ERROR("readinput", "Editor exited in a non-standard way.");
+				goto fail;
+			}
+		}
+
+		/* Get the size of the input */
+		size = lseek(fd, 0, SEEK_END);
+		if (size == -1) {
+			ERROR("readinput", "Failed to get the size of the temporary file (%s).", strerror(errno));
 			goto fail;
 		}
+		lseek(fd, 0, SEEK_SET);
+
+		input = malloc(size+1);
+		input[size] = '\0';
+
+		/* Read the input */
+		ret = read(fd, input, size);
+		if (ret < size) {
+			ERROR("readinput", "Failed to read from the temporary file (%s).", strerror(errno));
+			goto fail;
+		}
+
+		/* Clean the temporary file stuff */
+		close(fd);
+		fd = -1;
+		unlink(tmpname);
+		free(tmpname);
+		tmpname = NULL;
 	}
-
-	/* Get the size of the input */
-	size = lseek(fd, 0, SEEK_END);
-	if (size == -1) {
-		ERROR("readinput", "Failed to get the size of the temporary file (%s).", strerror(errno));
-		goto fail;
-	}
-	lseek(fd, 0, SEEK_SET);
-
-	input = malloc(size+1);
-	input[size] = '\0';
-
-	/* Read the input */
-	ret = read(fd, input, size);
-	if (ret < size) {
-		ERROR("readinput", "Failed to read from the temporary file (%s).", strerror(errno));
-		goto fail;
-	}
-
-	/* Clean the temporary file stuff */
-	close(fd);
-	fd = -1;
-	unlink(tmpname);
-	free(tmpname);
-	tmpname = NULL;
 
 	return input;
 
