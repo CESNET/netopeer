@@ -573,4 +573,8 @@ void store_config(void) {
 
 	free(netconf_dir);
 	free(config_file);
+
+	if (done) {
+		xmlCleanupParser();
+	}
 }
