@@ -40,6 +40,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -54,11 +55,12 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 #define PROMPT "netconf> "
 
-volatile int done = 0;
+volatile int done;
+extern int multiline;
+extern char* last_tmpfile;
 extern COMMAND commands[];
 
-void clb_print(NC_VERB_LEVEL level, const char* msg)
-{
+void clb_print(NC_VERB_LEVEL level, const char* msg) {
 	switch (level) {
 	case NC_VERB_ERROR:
 		fprintf(stderr, "libnetconf ERROR: %s\n", msg);
@@ -84,8 +86,7 @@ void clb_error_print(const char* tag,
 		const char* attribute,
 		const char* element,
 		const char* ns,
-		const char* sid)
-{
+		const char* sid) {
 	fprintf(stderr, "NETCONF %s: %s (%s) - %s", severity, tag, type, message);
 	if (path != NULL) {
 		fprintf(stderr, " (%s)\n", path);
@@ -102,17 +103,46 @@ void clb_error_print(const char* tag,
 	}
 }
 
-void print_version()
-{
+void print_version() {
 	fprintf(stdout, "Netopeer CLI client, version %s\n", VERSION);
 	fprintf(stdout, "compile time: %s, %s\n", __DATE__, __TIME__);
 }
 
-int main(int UNUSED(argc), char** UNUSED(argv))
-{
+void signal_handler(int sig) {
+	switch (sig) {
+	case SIGINT:
+	case SIGTERM:
+	case SIGQUIT:
+	case SIGABRT:
+		multiline = 0;
+		rl_line_buffer[0] = '\0';
+		rl_end = rl_point = 0;
+		rl_reset_line_state();
+		fprintf(stdout, "\n");
+		rl_redisplay();
+		break;
+	default:
+		exit(EXIT_FAILURE);
+		break;
+	}
+}
+
+int main(int UNUSED(argc), char** UNUSED(argv)) {
+	struct sigaction action;
+	sigset_t block_mask;
 	HIST_ENTRY* hent;
 	char* cmd, *cmdline, *cmdstart;
 	int i, j;
+
+	/* signal handling */
+	sigfillset(&block_mask);
+	action.sa_handler = signal_handler;
+	action.sa_mask = block_mask;
+	action.sa_flags = 0;
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGABRT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
 
 	initialize_readline();
 
@@ -154,17 +184,43 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 
 		/* execute the command if any valid specified */
 		if (commands[i].name) {
-			commands[i].func((const char*)cmdstart);
+			if (where_history() < history_length) {
+				hent = history_get(where_history()+1);
+				if (hent == NULL) {
+					ERROR("main", "Internal error (%s:%d).", __FILE__, __LINE__);
+					return EXIT_FAILURE;
+				}
+				commands[i].func((const char*)cmdstart, hent->timestamp);
+			} else {
+				commands[i].func((const char*)cmdstart, NULL);
+			}
 		} else {
 			/* if unknown command specified, tell it to user */
 			fprintf(stdout, "%s: no such command, type 'help' for more information.\n", cmd);
 		}
 
 		hent = history_get(history_length);
+		/* whether to save the last command */
 		if (hent == NULL || strcmp(hent->line, cmdline) != 0) {
 			add_history(cmdline);
+			hent = history_get(history_length);
+			if (hent == NULL) {
+				ERROR("main", "Internal error (%s:%d).", __FILE__, __LINE__);
+				return EXIT_FAILURE;
+			}
+			if (last_tmpfile != NULL) {
+				free(hent->timestamp);
+				hent->timestamp = strdup(last_tmpfile);
+			}
+
+		/* whether to at least replace the tmpfile of the command from the history with this new one */
+		} else if ((hent = current_history()) != NULL && strlen(hent->timestamp) != 0) {
+			free(hent->timestamp);
+			hent->timestamp = strdup(last_tmpfile);
 		}
 
+		free(last_tmpfile);
+		last_tmpfile = NULL;
 		free(cmdline);
 		free(cmd);
 	}

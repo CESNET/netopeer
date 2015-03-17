@@ -171,10 +171,11 @@ typedef enum GENERIC_OPS {
 	GO_COMMIT,
 	GO_DISCARD_CHANGES
 } GENERIC_OPS;
-int cmd_generic_op(GENERIC_OPS op, const char *arg);
+
+int cmd_generic_op(GENERIC_OPS op, const char* arg);
 
 struct arglist {
-	char **list;
+	char** list;
 	int count;
 	int size;
 };
@@ -185,8 +186,7 @@ struct arglist {
  * \param args          pointer to the arglist structure
  * \return              0 if success, non-zero otherwise
  */
-void init_arglist (struct arglist *args)
-{
+void init_arglist(struct arglist* args) {
 	if (args != NULL) {
 		args->list = NULL;
 		args->count = 0;
@@ -200,20 +200,19 @@ void init_arglist (struct arglist *args)
  * \param args          pointer to the arglist structure
  * \return              none
  */
-void clear_arglist (struct arglist *args)
-{
+void clear_arglist(struct arglist* args) {
 	int i = 0;
 
 	if (args && args->list) {
 		for (i = 0; i < args->count; i++) {
 			if (args->list[i]) {
-				free (args->list[i]);
+				free(args->list[i]);
 			}
 		}
-		free (args->list);
+		free(args->list);
 	}
 
-	init_arglist (args);
+	init_arglist(args);
 }
 
 /**
@@ -225,14 +224,14 @@ void clear_arglist (struct arglist *args)
  * \param args          arglist to store arguments
  * \param format        arguments to add to the arglist
  */
-void addargs (struct arglist *args, char *format, ...)
-{
+void addargs(struct arglist* args, char* format, ...) {
 	va_list arguments;
-	char *aux = NULL, *aux1 = NULL;
+	char* aux = NULL, *aux1 = NULL;
 	int len;
 
-	if (args == NULL)
-	return;
+	if (args == NULL) {
+		return;
+	}
 
 	/* store arguments to aux string */
 	va_start(arguments, format);
@@ -257,8 +256,9 @@ void addargs (struct arglist *args, char *format, ...)
 		continue;
 
 		if (args->list == NULL) { /* initial memory allocation */
-			if ((args->list = (char **) malloc(8 * sizeof(char *))) == NULL)
-			perror("Fatal error while allocating memory");
+			if ((args->list = (char**)malloc(8 * sizeof(char*))) == NULL) {
+				perror("Fatal error while allocating memory");
+			}
 			args->size = 8;
 			args->count = 0;
 		} else if (args->count + 2 >= args->size) {
@@ -270,7 +270,7 @@ void addargs (struct arglist *args, char *format, ...)
 			args->list = realloc(args->list, args->size * sizeof(char *));
 		}
 		/* add word in the end of the list */
-		if ((args->list[args->count] = (char *) malloc((strlen(aux) + 1) * sizeof(char))) == NULL)
+		if ((args->list[args->count] = (char*)malloc((strlen(aux) + 1) * sizeof(char))) == NULL)
 		perror("Fatal error while allocating memory");
 		strcpy(args->list[args->count], aux);
 		args->list[++args->count] = NULL; /* last argument */
@@ -279,20 +279,19 @@ void addargs (struct arglist *args, char *format, ...)
 	free(aux1);
 }
 
-int cmd_status (const char* UNUSED(arg))
-{
-	const char *s;
+int cmd_status (const char* UNUSED(arg), const char* UNUSED(old_input_file)) {
+	const char* s;
 	struct nc_cpblts* cpblts;
 
 	if (session == NULL) {
-		fprintf (stdout, "Client is not connected to any NETCONF server.\n");
+		fprintf(stdout, "Client is not connected to any NETCONF server.\n");
 	} else {
-		fprintf (stdout, "Current NETCONF session:\n");
-		fprintf (stdout, "  ID          : %s\n", nc_session_get_id(session));
-		fprintf (stdout, "  Host        : %s\n", nc_session_get_host(session));
-		fprintf (stdout, "  Port        : %s\n", nc_session_get_port(session));
-		fprintf (stdout, "  User        : %s\n", nc_session_get_user(session));
-		switch(nc_session_get_transport(session)) {
+		fprintf(stdout, "Current NETCONF session:\n");
+		fprintf(stdout, "  ID          : %s\n", nc_session_get_id(session));
+		fprintf(stdout, "  Host        : %s\n", nc_session_get_host(session));
+		fprintf(stdout, "  Port        : %s\n", nc_session_get_port(session));
+		fprintf(stdout, "  User        : %s\n", nc_session_get_user(session));
+		switch (nc_session_get_transport(session)) {
 		case NC_TRANSPORT_SSH:
 			s = "SSH";
 			break;
@@ -303,22 +302,21 @@ int cmd_status (const char* UNUSED(arg))
 			s = "Unknown";
 			break;
 		}
-		fprintf (stdout, "  Transport   : %s\n", s);
-		fprintf (stdout, "  Capabilities:\n");
-		cpblts = nc_session_get_cpblts (session);
+		fprintf(stdout, "  Transport   : %s\n", s);
+		fprintf(stdout, "  Capabilities:\n");
+		cpblts = nc_session_get_cpblts(session);
 		if (cpblts != NULL) {
-			nc_cpblts_iter_start (cpblts);
-			while ((s = nc_cpblts_iter_next (cpblts)) != NULL) {
-				fprintf (stdout, "\t%s\n", s);
+			nc_cpblts_iter_start(cpblts);
+			while ((s = nc_cpblts_iter_next(cpblts)) != NULL) {
+				fprintf(stdout, "\t%s\n", s);
 			}
 		}
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
-static NC_DATASTORE get_datastore(const char* paramtype, const char* operation, struct arglist *cmd, int index, char** url)
-{
+static NC_DATASTORE get_datastore(const char* paramtype, const char* operation, struct arglist* cmd, int index, char** url) {
 	int valid = 0;
 	char *datastore;
 	NC_DATASTORE retval = NC_DATASTORE_ERROR;
@@ -327,45 +325,45 @@ static NC_DATASTORE get_datastore(const char* paramtype, const char* operation, 
 
 userinput:
 
-		datastore = malloc (sizeof(char) * BUFFER_SIZE);
+		datastore = malloc(sizeof(char) * BUFFER_SIZE);
 		if (datastore == NULL) {
-			ERROR(operation, "memory allocation error (%s).", strerror (errno));
-			return (NC_DATASTORE_ERROR);
+			ERROR(operation, "memory allocation error (%s).", strerror(errno));
+			return NC_DATASTORE_ERROR;
 		}
 
 		/* repeat user input until valid datastore is selected */
 		while (!valid) {
 			/* get mandatory argument */
 			INSTRUCTION("Select %s datastore (running", paramtype);
-			if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
-				fprintf (stdout, "|startup");
+			if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
+				fprintf(stdout, "|startup");
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-				fprintf (stdout, "|candidate");
+			if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
+				fprintf(stdout, "|candidate");
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_URL_ID)) {
-				fprintf (stdout, "|url:<dsturl>");
+			if (nc_cpblts_enabled(session, NC_CAP_URL_ID)) {
+				fprintf(stdout, "|url:<dsturl>");
 			}
-			fprintf (stdout, "): ");
-			if (scanf ("%1023s", datastore) == EOF) {
+			fprintf(stdout, "): ");
+			if (scanf("%1023s", datastore) == EOF) {
 				ERROR(operation, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
-				return (NC_DATASTORE_ERROR);
+				return NC_DATASTORE_ERROR;
 			}
 
 			/* validate argument */
-			if (strcmp (datastore, "running") == 0) {
+			if (strcmp(datastore, "running") == 0) {
 				valid = 1;
 				retval = NC_DATASTORE_RUNNING;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && strcmp (datastore, "startup") == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID) && strcmp(datastore, "startup") == 0) {
 				valid = 1;
 				retval = NC_DATASTORE_STARTUP;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID) && strcmp (datastore, "candidate") == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID) && strcmp(datastore, "candidate") == 0) {
 				valid = 1;
 				retval = NC_DATASTORE_CANDIDATE;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_URL_ID) && strncmp (datastore, "url:", 4) == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_URL_ID) && strncmp(datastore, "url:", 4) == 0) {
 				valid = 1;
 				retval = NC_DATASTORE_URL;
 				if (url != NULL) {
@@ -383,19 +381,19 @@ userinput:
 		datastore = cmd->list[index];
 
 		/* validate argument */
-		if (strcmp (datastore, "running") == 0) {
+		if (strcmp(datastore, "running") == 0) {
 			valid = 1;
 			retval = NC_DATASTORE_RUNNING;
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && strcmp (datastore, "startup") == 0) {
+		if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID) && strcmp(datastore, "startup") == 0) {
 			valid = 1;
 			retval = NC_DATASTORE_STARTUP;
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID) && strcmp (datastore, "candidate") == 0) {
+		if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID) && strcmp(datastore, "candidate") == 0) {
 			valid = 1;
 			retval = NC_DATASTORE_CANDIDATE;
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_URL_ID) && strncmp (datastore, "url:", 4) == 0) {
+		if (nc_cpblts_enabled(session, NC_CAP_URL_ID) && strncmp(datastore, "url:", 4) == 0) {
 			valid = 1;
 			retval = NC_DATASTORE_URL;
 			if (url != NULL) {
@@ -408,14 +406,13 @@ userinput:
 		}
 	} else {
 		ERROR(operation, "invalid parameters, see \'%s --help\'.", operation);
-		return (NC_DATASTORE_ERROR);
+		return NC_DATASTORE_ERROR;
 	}
 
-	return (retval);
+	return retval;
 }
 
-static NCWD_MODE get_withdefaults(const char* operation, const char* mode)
-{
+static NCWD_MODE get_withdefaults(const char* operation, const char* mode) {
 	NCWD_MODE retval = NCWD_MODE_NOTSET;
 	char* mode_aux;
 	mode_aux = malloc(sizeof(char) * 128);
@@ -424,9 +421,9 @@ static NCWD_MODE get_withdefaults(const char* operation, const char* mode)
 userinput:
 		/* get mandatory argument */
 		INSTRUCTION("Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
-		if (scanf ("%127s", mode_aux) == EOF) {
+		if (scanf("%127s", mode_aux) == EOF) {
 			ERROR(operation, "Reading user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
-			return (NCWD_MODE_NOTSET);
+			return NCWD_MODE_NOTSET;
 		}
 		mode = mode_aux;
 	}
@@ -446,35 +443,34 @@ userinput:
 	}
 
 	free(mode_aux);
-	return (retval);
+	return retval;
 }
 
-static struct nc_filter *set_filter(const char* operation, const char *file)
-{
+static struct nc_filter* set_filter(const char* operation, const char* file, int interactive) {
 	int filter_fd;
 	struct stat filter_stat;
 	char *filter_s;
 	struct nc_filter *filter = NULL;
 
 	if (operation == NULL) {
-		return (NULL);
+		return NULL;
 	}
 
-	if (file) {
+	if (!interactive) {
 		/* open filter from the file */
 		filter_fd = open(optarg, O_RDONLY);
 		if (filter_fd == -1) {
 			ERROR(operation, "unable to open the filter file (%s).", strerror(errno));
-			return (NULL);
+			return NULL;
 		}
 
 		/* map content of the file into the memory */
 		fstat(filter_fd, &filter_stat);
-		filter_s = (char*) mmap(NULL, filter_stat.st_size, PROT_READ, MAP_PRIVATE, filter_fd, 0);
+		filter_s = (char*)mmap(NULL, filter_stat.st_size, PROT_READ, MAP_PRIVATE, filter_fd, 0);
 		if (filter_s == MAP_FAILED) {
 			ERROR(operation, "mmapping of the filter file failed (%s).", strerror(errno));
 			close(filter_fd);
-			return (NULL);
+			return NULL;
 		}
 
 		/* create the filter according to the file content */
@@ -485,7 +481,7 @@ static struct nc_filter *set_filter(const char* operation, const char *file)
 		close(filter_fd);
 	} else {
 		/* let user write filter interactively */
-		filter_s = readinput("Type the filter.");
+		filter_s = readinput("Type the filter.", file);
 
 		/* create the filter according to the file content */
 		filter = nc_filter_new(NC_FILTER_SUBTREE, filter_s);
@@ -494,12 +490,11 @@ static struct nc_filter *set_filter(const char* operation, const char *file)
 		free(filter_s);
 	}
 
-	return (filter);
+	return filter;
 }
 
 /* rpc parameter is freed after the function call */
-static int send_recv_process(const char* operation, nc_rpc* rpc, const char* output_file)
-{
+static int send_recv_process(const char* operation, nc_rpc* rpc, const char* output_file) {
 	nc_reply *reply = NULL;
 	char *data = NULL;
 	FILE* out_stream;
@@ -511,7 +506,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 		if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
 			ERROR(operation, "receiving rpc-reply failed.");
 			INSTRUCTION("Closing the session.\n");
-			cmd_disconnect(NULL);
+			cmd_disconnect(NULL, NULL);
 			ret = EXIT_FAILURE;
 			break;
 		}
@@ -534,11 +529,11 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 					ret = EXIT_FAILURE;
 					break;
 				}
-				fprintf(out_stream, "%s", data = nc_reply_get_data (reply));
+				fprintf(out_stream, "%s", data = nc_reply_get_data(reply));
 				fclose(out_stream);
 			} else {
 				INSTRUCTION("Result:\n");
-				fprintf(stdout, "%s\n", data = nc_reply_get_data (reply));
+				fprintf(stdout, "%s\n", data = nc_reply_get_data(reply));
 			}
 			free(data);
 			break;
@@ -561,41 +556,39 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 	nc_rpc_free(rpc);
 	nc_reply_free(reply);
 
-	return (ret);
+	return ret;
 }
 
-void cmd_editconfig_help()
-{
+void cmd_editconfig_help(void) {
 	char *rollback;
 	char *validate;
 
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_ROLLBACK_ID)) {
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_ROLLBACK_ID)) {
 		rollback = "|rollback";
 	} else {
 		rollback = "";
 	}
 
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_VALIDATE11_ID)) {
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_VALIDATE11_ID)) {
 			validate = "[--test <set|test-only|test-then-set>] ";
-	} else if (session == NULL || nc_cpblts_enabled (session, NC_CAP_VALIDATE10_ID)) {
+	} else if (session == NULL || nc_cpblts_enabled(session, NC_CAP_VALIDATE10_ID)) {
 		validate = "[--test <set|test-then-set>] ";
 	} else {
 		validate = "";
 	}
 
 	/* if session not established, print complete help for all capabilities */
-	fprintf (stdout, "edit-config [--help] [--defop <merge|replace|none>] [--error <stop|continue%s>] %s[--config <file> | --url <url>] running", rollback, validate);
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
-		fprintf (stdout, "|startup");
+	fprintf(stdout, "edit-config [--help] [--defop <merge|replace|none>] [--error <stop|continue%s>] %s[--config <file> | --url <url>] running", rollback, validate);
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
+		fprintf(stdout, "|startup");
 	}
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-		fprintf (stdout, "|candidate");
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
+		fprintf(stdout, "|candidate");
 	}
-	fprintf (stdout, "\nIf neither --config nor --url is specified, user is prompted to set edit data manually.\n");
+	fprintf(stdout, "\nIf neither --config nor --url is specified, user is prompted to set edit data manually.\n");
 }
 
-int cmd_editconfig (const char *arg)
-{
+int cmd_editconfig(const char* arg, const char* old_input_file) {
 	xmlDocPtr doc;
 	xmlNodePtr root;
 	int c;
@@ -620,18 +613,18 @@ int cmd_editconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
 	/* rocess command line parameters */
-	while ((c = getopt_long (cmd.count, cmd.list, "c:d:e:t:u:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "c:d:e:t:u:h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'c':
 			/* check if -u was not used */
 			if (config != NULL) {
 				ERROR("edit-config", "mixing --config and --url parameters is not allowed.");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* read the configuration */
@@ -639,7 +632,7 @@ int cmd_editconfig (const char *arg)
 			if (doc == NULL) {
 				ERROR("edit-config", "failed to parse the file.");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* remove the <config> root if included */
@@ -661,60 +654,60 @@ int cmd_editconfig (const char *arg)
 			break;
 		case 'd':
 			/* validate default operation */
-			if (strcmp (optarg, "merge") == 0) {
+			if (strcmp(optarg, "merge") == 0) {
 				defop = NC_EDIT_DEFOP_MERGE;
-			} else if (strcmp (optarg, "replace") == 0) {
+			} else if (strcmp(optarg, "replace") == 0) {
 				defop = NC_EDIT_DEFOP_REPLACE;
-			} else if (strcmp (optarg, "none") == 0) {
+			} else if (strcmp(optarg, "none") == 0) {
 				defop = NC_EDIT_DEFOP_NONE;
 			} else {
 				ERROR("edit-config", "invalid default operation %s.", optarg);
-				cmd_editconfig_help ();
+				cmd_editconfig_help();
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			break;
 		case 'e':
 			/* validate error option */
-			if (strcmp (optarg, "stop") == 0) {
+			if (strcmp(optarg, "stop") == 0) {
 				erropt = NC_EDIT_ERROPT_STOP;
-			} else if (strcmp (optarg, "continue") == 0) {
+			} else if (strcmp(optarg, "continue") == 0) {
 				erropt = NC_EDIT_ERROPT_CONT;
-			} else if (nc_cpblts_enabled (session, NC_CAP_ROLLBACK_ID) && strcmp (optarg, "rollback") == 0) {
+			} else if (nc_cpblts_enabled(session, NC_CAP_ROLLBACK_ID) && strcmp(optarg, "rollback") == 0) {
 				erropt = NC_EDIT_ERROPT_ROLLBACK;
 			} else {
 				ERROR("edit-config", "invalid error-option %s.", optarg);
-				cmd_editconfig_help ();
+				cmd_editconfig_help();
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			break;
 		case 'h':
-			cmd_editconfig_help ();
+			cmd_editconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 't':
-			if (!(nc_cpblts_enabled (session, NC_CAP_VALIDATE11_ID) || nc_cpblts_enabled (session, NC_CAP_VALIDATE10_ID))) {
+			if (!(nc_cpblts_enabled(session, NC_CAP_VALIDATE11_ID) || nc_cpblts_enabled(session, NC_CAP_VALIDATE10_ID))) {
 				ERROR("edit-config", "test-option is not allowed by the current session");
-				cmd_editconfig_help ();
+				cmd_editconfig_help();
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			/* validate test option */
-			if (strcmp (optarg, "set") == 0) {
+			if (strcmp(optarg, "set") == 0) {
 				testopt = NC_EDIT_TESTOPT_SET;
-			} else if (strcmp (optarg, "test-only") == 0 && nc_cpblts_enabled (session, NC_CAP_VALIDATE11_ID)) {
+			} else if (strcmp(optarg, "test-only") == 0 && nc_cpblts_enabled(session, NC_CAP_VALIDATE11_ID)) {
 				testopt = NC_EDIT_TESTOPT_TEST;
-			} else if (strcmp (optarg, "test-then-set") == 0) {
+			} else if (strcmp(optarg, "test-then-set") == 0) {
 				testopt = NC_EDIT_TESTOPT_TESTSET;
 			} else {
 				ERROR("edit-config", "invalid test-option %s.", optarg);
-				cmd_editconfig_help ();
+				cmd_editconfig_help();
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			break;
@@ -723,23 +716,23 @@ int cmd_editconfig (const char *arg)
 			if (config != NULL) {
 				ERROR("edit-config", "mixing --config and --url parameters is not allowed.");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			config = strdup(optarg);
 			source = NC_DATASTORE_URL;
 			break;
 		default:
 			ERROR("edit-config", "unknown option -%c.", c);
-			cmd_editconfig_help ();
+			cmd_editconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("get", "NETCONF session not established, use \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* get what datastore is target of the operation */
@@ -749,16 +742,16 @@ int cmd_editconfig (const char *arg)
 	clear_arglist(&cmd);
 
 	if (target == NC_DATASTORE_ERROR) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* check if edit configuration data were specified */
 	if (config == NULL) {
 		/* let user write edit data interactively */
-		config = readinput("Type the edit configuration data.");
+		config = readinput("Type the edit configuration data.", old_input_file);
 		if (config == NULL) {
 			ERROR("edit-config", "reading edit data failed.");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		source = NC_DATASTORE_CONFIG;
 	}
@@ -768,15 +761,14 @@ int cmd_editconfig (const char *arg)
 	free(config);
 	if (rpc == NULL) {
 		ERROR("edit-config", "creating rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("edit-config", rpc, NULL));
+	return send_recv_process("edit-config", rpc, NULL);
 }
 
-void cmd_validate_help ()
-{
+void cmd_validate_help(void) {
 	char *ds_startup, *ds_candidate, *ds_url;
 
 	if (session == NULL) {
@@ -785,33 +777,32 @@ void cmd_validate_help ()
 		ds_candidate = "|candidate";
 		ds_url = "|url:<url>";
 	} else {
-		if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 			ds_startup = "|startup";
 		} else {
 			ds_startup = "";
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
 			ds_candidate = "|candidate";
 		} else {
 			ds_candidate = "";
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_URL_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_URL_ID)) {
 			ds_url = "|url:<dsturl>";
 		} else {
 			ds_url = "";
 		}
 	}
-	fprintf (stdout, "validate [--help] --config [<file>] | running%s%s%s\n",
+	fprintf(stdout, "validate [--help] --config [<file>] | running%s%s%s\n",
 			ds_startup, ds_candidate, ds_url);
 
 	if (session != NULL &&
-	    !(nc_cpblts_enabled (session, NC_CAP_VALIDATE10_ID) || nc_cpblts_enabled (session, NC_CAP_VALIDATE11_ID))) {
-		fprintf (stdout, "WARNING: validate operation is not supported in the current session.\n");
+			!(nc_cpblts_enabled(session, NC_CAP_VALIDATE10_ID) || nc_cpblts_enabled(session, NC_CAP_VALIDATE11_ID))) {
+		fprintf(stdout, "WARNING: validate operation is not supported in the current session.\n");
 	}
 }
 
-int cmd_validate (const char *arg)
-{
+int cmd_validate(const char* arg, const char* old_input_file) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -829,18 +820,18 @@ int cmd_validate (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "c::h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "c::h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'c':
 			if (optarg == NULL) {
 				/* let user write edit data interactively */
-				config = readinput("Type the content of a configuration datastore.");
+				config = readinput("Type the content of a configuration datastore.", old_input_file);
 				if (config == NULL) {
 					ERROR("validate", "reading configuration data failed.");
-					return (EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 			} else {
 				/* open configuration data from the file */
@@ -848,17 +839,17 @@ int cmd_validate (const char *arg)
 				if (config_fd == -1) {
 					ERROR("validate", "unable to open the local datastore file (%s).", strerror(errno));
 					clear_arglist(&cmd);
-					return (EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 
 				/* map content of the file into the memory */
 				fstat(config_fd, &config_stat);
-				config_m = (char*) mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
+				config_m = (char*)mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
 				if (config_m == MAP_FAILED) {
 					ERROR("validate", "mmapping of the local datastore file failed (%s).", strerror(errno));
 					clear_arglist(&cmd);
 					close(config_fd);
-					return (EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 
 				/* make a copy of the content to allow closing the file */
@@ -872,22 +863,22 @@ int cmd_validate (const char *arg)
 			source = NC_DATASTORE_CONFIG;
 			break;
 		case 'h':
-			cmd_validate_help ();
+			cmd_validate_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR("validate", "unknown option -%c.", c);
-			cmd_validate_help ();
+			cmd_validate_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("validate", "NETCONF session not established, use \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* if the config option not set, parse remaining arguments to get source */
@@ -899,19 +890,18 @@ int cmd_validate (const char *arg)
 	clear_arglist(&cmd);
 
 	/* create requests */
-	rpc = nc_rpc_validate (source, config);
+	rpc = nc_rpc_validate(source, config);
 	free(config);
 	if (rpc == NULL) {
 		ERROR("validate", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("validate", rpc, NULL));
+	return send_recv_process("validate", rpc, NULL);
 }
 
-void cmd_copyconfig_help ()
-{
+void cmd_copyconfig_help(void) {
 	char *ds_startup, *ds_candidate, *ds_url;
 	char *defaults;
 
@@ -922,36 +912,35 @@ void cmd_copyconfig_help ()
 		ds_url = "|url:<dsturl>";
 		defaults = "[--defaults report-all|report-all-tagged|trim|explicit] ";
 	} else {
-		if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 			ds_startup = "|startup";
 		} else {
 			ds_startup = "";
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
 			ds_candidate = "|candidate";
 		} else {
 			ds_candidate = "";
 		}
-		if (nc_cpblts_enabled (session, NC_CAP_URL_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_URL_ID)) {
 			ds_url = "|url:<dsturl>";
 		} else {
 			ds_url = "";
 		}
 
-		if (nc_cpblts_enabled (session, NC_CAP_WITHDEFAULTS_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_WITHDEFAULTS_ID)) {
 			defaults = "[--defaults report-all|report-all-tagged|trim|explicit] ";
 		} else {
 			defaults = "";
 		}
 	}
 
-	fprintf (stdout, "copy-config [--help] %s[--source running%s%s%s | --config <file>] running%s%s%s\n",
+	fprintf(stdout, "copy-config [--help] %s[--source running%s%s%s | --config <file>] running%s%s%s\n",
 			defaults, ds_startup, ds_candidate, ds_url,
 			ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_copyconfig (const char *arg)
-{
+int cmd_copyconfig(const char* arg, const char* old_input_file) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -974,17 +963,17 @@ int cmd_copyconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "c:d:s:u:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "c:d:s:u:h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'c':
 			/* check if -s was not used */
 			if (source != NC_DATASTORE_ERROR) {
 				ERROR("copy-config", "mixing --source, --url and --config parameters is not allowed.");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* open edit configuration data from the file */
@@ -992,17 +981,17 @@ int cmd_copyconfig (const char *arg)
 			if (config_fd == -1) {
 				ERROR("copy-config", "unable to open the local datastore file (%s).", strerror(errno));
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* map content of the file into the memory */
 			fstat(config_fd, &config_stat);
-			config_m = (char*) mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
+			config_m = (char*)mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
 			if (config_m == MAP_FAILED) {
 				ERROR("copy-config", "mmapping of the local datastore file failed (%s).", strerror(errno));
 				clear_arglist(&cmd);
 				close(config_fd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* make a copy of the content to allow closing the file */
@@ -1021,20 +1010,20 @@ int cmd_copyconfig (const char *arg)
 			if (source != NC_DATASTORE_ERROR) {
 				ERROR("copy-config", "mixing --source, --url and --config parameters is not allowed.");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* validate argument */
-			if (strcmp (optarg, "running") == 0) {
+			if (strcmp(optarg, "running") == 0) {
 				source = NC_DATASTORE_RUNNING;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && strcmp (optarg, "startup") == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID) && strcmp(optarg, "startup") == 0) {
 				source = NC_DATASTORE_STARTUP;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID) && strcmp (optarg, "candidate") == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID) && strcmp(optarg, "candidate") == 0) {
 				source = NC_DATASTORE_CANDIDATE;
 			}
-			if (nc_cpblts_enabled (session, NC_CAP_URL_ID) && strncmp (optarg, "url:", 4) == 0) {
+			if (nc_cpblts_enabled(session, NC_CAP_URL_ID) && strncmp(optarg, "url:", 4) == 0) {
 				source = NC_DATASTORE_URL;
 				config = strdup(&(optarg[4]));
 			}
@@ -1042,26 +1031,26 @@ int cmd_copyconfig (const char *arg)
 			if (source == NC_DATASTORE_ERROR) {
 				ERROR("copy-config", "invalid source datastore specified (%s).", optarg);
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			break;
 		case 'h':
-			cmd_copyconfig_help ();
+			cmd_copyconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR("copy-config", "unknown option -%c.", c);
-			cmd_copyconfig_help ();
+			cmd_copyconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("copy-config", "NETCONF session not established, use \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	target = get_datastore("target", "copy-config", &cmd, optind, &url_dst);
@@ -1070,16 +1059,16 @@ int cmd_copyconfig (const char *arg)
 	clear_arglist(&cmd);
 
 	if (target == NC_DATASTORE_ERROR) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* check if edit configuration data were specified */
 	if (source == NC_DATASTORE_ERROR && config == NULL) {
 		/* let user write edit data interactively */
-		config = readinput("Type the content of a configuration datastore.");
+		config = readinput("Type the content of a configuration datastore.", old_input_file);
 		if (config == NULL) {
 			ERROR("copy-config", "reading configuration data failed.");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		source = NC_DATASTORE_CONFIG;
 	}
@@ -1095,33 +1084,31 @@ int cmd_copyconfig (const char *arg)
 	free(url_dst);
 	if (rpc == NULL) {
 		ERROR("copy-config", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	/* set with defaults settings */
 	if (nc_rpc_capability_attr(rpc, NC_CAP_ATTR_WITHDEFAULTS_MODE, wd) != EXIT_SUCCESS) {
 		ERROR("copy-config", "setting up the with-defaults mode failed.");
 		nc_rpc_free(rpc);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("copy-config", rpc, NULL));
+	return send_recv_process("copy-config", rpc, NULL);
 }
 
-void cmd_get_help ()
-{
-	char *defaults;
+void cmd_get_help(void) {
+	char* defaults;
 
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_WITHDEFAULTS_ID)) {
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_WITHDEFAULTS_ID)) {
 		defaults = "[--defaults report-all|report-all-tagged|trim|explicit] ";
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get [--help] %s[--filter [file]] [--out file]\n", defaults);
+	fprintf(stdout, "get [--help] %s[--filter [file]] [--out file]\n", defaults);
 }
 
-int cmd_get (const char *arg)
-{
+int cmd_get(const char* arg, const char* old_input_file) {
 	int c;
 	char* output = NULL;
 	struct nc_filter *filter = NULL;
@@ -1140,41 +1127,45 @@ int cmd_get (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
 			break;
 		case 'f':
-			filter = set_filter("get", optarg);
+			if (optarg == NULL) {
+				filter = set_filter("get", old_input_file, 1);
+			} else {
+				filter = set_filter("get", optarg, 0);
+			}
 			if (filter == NULL) {
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			break;
 		case 'h':
-			cmd_get_help ();
+			cmd_get_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 'o':
 			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get", "unknown option -%c.", c);
-			cmd_get_help ();
+			cmd_get_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (optind < cmd.count) {
 		ERROR("get", "invalid parameters, see \'get --help\'.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* arglist is no more needed */
@@ -1182,49 +1173,48 @@ int cmd_get (const char *arg)
 
 	if (session == NULL) {
 		ERROR("get", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
-	rpc = nc_rpc_get (filter);
+	rpc = nc_rpc_get(filter);
 	nc_filter_free(filter);
 	if (rpc == NULL) {
 		ERROR("get", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	/* set with defaults settings */
 	if (nc_rpc_capability_attr(rpc, NC_CAP_ATTR_WITHDEFAULTS_MODE, wd) != EXIT_SUCCESS) {
 		ERROR("get", "setting up with-defaults mode failed.");
 		nc_rpc_free(rpc);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get", rpc, output));
+	return send_recv_process("get", rpc, output);
 }
 
-void cmd_deleteconfig_help ()
-{
-	char *ds_startup, *ds_candidate, *ds_url;
+void cmd_deleteconfig_help(void) {
+	char* ds_startup, *ds_candidate, *ds_url;
 
 	if (session == NULL) {
 		ds_startup = "startup";
 		ds_candidate = "|candidate";
 		ds_url = "url:<url>";
 	} else {
-		if (nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 			ds_startup = "startup";
 		} else {
 			ds_startup = "";
 		}
 
-		if (nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
 			ds_candidate = (strlen(ds_startup) == 0) ? "candidate" : "|candidate";
 		} else {
 			ds_candidate = "";
 		}
 
-		if (nc_cpblts_enabled (session, NC_CAP_URL_ID)) {
+		if (nc_cpblts_enabled(session, NC_CAP_URL_ID)) {
 			ds_url = ((strlen(ds_startup) + strlen(ds_candidate)) == 0) ? "url:<url>" : "|url:<url>";
 		} else {
 			ds_url = "";
@@ -1232,15 +1222,14 @@ void cmd_deleteconfig_help ()
 	}
 
 	if ((strlen(ds_startup) + strlen(ds_candidate) + strlen(ds_url)) == 0) {
-		fprintf (stdout, "delete-config cannot be used in the current session.\n");
+		fprintf(stdout, "delete-config cannot be used in the current session.\n");
 		return;
 	}
 
-	fprintf (stdout, "delete-config [--help]  %s%s%s\n", ds_startup, ds_candidate, ds_url);
+	fprintf(stdout, "delete-config [--help]  %s%s%s\n", ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_deleteconfig (const char *arg)
-{
+int cmd_deleteconfig(const char* arg, const char* UNUSED(old_input_file)) {
 	int c;
 	NC_DATASTORE target;
 	nc_rpc *rpc = NULL;
@@ -1255,39 +1244,39 @@ int cmd_deleteconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'h':
-			cmd_deleteconfig_help ();
+			cmd_deleteconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR("delete-config", "unknown option -%c.", c);
-			cmd_deleteconfig_help ();
+			cmd_deleteconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("delete-config", "NETCONF session not established, use \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	if (!nc_cpblts_enabled (session, NC_CAP_STARTUP_ID) && !nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-		ERROR ("delete-config", "operation cannot be used in the current session.");
+	if (!nc_cpblts_enabled(session, NC_CAP_STARTUP_ID) && !nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
+		ERROR("delete-config", "operation cannot be used in the current session.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	target = get_datastore("target", "delete-config", &cmd, optind, &url);
 	while (target == NC_DATASTORE_RUNNING) {
-		fprintf (stdout, "delete-config: <running> datastore cannot be deleted.");
+		fprintf(stdout, "delete-config: <running> datastore cannot be deleted.");
 		target = get_datastore("target", "delete-config", &cmd, cmd.count, &url);
 	}
 
@@ -1295,7 +1284,7 @@ int cmd_deleteconfig (const char *arg)
 	clear_arglist(&cmd);
 
 	if (target == NC_DATASTORE_ERROR) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
@@ -1303,20 +1292,18 @@ int cmd_deleteconfig (const char *arg)
 	free(url);
 	if (rpc == NULL) {
 		ERROR("delete-config", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("delete-config", rpc, NULL));
+	return send_recv_process("delete-config", rpc, NULL);
 }
 
-void cmd_killsession_help ()
-{
-	fprintf (stdout, "kill-session [--help] <sessionID>\n");
+void cmd_killsession_help(void) {
+	fprintf(stdout, "kill-session [--help] <sessionID>\n");
 }
 
-int cmd_killsession (const char *arg)
-{
+int cmd_killsession(const char* arg, const char* UNUSED(old_input_file)) {
 	int c;
 	char *id;
 	nc_rpc *rpc = NULL;
@@ -1330,42 +1317,42 @@ int cmd_killsession (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'h':
-			cmd_killsession_help ();
+			cmd_killsession_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR("kill-session", "unknown option -%c.", c);
-			cmd_killsession_help ();
+			cmd_killsession_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if ((optind + 1) == cmd.count) {
 		id = strdup(cmd.list[optind]);
 	} else {
-		id = malloc (sizeof(char) * BUFFER_SIZE);
+		id = malloc(sizeof(char) * BUFFER_SIZE);
 		if (id == NULL) {
-			ERROR("kill-session", "memory allocation error (%s).", strerror (errno));
+			ERROR("kill-session", "memory allocation error (%s).", strerror(errno));
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		id[0] = 0;
 
 		while (id[0] == '\0') { /* string is empty */
 			/* get mandatory argument */
 			INSTRUCTION("Set session ID to kill: ");
-			if (scanf ("%1023s", id) == EOF) {
+			if (scanf("%1023s", id) == EOF) {
 				ERROR("kill-session", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 		}
 	}
@@ -1375,7 +1362,7 @@ int cmd_killsession (const char *arg)
 
 	if (session == NULL) {
 		ERROR("kill-session", "NETCONF session not established, use \'connect\' command.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
@@ -1383,24 +1370,22 @@ int cmd_killsession (const char *arg)
 	free(id);
 	if (rpc == NULL) {
 		ERROR("kill-session", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("kill-session", rpc, NULL));
+	return send_recv_process("kill-session", rpc, NULL);
 }
 
 #define CAP_ADD 'a'
 #define CAP_REM 'r'
 #define CAP_LIST 'l'
 #define CAP_DEF 'd'
-void cmd_capability_help (void)
-{
-	fprintf (stdout, "capability {--help|--add <uri>|--rem {<uri>|*}|--list|--default\n");
+void cmd_capability_help(void) {
+	fprintf(stdout, "capability {--help|--add <uri>|--rem {<uri>|*}|--list|--default\n");
 }
 
-int cmd_capability (const char * arg)
-{
+int cmd_capability(const char* arg, const char* UNUSED(old_input_file)) {
 	struct arglist cmd;
 	int c = -1;
 	const char * uri;
@@ -1416,96 +1401,94 @@ int cmd_capability (const char * arg)
 	optind = 0;
 
 	if (session != NULL) {
-		ERROR ("capability", "NETCONF session already established. Any changes to the supported capability list will take effect after reconnection.");
+		ERROR("capability", "NETCONF session already established. Any changes to the supported capability list will take effect after reconnection.");
 	}
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	if ((c=getopt_long (cmd.count, cmd.list, "a:r:l:d:h", long_options, &option_index)) == -1) {
+	if ((c = getopt_long(cmd.count, cmd.list, "a:r:l:d:h", long_options, &option_index)) == -1) {
 		cmd_capability_help();
 	} else do {
 		switch (c) {
 		case 'h':
-			cmd_capability_help ();
+			cmd_capability_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case CAP_ADD:
 			/* if adding first */
 			if (opts->cpblts == NULL) {
 				/* create structure */
-				opts->cpblts = nc_cpblts_new (NULL);
+				opts->cpblts = nc_cpblts_new(NULL);
 			}
-			if (nc_cpblts_add (opts->cpblts, optarg)) {
-				ERROR ("capability", "Cannot add the capability \"%s\" to the client supported list.", optarg);
+			if (nc_cpblts_add(opts->cpblts, optarg)) {
+				ERROR("capability", "Cannot add the capability \"%s\" to the client supported list.", optarg);
 				return EXIT_FAILURE;
 			}
-			store_config ();
+			store_config();
 			break;
 		case CAP_REM:
 			if (strcmp(optarg, "*") == 0) {
 				nc_cpblts_free(opts->cpblts);
 				opts->cpblts = nc_cpblts_new(NULL);
 			} else {
-				if (nc_cpblts_remove (opts->cpblts, optarg)) {
-					ERROR ("capability", "Cannot remove the capability \"%s\" from the client supported list.", optarg);
+				if (nc_cpblts_remove(opts->cpblts, optarg)) {
+					ERROR("capability", "Cannot remove the capability \"%s\" from the client supported list.", optarg);
 					return EXIT_FAILURE;
 				}
 			}
 			if (nc_cpblts_get(opts->cpblts, "urn:ietf:params:netconf:base:1.0") == NULL &&
 					nc_cpblts_get(opts->cpblts, "urn:ietf:params:netconf:base:1.1") == NULL) {
-				ERROR ("capability", "No base capability left in the supported list. Connection to a server will be impossible.");
+				ERROR("capability", "No base capability left in the supported list. Connection to a server will be impossible.");
 			}
-			store_config ();
+			store_config();
 			break;
 		case CAP_LIST:
-			fprintf (stdout, "Client claims support of the following capabilities:\n");
-			nc_cpblts_iter_start (opts->cpblts);
-			while ((uri = nc_cpblts_iter_next (opts->cpblts)) != NULL) {
-				fprintf (stdout, "%s\n", uri);
+			fprintf(stdout, "Client claims support of the following capabilities:\n");
+			nc_cpblts_iter_start(opts->cpblts);
+			while ((uri = nc_cpblts_iter_next(opts->cpblts)) != NULL) {
+				fprintf(stdout, "%s\n", uri);
 			}
 			break;
 		case CAP_DEF:
-			if (opts->cpblts != NULL) {
-				nc_cpblts_free (opts->cpblts);
+			if(opts->cpblts != NULL) {
+				nc_cpblts_free(opts->cpblts);
 			}
-			opts->cpblts = nc_session_get_cpblts_default ();
-			store_config ();
+			opts->cpblts = nc_session_get_cpblts_default();
+			store_config();
 			break;
 		default:
 			cmd_capability_help();
 			break;
 		}
-	} while ((c=getopt_long (cmd.count, cmd.list, "a:r:l:d:h", long_options, &option_index)) != -1);
+	} while ((c=getopt_long(cmd.count, cmd.list, "a:r:l:d:h", long_options, &option_index)) != -1);
 
 	clear_arglist(&cmd);
 
 	return EXIT_SUCCESS;
 }
 
-void cmd_getconfig_help ()
-{
+void cmd_getconfig_help(void) {
 	char *defaults;
 
 	/* if session not established, print complete help for all capabilities */
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_WITHDEFAULTS_ID)) {
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_WITHDEFAULTS_ID)) {
 		defaults = "[--defaults report-all|report-all-tagged|trim|explicit] ";
 	} else {
 		defaults = "";
 	}
-	fprintf (stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
-		fprintf (stdout, "|startup");
+	fprintf(stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
+		fprintf(stdout, "|startup");
 	}
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-		fprintf (stdout, "|candidate");
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
+		fprintf(stdout, "|candidate");
 	}
-	fprintf (stdout, "\n");
+	fprintf(stdout, "\n");
 }
 
-int cmd_getconfig (const char *arg)
-{
+int cmd_getconfig(const char* arg, const char* old_input_file) {
 	int c;
 	char* output = NULL;
 	NC_DATASTORE target;
@@ -1525,41 +1508,45 @@ int cmd_getconfig (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg);
 			break;
 		case 'f':
-			filter = set_filter("get-config", optarg);
+			if (optarg == NULL) {
+				filter = set_filter("get-config", old_input_file, 1);
+			} else {
+				filter = set_filter("get-config", optarg, 0);
+			}
 			if (filter == NULL) {
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			break;
 		case 'h':
-			cmd_getconfig_help ();
+			cmd_getconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 'o':
 			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get-config", "unknown option -%c.", c);
-			cmd_getconfig_help ();
+			cmd_getconfig_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("get-config", "NETCONF session not established, use the \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	target = get_datastore("target", "get-config", &cmd, optind, NULL);
@@ -1568,35 +1555,33 @@ int cmd_getconfig (const char *arg)
 	clear_arglist(&cmd);
 
 	if (target == NC_DATASTORE_ERROR) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
-	rpc = nc_rpc_getconfig (target, filter);
+	rpc = nc_rpc_getconfig(target, filter);
 	nc_filter_free(filter);
 	if (rpc == NULL) {
 		ERROR("get-config", "creating an rpc request failed.");;
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	/* set with defaults settings */
 	if (nc_rpc_capability_attr(rpc, NC_CAP_ATTR_WITHDEFAULTS_MODE, wd) != EXIT_SUCCESS) {
 		ERROR("get-config", "setting up the with-defaults mode failed.");
 		nc_rpc_free(rpc);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get-config", rpc, output));
+	return send_recv_process("get-config", rpc, output);
 }
 
-void cmd_getschema_help ()
-{
+void cmd_getschema_help(void) {
 	/* if session not established, print complete help for all capabilities */
-	fprintf (stdout, "get-schema [--help] [--version <version>] [--format <format>] [--out file] <identifier>\n");
+	fprintf(stdout, "get-schema [--help] [--version <version>] [--format <format>] [--out file] <identifier>\n");
 }
 
-int cmd_getschema (const char *arg)
-{
+int cmd_getschema(const char* arg, const char* UNUSED(old_input_file)) {
 	int c;
 	char *format = NULL, *version = NULL, *identifier = NULL, *output = NULL;
 	nc_rpc *rpc = NULL;
@@ -1613,10 +1598,10 @@ int cmd_getschema (const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "f:hv:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "f:hv:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'f':
 			format = optarg;
@@ -1625,48 +1610,48 @@ int cmd_getschema (const char *arg)
 			version = optarg;
 			break;
 		case 'h':
-			cmd_getschema_help ();
+			cmd_getschema_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 'o':
 			output = strdupa(optarg);
 			break;
 		default:
 			ERROR("get-schema", "unknown option -%c.", c);
-			cmd_getschema_help ();
+			cmd_getschema_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("get-schema", "NETCONF session not established, use the \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	if (optind == cmd.count) {
 		/* force input from user */
-		identifier = malloc (sizeof(char) * BUFFER_SIZE);
+		identifier = malloc(sizeof(char) * BUFFER_SIZE);
 		if (identifier == NULL) {
-			ERROR("get-schema", "memory allocation error (%s).", strerror (errno));
+			ERROR("get-schema", "memory allocation error (%s).", strerror(errno));
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		INSTRUCTION("Set identifier of the schema to retrieve: ");
-		if (scanf ("%1023s", identifier) == EOF) {
+		if (scanf("%1023s", identifier) == EOF) {
 			ERROR("get-schema", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	} else if ((optind + 1) == cmd.count) {
 		identifier = strdup(cmd.list[optind]);
 	} else {
 		ERROR("get-schema", "invalid parameters, see \'get-schema --help\'.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
@@ -1678,30 +1663,28 @@ int cmd_getschema (const char *arg)
 
 	if (rpc == NULL) {
 		ERROR("get-schema", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("get-schema", rpc, output));
+	return send_recv_process("get-schema", rpc, output);
 }
 
-void cmd_un_lock_help (char* operation)
-{
+void cmd_un_lock_help(char* operation) {
 	/* if session not established, print complete help for all capabilities */
-	fprintf (stdout, "%s running", operation);
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_STARTUP_ID)) {
-		fprintf (stdout, "|startup");
+	fprintf(stdout, "%s running", operation);
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
+		fprintf(stdout, "|startup");
 	}
-	if (session == NULL || nc_cpblts_enabled (session, NC_CAP_CANDIDATE_ID)) {
-		fprintf (stdout, "|candidate");
+	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_CANDIDATE_ID)) {
+		fprintf(stdout, "|candidate");
 	}
-	fprintf (stdout, "\n");
+	fprintf(stdout, "\n");
 }
 
 #define LOCK_OP 1
 #define UNLOCK_OP 2
-int cmd_un_lock (int op, const char *arg)
-{
+int cmd_un_lock(int op, const char* arg) {
 	int c;
 	NC_DATASTORE target;
 	nc_rpc *rpc = NULL;
@@ -1722,34 +1705,34 @@ int cmd_un_lock (int op, const char *arg)
 		break;
 	default:
 		ERROR("cmd_un_lock()", "Wrong use of an internal function (Invalid parameter)");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'h':
-			cmd_un_lock_help (operation);
+			cmd_un_lock_help(operation);
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR(operation, "unknown option -%c.", c);
-			cmd_un_lock_help (operation);
+			cmd_un_lock_help(operation);
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR(operation, "NETCONF session not established, use the \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	target = get_datastore("target", operation, &cmd, optind, NULL);
@@ -1758,7 +1741,7 @@ int cmd_un_lock (int op, const char *arg)
 	clear_arglist(&cmd);
 
 	if (target == NC_DATASTORE_ERROR) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
@@ -1772,30 +1755,30 @@ int cmd_un_lock (int op, const char *arg)
 	}
 	if (rpc == NULL) {
 		ERROR(operation, "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process(operation, rpc, NULL));
+	return send_recv_process(operation, rpc, NULL);
 }
 
-int cmd_lock (const char *arg)
-{
-	return cmd_un_lock (LOCK_OP, arg);
+int cmd_lock(const char* arg, const char* UNUSED(old_input_file)) {
+	return cmd_un_lock(LOCK_OP, arg);
 }
 
-int cmd_unlock (const char *arg)
-{
-	return cmd_un_lock (UNLOCK_OP, arg);
+int cmd_unlock(const char* arg, const char* UNUSED(old_input_file)) {
+	return cmd_un_lock(UNLOCK_OP, arg);
 }
 
-void cmd_auth_help ()
-{
+}
+
+}
+
+void cmd_auth_help(void) {
 	fprintf(stdout, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
 }
 
-int cmd_auth (const char* arg)
-{
+int cmd_auth(const char* arg, const char* UNUSED(old_input_file)) {
 	int i;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *pubkey;
@@ -1809,7 +1792,7 @@ int cmd_auth (const char* arg)
 		cmd = strtok_r(NULL, " ", &ptr);
 		if (cmd == NULL) {
 			ERROR("auth pref", "Missing the SSH authentication method argument");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (strcmp(cmd, "publickey") == 0) {
@@ -1838,7 +1821,7 @@ int cmd_auth (const char* arg)
 			}
 		} else {
 			ERROR("auth pref", "Unknown authentication method (%s)", cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 	} else if (strcmp(cmd, "keys") == 0) {
@@ -1856,7 +1839,7 @@ int cmd_auth (const char* arg)
 			cmd = strtok_r(NULL, " ", &ptr);
 			if (cmd == NULL) {
 				ERROR("auth keys add", "Missing the key path");
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			asprintf(&pubkey, "%s.pub", cmd);
@@ -1878,7 +1861,7 @@ int cmd_auth (const char* arg)
 			cmd = strtok_r(NULL, " ", &ptr);
 			if (cmd == NULL) {
 				ERROR("auth keys remove", "Missing the key path");
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			for (i = 0; i < opts->key_count; ++i) {
@@ -1888,7 +1871,7 @@ int cmd_auth (const char* arg)
 			}
 			if (i == opts->key_count) {
 				ERROR("auth keys remove", "Unknown key");
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			asprintf(&pubkey, "%s.pub", cmd);
@@ -1902,15 +1885,15 @@ int cmd_auth (const char* arg)
 
 		} else {
 			ERROR("auth keys", "Wrong argument (%s)", cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 	} else {
 		ERROR("auth", "Unknown argument %s", cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
 #ifdef ENABLE_TLS
@@ -2047,13 +2030,11 @@ void parse_cert(const char* name, const char* path) {
 	fclose(fp);
 }
 
-void cmd_cert_help ()
-{
-	fprintf (stdout, "cert [--help | display | add <cert_path> | remove <cert_name> | displayown | replaceown (<cert_path.pem> | <cert_path.crt> <key_path.key>)]\n");
+void cmd_cert_help(void) {
+	fprintf(stdout, "cert [--help | display | add <cert_path> | remove <cert_name> | displayown | replaceown (<cert_path.pem> | <cert_path.crt> <key_path.key>)]\n");
 }
 
-int cmd_cert (const char* arg)
-{
+int cmd_cert(const char* arg, const char* UNUSED(old_input_file)) {
 	int ret;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *path2, *dest;
@@ -2072,7 +2053,7 @@ int cmd_cert (const char* arg)
 
 		if ((trusted_dir = get_default_trustedCA_dir(NULL)) == NULL) {
 			ERROR("cert display", "Could not get the default trusted CA directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		dir = opendir(trusted_dir);
@@ -2097,23 +2078,23 @@ int cmd_cert (const char* arg)
 		path = strtok_r(NULL, " ", &ptr);
 		if (path == NULL || strlen(path) < 5) {
 			ERROR("cert add", "Missing or wrong path to the certificate");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		if (eaccess(path, R_OK) != 0) {
 			ERROR("cert add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		trusted_dir = get_default_trustedCA_dir(NULL);
 		if (trusted_dir == NULL) {
 			ERROR("cert add", "Could not get the default trusted CA directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (asprintf(&dest, "%s/%s", trusted_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
 			ERROR("cert add", "Memory allocation failed");
 			free(trusted_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(trusted_dir);
 
@@ -2126,14 +2107,14 @@ int cmd_cert (const char* arg)
 			ERROR("cert add", "Could not copy the certificate: %s", strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(dest);
 
 		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
 			ERROR("cert add", "c_rehash execution failed");
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		free(c_rehash_cmd);
@@ -2142,7 +2123,7 @@ int cmd_cert (const char* arg)
 		path = strtok_r(NULL, " ", &ptr);
 		if (path == NULL) {
 			ERROR("cert remove", "Missing the certificate name");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		// delete ".pem" if the user unnecessarily included it
@@ -2153,13 +2134,13 @@ int cmd_cert (const char* arg)
 		trusted_dir = get_default_trustedCA_dir(NULL);
 		if (trusted_dir == NULL) {
 			ERROR("cert remove", "Could not get the default trusted CA directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (asprintf(&dest, "%s/%s.pem", trusted_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", trusted_dir) == -1) {
 			ERROR("cert remove", "Memory allocation failed");
 			free(trusted_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(trusted_dir);
 
@@ -2167,14 +2148,14 @@ int cmd_cert (const char* arg)
 			ERROR("cert remove", "Cannot remove certificate \"%s\": %s (use the name from \"cert display\" output)", path, strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(dest);
 
 		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
 			ERROR("cert remove", "c_rehash execution failed");
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		free(c_rehash_cmd);
@@ -2185,13 +2166,13 @@ int cmd_cert (const char* arg)
 		netconf_dir = get_netconf_dir();
 		if (netconf_dir == NULL) {
 			ERROR("cert displayown", "Could not get the client home directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (asprintf(&dest, "%s/client.pem", netconf_dir) == -1) {
 			ERROR("cert displayown", "Memory allocation failed");
 			free(netconf_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(netconf_dir);
 		if (eaccess(dest, R_OK) == 0) {
@@ -2239,34 +2220,34 @@ int cmd_cert (const char* arg)
 		path = strtok_r(NULL, " ", &ptr);
 		if (path == NULL || strlen(path) < 5) {
 			ERROR("cert replaceown", "Missing the certificate or invalid path.");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		if (eaccess(path, R_OK) != 0) {
 			ERROR("cert replaceown", "Cannot access the certificate \"%s\": %s", path, strerror(errno));
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		path2 = strtok_r(NULL, " ", &ptr);
 		if (path2 != NULL) {
 			if (strlen(path2) < 5) {
 				ERROR("cert replaceown", "Invalid private key path.");
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			if (eaccess(path2, R_OK) != 0) {
 				ERROR("cert replaceown", "Cannot access the private key \"%s\": %s", path2, strerror(errno));
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 		}
 
 		netconf_dir = get_netconf_dir();
 		if (netconf_dir == NULL) {
 			ERROR("cert replaceown", "Could not get the client home directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		if (asprintf(&dest, "%s/client.XXX", netconf_dir) == -1) {
 			ERROR("cert replaceown", "Memory allocation failed");
 			free(netconf_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(netconf_dir);
 
@@ -2281,13 +2262,13 @@ int cmd_cert (const char* arg)
 			if (cp(dest, path) != 0) {
 				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
 				free(dest);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			strcpy(dest+strlen(dest)-4, ".key");
 			if (cp(dest, path2) != 0) {
 				ERROR("cert replaceown", "Could not copy the private key \"%s\": %s", path, strerror(errno));
 				free(dest);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 		} else {
 			/* PEM */
@@ -2304,7 +2285,7 @@ int cmd_cert (const char* arg)
 			if (cp(dest, path) != 0) {
 				ERROR("cert replaceown", "Could not copy the certificate \"%s\": %s", path, strerror(errno));
 				free(dest);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 		}
 
@@ -2312,10 +2293,10 @@ int cmd_cert (const char* arg)
 
 	} else {
 		ERROR("cert", "Unknown argument %s", cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
 void parse_crl(const char* name, const char* path) {
@@ -2379,11 +2360,11 @@ void parse_crl(const char* name, const char* path) {
 	fclose(fp);
 }
 
-void cmd_crl_help() {
-	fprintf (stdout, "crl [--help | display | add <crl_path> | remove <crl_name>]\n");
+void cmd_crl_help(void) {
+	fprintf(stdout, "crl [--help | display | add <crl_path> | remove <crl_name>]\n");
 }
 
-int cmd_crl (const char* arg) {
+int cmd_crl(const char* arg) {
 	int ret;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *dest;
@@ -2402,7 +2383,7 @@ int cmd_crl (const char* arg) {
 
 		if ((crl_dir = get_default_CRL_dir(NULL)) == NULL) {
 			ERROR("crl display", "Could not get the default CRL directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		dir = opendir(crl_dir);
@@ -2427,23 +2408,23 @@ int cmd_crl (const char* arg) {
 		path = strtok_r(NULL, " ", &ptr);
 		if (path == NULL || strlen(path) < 5) {
 			ERROR("crl add", "Missing or wrong path to the certificate");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		if (eaccess(path, R_OK) != 0) {
 			ERROR("crl add", "Cannot access certificate \"%s\": %s", path, strerror(errno));
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		crl_dir = get_default_CRL_dir(NULL);
 		if (crl_dir == NULL) {
 			ERROR("crl add", "Could not get the default CRL directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (asprintf(&dest, "%s/%s", crl_dir, strrchr(path, '/')+1) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
 			ERROR("crl add", "Memory allocation failed");
 			free(crl_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(crl_dir);
 
@@ -2456,14 +2437,14 @@ int cmd_crl (const char* arg) {
 			ERROR("crl add", "Could not copy the CRL \"%s\": %s", path, strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(dest);
 
 		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
 			ERROR("crl add", "c_rehash execution failed");
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		free(c_rehash_cmd);
@@ -2472,7 +2453,7 @@ int cmd_crl (const char* arg) {
 		path = strtok_r(NULL, " ", &ptr);
 		if (path == NULL) {
 			ERROR("crl remove", "Missing the certificate name");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		// delete ".pem" if the user unnecessarily included it
@@ -2483,13 +2464,13 @@ int cmd_crl (const char* arg) {
 		crl_dir = get_default_CRL_dir(NULL);
 		if (crl_dir == NULL) {
 			ERROR("crl remove", "Could not get the default CRL directory");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (asprintf(&dest, "%s/%s.pem", crl_dir, path) == -1 || asprintf(&c_rehash_cmd, "c_rehash %s &> /dev/null", crl_dir) == -1) {
 			ERROR("crl remove", "Memory allocation failed");
 			free(crl_dir);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(crl_dir);
 
@@ -2497,29 +2478,28 @@ int cmd_crl (const char* arg) {
 			ERROR("crl remove", "Cannot remove CRL \"%s\": %s (use the name from \"crl display\" output)", path, strerror(errno));
 			free(dest);
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		free(dest);
 
 		if ((ret = system(c_rehash_cmd)) == -1 || WEXITSTATUS(ret) != 0) {
 			ERROR("crl remove", "c_rehash execution failed");
 			free(c_rehash_cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		free(c_rehash_cmd);
 
 	} else {
 		ERROR("crl", "Unknown argument %s", cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 #endif
 
-void cmd_connect_help ()
-{
+void cmd_connect_help(void) {
 #ifdef ENABLE_TLS
 	fprintf (stdout, "connect [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>] host\n");
 #else
@@ -2527,12 +2507,11 @@ void cmd_connect_help ()
 #endif
 }
 
-void cmd_listen_help ()
-{
+void cmd_listen_help(void) {
 #ifdef ENABLE_TLS
-	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>]\n");
+	fprintf(stdout, "listen [--help] [--port <num>] [--login <username>] [--tls] [--cert <cert_path> [--key <key_path>]] [--trusted <trusted_CA_store.pem>]\n");
 #else
-	fprintf (stdout, "listen [--help] [--port <num>] [--login <username>]\n");
+	fprintf(stdout, "listen [--help] [--port <num>] [--login <username>]\n");
 #endif
 }
 
@@ -2543,8 +2522,7 @@ void cmd_listen_help ()
 #define DEFAULT_PORT_CH_TLS 6667
 #define ACCEPT_TIMEOUT 60000 /* 1 minute */
 
-static int cmd_connect_listen (const char* arg, int is_connect)
-{
+static int cmd_connect_listen(const char* arg, int is_connect) {
 	char* func_name = (is_connect ? strdupa("connect") : strdupa("listen"));
 #ifndef DISABLE_CALLHOME
 	static unsigned short listening = 0;
@@ -2579,21 +2557,21 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 	optind = 0;
 
 	if (session != NULL) {
-		ERROR(func_name, "already connected to %s.", nc_session_get_host (session));
-		return (EXIT_FAILURE);
+		ERROR(func_name, "already connected to %s.", nc_session_get_host(session));
+		return EXIT_FAILURE;
 	}
 
 	/* set default transport protocol */
 	nc_session_transport(NC_TRANSPORT_SSH);
 
 	/* process given arguments */
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
 #ifdef ENABLE_TLS
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(cmd.count, cmd.list, "hp:l:tc:k:s:", long_options, &option_index)) != -1)
 #else
-	while ((c = getopt_long (cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(cmd.count, cmd.list, "hp:l:", long_options, &option_index)) != -1)
 #endif
 	{
 		switch (c) {
@@ -2604,10 +2582,10 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 				cmd_listen_help();
 			}
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 'p':
-			port = (unsigned short) atoi (optarg);
+			port = (unsigned short)atoi(optarg);
 #ifndef DISABLE_CALLHOME
 			if (!is_connect && listening != 0 && listening != port) {
 				nc_callhome_listen_stop();
@@ -2713,14 +2691,14 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 	if (is_connect) {
 		if (optind == cmd.count) {
 			/* get mandatory argument */
-			host = malloc (sizeof(char) * BUFFER_SIZE);
+			host = malloc(sizeof(char) * BUFFER_SIZE);
 			if (host == NULL) {
-				ERROR(func_name, "memory allocation error (%s).", strerror (errno));
+				ERROR(func_name, "memory allocation error (%s).", strerror(errno));
 				goto error_cleanup;
 			}
 			hostfree = 1;
 			INSTRUCTION("Hostname to connect to: ");
-			if (scanf ("%1023s", host) == EOF) {
+			if (scanf("%1023s", host) == EOF) {
 				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				goto error_cleanup;
 			}
@@ -2729,16 +2707,16 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 		}
 
 		/* create the session */
-		session = nc_session_connect (host, port, user, opts->cpblts);
+		session = nc_session_connect(host, port, user, opts->cpblts);
 		if (session == NULL) {
 			ERROR(func_name, "connecting to the %s:%d as user \"%s\" failed.", host, port, user);
 			if (hostfree) {
-				free (host);
+				free(host);
 			}
 			goto error_cleanup;
 		}
 		if (hostfree) {
-			free (host);
+			free(host);
 		}
 	} else {
 #ifndef DISABLE_CALLHOME
@@ -2781,7 +2759,7 @@ static int cmd_connect_listen (const char* arg, int is_connect)
 #endif
 	clear_arglist(&cmd);
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 
 error_cleanup:
 #ifdef ENABLE_TLS
@@ -2799,23 +2777,20 @@ error_cleanup:
 	}
 #endif
 	clear_arglist(&cmd);
-	return (EXIT_FAILURE);
+	return EXIT_FAILURE;
 }
 
-int cmd_connect (const char* arg)
-{
+int cmd_connect(const char* arg, const char* UNUSED(old_input_file)) {
 	return cmd_connect_listen(arg, 1);
 }
 
 #ifndef DISABLE_CALLHOME
-int cmd_listen (const char* arg)
-{
+int cmd_listen(const char* arg, const char* UNUSED(old_input_file)) {
 	return cmd_connect_listen(arg, 0);
 }
 #endif
 
-int cmd_disconnect (const char* UNUSED(arg))
-{
+int cmd_disconnect(const char* UNUSED(arg), const char* UNUSED(old_input_file)) {
 	if (session == NULL) {
 		ERROR("disconnect", "not connected to any NETCONF server.");
 	} else {
@@ -2823,65 +2798,61 @@ int cmd_disconnect (const char* UNUSED(arg))
 		session = NULL;
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
-int cmd_quit (const char* UNUSED(arg))
-{
+int cmd_quit(const char* UNUSED(arg), const char* UNUSED(old_input_file)) {
 	done = 1;
 	if (session != NULL) {
-		cmd_disconnect (NULL);
+		cmd_disconnect(NULL, NULL);
 	}
-	return (0);
+	return EXIT_SUCCESS;
 }
 
-int cmd_verbose (const char *UNUSED(arg))
-{
+int cmd_verbose(const char *UNUSED(arg), const char* UNUSED(old_input_file)) {
 	if (verb_level != 1) {
 		verb_level = 1;
-		nc_verbosity (NC_VERB_VERBOSE);
-		fprintf (stdout, "Verbose level set to VERBOSE\n");
+		nc_verbosity(NC_VERB_VERBOSE);
+		fprintf(stdout, "Verbose level set to VERBOSE\n");
 	} else {
 		verb_level = 0;
-		nc_verbosity (NC_VERB_ERROR);
-		fprintf (stdout, "Verbose messages switched off\n");
+		nc_verbosity(NC_VERB_ERROR);
+		fprintf(stdout, "Verbose messages switched off\n");
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
-int cmd_debug (const char *UNUSED(arg))
-{
+int cmd_debug(const char *UNUSED(arg), const char* UNUSED(old_input_file)) {
 	if (verb_level != 2) {
 		verb_level = 2;
-		nc_verbosity (NC_VERB_DEBUG);
-		fprintf (stdout, "Verbose level set to DEBUG\n");
+		nc_verbosity(NC_VERB_DEBUG);
+		fprintf(stdout, "Verbose level set to DEBUG\n");
 	} else {
 		verb_level = 0;
-		nc_verbosity (NC_VERB_ERROR);
-		fprintf (stdout, "Verbose messages switched off\n");
+		nc_verbosity(NC_VERB_ERROR);
+		fprintf(stdout, "Verbose messages switched off\n");
 	}
 
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
-int cmd_help (const char* arg)
-{
+int cmd_help(const char* arg, const char* UNUSED(old_input_file)) {
 	int i;
 	char *args = strdupa(arg);
 	char *cmd = NULL;
 	char cmdline[BUFFER_SIZE];
 
-	strtok (args, " ");
-	if ((cmd = strtok (NULL, " ")) == NULL) {
+	strtok(args, " ");
+	if ((cmd = strtok(NULL, " ")) == NULL) {
 		/* generic help for the application */
-		print_version ();
+		print_version();
 
 generic_help:
 		INSTRUCTION("Available commands:\n");
 		for (i = 0; commands[i].name; i++) {
 			if (commands[i].helpstring != NULL) {
-				fprintf (stdout, "  %-15s %s\n", commands[i].name, commands[i].helpstring);
+				fprintf(stdout, "  %-15s %s\n", commands[i].name, commands[i].helpstring);
 			}
 		}
 
@@ -2899,7 +2870,7 @@ generic_help:
 		/* execute the command's help if any valid command specified */
 		if (commands[i].name) {
 			snprintf(cmdline, BUFFER_SIZE, "%s --help", commands[i].name);
-			commands[i].func(cmdline);
+			commands[i].func(cmdline, NULL);
 		} else {
 			/* if unknown command specified, print the list of commands */
 			fprintf(stdout, "Unknown command \'%s\'\n", cmd);
@@ -2907,7 +2878,7 @@ generic_help:
 		}
 	}
 
-	return (0);
+	return EXIT_SUCCESS;
 }
 
 struct ntf_thread_config {
@@ -2919,8 +2890,8 @@ struct ntf_thread_config {
 
 static pthread_key_t ntf_file;
 static volatile int ntf_file_flag = 0; /* flag if the thread specific key is already initiated */
-static void notification_fileprint (time_t eventtime, const char* content)
-{
+
+static void notification_fileprint(time_t eventtime, const char* content) {
 	FILE *f;
 	char t[128];
 
@@ -2932,8 +2903,7 @@ static void notification_fileprint (time_t eventtime, const char* content)
 	}
 }
 
-void* notification_thread(void* arg)
-{
+void* notification_thread(void* arg) {
 	struct ntf_thread_config *config = (struct ntf_thread_config*)arg;
 
 	pthread_setspecific(ntf_file, (void*)config->output);
@@ -2943,20 +2913,18 @@ void* notification_thread(void* arg)
 	}
 	free(config);
 
-	return (NULL);
+	return NULL;
 }
 
-void cmd_subscribe_help()
-{
-	fprintf (stdout, "subscribe [--help] [--filter [file]] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
-	fprintf (stdout, "\t<time> has following format:\n");
-	fprintf (stdout, "\t\t+<num>  - current time plus the given number of seconds.\n");
-	fprintf (stdout, "\t\t<num>   - absolute time as number of seconds since 1970-01-01.\n");
-	fprintf (stdout, "\t\t-<num>  - current time minus the given number of seconds.\n");
+void cmd_subscribe_help(void) {
+	fprintf(stdout, "subscribe [--help] [--filter [file]] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
+	fprintf(stdout, "\t<time> has following format:\n");
+	fprintf(stdout, "\t\t+<num>  - current time plus the given number of seconds.\n");
+	fprintf(stdout, "\t\t<num>   - absolute time as number of seconds since 1970-01-01.\n");
+	fprintf(stdout, "\t\t-<num>  - current time minus the given number of seconds.\n");
 }
 
-int cmd_subscribe(const char *arg)
-{
+int cmd_subscribe(const char* arg, const char* old_input_file) {
 	int c;
 	struct nc_filter *filter = NULL;
 	char *stream;
@@ -2979,17 +2947,17 @@ int cmd_subscribe(const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "bef::ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "bef::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'b':
 		case 'e':
 			if (optarg[0] == '-' || optarg[0] == '+') {
 				if ((t = time(NULL)) == -1) {
 					ERROR("subscribe", "Getting the current time failed (%s)", strerror(errno));
-					return (EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 				t = t + strtol(optarg, NULL, 10);
 			} else {
@@ -3001,7 +2969,7 @@ int cmd_subscribe(const char *arg)
 					/* begin time is in future */
 					ERROR("subscribe", "Begin time cannot be set to future.");
 					clear_arglist(&cmd);
-					return (EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 				start = t;
 			} else { /* c == 'e' */
@@ -3009,16 +2977,20 @@ int cmd_subscribe(const char *arg)
 			}
 			break;
 		case 'f':
-			filter = set_filter("create-subscription", optarg);
+			if (optarg == NULL) {
+				filter = set_filter("create-subscription", old_input_file, 1);
+			} else {
+				filter = set_filter("create-subscription", optarg, 0);
+			}
 			if (filter == NULL) {
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			break;
 		case 'h':
-			cmd_subscribe_help ();
+			cmd_subscribe_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		case 'o':
 			fprintf(stderr,"file: %s", optarg);
@@ -3026,41 +2998,41 @@ int cmd_subscribe(const char *arg)
 			if (output == NULL) {
 				ERROR("create-subscription", "opening the output file failed (%s).", strerror(errno));
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			break;
 		default:
 			ERROR("create-subscription", "unknown option -%c.", c);
-			cmd_subscribe_help ();
+			cmd_subscribe_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (session == NULL) {
 		ERROR("subscribe", "NETCONF session not established, use the \'connect\' command.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* check if notifications are allowed on this session */
 	if (nc_session_notif_allowed(session) == 0) {
 		ERROR("subscribe", "Notification subscription is not allowed on this session.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* check times */
 	if (start != -1 && stop != -1 && start > stop) {
 		ERROR("subscribe", "Subscription start time must be lower than the end time.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	if ((optind + 1) < cmd.count) {
 		ERROR("create-subscription", "invalid parameters, see \'get --help\'.");
 		clear_arglist(&cmd);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	} else if ((optind + 1) == cmd.count) {
 		/* stream specified */
 		stream = cmd.list[optind];
@@ -3075,11 +3047,11 @@ int cmd_subscribe(const char *arg)
 	clear_arglist(&cmd);
 	if (rpc == NULL) {
 		ERROR("create-subscription", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	if (send_recv_process("subscribe", rpc, NULL) != 0) {
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	rpc = NULL; /* just note that rpc is already freed by send_recv_process() */
 
@@ -3097,20 +3069,18 @@ int cmd_subscribe(const char *arg)
 	tconfig->output = (output == NULL) ? stdout : output;
 	if (pthread_create(&thread, NULL, notification_thread, tconfig) != 0) {
 		ERROR("create-subscription", "creating a thread for receiving notifications failed");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	pthread_detach(thread);
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 #endif /* DISABLE_NOTIFICATIONS */
 
-void cmd_editor_help()
-{
+void cmd_editor_help(void) {
 	fprintf(stdout, "editor [--help] [<path/name_of_the_editor> | --default | --none]\n");
 }
 
-int cmd_editor(const char *arg)
-{
+int cmd_editor(const char* arg, const char* UNUSED(old_input_file)) {
 	char* cmd, *args = strdupa(arg), *ptr;
 
 	cmd = strtok_r(args, " ", &ptr);
@@ -3140,15 +3110,13 @@ int cmd_editor(const char *arg)
 	return EXIT_SUCCESS;
 }
 
-void cmd_userrpc_help()
-{
-	fprintf (stdout, "user-rpc [--help] [--file <file>]\n\n"
+void cmd_userrpc_help(void) {
+	fprintf(stdout, "user-rpc [--help] [--file <file>]\n\n"
 	"\'--file <file>\' - input file with RPC message content.\n"
 	"If \'--file\' is omitted, user is asked to enter content manually.\n");
 }
 
-int cmd_userrpc(const char *arg)
-{
+int cmd_userrpc(const char* arg, const char* old_input_file) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -3165,10 +3133,10 @@ int cmd_userrpc(const char *arg)
 	/* set back to start to be able to use getopt() repeatedly */
 	optind = 0;
 
-	init_arglist (&cmd);
-	addargs (&cmd, "%s", arg);
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long (cmd.count, cmd.list, "f:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "f:h", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'f':
 			/* open edit configuration data from the file */
@@ -3176,7 +3144,7 @@ int cmd_userrpc(const char *arg)
 			if (config_fd == -1) {
 				ERROR("user-rpc", "unable to open a local file (%s).", strerror(errno));
 				clear_arglist(&cmd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* map content of the file into the memory */
@@ -3186,7 +3154,7 @@ int cmd_userrpc(const char *arg)
 				ERROR("user-rpc", "mmapping of a local datastore file failed (%s).", strerror(errno));
 				clear_arglist(&cmd);
 				close(config_fd);
-				return (EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 
 			/* make a copy of the content to allow closing the file */
@@ -3197,15 +3165,15 @@ int cmd_userrpc(const char *arg)
 			close(config_fd);
 			break;
 		case 'h':
-			cmd_userrpc_help ();
+			cmd_userrpc_help();
 			clear_arglist(&cmd);
-			return (EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 			break;
 		default:
 			ERROR("user-rpc", "unknown option -%c.", c);
-			cmd_userrpc_help ();
+			cmd_userrpc_help();
 			clear_arglist(&cmd);
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -3214,51 +3182,46 @@ int cmd_userrpc(const char *arg)
 
 	if (session == NULL) {
 		ERROR("user-rpc", "NETCONF session not established, use the \'connect\' command.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	if (config == NULL) {
-		config = readinput("Type the content of a RPC operation.");
+		config = readinput("Type the content of a RPC operation.", old_input_file);
 		if (config == NULL) {
 			ERROR("copy-config", "reading filter failed.");
-			return (EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
 	/* create requests */
-	rpc = nc_rpc_generic (config);
+	rpc = nc_rpc_generic(config);
 	free(config);
 	if (rpc == NULL) {
 		ERROR("user-rpc", "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process("user-rpc", rpc, NULL));
+	return send_recv_process("user-rpc", rpc, NULL);
 }
 
-void cmd_discardchanges_help()
-{
-	fprintf (stdout, "discard-changes\n");
+void cmd_discardchanges_help(void) {
+	fprintf(stdout, "discard-changes\n");
 }
 
-int cmd_discardchanges(const char *arg)
-{
-	return (cmd_generic_op(GO_DISCARD_CHANGES, arg));
+int cmd_discardchanges(const char* arg, const char* UNUSED(old_input_file)) {
+	return cmd_generic_op(GO_DISCARD_CHANGES, arg);
 }
 
-void cmd_commit_help()
-{
-	fprintf (stdout, "commit\n");
+void cmd_commit_help(void) {
+	fprintf(stdout, "commit\n");
 }
 
-int cmd_commit(const char *arg)
-{
-	return (cmd_generic_op(GO_COMMIT, arg));
+int cmd_commit(const char* arg, const char* UNUSED(old_input_file)) {
+	return cmd_generic_op(GO_COMMIT, arg);
 }
 
-int cmd_generic_op(GENERIC_OPS op, const char *arg)
-{
+int cmd_generic_op(GENERIC_OPS op, const char* arg) {
 	int i;
 	char* args = strdupa(arg);
 	char* op_string = NULL;
@@ -3279,7 +3242,7 @@ int cmd_generic_op(GENERIC_OPS op, const char *arg)
 		break;
 	default:
 		ERROR(op_string, "Unknown generic operation.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* check input parameters - no parameter is accepted */
@@ -3289,17 +3252,17 @@ int cmd_generic_op(GENERIC_OPS op, const char *arg)
 	}
 	if (strcmp(args, op_string) != 0) {
 		op_help();
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* create requests */
 	rpc = op_func();
 	if (rpc == NULL) {
 		ERROR(op_string, "creating an rpc request failed.");
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	/* send the request and get the reply */
-	return (send_recv_process(op_string, rpc, NULL));
+	return send_recv_process(op_string, rpc, NULL);
 }
 
