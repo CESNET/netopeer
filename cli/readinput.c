@@ -406,7 +406,7 @@ fail:
 	free(tmpname);
 	free(old_content);
 	free((char*)last_tmpfile);
-	last_tmpfile = tmpname;
+	last_tmpfile = NULL;
 	free(input);
 
 	return NULL;
