@@ -226,6 +226,17 @@ int main(int UNUSED(argc), char** UNUSED(argv)) {
 	}
 
 	store_config();
+
+	clear_history();
+	free(history_list());
+
+	/* cannot call, causes invalid free (seriously readline?), but would free ~650 kb */
+	//rl_discard_keymap(rl_get_keymap_by_name("emacs"));
+	rl_discard_keymap(rl_get_keymap_by_name("vi-insert"));
+
+	rl_expand_prompt(NULL);
+	rl_free(rl_prompt);
+
 	/* bye, bye */
 	return (EXIT_SUCCESS);
 }
