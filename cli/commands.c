@@ -1770,10 +1770,6 @@ int cmd_unlock(const char* arg, const char* UNUSED(old_input_file)) {
 	return cmd_un_lock(UNLOCK_OP, arg);
 }
 
-}
-
-}
-
 void cmd_auth_help(void) {
 	fprintf(stdout, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
 }
