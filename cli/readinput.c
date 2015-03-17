@@ -44,6 +44,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -59,6 +61,7 @@
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 volatile int multiline;
+volatile char* last_tmpfile;
 
 extern struct cli_options* opts;
 
@@ -214,6 +217,19 @@ int bind_esc(int UNUSED(count), int UNUSED(key)) {
 	return 0;
 }
 
+char* ins_old_content;
+
+int bind_ins_content(int UNUSED(count), int UNUSED(key)) {
+	if (ins_old_content != NULL) {
+		rl_extend_line_buffer(strlen(rl_line_buffer)+strlen(ins_old_content));
+		memmove(rl_line_buffer+rl_point+strlen(ins_old_content), rl_line_buffer+rl_point, rl_end-rl_point+1);
+		memcpy(rl_line_buffer+rl_point, ins_old_content, strlen(ins_old_content));
+		rl_end += strlen(ins_old_content);
+		rl_point += strlen(ins_old_content);
+	}
+	return 0;
+}
+
 /**
  * \brief Tell the GNU Readline library how to complete commands.
  *
@@ -231,12 +247,13 @@ void initialize_readline(void) {
 	rl_bind_key('\r', bind_cr);
 	rl_bind_key(CTRL('d'), bind_esc);
 	rl_bind_key(CTRL('x'), bind_del_hent);
+	rl_bind_key(CTRL('a'), bind_ins_content);
 }
 
-char* readinput(const char* instruction) {
-	int fd = -1, ret, size;
+char* readinput(const char* instruction, const char* tmpfile) {
+	int tmpfd = -1, oldfd, ret, size, old_history_pos;
 	pid_t pid, wait_pid;
-	char* tmpname = NULL, *input = NULL;
+	char* tmpname = NULL, *input = NULL, *old_content = NULL;
 	const char* editor = NULL;
 
 	editor = getenv(EDITOR_ENV);
@@ -250,34 +267,80 @@ char* readinput(const char* instruction) {
 		editor = EDITOR_DEFAULT;
 	}
 
+	/* Create a unique temporary file */
+	asprintf(&tmpname, "/tmp/tmpXXXXXX.xml");
+	tmpfd = mkstemps(tmpname, 4);
+	if (tmpfd == -1) {
+		ERROR("readinput", "Failed to create a temporary file (%s).", strerror(errno));
+		goto fail;
+	}
+
+	/* Read the old content, if any */
+	if (tmpfile != NULL) {
+		oldfd = open(tmpfile, O_RDONLY);
+		if (oldfd != -1) {
+			size = lseek(oldfd, 0, SEEK_END);
+			lseek(oldfd, 0, SEEK_SET);
+			if (size > 0) {
+				old_content = malloc(size+1);
+				old_content[size] = '\0';
+				ret = read(oldfd, old_content, size);
+				if (ret != size) {
+					free(old_content);
+					old_content = NULL;
+				}
+			}
+			close(oldfd);
+		}
+	}
+
 	if (strcmp(editor, "NONE") == 0) {
-		INSTRUCTION("(finish input by Ctrl-D)");
+		INSTRUCTION("(finish input by Ctrl-D, add previous content from history by Ctrl-A)");
 		INSTRUCTION(instruction);
 		INSTRUCTION("\n");
 
 		multiline = 1;
+		if (old_content != NULL) {
+			ins_old_content = old_content;
+		}
+
+		/* calling readline resets history position */
+		old_history_pos = where_history();
 		input = readline(NULL);
+		history_set_pos(old_history_pos);
+
+		ins_old_content = NULL;
 		multiline = 0;
 
-	} else {
-		asprintf(&tmpname, "/tmp/tmpXXXXXX.xml");
-
-		fd = mkstemps(tmpname, 4);
-		if (fd == -1) {
-			ERROR("readinput", "Failed to create a temporary file (%s).", strerror(errno));
+		if (input == NULL) {
+			/* not really a fail, just no input */
 			goto fail;
 		}
 
-		if (instruction != NULL) {
-			ret = write(fd, "\n<!--\n", 6);
-			ret += write(fd, instruction, strlen(instruction));
-			ret += write(fd, "\n-->\n", 5);
+		ret = write(tmpfd, input, strlen(input));
+		if (ret < strlen(input)) {
+			ERROR("readinput", "Failed to write the content into a temp file (%s).", strerror(errno));
+			goto fail;
+		}
+
+	} else {
+		if (old_content != NULL) {
+			ret = write(tmpfd, old_content, strlen(old_content));
+			if (ret < strlen(old_content)) {
+				ERROR("readinput", "Failed to write the previous content (%s).", strerror(errno));
+				goto fail;
+			}
+
+		} else if (instruction != NULL) {
+			ret = write(tmpfd, "\n<!--\n", 6);
+			ret += write(tmpfd, instruction, strlen(instruction));
+			ret += write(tmpfd, "\n-->\n", 5);
 			if (ret < 6+strlen(instruction)+5) {
 				ERROR("readinput", "Failed to write the instruction (%s).", strerror(errno));
 				goto fail;
 			}
 
-			ret = lseek(fd, 0, SEEK_SET);
+			ret = lseek(tmpfd, 0, SEEK_SET);
 			if (ret == -1) {
 				ERROR("readinput", "Rewinding the temporary file failed (%s).", strerror(errno));
 				goto fail;
@@ -307,39 +370,43 @@ char* readinput(const char* instruction) {
 		}
 
 		/* Get the size of the input */
-		size = lseek(fd, 0, SEEK_END);
+		size = lseek(tmpfd, 0, SEEK_END);
 		if (size == -1) {
 			ERROR("readinput", "Failed to get the size of the temporary file (%s).", strerror(errno));
 			goto fail;
+		} else if (size == 0) {
+			/* not a fail, just no input */
+			goto fail;
 		}
-		lseek(fd, 0, SEEK_SET);
+		lseek(tmpfd, 0, SEEK_SET);
 
 		input = malloc(size+1);
 		input[size] = '\0';
 
 		/* Read the input */
-		ret = read(fd, input, size);
+		ret = read(tmpfd, input, size);
 		if (ret < size) {
 			ERROR("readinput", "Failed to read from the temporary file (%s).", strerror(errno));
 			goto fail;
 		}
-
-		/* Clean the temporary file stuff */
-		close(fd);
-		fd = -1;
-		unlink(tmpname);
-		free(tmpname);
-		tmpname = NULL;
 	}
+
+	close(tmpfd);
+	free(old_content);
+	free((char*)last_tmpfile);
+	last_tmpfile = tmpname;
 
 	return input;
 
 fail:
-	close(fd);
+	close(tmpfd);
 	if (tmpname != NULL) {
 		unlink(tmpname);
 	}
 	free(tmpname);
+	free(old_content);
+	free((char*)last_tmpfile);
+	last_tmpfile = tmpname;
 	free(input);
 
 	return NULL;

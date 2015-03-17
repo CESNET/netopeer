@@ -14,40 +14,40 @@ char some_msg[4096];
 #  define UNUSED(x) UNUSED_ ## x
 #endif
 
-int cmd_connect(const char* arg);
-int cmd_listen(const char* arg);
-int cmd_disconnect(const char* arg);
-int cmd_copyconfig (const char *arg);
-int cmd_deleteconfig (const char *arg);
-int cmd_editconfig (const char *arg);
-int cmd_get(const char *arg);
-int cmd_getconfig(const char *arg);
-int cmd_help(const char* arg);
-int cmd_killsession(const char *arg);
-int cmd_lock(const char *arg);
-int cmd_subscribe(const char *arg);
-int cmd_unlock(const char *arg);
-int cmd_validate(const char *arg);
-int cmd_status(const char* arg);
-int cmd_auth(const char* arg);
+int cmd_connect(const char* arg, const char* old_input_file);
+int cmd_listen(const char* arg, const char* old_input_file);
+int cmd_disconnect(const char* arg, const char* old_input_file);
+int cmd_copyconfig (const char *arg, const char* old_input_file);
+int cmd_deleteconfig (const char *arg, const char* old_input_file);
+int cmd_editconfig (const char *arg, const char* old_input_file);
+int cmd_get(const char *arg, const char* old_input_file);
+int cmd_getconfig(const char *arg, const char* old_input_file);
+int cmd_help(const char* arg, const char* old_input_file);
+int cmd_killsession(const char *arg, const char* old_input_file);
+int cmd_lock(const char *arg, const char* old_input_file);
+int cmd_subscribe(const char *arg, const char* old_input_file);
+int cmd_unlock(const char *arg, const char* old_input_file);
+int cmd_validate(const char *arg, const char* old_input_file);
+int cmd_status(const char* arg, const char* old_input_file);
+int cmd_auth(const char* arg, const char* old_input_file);
 #ifdef ENABLE_TLS
-int cmd_cert(const char* arg);
-int cmd_crl(const char* arg);
+int cmd_cert(const char* arg, const char* old_input_file);
+int cmd_crl(const char* arg, const char* old_input_file);
 #endif
-int cmd_quit(const char* arg);
-int cmd_debug(const char *arg);
-int cmd_verbose(const char *arg);
-int cmd_userrpc(const char *arg);
-int cmd_commit(const char* arg);
-int cmd_getschema(const char* arg);
-int cmd_discardchanges(const char* arg);
-int cmd_capability(const char *arg);
-int cmd_editor(const char *arg);
+int cmd_quit(const char* arg, const char* old_input_file);
+int cmd_debug(const char *arg, const char* old_input_file);
+int cmd_verbose(const char *arg, const char* old_input_file);
+int cmd_userrpc(const char *arg, const char* old_input_file);
+int cmd_commit(const char* arg, const char* old_input_file);
+int cmd_getschema(const char* arg, const char* old_input_file);
+int cmd_discardchanges(const char* arg, const char* old_input_file);
+int cmd_capability(const char *arg, const char* old_input_file);
+int cmd_editor(const char *arg, const char* old_input_file);
 
 typedef struct
 {
 	char *name; /* User printable name of the function. */
-	int (*func)(const char*); /* Function to call to do the command. */
+	int (*func)(const char*, const char*); /* Function to call to do the command. */
 	char *helpstring; /* Documentation for this function.  */
 } COMMAND;
 

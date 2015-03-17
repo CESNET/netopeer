@@ -40,6 +40,6 @@
 #define READINPUT_H_
 
 void initialize_readline(void);
-char* readinput(const char* instruction);
+char* readinput(const char* instruction, const char* tmpfile);
 
 #endif /* READINPUT_H_ */
