@@ -214,7 +214,7 @@ int main(int UNUSED(argc), char** UNUSED(argv)) {
 			}
 
 		/* whether to at least replace the tmpfile of the command from the history with this new one */
-		} else if ((hent = current_history()) != NULL && strlen(hent->timestamp) != 0) {
+		} else if (last_tmpfile != NULL && (hent = current_history()) != NULL && strlen(hent->timestamp) != 0) {
 			free(hent->timestamp);
 			hent->timestamp = strdup(last_tmpfile);
 		}
