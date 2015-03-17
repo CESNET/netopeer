@@ -253,7 +253,7 @@ void initialize_readline(void) {
 char* readinput(const char* instruction, const char* tmpfile) {
 	int tmpfd = -1, oldfd, ret, size, old_history_pos;
 	pid_t pid, wait_pid;
-	char* tmpname = NULL, *input = NULL, *old_content = NULL;
+	char* tmpname = NULL, *input = NULL, *old_content = NULL, *ptr, *ptr2;
 	const char* editor = NULL;
 
 	editor = getenv(EDITOR_ENV);
@@ -332,7 +332,7 @@ char* readinput(const char* instruction, const char* tmpfile) {
 			}
 
 		} else if (instruction != NULL) {
-			ret = write(tmpfd, "\n<!--\n", 6);
+			ret = write(tmpfd, "\n<!--#\n", 7);
 			ret += write(tmpfd, instruction, strlen(instruction));
 			ret += write(tmpfd, "\n-->\n", 5);
 			if (ret < 6+strlen(instruction)+5) {
@@ -388,6 +388,29 @@ char* readinput(const char* instruction, const char* tmpfile) {
 		if (ret < size) {
 			ERROR("readinput", "Failed to read from the temporary file (%s).", strerror(errno));
 			goto fail;
+		}
+
+		/* Remove the instruction comment */
+		if (old_content == NULL && instruction != NULL) {
+			ptr = strstr(input, "\n<!--#\n");
+			ptr2 = strstr(input, "\n-->\n");
+			/* The user could have deleted or modified the comment, ignore it then */
+			if (ptr != NULL && ptr2 != NULL) {
+				ptr2 += 5;
+				memmove(ptr, ptr2, strlen(ptr2)+1);
+
+				/* Save the modified content */
+				if (ftruncate(tmpfd, 0) == -1) {
+					ERROR("readinput", "Failed to truncate the temporary file (%s).", strerror(errno));
+					goto fail;
+				}
+				lseek(tmpfd, 0, SEEK_SET);
+				ret = write(tmpfd, input, strlen(input));
+				if (ret < strlen(input)) {
+					ERROR("readinput", "Failed to write to the temporary file (%s).", strerror(errno));
+					goto fail;
+				}
+			}
 		}
 	}
 
