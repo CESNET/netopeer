@@ -403,7 +403,7 @@ Perform NETCONF <get> operation. Receives both status as well as configuration
 data from the current running datastore. For more details see \fIRFC 6241 section 7.7\fR.
 .PP
 .B get
-[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter [\fIfile\fR]]
+[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter | \-\-filter\-file \fIfile\fR]]
 .PP
 .RS 4
 .B \-\-defaults
@@ -416,12 +416,15 @@ section of this manual.
 .RE
 .PP
 .B \-\-filter
-[\fIfile\fR]
 .RS 4
 Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
-The option is able to accept path to the \fIfile\fR containing the filter
-specification. If the path is not specified, user is prompted to write the
-filter specification manually.
+User is prompted to write the filter specification manually.
+.RE
+.PP
+.B \-\-filter\-file
+\fIfile\fR
+.RS 4
+The same as filter, but loads the filter from \fIfile\fR.
 .RE
 .RE
 .SS get-config
@@ -429,7 +432,7 @@ Perform NETCONF <get-config> operation. Retrieves only configuration data from
 the specified \fItarget_datastore\fR. For more details see \fIRFC 6241 section 7.1\fR.
 .PP
 .B get-config
-[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter [\fIfile\fR]] \fItarget_datastore\fR
+[\-\-help] [\-\-defaults \fImode\fR] [\-\-filter | \-\-filter\-file \fIfile\fR] \fItarget_datastore\fR
 .PP
 .RS 4
 .B \-\-defaults
@@ -442,12 +445,15 @@ section of this manual.
 .RE
 .PP
 .B \-\-filter
-[\fIfile\fR]
 .RS 4
 Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
-The option is able to accept path to the \fIfile\fR containing the filter
-specification. If the path is not specified, user is prompted to write the
-filter specification manually.
+User is prompted to write the filter specification manually.
+.RE
+.PP
+.B \-\-filter\-file
+\fIfile\fR
+.RS 4
+The same as filter, but loads the filter from \fIfile\fR.
 .RE
 .PP
 \fItarget_datastore\fR
@@ -542,6 +548,7 @@ more details see \fIRFC 6241 section 8.6.4.1\fR.
 .B validate
 [\-\-help] \-\-config [\fIfile\fR] | \fItarget_datastore\fR
 .PP
+.RS 4
 .B \-\-config
 \fIfile\fR
 .RS 4
@@ -565,16 +572,19 @@ Perform NETCONF Event Notifications <create-subscription> operation. For more
 details see \fIRFC 5277 section 2.1.1\fR.
 .PP
 .B subscribe
-[\-\-help] [\-\-filter [file]] [\-\-begin \fItime\fR] [\-\-end \fItime\fR] [\-\-output \fIfile\fR] [\fIstream\fR]
+[\-\-help] [\-\-filter | \-\-filter\-file \fIfile\fI]] [\-\-begin \fItime\fR] [\-\-end \fItime\fR] [\-\-output \fIfile\fR] [\fIstream\fR]
 .PP
 .RS 4
 .B \-\-filter
-[\fIfile\fR]
 .RS 4
 Specifies if the request will contain subtree filter (\fIRFC 6241 section 6\fR).
-The option is able to accept path to the \fIfile\fR containing the filter
-specification. If the path is not specified, user is prompted to write the
-filter specification manually.
+User is prompted to write the filter specification manually.
+.RE
+.PP
+.B \-\-filter\-file
+\fIfile\fR
+.RS 4
+The same as filter, but loads the filter from \fIfile\fR.
 .RE
 .PP
 .B \-\-begin
