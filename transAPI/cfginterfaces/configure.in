@@ -159,7 +159,7 @@ fi
 AC_SUBST(COUNT)
 AC_SUBST(CB_CODE)
 
-AC_CONFIG_FILES([Makefile config.h cfginterfaces.c model/ietf-interfaces-data.rng])
+AC_CONFIG_FILES([Makefile config.h cfginterfaces.c model/ietf-interfaces-config.rng])
 AC_OUTPUT
 if test "$DISTRO" = "DEBIAN"; then
 	AC_MSG_NOTICE([])
