@@ -147,7 +147,7 @@ AC_CHECK_FUNC([l64a], [CPPFLAGS="$CPPFLAGS -DHAVE_L64A"])
 
 AC_SUBST(FEATURES)
 
-AC_CONFIG_FILES([Makefile model/ietf-system-data.rng base/common.h])
+AC_CONFIG_FILES([Makefile base/common.h])
 AC_OUTPUT
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([------ietf-system feature summary------])

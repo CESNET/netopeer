@@ -11561,7 +11561,7 @@ fi
 
 
 
-ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng base/common.h"
+ac_config_files="$ac_config_files Makefile base/common.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12557,7 +12557,6 @@ do
   case $ac_config_target in
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "model/ietf-system-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-system-data.rng" ;;
     "base/common.h") CONFIG_FILES="$CONFIG_FILES base/common.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
