@@ -190,9 +190,9 @@ int main(int UNUSED(argc), char** UNUSED(argv)) {
 					ERROR("main", "Internal error (%s:%d).", __FILE__, __LINE__);
 					return EXIT_FAILURE;
 				}
-				commands[i].func((const char*)cmdstart, hent->timestamp);
+				commands[i].func((const char*)cmdstart, hent->timestamp, stdout);
 			} else {
-				commands[i].func((const char*)cmdstart, NULL);
+				commands[i].func((const char*)cmdstart, NULL, stdout);
 			}
 		} else {
 			/* if unknown command specified, tell it to user */
