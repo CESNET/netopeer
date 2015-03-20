@@ -11171,7 +11171,7 @@ done
 # Checks for library functions.
 #AC_CHECK_FUNCS([strdup])
 
-ac_config_files="$ac_config_files Makefile turing-machine-data.rng"
+ac_config_files="$ac_config_files Makefile turing-machine-config.rng"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12167,7 +12167,7 @@ do
   case $ac_config_target in
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "turing-machine-data.rng") CONFIG_FILES="$CONFIG_FILES turing-machine-data.rng" ;;
+    "turing-machine-config.rng") CONFIG_FILES="$CONFIG_FILES turing-machine-config.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
