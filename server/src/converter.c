@@ -197,7 +197,7 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 	return schema;
 }
 
-json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con) {
+json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* mod_augment, char* namespace_name, int augmented, conn_t* con) {
 
 	json_t* parent = NULL;
 	json_t* json_node = NULL;
@@ -207,6 +207,9 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 		parent = json_object();
 	}
 
+	clb_print(NC_VERB_WARNING, "xml_to_json started on node");
+	clb_print(NC_VERB_WARNING, (char*) node->name);
+
 	append_to_path(p, (char*) node->name);
 	int namespace_changed = 0;
 
@@ -215,19 +218,21 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 		if (node == NULL || node->ns == NULL || node->ns->href == NULL) {
 			error_and_quit(EXIT_FAILURE, "xml_to_json: could not find out namespace of root element");
 		}
+		clb_print(NC_VERB_WARNING, "first namespace");
 		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
 	} else if (strcmp((char*)node->ns->href, namespace_name)) {
 		// check xmlns to see if we're dealing with something augmented
+		clb_print(NC_VERB_WARNING, "namespace changed");
 		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
 		augmented = 1;
 		namespace_changed = 1;
-		char* schema = get_schema(namespace_name, con, "1");
-		mod = read_module_from_string(schema);
-		free(schema);
+//		char* schema = get_schema(namespace_name, con, "1");
+//		mod = read_module_from_string(schema);
+//		free(schema);
 		// request yang model from server through con
 	}
 
-	tuple* t = augmented ? query_yang_augmented(p->string, mod) : query_yang(p->string, mod);
+	tuple* t = augmented ? query_yang_augmented(p->string, mod, mod_augment) : query_yang(p->string, mod);
 
 	switch (t->container_type) {
 	case LIST: // TODO: what if list is first in the structure?
@@ -261,7 +266,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 
 				while (child != NULL) {
 					if (!strcmp((char*) child->name, listp->strings[i])) {
-						json_object_set_new(json_node, (char*) child->name, xml_to_json(child, p, mod, namespace_name, augmented, con));
+						json_object_set_new(json_node, (char*) child->name, xml_to_json(child, p, mod, mod_augment, namespace_name, augmented, con));
 						break;
 					}
 					child = child->next;
@@ -276,7 +281,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace
 				json_t* array = json_array();
 				while (child != NULL) {
 					if (!strcmp((char*) child->name, listp->strings[i])) {
-						json_array_append(array, xml_to_json(child, p, mod, namespace_name, augmented, con));
+						json_array_append(array, xml_to_json(child, p, mod, mod_augment, namespace_name, augmented, con));
 					}
 					child = child->next;
 				}
@@ -417,8 +422,23 @@ tuple* query_yang(char* path, const module* mod) {
 	return NULL;
 }
 
-tuple* query_yang_augmented(char* path, const module* mod) {
+tuple* query_yang_augmented(char* path, const module* mod, const module* mod_augment) {
 	tuple* t = malloc(sizeof(tuple));
+
+	path = strchr(path, ':') + 1;
+	path = strchr(path, ':') + 1;
+
+	clb_print(NC_VERB_WARNING, "path is");
+	clb_print(NC_VERB_WARNING, path);
+
+	yang_node** aug_nodes = mod_augment->augment_list[0]->node_list;
+	int i = 0;
+	yang_node* this_node = aug_nodes[i];
+
+	while(this_node != NULL) {
+
+	}
+
 	return t;
 }
 

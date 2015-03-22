@@ -31,9 +31,9 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level, const char* array_na
  * augmented - internal, set to 0 at the start, 1 means the module we're getting is only augmenting and we should ask it for augments only
  * con - connection so that the converter can ask for schemas from the server
  */
-json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, char* namespace_name, int augmented, conn_t* con);
+json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* mod_augment, char* namespace_name, int augmented, conn_t* con);
 tuple* query_yang(char* path, const module* mod);
-tuple* query_yang_augmented(char* path, const module* mod); // TODO
+tuple* query_yang_augmented(char* path, const module* mod, const module* mod_augment); // TODO
 yang_node* find_by_name(char* name, yang_node** node_list);
 char* read_until_colon(char* string);
 json_data_types map_to_json_data_type(char* yang_data_type);

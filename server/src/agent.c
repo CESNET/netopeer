@@ -437,8 +437,51 @@ int main (int argc, char** argv)
 					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
 					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
 
-					// TODO: copy_string strikes again, there's a bug hidden somewhere, can't successfully read the file
-//					read_module_from_string(ietf_system);
+					// this works, good
+					module* cert_to_name_mod = read_module_from_string(ietf_x509_cert_to_name);
+					module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
+					module* ietf_system_mod = read_module_from_string(ietf_system);
+
+					xmlDocPtr doc = xmlParseDoc((const xmlChar*)nc_reply_dump(reply));
+					if (doc == NULL) {
+						clb_print(NC_VERB_ERROR, "Message processing failed: could not read xml doc");
+						break;
+					}
+					xmlNodePtr root = xmlDocGetRootElement(doc);
+					if (root == NULL) {
+						clb_print(NC_VERB_ERROR, "Message processing failed: could not get root element");
+						break;
+					}
+					xmlNodePtr data = root->xmlChildrenNode;
+					while (data != NULL && strcmp((char*)data->name, "data")) {
+						clb_print(NC_VERB_WARNING, "Node name is not data, it is:");
+						clb_print(NC_VERB_WARNING, (char*) data->name);
+						data = data->next;
+					}
+					xmlBufferPtr buffer = xmlBufferCreate();
+					xmlNodeDump(buffer, doc, data, 0, 1);
+					save((char*)buffer->content, "data-dump");
+					xmlBufferFree(buffer);
+
+					xmlNodePtr system = data->xmlChildrenNode;
+					while (system != NULL && strcmp((char*) system->name, "system")) {
+						clb_print(NC_VERB_WARNING, "Node name is not system, it is:");
+						clb_print(NC_VERB_WARNING, (char*) system->name);
+						system = system->next;
+					}
+
+					xmlBufferPtr buffer2 = xmlBufferCreate();
+					xmlNodeDump(buffer2, doc, system, 0, 1);
+					save((char*)buffer2->content, "system-dump");
+
+					// convert
+					path* p = new_path(5000);
+					json_t* json_obj = xml_to_json(system, p, ietf_system_mod, ietf_system_tls_auth_mod, NULL, 0, NULL);
+					clb_print(NC_VERB_WARNING, "dumping to json");
+					save(json_dumps(json_obj, 0), "json-dump");
+					free_path(p);
+
+					xmlBufferFree(buffer2);
 
 					destroy_string(ietf_system);
 					destroy_string(ietf_system_tls_auth);
