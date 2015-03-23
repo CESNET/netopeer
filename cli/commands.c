@@ -334,7 +334,7 @@ userinput:
 		/* repeat user input until valid datastore is selected */
 		while (!valid) {
 			/* get mandatory argument */
-			INSTRUCTION("Select %s datastore (running", paramtype);
+			INSTRUCTION(output, "Select %s datastore (running", paramtype);
 			if (nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 				fprintf(output, "|startup");
 			}
@@ -420,7 +420,7 @@ static NCWD_MODE get_withdefaults(const char* operation, const char* mode) {
 	if (0) {
 userinput:
 		/* get mandatory argument */
-		INSTRUCTION("Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
+		INSTRUCTION(stdout, "Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
 		if (scanf("%127s", mode_aux) == EOF) {
 			ERROR(operation, "Reading user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 			return NCWD_MODE_NOTSET;
@@ -505,7 +505,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 	case NC_MSG_UNKNOWN:
 		if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
 			ERROR(operation, "receiving rpc-reply failed.");
-			INSTRUCTION("Closing the session.\n");
+			INSTRUCTION(output, "Closing the session.\n");
 			cmd_disconnect(NULL, NULL, output);
 			ret = EXIT_FAILURE;
 			break;
@@ -519,7 +519,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 	case NC_MSG_REPLY:
 		switch (nc_reply_get_type(reply)) {
 		case NC_REPLY_OK:
-			INSTRUCTION("Result OK\n");
+			INSTRUCTION(output, "Result OK\n");
 			break;
 		case NC_REPLY_DATA:
 			if (output_file != NULL) {
@@ -532,7 +532,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 				fprintf(out_stream, "%s", data = nc_reply_get_data(reply));
 				fclose(out_stream);
 			} else {
-				INSTRUCTION("Result:\n");
+				INSTRUCTION(output, "Result:\n");
 				fprintf(output, "%s\n", data = nc_reply_get_data(reply));
 			}
 			free(data);
@@ -951,7 +951,7 @@ int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output) {
 	nc_rpc *rpc = NULL;
 	NCWD_MODE wd = NCWD_MODE_NOTSET;
 	struct arglist cmd;
-	struct option long_options[] ={
+	struct option long_options[] = {
 			{"config", 1, 0, 'c'},
 			{"defaults", 1, 0, 'd'},
 			{"source", 1, 0, 's'},
@@ -1352,7 +1352,7 @@ int cmd_killsession(const char* arg, const char* UNUSED(old_input_file), FILE* o
 
 		while (id[0] == '\0') { /* string is empty */
 			/* get mandatory argument */
-			INSTRUCTION("Set session ID to kill: ");
+			INSTRUCTION(output, "Set session ID to kill: ");
 			if (scanf("%1023s", id) == EOF) {
 				ERROR("kill-session", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				clear_arglist(&cmd);
@@ -1648,7 +1648,7 @@ int cmd_getschema(const char* arg, const char* UNUSED(old_input_file), FILE* out
 			return EXIT_FAILURE;
 		}
 
-		INSTRUCTION("Set identifier of the schema to retrieve: ");
+		INSTRUCTION(output, "Set identifier of the schema to retrieve: ");
 		if (scanf("%1023s", identifier) == EOF) {
 			ERROR("get-schema", "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 			clear_arglist(&cmd);
@@ -2701,7 +2701,7 @@ static int cmd_connect_listen(const char* arg, int is_connect, FILE* output) {
 				goto error_cleanup;
 			}
 			hostfree = 1;
-			INSTRUCTION("Hostname to connect to: ");
+			INSTRUCTION(output, "Hostname to connect to: ");
 			if (scanf("%1023s", host) == EOF) {
 				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				goto error_cleanup;
@@ -2853,14 +2853,14 @@ int cmd_help(const char* arg, const char* UNUSED(old_input_file), FILE* output) 
 		print_version();
 
 generic_help:
-		INSTRUCTION("Available commands:\n");
+		INSTRUCTION(output, "Available commands:\n");
 		for (i = 0; commands[i].name; i++) {
 			if (commands[i].helpstring != NULL) {
 				fprintf(output, "  %-15s %s\n", commands[i].name, commands[i].helpstring);
 			}
 		}
 
-		INSTRUCTION("To delete a command history entry, use CTRL+X.\n\n");
+		INSTRUCTION(output, "To delete a command history entry, use CTRL+X.\n\n");
 	} else {
 		/* print specific help for the selected command */
 
