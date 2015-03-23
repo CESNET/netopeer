@@ -1,0 +1,265 @@
+module netopeer-test {
+  namespace "urn:cesnet:tmc:netopeer:test";
+  prefix nptest;
+
+  import ietf-netconf {
+    prefix nc;
+  }
+
+  organization "CESNET, z.s.p.o.";
+  contact
+    "mvasko@cesnet.cz";
+  description
+    "Module specifying any NETCONF server test cases,
+      which are executed using netopeer-cli(1).";
+
+  revision 2015-03-17 {
+    description
+      "Initial revision";
+  }
+
+  container netopeer-tests {
+    description
+      "The root container with the test cases.";
+
+    container requirements {
+      description
+        "A global list of requirements all the tests rely
+          upon.";
+
+      uses hello-requirements;
+    }
+
+    container variables {
+      description
+        "A global list of variables to be substituted
+          in every test.";
+
+      uses test-variable-list;
+    }
+
+    list test {
+      key "name";
+      min-elements 1;
+      description
+        "One test case.";
+
+      leaf name {
+        type string;
+        description
+          "The name of the test.";
+      }
+
+      leaf count {
+        type uint32 {
+          range "1..max";
+        }
+        default 1;
+        description
+          "Number of test executions.";
+      }
+
+      container test-requirements {
+        description
+          "All the server requirements this particular test
+            relies upon in addition to the global ones, if
+            specified.";
+
+        uses hello-requirements;
+      }
+
+      container variables {
+        description
+          "Variables that will be used only in this test.";
+
+        uses test-variable-list;
+      }
+
+      list command {
+        key "id";
+        min-elements 1;
+        description
+          "One command of the test case.";
+
+        leaf id {
+          type uint32 {
+            range "1..max";
+          }
+          description
+            "An arbitrary, but unique identifier of this
+              command determining the command execution
+              order. Commands with lower ids are executed
+              first.";
+        }
+
+        choice cmd-type {
+          mandatory true;
+          description
+            "The executed netopeer-cli(1) command.";
+
+          case simple {
+            leaf cmd {
+              type string;
+              description
+                "A simple command.";
+            }
+          }
+
+          case with-file {
+            leaf cmd-with-file {
+              type string;
+              description
+                "A command with the '(file)' argument replaced
+                  by the content in the cmd-file node.";
+            }
+
+            leaf cmd-file {
+              mandatory true;
+              type string;
+              description
+                "The file used in the cmd-with-file command.";
+            }
+          }
+        }
+
+        choice result {
+          mandatory true;
+          description
+            "The expected result of the command.";
+
+          case success {
+            leaf result-success {
+              type empty;
+              description
+                "This command is expected to succeed.";
+            }
+          }
+
+          case error {
+            leaf result-error {
+              type nc:error-tag-type;
+              description
+                "The expected error this command should end
+                  with.";
+            }
+          }
+
+          case file {
+            leaf result-file {
+              type string;
+              description
+                "The expected content this command should
+                  return.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping hello-requirements {
+    description
+      "The expected supported capabilities as
+        advertised in the server 'hello' message.";
+
+    leaf-list capability {
+      type string;
+      description
+        "The required capabilities for this test.";
+    }
+
+    list model {
+      key "namespace";
+      leaf namespace {
+        type string;
+        description
+          "The namespace of the required model.";
+      }
+
+      choice revision {
+        description
+          "Revision requirement of the model.";
+
+        case exact {
+          leaf exact-revision {
+            type string;
+            description
+              "The model must be in this revision for
+                the requirement to be satisfied.";
+          }
+        }
+
+        case not-older {
+          leaf not-older-revision {
+            type string;
+            description
+              "The model must be in this revision or
+                newer for the requirement to be
+                satisfied.";
+          }
+        }
+      }
+
+      leaf-list feature {
+        type string;
+        description
+          "These features must be enabled in the model.";
+      }
+    }
+  }
+
+  grouping test-variable-list {
+    description
+      "Variables to be substituted in test XML files.";
+
+    list variable {
+      key "name";
+      description
+        "One variable entry.";
+
+      leaf name {
+        mandatory true;
+        type string;
+        description
+          "The name to look for, the whole variable name
+            will be '__name__'.";
+      }
+
+      choice value {
+        description
+          "How to generate the values.";
+
+        case range {
+          container value-range {
+            description
+              "Generate number sequence.";
+
+            leaf start {
+              mandatory true;
+              type uint32;
+              description
+                "The first generated value.";
+            }
+
+            leaf step {
+              mandatory true;
+              type string;
+              description
+                "Operation to perform after every test.
+                  For example '+1' or '*2'.";
+            }
+          }
+        }
+
+        case list {
+          leaf value-list {
+            type string;
+            description
+              "A list of values separated by ';' that
+                will be iteratively used.";
+          }
+        }
+      }
+    }
+  }
+}

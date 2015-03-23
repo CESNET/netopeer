@@ -71,6 +71,7 @@
 #include "commands.h"
 #include "configuration.h"
 #include "readinput.h"
+#include "test.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
@@ -111,6 +112,7 @@ COMMAND commands[] = {
 	{"lock", cmd_lock, "NETCONF <lock> operation"},
 	{"unlock", cmd_unlock, "NETCONF <unlock> operation"},
 	{"validate", cmd_validate, "NETCONF <validate> operation"},
+	{"test", cmd_test, "Run a specified test case"},
 #ifndef DISABLE_NOTIFICATIONS
 	{"subscribe", cmd_subscribe, "NETCONF Event Notifications <create-subscription> operation"},
 #endif
@@ -1776,6 +1778,401 @@ int cmd_lock(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 
 int cmd_unlock(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
 	return cmd_un_lock(UNLOCK_OP, arg, output, input);
+}
+
+void cmd_test_help(FILE* output) {
+	fprintf(output, "test <test_case.xml> [<other_test_cases.xml> ...]\n");
+}
+
+static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
+	xmlNodePtr model;
+	struct np_test_capab* ret = NULL, *ret_cur;
+
+	for (; node_list != NULL; node_list = node_list->next) {
+		if (!xmlStrEqual(node_list->name, BAD_CAST "capability") && !xmlStrEqual(node_list->name, BAD_CAST "model")) {
+			continue;
+		}
+
+		/* ret_cur is the new list item */
+		if (ret == NULL) {
+			ret = calloc(1, sizeof(struct np_test_capab));
+			ret_cur = ret;
+		} else {
+			ret_cur->next = calloc(1, sizeof(struct np_test_capab));
+			ret_cur = ret_cur->next;
+		}
+
+		if (xmlStrEqual(node_list->name, BAD_CAST "capability")) {
+			ret_cur->capab = (char*)xmlNodeGetContent(node_list);
+		} else {
+			for (model = node_list->children; model != NULL; model = model->next) {
+				if (xmlStrEqual(model->name, BAD_CAST "namespace")) {
+					if (ret_cur->capab != NULL) {
+						ERROR("test_parse_capabs", "Double \"namespace\" node.");
+						np_test_capab_free(ret);
+						return NULL;
+					}
+					ret_cur->capab = (char*)xmlNodeGetContent(model);
+				}
+
+				if (xmlStrEqual(model->name, BAD_CAST "exact-revision")) {
+					if (ret_cur->exact_revision != NULL || ret_cur->not_older_revision != NULL) {
+						ERROR("test_parse_capabs", "Double revision specified.");
+						np_test_capab_free(ret);
+						return NULL;
+					}
+					ret_cur->exact_revision = (char*)xmlNodeGetContent(model);
+				}
+
+				if (xmlStrEqual(model->name, BAD_CAST "not-older-revision")) {
+					if (ret_cur->exact_revision != NULL || ret_cur->not_older_revision != NULL) {
+						ERROR("test_parse_capabs", "Double revision specified.");
+						np_test_capab_free(ret);
+						return NULL;
+					}
+					ret_cur->not_older_revision = (char*)xmlNodeGetContent(model);
+				}
+
+				if (xmlStrEqual(model->name, BAD_CAST "feature")) {
+					++ret_cur->feature_count;
+					ret_cur->features = realloc(ret_cur->features, ret_cur->feature_count*sizeof(char*));
+					ret_cur->features[ret_cur->feature_count-1] = (char*)xmlNodeGetContent(model);
+				}
+			}
+		}
+
+		if (ret_cur->capab == NULL) {
+			ERROR("test_parse_capabs", "Missing the capability name.");
+			np_test_capab_free(ret);
+			return NULL;
+		}
+	}
+
+	return ret;
+}
+
+static struct np_test_var* test_parse_vars(xmlNodePtr node_list) {
+	char* var_list, *ptr;
+	xmlNodePtr node, var;
+	struct np_test_var* ret = NULL, *ret_cur;
+
+	for (; node_list != NULL; node_list = node_list->next) {
+		if (!xmlStrEqual(node_list->name, BAD_CAST "variable")) {
+			continue;
+		}
+
+		/* ret_cur is the new list item */
+		if (ret == NULL) {
+			ret = calloc(1, sizeof(struct np_test_var));
+			ret_cur = ret;
+		} else {
+			ret_cur->next = calloc(1, sizeof(struct np_test_var));
+			ret_cur = ret_cur->next;
+		}
+
+		for (var = node_list->children; var != NULL; var = var->next) {
+			if (xmlStrEqual(var->name, BAD_CAST "name")) {
+				ret_cur->name = (char*)xmlNodeGetContent(var);
+			}
+
+			if (xmlStrEqual(var->name, BAD_CAST "value-range")) {
+				if (ret_cur->value_list != NULL) {
+					ERROR("test_parse_vars", "More cases from \"value\" choice used.");
+					np_test_var_free(ret);
+					return NULL;
+				}
+				for (node = var->children; node != NULL; node = node->next) {
+					if (xmlStrEqual(node->name, BAD_CAST "start")) {
+						ret_cur->value_range_start = atoi((char*)node->children->content);
+					}
+
+					if (xmlStrEqual(node->name, BAD_CAST "step")) {
+						ret_cur->value_range_step = atoi((char*)node->children->content+1);
+						switch ((char)node->children->content[0]) {
+						case '+':
+							ret_cur->value_range_op = ADD;
+							break;
+						case '-':
+							ret_cur->value_range_op = SUB;
+							break;
+						case '*':
+							ret_cur->value_range_op = MUL;
+							break;
+						case '/':
+							ret_cur->value_range_op = DIV;
+							break;
+						default:
+							ERROR("test_parse_vars", "Unknown step operation '%c'.", (char)node->children->content[0]);
+							np_test_var_free(ret);
+							return NULL;
+						}
+					}
+				}
+			}
+
+			if (xmlStrEqual(var->name, BAD_CAST "value-list")) {
+				if (ret_cur->value_range_start > 0 || ret_cur->value_range_step > 0) {
+					ERROR("test_parse_vars", "More cases from \"value\" choice used.");
+					np_test_var_free(ret);
+					return NULL;
+				}
+
+				var_list = (char*)xmlNodeGetContent(var);
+				for (ptr = strtok(var_list, ";"); ptr != NULL; ptr = strtok(NULL, ";")) {
+					++ret_cur->value_list_count;
+					ret_cur->value_list = realloc(ret_cur->value_list, ret_cur->value_list_count*sizeof(char*));
+					ret_cur->value_list[ret_cur->value_list_count-1] = strdup(ptr);
+				}
+				free(var_list);
+			}
+		}
+
+		if (ret_cur->name == NULL) {
+			ERROR("test_parse_vars", "Missing the variable name.");
+			np_test_var_free(ret);
+			return NULL;
+		}
+		if (ret_cur->value_range_start == 0 && ret_cur->value_range_step == 0 && ret_cur->value_list == NULL) {
+			ERROR("test_parse_vars", "Missing the value generator.");
+			np_test_var_free(ret);
+			return NULL;
+		}
+	}
+
+	return ret;
+}
+
+static struct np_test_cmd* test_parse_cmds(xmlNodePtr node_list) {
+	char* error_val;
+	xmlNodePtr cmd;
+	xmlBufferPtr buf;
+	struct np_test_cmd* ret = NULL, *ret_cur = NULL, *ret_ptr;
+
+	for (; node_list != NULL; node_list = node_list->next) {
+		if (!xmlStrEqual(node_list->name, BAD_CAST "command")) {
+			continue;
+		}
+
+		/* ret_cur is the new list item */
+		ret_cur = calloc(1, sizeof(struct np_test_cmd));
+
+		for (cmd = node_list->children; cmd != NULL; cmd = cmd->next) {
+			if (xmlStrEqual(cmd->name, BAD_CAST "id")) {
+				ret_cur->id = atoi((char*)cmd->children->content);
+			}
+
+			if (xmlStrEqual(cmd->name, BAD_CAST "cmd") || xmlStrEqual(cmd->name, BAD_CAST "cmd-with-file")) {
+				if (ret_cur->cmd != NULL) {
+					ERROR("test_parse_cmds", "Double command specififed.");
+					np_test_cmd_free(ret);
+					np_test_cmd_free(ret_cur);
+					return NULL;
+				}
+				ret_cur->cmd = (char*)xmlNodeGetContent(cmd);
+			}
+
+			if (xmlStrEqual(cmd->name, BAD_CAST "cmd-file")) {
+				buf = xmlBufferCreate();
+				xmlNodeDump(buf, cmd->doc, cmd->children, 1, 1);
+				ret_cur->file = strdup((char*)xmlBufferContent(buf));
+				xmlBufferFree(buf);
+			}
+
+			if (xmlStrEqual(cmd->name, BAD_CAST "result-error")) {
+				if (ret_cur->result_file != NULL) {
+					ERROR("test_parse_cmds", "Double result specified.");
+					np_test_cmd_free(ret);
+					np_test_cmd_free(ret_cur);
+					return NULL;
+				}
+				error_val = (char*)xmlNodeGetContent(cmd);
+				if (strchr(error_val, ':') == NULL) {
+					ERROR("test_parse_cmds", "Result-error in the wrong namespace.");
+					free(error_val);
+					np_test_cmd_free(ret);
+					np_test_cmd_free(ret_cur);
+					return NULL;
+				}
+				ret_cur->result_err = strdup(strchr(error_val, ':')+1);
+				free(error_val);
+			}
+
+			if (xmlStrEqual(cmd->name, BAD_CAST "result-file")) {
+				if (ret_cur->result_err != 0) {
+					ERROR("test_parse_cmds", "Double result specified.");
+					np_test_cmd_free(ret);
+					np_test_cmd_free(ret_cur);
+					return NULL;
+				}
+				buf = xmlBufferCreate();
+				xmlNodeDump(buf, cmd->doc, cmd->children, 1, 1);
+				ret_cur->result_file = strdup((char*)xmlBufferContent(buf));
+				xmlBufferFree(buf);
+			}
+		}
+
+		if (ret_cur->id == 0) {
+			ERROR("test_parse_cmds", "Missing the command ID.");
+			np_test_cmd_free(ret);
+			np_test_cmd_free(ret_cur);
+			return NULL;
+		}
+		if (ret_cur->cmd == NULL) {
+			ERROR("test_parse_cmds", "Missing the command.");
+			np_test_cmd_free(ret);
+			np_test_cmd_free(ret_cur);
+			return NULL;
+		}
+
+		/* append the new test into the sorted list */
+		if (ret == NULL) {
+			/* list is empty */
+			ret = ret_cur;
+		} else if (ret_cur->id < ret->id) {
+			/* new item should be the first */
+			ret_cur->next = ret;
+			ret = ret_cur;
+		} else {
+			/* new item is not the first */
+			for (ret_ptr = ret; ret_ptr->next != NULL && ret_cur->id < ret_ptr->id; ret_ptr = ret_ptr->next);
+
+			if (ret_cur->id < ret_ptr->id) {
+				/* new item is last but one */
+				ret_cur->next = ret_ptr->next;
+				ret_ptr->next = ret_cur;
+			} else {
+				/* new item is last */
+				ret_ptr->next = ret_cur;
+			}
+		}
+	}
+
+	return ret;
+}
+
+static struct np_test* test_parse_tests(xmlNodePtr node_list) {
+	xmlNodePtr test;
+	struct np_test* ret = NULL, *ret_cur;
+
+	for (; node_list != NULL; node_list = node_list->next) {
+		if (!xmlStrEqual(node_list->name, BAD_CAST "test")) {
+			continue;
+		}
+
+		if (ret == NULL) {
+			ret = calloc(1, sizeof(struct np_test));
+			ret_cur = ret;
+		} else {
+			ret_cur->next = calloc(1, sizeof(struct np_test));
+			ret_cur = ret_cur->next;
+		}
+
+		for (test = node_list->children; test != NULL; test = test->next) {
+			if (xmlStrEqual(test->name, BAD_CAST "name")) {
+				ret_cur->name = (char*)xmlNodeGetContent(test);
+			}
+
+			if (xmlStrEqual(test->name, BAD_CAST "count")) {
+				ret_cur->count = atoi((char*)test->children->content);
+			}
+
+			if (xmlStrEqual(test->name, BAD_CAST "test-requirements")) {
+				ret_cur->required_capabs = test_parse_capabs(test->children);
+			}
+
+			if (xmlStrEqual(test->name, BAD_CAST "variables")) {
+				ret_cur->vars = test_parse_vars(test->children);
+			}
+		}
+
+		ret_cur->cmds = test_parse_cmds(node_list->children);
+
+		if (ret_cur->name == NULL) {
+			ERROR("test_parse_tests", "Missing the test name.");
+			np_test_free(ret);
+			return NULL;
+		}
+		if (ret_cur->cmds == NULL) {
+			ERROR("test_parse_tests", "Missing the test commands.");
+			np_test_free(ret);
+			return NULL;
+		}
+
+		if (ret_cur->count == 0) {
+			ret_cur->count = 1;
+		}
+	}
+
+	return ret;
+}
+
+int cmd_test(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
+	char* args = strdupa(arg);
+	char* cmd = NULL, *ptr;
+	struct np_test* tests;
+	struct np_test_capab* test_capabs;
+	struct np_test_var* vars;
+	const struct nc_cpblts* capabs;
+	xmlDocPtr doc;
+	xmlNodePtr root, node;
+
+	cmd = strtok_r(args, " ", &ptr);
+	cmd = strtok_r(NULL, " ", &ptr);
+	if (cmd == NULL || strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+		cmd_test_help(output);
+
+	} else {
+		if (session == NULL) {
+			ERROR("test", "NETCONF session not established, use the \'connect\' command.");
+			return EXIT_FAILURE;
+		}
+
+		capabs = nc_session_get_cpblts(session);
+		if (capabs == NULL) {
+			ERROR("test", "Failed to get the current session capabilities.");
+			return EXIT_FAILURE;
+		}
+
+		for (; cmd != NULL; cmd = strtok_r(NULL, " ", &ptr)) {
+			tests = NULL;
+			test_capabs = NULL;
+			vars = NULL;
+
+			doc = xmlReadFile(cmd, NULL, XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
+			if (doc == NULL) {
+				ERROR("test", "Failed to parse \'%s\'.", cmd);
+				return EXIT_FAILURE;
+			}
+
+			root = xmlDocGetRootElement(doc);
+			for (node = root->children; node != NULL; node = node->next) {
+				if (xmlStrEqual(node->name, BAD_CAST "requirements")) {
+					test_capabs = test_parse_capabs(node->children);
+				}
+
+				if (xmlStrEqual(node->name, BAD_CAST "variables")) {
+					vars = test_parse_vars(node->children);
+				}
+			}
+
+			tests = test_parse_tests(root->children);
+			if (tests == NULL) {
+				ERROR("test", "Failed to parse tests (%s).", cmd);
+				xmlFreeDoc(doc);
+				np_test_capab_free(test_capabs);
+				np_test_var_free(vars);
+				return EXIT_FAILURE;
+			}
+
+			perform_test(tests, test_capabs, vars, capabs, output);
+			xmlFreeDoc(doc);
+			np_test_free(tests);
+			np_test_capab_free(test_capabs);
+			np_test_var_free(vars);
+		}
+	}
+
+	return EXIT_SUCCESS;
 }
 
 void cmd_auth_help(FILE* output) {
