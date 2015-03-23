@@ -753,6 +753,19 @@ are defined, with this priority, then those editors are used.
 .PP
 .SS  status
 Print information about the current NETCONF session.
+.SS test
+Execute a test case using the current NETCONF session.
+.PP
+.B test
+[\-\-help] \fIfile.xml\fR [\fIother_files.xml\fR ...]
+.PP
+.RS 4
+\fIfile.xml\fR
+.RS 4
+An XML file fully describing test case(s) conforming to the model
+.B netopeer-test.
+.RE
+.RE
 .SS  user-rpc
 Send your own content in an RPC envelope. This can be used for RPC operations
 defined in data models not supported by the
