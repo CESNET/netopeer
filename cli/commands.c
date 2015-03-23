@@ -446,7 +446,7 @@ userinput:
 	return retval;
 }
 
-static struct nc_filter* set_filter(const char* operation, const char* file, int interactive) {
+static struct nc_filter* set_filter(const char* operation, const char* file, int interactive, FILE* output) {
 	int filter_fd;
 	struct stat filter_stat;
 	char *filter_s;
@@ -481,7 +481,7 @@ static struct nc_filter* set_filter(const char* operation, const char* file, int
 		close(filter_fd);
 	} else {
 		/* let user write filter interactively */
-		filter_s = readinput("Type the filter.", file);
+		filter_s = readinput("Type the filter.", file, output);
 
 		/* create the filter according to the file content */
 		filter = nc_filter_new(NC_FILTER_SUBTREE, filter_s);
@@ -748,7 +748,7 @@ int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output) {
 	/* check if edit configuration data were specified */
 	if (config == NULL) {
 		/* let user write edit data interactively */
-		config = readinput("Type the edit configuration data.", old_input_file);
+		config = readinput("Type the edit configuration data.", old_input_file, output);
 		if (config == NULL) {
 			ERROR("edit-config", "reading edit data failed.");
 			return EXIT_FAILURE;
@@ -828,7 +828,7 @@ int cmd_validate(const char* arg, const char* old_input_file, FILE* output) {
 		case 'c':
 			if (optarg == NULL) {
 				/* let user write edit data interactively */
-				config = readinput("Type the content of a configuration datastore.", old_input_file);
+				config = readinput("Type the content of a configuration datastore.", old_input_file, output);
 				if (config == NULL) {
 					ERROR("validate", "reading configuration data failed.");
 					return EXIT_FAILURE;
@@ -1065,7 +1065,7 @@ int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output) {
 	/* check if edit configuration data were specified */
 	if (source == NC_DATASTORE_ERROR && config == NULL) {
 		/* let user write edit data interactively */
-		config = readinput("Type the content of a configuration datastore.", old_input_file);
+		config = readinput("Type the content of a configuration datastore.", old_input_file, output);
 		if (config == NULL) {
 			ERROR("copy-config", "reading configuration data failed.");
 			return EXIT_FAILURE;
@@ -1137,14 +1137,14 @@ int cmd_get(const char* arg, const char* old_input_file, FILE* output) {
 			wd = get_withdefaults("get-config", optarg);
 			break;
 		case 'f':
-			filter = set_filter("get", old_input_file, 1);
+			filter = set_filter("get", old_input_file, 1, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'i':
-			filter = set_filter("get", optarg, 0);
+			filter = set_filter("get", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
@@ -1522,14 +1522,14 @@ int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output) {
 			wd = get_withdefaults("get-config", optarg);
 			break;
 		case 'f':
-			filter = set_filter("get-config", old_input_file, 1);
+			filter = set_filter("get-config", old_input_file, 1, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'i':
-			filter = set_filter("get-config", optarg, 0);
+			filter = set_filter("get-config", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
@@ -2982,14 +2982,14 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output) {
 			}
 			break;
 		case 'f':
-			filter = set_filter("create-subscription", old_input_file, 1);
+			filter = set_filter("create-subscription", old_input_file, 1, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'i':
-			filter = set_filter("create-subscription", optarg, 0);
+			filter = set_filter("create-subscription", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
@@ -3194,7 +3194,7 @@ int cmd_userrpc(const char* arg, const char* old_input_file, FILE* output) {
 	}
 
 	if (config == NULL) {
-		config = readinput("Type the content of a RPC operation.", old_input_file);
+		config = readinput("Type the content of a RPC operation.", old_input_file, output);
 		if (config == NULL) {
 			ERROR("copy-config", "reading filter failed.");
 			return EXIT_FAILURE;
