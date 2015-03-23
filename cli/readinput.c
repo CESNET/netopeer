@@ -250,7 +250,7 @@ void initialize_readline(void) {
 	rl_bind_key(CTRL('a'), bind_ins_content);
 }
 
-char* readinput(const char* instruction, const char* tmpfile) {
+char* readinput(const char* instruction, const char* tmpfile, FILE* output) {
 	int tmpfd = -1, oldfd, ret, size, old_history_pos;
 	pid_t pid, wait_pid;
 	char* tmpname = NULL, *input = NULL, *old_content = NULL, *ptr, *ptr2;
@@ -295,9 +295,9 @@ char* readinput(const char* instruction, const char* tmpfile) {
 	}
 
 	if (strcmp(editor, "NONE") == 0) {
-		INSTRUCTION("(finish input by Ctrl-D, add previous content from history by Ctrl-A)");
-		INSTRUCTION(instruction);
-		INSTRUCTION("\n");
+		INSTRUCTION(output, "(finish input by Ctrl-D, add previous content from history by Ctrl-A)");
+		INSTRUCTION(output, instruction);
+		INSTRUCTION(output, "\n");
 
 		multiline = 1;
 		if (old_content != NULL) {
