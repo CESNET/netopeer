@@ -279,7 +279,7 @@ void addargs(struct arglist* args, char* format, ...) {
 	free(aux1);
 }
 
-int cmd_status(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output) {
+int cmd_status(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	const char* s;
 	struct nc_cpblts* cpblts;
 
@@ -316,7 +316,7 @@ int cmd_status(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE
 	return EXIT_SUCCESS;
 }
 
-static NC_DATASTORE get_datastore(const char* paramtype, const char* operation, struct arglist* cmd, int index, char** url, FILE* output) {
+static NC_DATASTORE get_datastore(const char* paramtype, const char* operation, struct arglist* cmd, int index, char** url, FILE* output, FILE* input) {
 	int valid = 0;
 	char *datastore;
 	NC_DATASTORE retval = NC_DATASTORE_ERROR;
@@ -345,7 +345,7 @@ userinput:
 				fprintf(output, "|url:<dsturl>");
 			}
 			fprintf(output, "): ");
-			if (scanf("%1023s", datastore) == EOF) {
+			if (fscanf(input, "%1023s", datastore) == EOF) {
 				ERROR(operation, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				return NC_DATASTORE_ERROR;
 			}
@@ -412,7 +412,7 @@ userinput:
 	return retval;
 }
 
-static NCWD_MODE get_withdefaults(const char* operation, const char* mode) {
+static NCWD_MODE get_withdefaults(const char* operation, const char* mode, FILE* output, FILE* input) {
 	NCWD_MODE retval = NCWD_MODE_NOTSET;
 	char* mode_aux;
 	mode_aux = malloc(sizeof(char) * 128);
@@ -420,8 +420,8 @@ static NCWD_MODE get_withdefaults(const char* operation, const char* mode) {
 	if (0) {
 userinput:
 		/* get mandatory argument */
-		INSTRUCTION(stdout, "Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
-		if (scanf("%127s", mode_aux) == EOF) {
+		INSTRUCTION(output, "Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
+		if (fscanf(input, "%127s", mode_aux) == EOF) {
 			ERROR(operation, "Reading user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 			return NCWD_MODE_NOTSET;
 		}
@@ -506,7 +506,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 		if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
 			ERROR(operation, "receiving rpc-reply failed.");
 			INSTRUCTION(output, "Closing the session.\n");
-			cmd_disconnect(NULL, NULL, output);
+			cmd_disconnect(NULL, NULL, output, NULL);
 			ret = EXIT_FAILURE;
 			break;
 		}
@@ -588,7 +588,7 @@ void cmd_editconfig_help(FILE* output) {
 	fprintf(output, "\nIf neither --config nor --url is specified, user is prompted to set edit data manually.\n");
 }
 
-int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
 	xmlDocPtr doc;
 	xmlNodePtr root;
 	int c;
@@ -736,7 +736,7 @@ int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output) {
 	}
 
 	/* get what datastore is target of the operation */
-	target = get_datastore("target", "edit-config", &cmd, optind, NULL, output);
+	target = get_datastore("target", "edit-config", &cmd, optind, NULL, output, input);
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
@@ -802,7 +802,7 @@ void cmd_validate_help(FILE* output) {
 	}
 }
 
-int cmd_validate(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_validate(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -883,7 +883,7 @@ int cmd_validate(const char* arg, const char* old_input_file, FILE* output) {
 
 	/* if the config option not set, parse remaining arguments to get source */
 	if (config == NULL) {
-		source = get_datastore("source", "validate", &cmd, optind, &config, output);
+		source = get_datastore("source", "validate", &cmd, optind, &config, output, input);
 	}
 
 	/* arglist is no more needed */
@@ -940,7 +940,7 @@ void cmd_copyconfig_help(FILE* output) {
 			ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -1003,7 +1003,7 @@ int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output) {
 			close(config_fd);
 			break;
 		case 'd':
-			wd = get_withdefaults("get-config", optarg);
+			wd = get_withdefaults("get-config", optarg, output, input);
 			break;
 		case 's':
 			/* check if -c was not used */
@@ -1053,7 +1053,7 @@ int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output) {
 		return EXIT_FAILURE;
 	}
 
-	target = get_datastore("target", "copy-config", &cmd, optind, &url_dst, output);
+	target = get_datastore("target", "copy-config", &cmd, optind, &url_dst, output, input);
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
@@ -1108,7 +1108,7 @@ void cmd_get_help(FILE* output) {
 	fprintf(output, "get [--help] %s[--filter | --filter-file <file>] [--out <file>]\n", defaults);
 }
 
-int cmd_get(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_get(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
 	int c;
 	char* out = NULL;
 	struct nc_filter *filter = NULL;
@@ -1134,7 +1134,7 @@ int cmd_get(const char* arg, const char* old_input_file, FILE* output) {
 	while ((c = getopt_long(cmd.count, cmd.list, "d:fi:ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
-			wd = get_withdefaults("get-config", optarg);
+			wd = get_withdefaults("get-config", optarg, output, input);
 			break;
 		case 'f':
 			filter = set_filter("get", old_input_file, 1, output);
@@ -1233,7 +1233,7 @@ void cmd_deleteconfig_help(FILE* output) {
 	fprintf(output, "delete-config [--help]  %s%s%s\n", ds_startup, ds_candidate, ds_url);
 }
 
-int cmd_deleteconfig(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_deleteconfig(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
 	int c;
 	NC_DATASTORE target;
 	nc_rpc *rpc = NULL;
@@ -1278,10 +1278,10 @@ int cmd_deleteconfig(const char* arg, const char* UNUSED(old_input_file), FILE* 
 		return EXIT_FAILURE;
 	}
 
-	target = get_datastore("target", "delete-config", &cmd, optind, &url, output);
+	target = get_datastore("target", "delete-config", &cmd, optind, &url, output, input);
 	while (target == NC_DATASTORE_RUNNING) {
 		fprintf(output, "delete-config: <running> datastore cannot be deleted.");
-		target = get_datastore("target", "delete-config", &cmd, cmd.count, &url, output);
+		target = get_datastore("target", "delete-config", &cmd, cmd.count, &url, output, input);
 	}
 
 	/* arglist is no more needed */
@@ -1307,7 +1307,7 @@ void cmd_killsession_help(FILE* output) {
 	fprintf(output, "kill-session [--help] <sessionID>\n");
 }
 
-int cmd_killsession(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_killsession(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	int c;
 	char *id;
 	nc_rpc *rpc = NULL;
@@ -1389,7 +1389,7 @@ void cmd_capability_help(FILE* output) {
 	fprintf(output, "capability {--help|--add <uri>|--rem {<uri>|*}|--list|--default\n");
 }
 
-int cmd_capability(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_capability(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	struct arglist cmd;
 	int c = -1;
 	const char * uri;
@@ -1492,7 +1492,7 @@ void cmd_getconfig_help(FILE* output) {
 	fprintf(output, "\n");
 }
 
-int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
 	int c;
 	char* out = NULL;
 	NC_DATASTORE target;
@@ -1519,7 +1519,7 @@ int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output) {
 	while ((c = getopt_long(cmd.count, cmd.list, "d:fi:ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
-			wd = get_withdefaults("get-config", optarg);
+			wd = get_withdefaults("get-config", optarg, output, input);
 			break;
 		case 'f':
 			filter = set_filter("get-config", old_input_file, 1, output);
@@ -1557,7 +1557,7 @@ int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output) {
 		return EXIT_FAILURE;
 	}
 
-	target = get_datastore("target", "get-config", &cmd, optind, NULL, output);
+	target = get_datastore("target", "get-config", &cmd, optind, NULL, output, input);
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
@@ -1589,7 +1589,7 @@ void cmd_getschema_help(FILE* output) {
 	fprintf(output, "get-schema [--help] [--version <version>] [--format <format>] [--out <file>] <identifier>\n");
 }
 
-int cmd_getschema(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_getschema(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	int c;
 	char *format = NULL, *version = NULL, *identifier = NULL, *out = NULL;
 	nc_rpc *rpc = NULL;
@@ -1692,7 +1692,7 @@ void cmd_un_lock_help(char* operation, FILE* output) {
 
 #define LOCK_OP 1
 #define UNLOCK_OP 2
-int cmd_un_lock(int op, const char* arg, FILE* output) {
+int cmd_un_lock(int op, const char* arg, FILE* output, FILE* input) {
 	int c;
 	NC_DATASTORE target;
 	nc_rpc *rpc = NULL;
@@ -1743,7 +1743,7 @@ int cmd_un_lock(int op, const char* arg, FILE* output) {
 		return EXIT_FAILURE;
 	}
 
-	target = get_datastore("target", operation, &cmd, optind, NULL, output);
+	target = get_datastore("target", operation, &cmd, optind, NULL, output, input);
 
 	/* arglist is no more needed */
 	clear_arglist(&cmd);
@@ -1770,19 +1770,19 @@ int cmd_un_lock(int op, const char* arg, FILE* output) {
 	return send_recv_process(operation, rpc, NULL, output);
 }
 
-int cmd_lock(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
-	return cmd_un_lock(LOCK_OP, arg, output);
+int cmd_lock(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
+	return cmd_un_lock(LOCK_OP, arg, output, input);
 }
 
-int cmd_unlock(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
-	return cmd_un_lock(UNLOCK_OP, arg, output);
+int cmd_unlock(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
+	return cmd_un_lock(UNLOCK_OP, arg, output, input);
 }
 
 void cmd_auth_help(FILE* output) {
 	fprintf(output, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
 }
 
-int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	int i;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *pubkey;
@@ -2038,7 +2038,7 @@ void cmd_cert_help(FILE* output) {
 	fprintf(output, "cert [--help | display | add <cert_path> | remove <cert_name> | displayown | replaceown (<cert_path.pem> | <cert_path.crt> <key_path.key>)]\n");
 }
 
-int cmd_cert(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_cert(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	int ret;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *path2, *dest;
@@ -2368,7 +2368,7 @@ void cmd_crl_help(FILE* output) {
 	fprintf(output, "crl [--help | display | add <crl_path> | remove <crl_name>]\n");
 }
 
-int cmd_crl(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_crl(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	int ret;
 	char* args = strdupa(arg);
 	char* cmd = NULL, *ptr = NULL, *path, *dest;
@@ -2526,7 +2526,7 @@ void cmd_listen_help(FILE* output) {
 #define DEFAULT_PORT_CH_TLS 6667
 #define ACCEPT_TIMEOUT 60000 /* 1 minute */
 
-static int cmd_connect_listen(const char* arg, int is_connect, FILE* output) {
+static int cmd_connect_listen(const char* arg, int is_connect, FILE* output, FILE* input) {
 	char* func_name = (is_connect ? strdupa("connect") : strdupa("listen"));
 #ifndef DISABLE_CALLHOME
 	static unsigned short listening = 0;
@@ -2702,7 +2702,7 @@ static int cmd_connect_listen(const char* arg, int is_connect, FILE* output) {
 			}
 			hostfree = 1;
 			INSTRUCTION(output, "Hostname to connect to: ");
-			if (scanf("%1023s", host) == EOF) {
+			if (fscanf(input, "%1023s", host) == EOF) {
 				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				goto error_cleanup;
 			}
@@ -2784,17 +2784,17 @@ error_cleanup:
 	return EXIT_FAILURE;
 }
 
-int cmd_connect(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
-	return cmd_connect_listen(arg, 1, output);
+int cmd_connect(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
+	return cmd_connect_listen(arg, 1, output, input);
 }
 
 #ifndef DISABLE_CALLHOME
-int cmd_listen(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
-	return cmd_connect_listen(arg, 0, output);
+int cmd_listen(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
+	return cmd_connect_listen(arg, 0, output, input);
 }
 #endif
 
-int cmd_disconnect(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output) {
+int cmd_disconnect(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	if (session == NULL) {
 		ERROR("disconnect", "not connected to any NETCONF server.");
 	} else {
@@ -2805,15 +2805,15 @@ int cmd_disconnect(const char* UNUSED(arg), const char* UNUSED(old_input_file), 
 	return EXIT_SUCCESS;
 }
 
-int cmd_quit(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output) {
+int cmd_quit(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* input) {
 	done = 1;
 	if (session != NULL) {
-		cmd_disconnect(NULL, NULL, output);
+		cmd_disconnect(NULL, NULL, output, input);
 	}
 	return EXIT_SUCCESS;
 }
 
-int cmd_verbose(const char *UNUSED(arg), const char* UNUSED(old_input_file), FILE* output) {
+int cmd_verbose(const char *UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	if (verb_level != 1) {
 		verb_level = 1;
 		nc_verbosity(NC_VERB_VERBOSE);
@@ -2827,7 +2827,7 @@ int cmd_verbose(const char *UNUSED(arg), const char* UNUSED(old_input_file), FIL
 	return EXIT_SUCCESS;
 }
 
-int cmd_debug(const char *UNUSED(arg), const char* UNUSED(old_input_file), FILE* output) {
+int cmd_debug(const char *UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	if (verb_level != 2) {
 		verb_level = 2;
 		nc_verbosity(NC_VERB_DEBUG);
@@ -2841,7 +2841,7 @@ int cmd_debug(const char *UNUSED(arg), const char* UNUSED(old_input_file), FILE*
 	return EXIT_SUCCESS;
 }
 
-int cmd_help(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_help(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* input) {
 	int i;
 	char *args = strdupa(arg);
 	char *cmd = NULL;
@@ -2874,7 +2874,7 @@ generic_help:
 		/* execute the command's help if any valid command specified */
 		if (commands[i].name) {
 			snprintf(cmdline, BUFFER_SIZE, "%s --help", commands[i].name);
-			commands[i].func(cmdline, NULL, output);
+			commands[i].func(cmdline, NULL, output, input);
 		} else {
 			/* if unknown command specified, print the list of commands */
 			fprintf(output, "Unknown command \'%s\'\n", cmd);
@@ -2928,7 +2928,7 @@ void cmd_subscribe_help(FILE* output) {
 	fprintf(output, "\t\t-<num>  - current time minus the given number of seconds.\n");
 }
 
-int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FILE* UNUSED(input)) {
 	int c;
 	struct nc_filter *filter = NULL;
 	char *stream;
@@ -3088,7 +3088,7 @@ void cmd_editor_help(FILE* output) {
 	fprintf(output, "editor [--help] [<path/name_of_the_editor> | --default | --none]\n");
 }
 
-int cmd_editor(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_editor(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	char* cmd, *args = strdupa(arg), *ptr;
 
 	cmd = strtok_r(args, " ", &ptr);
@@ -3124,7 +3124,7 @@ void cmd_userrpc_help(FILE* output) {
 	"If \'--file\' is omitted, user is asked to enter content manually.\n");
 }
 
-int cmd_userrpc(const char* arg, const char* old_input_file, FILE* output) {
+int cmd_userrpc(const char* arg, const char* old_input_file, FILE* output, FILE* UNUSED(input)) {
 	int c;
 	int config_fd;
 	struct stat config_stat;
@@ -3217,7 +3217,7 @@ void cmd_discardchanges_help(FILE* output) {
 	fprintf(output, "discard-changes\n");
 }
 
-int cmd_discardchanges(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_discardchanges(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	return cmd_generic_op(GO_DISCARD_CHANGES, arg, output);
 }
 
@@ -3225,7 +3225,7 @@ void cmd_commit_help(FILE* output) {
 	fprintf(output, "commit\n");
 }
 
-int cmd_commit(const char* arg, const char* UNUSED(old_input_file), FILE* output) {
+int cmd_commit(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	return cmd_generic_op(GO_COMMIT, arg, output);
 }
 
