@@ -865,6 +865,7 @@ struct transapi_rpc_callbacks server_rpc_clbks = {
 };
 
 struct transapi server_transapi = {
+	.version = 6,
 	.init = server_transapi_init,
 	.close = server_transapi_close,
 	.get_state = server_get_state_data,

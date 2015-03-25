@@ -57,7 +57,7 @@ extern int quit, restart_soft, restart_hard;
 extern int server_start;
 
 /* transAPI version which must be compatible with libnetconf */
-/* int transapi_version = 3; */
+/* int transapi_version = 6; */
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -932,6 +932,7 @@ struct transapi_rpc_callbacks netopeer_rpc_clbks = {
 };
 
 struct transapi netopeer_transapi = {
+	.version = 6,
 	.init = netopeer_transapi_init,
 	.close = netopeer_transapi_close,
 	.get_state = netopeer_get_state_data,
