@@ -54,7 +54,6 @@
 #include <pthread.h>
 #include <sys/poll.h>
 #include <sys/epoll.h>
-#include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
