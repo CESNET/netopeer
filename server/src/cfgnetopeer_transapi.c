@@ -637,7 +637,7 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 		return EXIT_FAILURE;
 	}
 
-	if (op & (XMLDIFF_REM | XMLDIFF_ADD) && strcmp(module_enabled, "false") == 0) {
+	if ((op & (XMLDIFF_REM | XMLDIFF_ADD)) && strcmp(module_enabled, "false") == 0) {
 		/* module is/was not enabled, nothing to enable/disable */
 		return EXIT_SUCCESS;
 	}
@@ -649,7 +649,7 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 		module = module->next;
 	}
 
-	if (op & XMLDIFF_REM || (op & XMLDIFF_MOD && strcmp(module_enabled, "false") == 0)) {
+	if ((op & XMLDIFF_REM) || ((op & XMLDIFF_MOD) && strcmp(module_enabled, "false") == 0)) {
 		if (module == NULL) {
 			nc_verb_error("%s: internal error: module to disable not found", __func__);
 			return EXIT_FAILURE;
@@ -658,7 +658,7 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 		if (module_disable(module, 1)) {
 			return EXIT_FAILURE;
 		}
-	} else if (op & XMLDIFF_ADD || (op & XMLDIFF_MOD && strcmp(module_enabled, "true") == 0)) {
+	} else if ((op & XMLDIFF_ADD) || ((op & XMLDIFF_MOD) && strcmp(module_enabled, "true") == 0)) {
 		if (module != NULL) {
 			nc_verb_error("%s: internal error: module to enable already exists", __func__);
 			return EXIT_FAILURE;

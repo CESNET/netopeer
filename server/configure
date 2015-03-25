@@ -2557,6 +2557,20 @@ fi
 
 
 
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
+
 # check for Linux distribution
 
 # Check whether --with-distro was given.
@@ -3049,6 +3063,8 @@ $as_echo "no" >&6; }
 		fi
 	fi
 
+BUILDREQS="$BUILDREQS python"
+REQS="$REQS python"
 
 # Check for rpmbuild
 # Extract the first word of "rpmbuild", so it can be a program name with args.

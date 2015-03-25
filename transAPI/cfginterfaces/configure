@@ -11560,7 +11560,7 @@ fi
 
 
 
-ac_config_files="$ac_config_files Makefile config.h cfginterfaces.c model/ietf-interfaces-data.rng"
+ac_config_files="$ac_config_files Makefile config.h cfginterfaces.c model/ietf-interfaces-config.rng"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12558,7 +12558,7 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "config.h") CONFIG_FILES="$CONFIG_FILES config.h" ;;
     "cfginterfaces.c") CONFIG_FILES="$CONFIG_FILES cfginterfaces.c" ;;
-    "model/ietf-interfaces-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-interfaces-data.rng" ;;
+    "model/ietf-interfaces-config.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-interfaces-config.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

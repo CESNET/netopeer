@@ -44,82 +44,82 @@
 		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-interfaces" prefix="if"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-ip" prefix="ip"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:iana-if-type" prefix="ianaift"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-interfaces</axsl:attribute><axsl:attribute name="name">ietf-interfaces</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M6"/><svrl:active-pattern><axsl:attribute name="id">ietf-ip</axsl:attribute><axsl:attribute name="name">ietf-ip</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M7"/><svrl:active-pattern><axsl:attribute name="id">iana-if-type</axsl:attribute><axsl:attribute name="name">iana-if-type</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M8"/></svrl:schematron-output></axsl:template>
 
 <!--SCHEMATRON PATTERNS-->
-<axsl:param name="root" select="/nc:data"/>
+<axsl:param name="root" select="/nc:config"/>
 
 <!--PATTERN ietf-interfaces-->
 
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces/if:interface" priority="1011" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces/if:interface"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface" priority="1011" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::if:interface[if:name=current()/if:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::if:interface[if:name=current()/if:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "if:name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces/if:interface/ip:ipv4/ip:address" priority="1010" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces/if:interface/ip:ipv4/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address" priority="1010" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if>
 
 		<!--ASSERT -->
-<axsl:choose><axsl:when test="ip:prefix-length[not(processing-instruction('dsrl'))] or false()"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ip:prefix-length[not(processing-instruction('dsrl'))] or false()"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node(s) from one case of mandatory choice "subnet" must exist</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
+<axsl:choose><axsl:when test="ip:prefix-length[not(processing-instruction('dsrl'))] or ip:netmask[not(processing-instruction('dsrl'))] or false()"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ip:prefix-length[not(processing-instruction('dsrl'))] or ip:netmask[not(processing-instruction('dsrl'))] or false()"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node(s) from one case of mandatory choice "subnet" must exist</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces/if:interface/ip:ipv4/ip:neighbor" priority="1009" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces/if:interface/ip:ipv4/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor" priority="1009" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces/if:interface/ip:ipv6/ip:address" priority="1008" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces/if:interface/ip:ipv6/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address" priority="1008" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces/if:interface/ip:ipv6/ip:neighbor" priority="1007" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces/if:interface/ip:ipv6/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor" priority="1007" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface" priority="1006" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface" priority="1006" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::if:interface[if:name=current()/if:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::if:interface[if:name=current()/if:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "if:name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/if:higher-layer-if" priority="1005" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/if:higher-layer-if"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/if:higher-layer-if" priority="1005" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/if:higher-layer-if"/>
 
 		<!--REPORT -->
 <axsl:if test=". = preceding-sibling::if:higher-layer-if"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test=". = preceding-sibling::if:higher-layer-if"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate leaf-list entry "<axsl:text/><axsl:value-of select="."/><axsl:text/>".</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/if:lower-layer-if" priority="1004" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/if:lower-layer-if"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/if:lower-layer-if" priority="1004" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/if:lower-layer-if"/>
 
 		<!--REPORT -->
 <axsl:if test=". = preceding-sibling::if:lower-layer-if"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test=". = preceding-sibling::if:lower-layer-if"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate leaf-list entry "<axsl:text/><axsl:value-of select="."/><axsl:text/>".</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/ip:ipv4/ip:address" priority="1003" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/ip:ipv4/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv4/ip:address" priority="1003" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv4/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/ip:ipv4/ip:neighbor" priority="1002" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/ip:ipv4/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv4/ip:neighbor" priority="1002" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv4/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/ip:ipv6/ip:address" priority="1001" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/ip:ipv6/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv6/ip:address" priority="1001" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv6/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/if:interfaces-state/if:interface/ip:ipv6/ip:neighbor" priority="1000" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/if:interfaces-state/if:interface/ip:ipv6/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv6/ip:neighbor" priority="1000" mode="M6"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv6/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template><axsl:template match="text()" priority="-1" mode="M6"/><axsl:template match="@*|node()" priority="-2" mode="M6"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>

@@ -65,6 +65,20 @@ fi
 # check for roff2html from groff
 AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
+
 # check for Linux distribution
 AC_ARG_WITH([distro],
 	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),
@@ -216,6 +230,8 @@ AX_PYTHON_MODULE(re, fatal)
 AX_PYTHON_MODULE(string, fatal)
 AX_PYTHON_MODULE(argparse, fatal)
 AX_PYTHON_MODULE(xml, fatal)
+BUILDREQS="$BUILDREQS python"
+REQS="$REQS python"
 
 # Check for rpmbuild
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
