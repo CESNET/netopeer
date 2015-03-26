@@ -2230,7 +2230,7 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 		if (cmd == NULL) {
 			fprintf(output, "The private keys used for SSH authentication:\n");
 			if (opts->key_count == 0) {
-				fprintf(output, "(default)\n");
+				fprintf(output, "(none)\n");
 			} else {
 				for (i = 0; i < opts->key_count; ++i) {
 					fprintf(output, "%s\n", opts->keys[i]);
