@@ -92,14 +92,14 @@ TOOLS = manager/netopeer-manager
 PYTOOLS = configurator/netopeer-configurator
 
 CFGS =	config/netopeer-cfgnetopeer.yin \
-	config/netopeer-cfgnetopeer-data.rng \
-	config/netopeer-cfgnetopeer-gdefs.rng \
+	config/netopeer-cfgnetopeer-config.rng \
+	config/netopeer-cfgnetopeer-gdefs-config.rng \
 	config/netopeer-cfgnetopeer-schematron.xsl \
 	config/ietf-netconf-server.yin \
 	config/ietf-x509-cert-to-name.yin \
 	config/ietf-netconf-acm.yin \
-	config/ietf-netconf-server-data.rng \
-	config/ietf-netconf-server-gdefs.rng \
+	config/ietf-netconf-server-config.rng \
+	config/ietf-netconf-server-gdefs-config.rng \
 	config/ietf-netconf-server-schematron.xsl \
 	@SERVER_TLS_CFGS@
 
