@@ -2464,7 +2464,7 @@ int cmd_cert(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 				name = strdup(d->d_name);
 				name[strlen(name)-4] = '\0';
 				asprintf(&path, "%s/%s", trusted_dir, d->d_name);
-				parse_cert(name, path);
+				parse_cert(name, path, output);
 				free(name);
 				free(path);
 			}
@@ -2609,11 +2609,11 @@ int cmd_cert(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 		}
 
 		if (crt) {
-			parse_cert("CRT", dest);
+			parse_cert("CRT", dest, output);
 		}
 		if (pem) {
 			strcpy(dest+strlen(dest)-4, ".pem");
-			parse_cert("PEM", dest);
+			parse_cert("PEM", dest, output);
 		}
 		free(dest);
 
@@ -2794,7 +2794,7 @@ int cmd_crl(const char* arg, const char* UNUSED(old_input_file), FILE* output, F
 				name = strdup(d->d_name);
 				name[strlen(name)-4] = '\0';
 				asprintf(&path, "%s/%s", crl_dir, d->d_name);
-				parse_crl(name, path);
+				parse_crl(name, path, output);
 				free(name);
 				free(path);
 			}
