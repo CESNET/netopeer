@@ -438,4 +438,10 @@ void print_file_and_reset(FILE* file);
 
 module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_this);
 
+/*
+ * removes '"' and ';' from around the string
+ * expects dynamically allocated string
+ */
+char* normalize_name(char* name);
+
 #endif // YANG_PARSER_H_

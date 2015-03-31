@@ -35,7 +35,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 tuple* query_yang(char* path, const module* mod);
 tuple* query_yang_augmented(char* path, const module* mod, const module* mod_augment); // TODO
 yang_node* find_by_name(char* name, yang_node** node_list);
-char* read_until_colon(char* string);
+char* read_until_colon(const char* string);
 json_data_types map_to_json_data_type(char* yang_data_type);
 void free_tuple(tuple* t);
 path* new_path(int characters); // returns new path with allocated string, there can later be a function that reallocates the string
@@ -54,5 +54,9 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id);
  * returns data from netconf rpc response in a newly allocated string
  */
 char* get_data(const char* resp);
+/*
+ * safely compares two normalized name - removes '"' from around the strings and ';' from the end
+ */
+int safe_normalized_compare(const char* first, const char* second);
 
 #endif // CONVERTER_H_

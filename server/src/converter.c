@@ -199,6 +199,10 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 
 json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* mod_augment, char* namespace_name, int augmented, conn_t* con) {
 
+	if (p == NULL || p->string == NULL) {
+		error_and_quit(EXIT_FAILURE, "xml_to_json: NULL path received, initialize path before passing it here");
+	}
+
 	json_t* parent = NULL;
 	json_t* json_node = NULL;
 	if (strlen(p->string) == 0) {
@@ -210,33 +214,44 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 	clb_print(NC_VERB_WARNING, "xml_to_json started on node");
 	clb_print(NC_VERB_WARNING, (char*) node->name);
 
-	append_to_path(p, (char*) node->name);
-	int namespace_changed = 0;
-
 	// first try, if we didn't receive namespace name, we're going to find out or fail
 	if (namespace_name == NULL && (p == NULL || p->string == NULL || strlen(p->string) <= 0)) {
 		if (node == NULL || node->ns == NULL || node->ns->href == NULL) {
 			error_and_quit(EXIT_FAILURE, "xml_to_json: could not find out namespace of root element");
 		}
-		clb_print(NC_VERB_WARNING, "first namespace");
+		clb_print(NC_VERB_WARNING, "xml_to_json: first namespace");
 		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
-	} else if (strcmp((char*)node->ns->href, namespace_name)) {
+		clb_print(NC_VERB_WARNING, namespace_name);
+	} else if (namespace_name != NULL && strcmp(strrchr((char*)node->ns->href, ':') + 1, namespace_name)) {
 		// check xmlns to see if we're dealing with something augmented
 		clb_print(NC_VERB_WARNING, "namespace changed");
 		namespace_name = strrchr((char*)node->ns->href, ':') == NULL ? (char*)node->ns->href : strrchr((char*)node->ns->href, ':') + 1;
+		clb_print(NC_VERB_WARNING, namespace_name);
 		augmented = 1;
-		namespace_changed = 1;
 //		char* schema = get_schema(namespace_name, con, "1");
 //		mod = read_module_from_string(schema);
 //		free(schema);
 		// request yang model from server through con
+	} else {
+		clb_print(NC_VERB_VERBOSE, "xml_to_json: namespace didn't change");
 	}
 
-	tuple* t = augmented ? query_yang_augmented(p->string, mod, mod_augment) : query_yang(p->string, mod);
+	append_to_path(p, (char*) node->name);
+
+	tuple* t = augmented ? query_yang_augmented(p->string,mod, mod_augment) : query_yang(p->string, mod);
+	clb_print(NC_VERB_VERBOSE, "xml_to_json: received tuple");
+	clb_print(NC_VERB_VERBOSE, "xml_to_json: tuple: data type");
+	clb_print(NC_VERB_VERBOSE, t->data_type);
+	clb_print(NC_VERB_VERBOSE, t->container_type == CONTAINER ? "container" : "something else");
+//	clb_print(NC_VERB_VERBOSE, "returned from query_yang_augmented; old module is:");
+//	clb_print(NC_VERB_VERBOSE, mod->name);
+//	clb_print(NC_VERB_VERBOSE, mod->node->name);
 
 	switch (t->container_type) {
 	case LIST: // TODO: what if list is first in the structure?
+		clb_print(NC_VERB_VERBOSE, "list or container");
 	case CONTAINER: {
+		clb_print(NC_VERB_VERBOSE, "container");
 
 		json_node = json_object(); // this is an object
 		xmlNodePtr child = node->xmlChildrenNode;
@@ -253,20 +268,51 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 		int i;
 		for (i = 0; i < listp->number; i++) {
 
-			// query yang model for each child
+			// query yang model for each child (and check namespaces so that we know if we need to augment)
+			child = node->xmlChildrenNode;
+
+			clb_print(NC_VERB_VERBOSE, "querying yang model for node with name:");
+			clb_print(NC_VERB_VERBOSE, listp->strings[i]);
+
+			clb_print(NC_VERB_VERBOSE, child == NULL ? "NULL" : "NOT NULL");
+			clb_print(NC_VERB_VERBOSE, (char*) child->name);
+			clb_print(NC_VERB_VERBOSE, "cycling through children");
+			while (child != NULL) {
+				if (!safe_normalized_compare((char*) child->name, listp->strings[i])) {
+					break;
+				}
+				child = child->next;
+			}
+			clb_print(NC_VERB_VERBOSE, "namespaces?");
+			clb_print(NC_VERB_VERBOSE, (char*) child->ns->href);
+			char* child_namespace_name = strrchr((char*)child->ns->href, ':') == NULL ? (char*)child->ns->href : strrchr((char*)child->ns->href, ':') + 1;
+			if (child_namespace_name == NULL) {
+				error_and_quit(EXIT_FAILURE, "xml_to_json: invalid child namespace name");
+			}
+
+			clb_print(NC_VERB_VERBOSE, "appending to path");
 			append_to_path(p, (char*) listp->strings[i]);
-			tuple* childt = query_yang(p->string, mod);
+			clb_print(NC_VERB_VERBOSE, "going for query");
+			tuple* childt = (strcmp(child_namespace_name, namespace_name) || augmented) ? query_yang_augmented(p->string,mod, mod_augment) : query_yang(p->string, mod);
+
+			child = node->xmlChildrenNode;
+
+			if (childt == NULL) {
+				error_and_quit(EXIT_FAILURE, "received NULL tuple for child %s", p->string);
+			}
 			remove_last_from_path(p);
 
 			switch(childt->container_type) {
 			case CONTAINER: // if it is something we can process normally, do so
 			case LEAF: {
+				clb_print(NC_VERB_VERBOSE, "leaf");
 
 				child = node->xmlChildrenNode;
 
 				while (child != NULL) {
-					if (!strcmp((char*) child->name, listp->strings[i])) {
+					if (!safe_normalized_compare((char*) child->name, listp->strings[i])) {
 						json_object_set_new(json_node, (char*) child->name, xml_to_json(child, p, mod, mod_augment, namespace_name, augmented, con));
+						clb_print(NC_VERB_VERBOSE, "returned from xml_to_json in container/leaf branch");
 						break;
 					}
 					child = child->next;
@@ -280,8 +326,9 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 
 				json_t* array = json_array();
 				while (child != NULL) {
-					if (!strcmp((char*) child->name, listp->strings[i])) {
+					if (!safe_normalized_compare((char*) child->name, listp->strings[i])) {
 						json_array_append(array, xml_to_json(child, p, mod, mod_augment, namespace_name, augmented, con));
+						clb_print(NC_VERB_VERBOSE, "returned from xml_to_json in list/leaf-list branch");
 					}
 					child = child->next;
 				}
@@ -293,31 +340,41 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 			}
 
 			free_tuple(childt);
+			clb_print(NC_VERB_VERBOSE, "freed tuple from list/leaf-list branch");
+
 		}
 		destroy_list(listp);
 		break;
 	}
 	case LEAF_LIST: // TODO: what if leaf list is first in the structure?
+		clb_print(NC_VERB_VERBOSE, "leaf-list or leaf");
 	case LEAF: {
+		clb_print(NC_VERB_VERBOSE, "leaf");
 		// the type of this json node depends on the type defined in yang model
 		json_data_types type = map_to_json_data_type(t->data_type);
+		clb_print(NC_VERB_VERBOSE, "getting content");
 		char* content = (char*) xmlNodeGetContent(node);
+		clb_print(NC_VERB_VERBOSE, "getting content - done");
 		switch (type) {
 		case J_STRING: {
+			clb_print(NC_VERB_VERBOSE, "j_string");
 			json_node = json_string(content);
 			break;
 		}
 		case J_INTEGER: {
+			clb_print(NC_VERB_VERBOSE, "j_integer");
 			json_node = json_integer(atoi(content));
 			break;
 		}
 		case J_REAL: {
+			clb_print(NC_VERB_VERBOSE, "j_real");
 			double d;
 			sscanf(content, "%lf", &d);
 			json_node = json_real(d);
 			break;
 		}
 		case J_BOOLEAN: {
+			clb_print(NC_VERB_VERBOSE, "j_boolean");
 			if (!strcmp(content, "true")) {
 				json_node = json_true();
 			} else {
@@ -326,6 +383,7 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 			break;
 		}
 		case J_NULL: {
+			clb_print(NC_VERB_VERBOSE, "j_null");
 			json_node = json_null();
 			break;
 		}
@@ -348,82 +406,117 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 	}
 
 	free_tuple(t);
-	if (namespace_changed) {
-		destroy_module(mod);
-	}
+//	if (namespace_changed) {
+//		destroy_module(mod);
+//	}
+
+//	clb_print(NC_VERB_VERBOSE, "returning json node; old module is:");
+//	clb_print(NC_VERB_VERBOSE, mod->name);
+//	clb_print(NC_VERB_VERBOSE, mod->node->name);
+
+	clb_print(NC_VERB_VERBOSE, "done with xml_to_json");
 	return json_node;
 }
 
 // accepted path format: "name1:name2:name3"
 tuple* query_yang(char* path, const module* mod) {
 
+	clb_print(NC_VERB_VERBOSE, "query_yang: started, path is:");
+	clb_print(NC_VERB_VERBOSE, path);
+
 	int string_length = strlen(path);
 	int length_read = 0;
 
-	char* module_name = read_until_colon(path);
-	length_read += strlen(module_name) + 1;
-	path += strlen(module_name) + 1;
-	if (strcmp(module_name, mod->name)) {
-		error_and_quit(EXIT_FAILURE,
-				"query_yang: No such module: %s. Known module name is %s.",
-				module_name, mod->name);
-	} else if (length_read >= string_length) {
-		tuple* t = malloc(sizeof(tuple));
-		t->data_type = NULL;
-		t->container_type = CONTAINER; /*TODO: this is a module, not a container*/
-		free(module_name);
-		return t;
-	}
+//	char* module_name = read_until_colon(path);
+//	length_read += strlen(module_name) + 1;
+//	path += strlen(module_name) + 1;
+//	if (safe_normalized_compare(module_name, mod->name)) {
+//		error_and_quit(EXIT_FAILURE,
+//				"query_yang: No such module: %s. Known module name is %s.",
+//				module_name, mod->name);
+//	} else if (length_read >= string_length) {
+//		tuple* t = malloc(sizeof(tuple));
+//		t->data_type = NULL;
+//		t->container_type = CONTAINER; /*TODO: this is a module, not a container*/
+//		free(module_name);
+//		return t;
+//	}
+//
+//	free(module_name);
 
-	free(module_name);
-
+	clb_print(NC_VERB_VERBOSE, "query_yang: on module:");
+	clb_print(NC_VERB_VERBOSE, mod->name);
+	clb_print(NC_VERB_VERBOSE, "query_yang: first node name:");
+	clb_print(NC_VERB_VERBOSE, mod->node->name);
+	clb_print(NC_VERB_VERBOSE, "query_yang: first node name from path");
 	char* first_node_name = read_until_colon(path);
+	clb_print(NC_VERB_VERBOSE, "query_yang: read until colon finished");
 	length_read += strlen(first_node_name) + 1;
 	path += strlen(first_node_name) + 1;
-	if (strcmp(first_node_name, mod->node->name)) {
+	clb_print(NC_VERB_VERBOSE, "query_yang: going to compare");
+	if (safe_normalized_compare(first_node_name, mod->node->name)) {
 		error_and_quit(EXIT_FAILURE,
 				"query_yang: No such first node: %s. Known first node name is %s.",
 				first_node_name, mod->node->name);
 	} else if (length_read >= string_length) {
+		clb_print(NC_VERB_VERBOSE, "query_yang: found node name, finished");
 		tuple* t = malloc(sizeof(tuple));
 		t->container_type = mod->node->type;
+		t->data_type = NULL;
+		clb_print(NC_VERB_VERBOSE, "query_yang: copying data type");
 		copy_string(&(t->data_type), mod->node->value);
+		clb_print(NC_VERB_VERBOSE, "query_yang: freeing first node name, finished");
 		free(first_node_name);
 		return t;
 	}
 
+	clb_print(NC_VERB_VERBOSE, "query_yang: freeing first node name");
 	free(first_node_name);
+	clb_print(NC_VERB_VERBOSE, "query_yang: first node name - done");
 
 	yang_node** node_list = mod->node->node_list;
 
 	while (length_read < string_length) {
 		char* name = read_until_colon(path);
+		clb_print(NC_VERB_VERBOSE, "query_yang: node name");
+		clb_print(NC_VERB_VERBOSE, name);
 		length_read += strlen(name) + 1;
 		path += strlen(name) + 1;
 
+		clb_print(NC_VERB_VERBOSE, "query_yang: finding by name");
 		yang_node* node = find_by_name(name, node_list);
 		if (length_read >= string_length && node != NULL) {
+			clb_print(NC_VERB_VERBOSE, "query_yang: found node name - finished");
 			tuple* t = malloc(sizeof(tuple));
 			t->container_type = node->type;
+			t->data_type = NULL;
+			clb_print(NC_VERB_VERBOSE, "query_yang: copying node value");
 			copy_string(&(t->data_type), node->value);
+			clb_print(NC_VERB_VERBOSE, "query_yang: freeing name");
 			free(name);
-
 
 			return t;
 		} else if (node == NULL) {
+			clb_print(NC_VERB_VERBOSE, "query_yang: didn't find node by name, quitting, freeing");
 			free(name);
+			clb_print(NC_VERB_VERBOSE, "query_yang: done freeing");
 			return NULL;
 		} else {
+			clb_print(NC_VERB_VERBOSE, "query_yang: didn't finish looking for now, advancing");
 			node_list = node->node_list;
 		}
+
+		clb_print(NC_VERB_VERBOSE, "query_yang: freeing name last");
 		free(name);
 	}
 
 	return NULL;
 }
 
+// TODO: multiple augmenting modules
 tuple* query_yang_augmented(char* path, const module* mod, const module* mod_augment) {
 	tuple* t = malloc(sizeof(tuple));
+	t->data_type = NULL;
 
 	path = strchr(path, ':') + 1;
 	path = strchr(path, ':') + 1;
@@ -431,12 +524,56 @@ tuple* query_yang_augmented(char* path, const module* mod, const module* mod_aug
 	clb_print(NC_VERB_WARNING, "path is");
 	clb_print(NC_VERB_WARNING, path);
 
+//	error_and_quit(EXIT_FAILURE, "query_yang_augmented: not implemented yet");
+
+//	return query_yang(path, mod_augment);
+
+	clb_print(NC_VERB_VERBOSE, "on aug module:");
+	clb_print(NC_VERB_VERBOSE, mod_augment->name);
+	clb_print(NC_VERB_VERBOSE, "old module is:");
+	clb_print(NC_VERB_VERBOSE, mod->name);
+	clb_print(NC_VERB_VERBOSE, mod->node->name);
+//	clb_print(NC_VERB_VERBOSE, "query_yang_augmented: getting aug_nodes");
+//	clb_print(NC_VERB_VERBOSE, mod_augment == NULL ? "NULL" : "OK");
+//	clb_print(NC_VERB_VERBOSE, mod_augment->augment_list == NULL ? "NULL" : "OK");
+//	clb_print(NC_VERB_VERBOSE, mod_augment->augment_list[0]->node_list == NULL ? "NULL" : "OK");
 	yang_node** aug_nodes = mod_augment->augment_list[0]->node_list;
-	int i = 0;
-	yang_node* this_node = aug_nodes[i];
+//	clb_print(NC_VERB_VERBOSE, "query_yang_augmented: done getting aug_nodes");
 
-	while(this_node != NULL) {
+	int length_read = 0, string_length = strlen(path);
 
+	while (length_read < string_length) {
+		char* name = read_until_colon(path);
+		clb_print(NC_VERB_VERBOSE, "query_yang_augmented: node name");
+		clb_print(NC_VERB_VERBOSE, name);
+		length_read += strlen(name) + 1;
+		path += strlen(name) + 1;
+
+		clb_print(NC_VERB_VERBOSE, "query_yang_augmented: finding by name");
+		yang_node* node = find_by_name(name, aug_nodes);
+		if (length_read >= string_length && node != NULL) {
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: found node name - finished");
+			tuple* t = malloc(sizeof(tuple));
+			t->container_type = node->type;
+			t->data_type = NULL;
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: copying node value");
+			copy_string(&(t->data_type), node->value);
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: freeing name");
+			free(name);
+
+			return t;
+		} else if (node == NULL) {
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: didn't find node by name, quitting, freeing");
+			free(name);
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: done freeing");
+			return NULL;
+		} else {
+			clb_print(NC_VERB_VERBOSE, "query_yang_augmented: didn't finish looking for now, advancing");
+			aug_nodes = node->node_list;
+		}
+
+		clb_print(NC_VERB_VERBOSE, "query_yang_augmented: freeing name last");
+		free(name);
 	}
 
 	return t;
@@ -446,8 +583,18 @@ yang_node* find_by_name(char* name, yang_node** node_list) {
 	int i = 0;
 	yang_node* current = node_list[i];
 	while (current != NULL) {
-		if (!strcmp(name, current->name)) {
+		if (!safe_normalized_compare(name, current->name)) {
 			return current;
+		}
+		if (current->type == CHOICE) { // TODO: number of problems here: 1, this should be handled at entirely different place. 2, what if there are two choice nodes with same cases? (and we want the second one)
+			yang_node* potential_match = find_by_name(name, current->node_list);
+			if (potential_match != NULL) { // TODO: this is adaptation to our current parser, could the parser be enhanced instead?
+				yang_node** potential_match_list = potential_match->node_list;
+				yang_node* final_match = find_by_name(name, potential_match_list);
+				if (final_match != NULL) {
+					return final_match;
+				}
+			}
 		}
 		i++;
 		current = node_list[i];
@@ -455,20 +602,18 @@ yang_node* find_by_name(char* name, yang_node** node_list) {
 	return NULL;
 }
 
-char* read_until_colon(char* string) {
+char* read_until_colon(const char* string) {
 	char* colon = strchr(string, ':');
 
 	if (colon == NULL) {
-		char* res = malloc(strlen(string) + 1);
-		memset(res, 0, strlen(string) + 1);
-		strncpy(res, string, strlen(string));
+		char* res = NULL;
+		copy_string(&res, string);
 		return res;
 	}
 
-	int size = strlen(string) - strlen(strchr(string, ':')) + 1;
-	char* res = malloc(size);
-	memset(res, 0, size);
-	strncpy(res, string, size - 1);
+	char* res = malloc(strlen(string) - strlen(colon) + 1);
+	memset(res, 0, strlen(string) - strlen(colon) + 1);
+	strncpy(res, string, strlen(string) - strlen(colon));
 	return res;
 }
 
@@ -519,7 +664,7 @@ json_data_types map_to_json_data_type(char* yang_data_type) {
 	if (!strcmp(yang_data_type, Y_BOOLEAN)) {
 		return J_BOOLEAN;
 	}
-	return J_NULL;
+	return J_STRING; // was J_NULL
 }
 
 // returns new path with allocated string, there can later be a function that reallocates the string
@@ -693,5 +838,28 @@ char* get_data(const char* resp) {
 //	xmlFreeNode(root);
 	xmlFreeDoc(doc);
 
+	return ret;
+}
+
+int safe_normalized_compare(const char* first, const char* second) {
+	if (first == NULL || second == NULL) {
+		clb_print(NC_VERB_WARNING, "safe_normalized_compare: at least one of our arguments is NULL");
+	} else {
+//		clb_print(NC_VERB_WARNING, "received:");
+//		clb_print(NC_VERB_WARNING, first);
+//		clb_print(NC_VERB_WARNING, second);
+	}
+	char* first_norm = NULL, *second_norm = NULL;
+	copy_string(&first_norm, first);
+	copy_string(&second_norm, second);
+//	clb_print(NC_VERB_WARNING, first_norm);
+//	clb_print(NC_VERB_WARNING, second_norm);
+	first_norm = normalize_name(first_norm);
+	second_norm = normalize_name(second_norm);
+//	clb_print(NC_VERB_WARNING, first_norm);
+//	clb_print(NC_VERB_WARNING, second_norm);
+	int ret = strcmp(first_norm, second_norm);
+	free(first_norm);
+	free(second_norm);
 	return ret;
 }

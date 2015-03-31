@@ -10,6 +10,8 @@
 #include "yang_parser.h"
 #include "comm.h"
 
+#define ERR_MSG_SIZE 3000
+
 extern int debug_level;
 extern int errno;
 // TODO: containers without case also work as choices, have a look at it yang rfc
@@ -465,6 +467,7 @@ module* read_module_from_file(FILE* file) {
 	}
 	clb_print(NC_VERB_VERBOSE, "module name is");
 	char* module_name = read_word_dyn(file);
+//	module_name = normalize_name(module_name);
 	clb_print(NC_VERB_VERBOSE, module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
@@ -475,8 +478,6 @@ module* read_module_from_file(FILE* file) {
 
 	fill_module(file, mod);
 	mod->node = read_yang_node_from_file(file, mod);
-
-
 
 	if (read_words_on_this_level_until(file, "}") <= 0) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '}' after module.\n");
@@ -1036,6 +1037,10 @@ void fill_augment(FILE* file, augment* a, module* mod) {
 }
 
 void fill_module(FILE* file, module* mod) {
+	fpos_t pos;
+	if (-1 == fgetpos(file, &pos)) {
+		error_and_quit(EXIT_FAILURE, "fill_module: fatal error, fgetpos: %s", strerror(errno));
+	}
 	grouping* new_grouping = NULL;
 	if (mod->grouping_list == NULL) {
 			mod->grouping_list = malloc(sizeof(grouping*));
@@ -1051,6 +1056,9 @@ void fill_module(FILE* file, module* mod) {
 		}
 		mod->grouping_list[new_children_count - 1] = new_grouping;
 		mod->grouping_list[new_children_count] = NULL;
+	}
+	if (-1 == fsetpos(file, &pos)) {
+		error_and_quit(EXIT_FAILURE, "fill_module: fatal error, fsetpos: %s", strerror(errno));
 	}
 }
 
@@ -1116,6 +1124,13 @@ int error_and_quit(int exit_code, char* error_format, ...) {
 	format[strlen(error_format) + 1] = '\0';
 
 	vfprintf(stderr, format, argument_list);
+
+	/*TODO: adaptation for no stderr*/
+	char message[ERR_MSG_SIZE];
+	memset(message, 0, ERR_MSG_SIZE);
+	vsnprintf(message, ERR_MSG_SIZE - 1, format, argument_list);
+	clb_print(NC_VERB_ERROR, message);
+
 	dprint(D_TRACE, "Exiting the program with error code: %d.\n", exit_code);
 	exit(exit_code);
 }
@@ -1129,29 +1144,29 @@ void copy_string(char** where, const char* what) {
 	}
 
 	if (*where == NULL && what == NULL) {
-		clb_print(NC_VERB_VERBOSE, "copy_string: not copying");
+//		clb_print(NC_VERB_VERBOSE, "copy_string: not copying");
 		dprint(D_TRACE, "Leaving copy_string, didn't copy, both NULL.\n");
 		return;
 	}
 	if (*where == NULL && what != NULL) {
-		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying");
+//		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying");
 		*where = malloc(strlen(what) + 1);
 		if (*where == NULL) {
 			error_and_quit(EXIT_FAILURE, "copy_string: Could not allocate memory for new string location. Memory amount requested (in bytes): %d.", strlen(what) + 1);
 		}
 		strncpy(*where, what, strlen(what) + 1);
 		dprint(D_TRACE, "Leaving copy_string, created destination and copied.\n");
-		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying - all ok");
+//		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying - all ok");
 		return;
 	}
 	if (what == NULL) {
-		clb_print(NC_VERB_VERBOSE, "copy_string: freeing");
+//		clb_print(NC_VERB_VERBOSE, "copy_string: freeing");
 		free(*where);
 		*where = NULL;
 		dprint(D_TRACE, "Leaving copy_string, freed destination, source NULL.\n");
 		return;
 	}
-	clb_print(NC_VERB_VERBOSE, "copy_string: freeing and copying");
+//	clb_print(NC_VERB_VERBOSE, "copy_string: freeing and copying");
 	free(*where);
 	*where = malloc(strlen(what) + 1);
 	if (*where == NULL) {
@@ -1275,6 +1290,7 @@ module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_
 		return NULL;
 	}
 	char* module_name = read_word_dyn(file);
+//	module_name = normalize_name(module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file_with_groupings: Corrupt file, expected '{' after %s (module name).\n", module_name);
@@ -1298,4 +1314,24 @@ module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_
 	}
 	dprint(D_TRACE, "Leaving read_module_from_file(read module).\n");
 	return mod;
+}
+
+char* normalize_name(char* name) {
+	if (name == NULL) {
+		error_and_quit(EXIT_FAILURE, "normalize_name: received NULL");
+	}
+	char* old_name = name;
+	while (name[0] == '"') {
+		name++;
+	}
+	int i = strlen(name) - 1;
+	while (name[i] == '"' || name[i] == ';') {
+		name[i] = '\0';
+		i--;
+	}
+	char* ret = malloc(strlen(name) + 1);
+	memset(ret, 0, strlen(name) + 1);
+	strncpy(ret, name, strlen(name));
+	free(old_name);
+	return ret;
 }

@@ -89,7 +89,7 @@ int rc_create_rpc(httpmsg* msg, nc_rpc** rpc);
 void rc_send_error(int status, int fd);
 void save(const char* str, const char* file);
 
-int rc_send_reply(int outfd, nc_reply* reply);
+int rc_send_reply(int outfd, nc_reply* reply, char* json_dump);
 // RESTCONF FUNCTIONS - END
 
 /*!
@@ -437,6 +437,8 @@ int main (int argc, char** argv)
 					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
 					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
 
+					// TODO: extract needed modules dynamically + conversion from capabilities
+
 					// this works, good
 					module* cert_to_name_mod = read_module_from_string(ietf_x509_cert_to_name);
 					module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
@@ -492,7 +494,7 @@ int main (int argc, char** argv)
 						rc_send_error(-2, outfd);
 						break;
 					}
-					if (rc_send_reply(outfd, reply)) {
+					if (rc_send_reply(outfd, reply, json_dumps(json_obj, 0))) {
 						clb_print(NC_VERB_WARNING, "Sending reply failed.");
 					}
 
@@ -614,14 +616,16 @@ void rc_send_error(int status, int fd) {
 	}
 }
 
-int rc_send_reply(int outfd, nc_reply* reply) {
+int rc_send_reply(int outfd, nc_reply* reply, char* json_dump) {
 	clb_print(NC_VERB_VERBOSE, "Replying to client");
 	/* prepare message */
-	int payload_size = strlen(nc_reply_get_data(reply));
+//	int payload_size = strlen(nc_reply_get_data(reply));
+	int payload_size = strlen(json_dump);
 	char* status_line = "HTTP/1.1 200 OK\r\n";
 	char* headers = malloc(50); /* enough to hold "Content-Length: <number>\r\n\r\n" */
 	if (headers == NULL) {
 		clb_print(NC_VERB_ERROR, "Could not allocate memory for headers");
+		free(json_dump);
 		return EXIT_FAILURE;
 	}
 	memset(headers, 0, 50);
@@ -629,6 +633,7 @@ int rc_send_reply(int outfd, nc_reply* reply) {
 	if (ret < 0) {
 		clb_print(NC_VERB_ERROR, "Could not print headers");
 		free(headers);
+		free(json_dump);
 		return EXIT_FAILURE;
 	}
 	int message_size = strlen(status_line) + strlen(headers) + payload_size + 1;
@@ -636,14 +641,16 @@ int rc_send_reply(int outfd, nc_reply* reply) {
 	if (message == NULL) {
 		clb_print(NC_VERB_ERROR, "Could not allocate memory for message");
 		free(headers);
+		free(json_dump);
 		return EXIT_FAILURE;
 	}
 	memset(message, 0, message_size + 1);
-	ret = snprintf(message, message_size, "%s%s%s", status_line, headers, nc_reply_get_data(reply));
+	ret = snprintf(message, message_size, "%s%s%s", status_line, headers, /*nc_reply_get_data(reply)*/json_dump);
 	if (ret < 0) {
 		clb_print(NC_VERB_ERROR, "Could not print message");
 		free(headers);
 		free(message);
+		free(json_dump);
 		return EXIT_FAILURE;
 	}
 
@@ -655,11 +662,13 @@ int rc_send_reply(int outfd, nc_reply* reply) {
 
 	if (count < 0) {
 		clb_print(NC_VERB_ERROR, "Writing message failed.");
+		free(json_dump);
 		return EXIT_FAILURE;
 	} else {
 		clb_print(NC_VERB_ERROR, "Writing response was successful");
 	}
 
+	free(json_dump);
 	return EXIT_SUCCESS;
 }
 
