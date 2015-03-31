@@ -147,27 +147,27 @@ AC_ARG_ENABLE([configurator],
 AC_ARG_ENABLE([ssh],
 	AC_HELP_STRING([--disable-ssh], [Compile without SSH transport]),
 	if test "$enableval" = "no"; then
-		ssh=no
+		SSH=no
 		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-ssh"
 	else
-		ssh=yes
+		SSH=yes
 	fi
 	,
 	# SSH is on by default
-	ssh=yes
+	SSH=yes
 )
 
 # --enable-tls
 AC_ARG_ENABLE([tls],
 	AC_HELP_STRING([--enable-tls], [Compile with TLS transport]),
 	if test "$enableval" = "no"; then
-		tls=no
+		TLS=no
 	else
-		tls=yes
+		TLS=yes
 		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --enable-tls"
 	fi
 	,
-	tls=no
+	TLS=no
 )
 
 ############################ Check for programs ################################
@@ -223,6 +223,7 @@ fi
 
 # Check python for manager and configurator
 AX_PYTHON_MODULE(os, fatal)
+AX_PYTHON_MODULE(copy, fatal)
 AX_PYTHON_MODULE(curses, fatal)
 AX_PYTHON_MODULE(libxml2, fatal)
 AX_PYTHON_MODULE(subprocess, fatal)
@@ -264,7 +265,7 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
-if test "$ssh" = "yes"; then
+if test "$SSH" = "yes"; then
 	# libssh
 	AC_SEARCH_LIBS([ssh_pki_key_ecdsa_name], [ssh], [], [AC_MSG_ERROR([Missing the libssh library (>= 0.6.4).])])
 	AC_SEARCH_LIBS([ssh_threads_get_pthread], [ssh_threads], [], [AC_MSG_ERROR([Missing the libssh_threads library.])])
@@ -273,7 +274,7 @@ if test "$ssh" = "yes"; then
 	AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the libcrypt library.])])
 fi
 
-if test "$tls" = "yes"; then
+if test "$TLS" = "yes"; then
 	# libssl
 	AC_SEARCH_LIBS([SSL_library_init], [ssl], [], [AC_MSG_ERROR([Missing the libssl library.])])
 
@@ -350,7 +351,7 @@ NETOPEER_FEATURES=""
 IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
 CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
 
-if test "$ssh" = "yes"; then
+if test "$SSH" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_SSH"
 
 	SERVER_TRANSPORT_SRCS="src/ssh/server_ssh.c src/ssh/cfgnetopeer_transapi_ssh.c src/ssh/netconf_server_transapi_ssh.c"
@@ -369,14 +370,14 @@ if test "$ssh" = "yes"; then
 		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-ssh"
 	fi
 fi
-if test "$tls" = "yes"; then
+if test "$TLS" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_TLS"
 
 	SERVER_TRANSPORT_SRCS="$SERVER_TRANSPORT_SRCS src/tls/server_tls.c src/tls/cfgnetopeer_transapi_tls.c src/tls/netconf_server_transapi_tls.c"
 	SERVER_TRANSPORT_HDRS="$SERVER_TRANSPORT_HDRS src/tls/server_tls.h src/tls/cfgnetopeer_transapi_tls.h src/tls/netconf_server_transapi_tls.h"
 	SERVER_TLS_CFGS="config/datastore.xml"
 
-	if test "$ssh" = "yes"; then
+	if test "$SSH" = "yes"; then
 		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
 	else
 		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls)"
@@ -385,7 +386,7 @@ if test "$tls" = "yes"; then
 	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
 
-	if test "$ssh" = "yes"; then
+	if test "$SSH" = "yes"; then
 		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
 		CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},"
 	fi
@@ -399,7 +400,7 @@ if test "$tls" = "yes"; then
 	fi
 fi
 
-if (test "$ssh" = "no") && (test "$tls" = "no"); then
+if (test "$SSH" = "no") && (test "$TLS" = "no"); then
 	AC_MSG_ERROR([Cannot compile without any transport protocol!])
 fi
 
@@ -443,6 +444,8 @@ AC_SUBST(SERVER_TLS_CFGS)
 AC_SUBST(CLIENT_STRUCT_SIZE)
 AC_SUBST(NCSERVER_FEATURES)
 AC_SUBST(NETOPEER_FEATURES)
+AC_SUBST(SSH)
+AC_SUBST(TLS)
 
 AC_SUBST(RPMBUILD)
 if test -z "$RPMBUILD"; then

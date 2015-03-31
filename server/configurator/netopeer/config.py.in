@@ -23,4 +23,6 @@ paths = {
 options = {
 		'user' : 'root',\
 		'group' : '@GROUP@',\
+		'ssh' : '@SSH@',\
+		'tls' : '@TLS@',\
 	}
