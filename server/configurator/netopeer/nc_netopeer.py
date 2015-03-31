@@ -245,11 +245,12 @@ class nc_netopeer(ncmodule.ncmodule):
 					(xml_module[0].getContent() == 'false' and module.enabled):
 				return(True)
 
-		if len(self.new_client_keys) != len(self.client_keys):
-			return(True)
-		for key_path in self.new_client_keys.keys():
-			if not key_path in self.client_keys or self.client_keys[key_path] != self.new_client_keys[key_path]:
+		if config.options['ssh'] == 'yes':
+			if len(self.new_client_keys) != len(self.client_keys):
 				return(True)
+			for key_path in self.new_client_keys.keys():
+				if not key_path in self.client_keys or self.client_keys[key_path] != self.new_client_keys[key_path]:
+					return(True)
 
 		return(False)
 
@@ -261,9 +262,9 @@ class nc_netopeer(ncmodule.ncmodule):
 
 		if self.selected < len(self.modules):
 			tools.append(('ENTER','enable/disable'))
-		elif self.selected == len(self.modules):
+		elif config.options['ssh'] == 'yes' and self.selected == len(self.modules):
 			tools.append(('ENTER','add SSH key'))
-		elif self.selected > len(self.modules):
+		elif config.options['ssh'] == 'yes' and self.selected > len(self.modules):
 			tools.append(('ENTER','edit'))
 			tools.append(('DEL','delete'))
 
@@ -303,7 +304,7 @@ class nc_netopeer(ncmodule.ncmodule):
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
 			self.selected = self.selected-1
-		elif key == curses.KEY_DOWN and self.selected < len(self.modules)+len(self.new_client_keys):
+		elif key == curses.KEY_DOWN and self.selected < len(self.modules)+ (len(self.new_client_keys) if config.options['ssh'] == 'yes' else -1):
 			self.selected = self.selected+1
 		elif key == curses.KEY_DC and self.selected > len(self.modules):
 			if self.selected == len(self.modules)+len(self.new_client_keys):
@@ -314,7 +315,7 @@ class nc_netopeer(ncmodule.ncmodule):
 		elif key == ord('\n'):
 			if self.selected >= 0 and self.selected < len(self.modules):
 				self.modules[self.selected].enabled = not self.modules[self.selected].enabled
-			if self.selected == len(self.modules):
+			if config.options['ssh'] == 'yes' and self.selected == len(self.modules):
 				window.addstr(11+len(self.modules), 0, 'Path: '+' '*(self.linewidth-6))
 				key_path = self.get_editable(11+len(self.modules), 6, stdscr, window, '', curses.color_pair(1) | curses.A_REVERSE, True)
 				if key_path == '':
@@ -334,7 +335,7 @@ class nc_netopeer(ncmodule.ncmodule):
 				if 4+len(key_path)+len(key_username) > self.linewidth:
 					self.linewidth = 4+len(key_path)+len(key_username)
 
-			if self.selected > len(self.modules):
+			if config.options['ssh'] == 'yes' and self.selected > len(self.modules):
 				window.addstr(12+self.selected, 0, 'Path: '+' '*(self.linewidth-5))
 				selected_key_path = sorted(self.new_client_keys.keys())[self.selected-len(self.modules)-1]
 				key_path = self.get_editable(12+self.selected, 6, stdscr, window, selected_key_path, curses.color_pair(1), True)
