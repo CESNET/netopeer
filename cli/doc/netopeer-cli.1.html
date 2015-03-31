@@ -739,8 +739,7 @@ datastore. For more details see <i>RFC 6241 section
 
 <p style="margin-left:11%; margin-top: 1em"><b>get</b>
 [&minus;&minus;help] [&minus;&minus;defaults <i>mode</i>]
-[&minus;&minus;filter | &minus;&minus;filter&minus;file
-<i>file</i>]]</p>
+[&minus;&minus;filter [<i>file</i>]]</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defaults</b>
@@ -752,18 +751,14 @@ with specified retrieval mode. For more details see <i>RFC
 this manual.</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
 
 <p style="margin-left:23%;">Specifies if the request will
-contain subtree filter (<i>RFC 6241 section 6</i>). User is
-prompted to write the filter specification manually.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter&minus;file</b>
-<i>file</i></p>
-
-<p style="margin-left:23%;">The same as filter, but loads
-the filter from <i>file</i>.</p>
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>get-config</b>
@@ -776,8 +771,8 @@ section 7.1</i>.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>get-config</b>
 [&minus;&minus;help] [&minus;&minus;defaults <i>mode</i>]
-[&minus;&minus;filter | &minus;&minus;filter&minus;file
-<i>file</i>] <i>target_datastore</i></p>
+[&minus;&minus;filter [<i>file</i>]]
+<i>target_datastore</i></p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;defaults</b>
@@ -789,18 +784,14 @@ with specified retrieval mode. For more details see <i>RFC
 this manual.</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
 
 <p style="margin-left:23%;">Specifies if the request will
-contain subtree filter (<i>RFC 6241 section 6</i>). User is
-prompted to write the filter specification manually.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter&minus;file</b>
-<i>file</i></p>
-
-<p style="margin-left:23%;">The same as filter, but loads
-the filter from <i>file</i>.</p>
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
@@ -911,23 +902,23 @@ configuration data. For more details see <i>RFC 6241 section
 <i>target_datastore</i></p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;config</b>
+<p style="margin-left:11%; margin-top: 1em"><b>&minus;&minus;config</b>
 <i>file</i></p>
 
-<p style="margin-left:23%;">Validate specified
+<p style="margin-left:17%;">Validate specified
 configuration data. If the <i>file</i> is specified, the
 complete configuration data are taken from the specified
 file. If the <i>file</i> is not specified, user is prompted
 to type the configuration data manually.</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><i>target_datastore</i></p>
+<p style="margin-left:11%; margin-top: 1em"><i>target_datastore</i></p>
 
-<p style="margin-left:23%;">Target datastore to validate.
+<p style="margin-left:17%;">Target datastore to validate.
 For description of possible values, see the
 <b>DATASTORES</b> section of this manual.</p>
 
-<p style="margin-left:17%; margin-top: 1em">Options
+<p style="margin-left:11%; margin-top: 1em">Options
 &minus;&minus;config and <i>target_datastore</i> are
 mutually exclusive, but one of these options is
 required.</p>
@@ -941,25 +932,20 @@ Perform NETCONF Event Notifications
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>subscribe</b>
-[&minus;&minus;help] [&minus;&minus;filter |
-&minus;&minus;filter&minus;file <i>file]]
-[&minus;&minus;begin time</i>] [&minus;&minus;end
+[&minus;&minus;help] [&minus;&minus;filter [file]]
+[&minus;&minus;begin <i>time</i>] [&minus;&minus;end
 <i>time</i>] [&minus;&minus;output <i>file</i>]
 [<i>stream</i>]</p>
 
 
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b></p>
+<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter</b>
+[<i>file</i>]</p>
 
 <p style="margin-left:23%;">Specifies if the request will
-contain subtree filter (<i>RFC 6241 section 6</i>). User is
-prompted to write the filter specification manually.</p>
-
-
-<p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;filter&minus;file</b>
-<i>file</i></p>
-
-<p style="margin-left:23%;">The same as filter, but loads
-the filter from <i>file</i>.</p>
+contain subtree filter (<i>RFC 6241 section 6</i>). The
+option is able to accept path to the <i>file</i> containing
+the filter specification. If the path is not specified, user
+is prompted to write the filter specification manually.</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>&minus;&minus;begin</b>

@@ -1107,7 +1107,7 @@ void cmd_get_help(FILE* output) {
 	} else {
 		defaults = "";
 	}
-	fprintf(output, "get [--help] %s[--filter | --filter-file <file>] [--out <file>]\n", defaults);
+	fprintf(stdout, "get [--help] %s[--filter [file]] [--out file]\n", defaults);
 }
 
 int cmd_get(const char* arg, const char* old_input_file, FILE* output, FILE* input) {
@@ -1119,8 +1119,7 @@ int cmd_get(const char* arg, const char* old_input_file, FILE* output, FILE* inp
 	struct arglist cmd;
 	struct option long_options[] ={
 			{"defaults", 1, 0, 'd'},
-			{"filter", 0, 0, 'f'},
-			{"filter-file", 1, 0, 'i'},
+			{"filter", 2, 0, 'f'},
 			{"help", 0, 0, 'h'},
 			{"out", 1, 0, 'o'},
 			{0, 0, 0, 0}
@@ -1133,20 +1132,17 @@ int cmd_get(const char* arg, const char* old_input_file, FILE* output, FILE* inp
 	init_arglist(&cmd);
 	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long(cmd.count, cmd.list, "d:fi:ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg, output, input);
 			break;
 		case 'f':
-			filter = set_filter("get", old_input_file, 1, output);
-			if (filter == NULL) {
-				clear_arglist(&cmd);
-				return EXIT_FAILURE;
+			if (optarg == NULL) {
+				filter = set_filter("get", old_input_file, 1, output);
+			} else {
+				filter = set_filter("get", optarg, 0, output);
 			}
-			break;
-		case 'i':
-			filter = set_filter("get", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
@@ -1484,7 +1480,7 @@ void cmd_getconfig_help(FILE* output) {
 	} else {
 		defaults = "";
 	}
-	fprintf(output, "get-config [--help] %s[--filter | --filter-file <file>] [--out <file>] running", defaults);
+	fprintf(stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
 	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 		fprintf(output, "|startup");
 	}
@@ -1504,8 +1500,7 @@ int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output, FIL
 	struct arglist cmd;
 	struct option long_options[] ={
 			{"defaults", 1, 0, 'd'},
-			{"filter", 0, 0, 'f'},
-			{"filter-file", 1, 0, 'i'},
+			{"filter", 2, 0, 'f'},
 			{"help", 0, 0, 'h'},
 			{"out", 1, 0, 'o'},
 			{0, 0, 0, 0}
@@ -1518,20 +1513,17 @@ int cmd_getconfig(const char* arg, const char* old_input_file, FILE* output, FIL
 	init_arglist(&cmd);
 	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long(cmd.count, cmd.list, "d:fi:ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "d:f::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			wd = get_withdefaults("get-config", optarg, output, input);
 			break;
 		case 'f':
-			filter = set_filter("get-config", old_input_file, 1, output);
-			if (filter == NULL) {
-				clear_arglist(&cmd);
-				return EXIT_FAILURE;
+			if (optarg == NULL) {
+				filter = set_filter("get-config", old_input_file, 1, output);
+			} else {
+				filter = set_filter("get-config", optarg, 0, output);
 			}
-			break;
-		case 'i':
-			filter = set_filter("get-config", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
@@ -3318,7 +3310,7 @@ void* notification_thread(void* arg) {
 }
 
 void cmd_subscribe_help(FILE* output) {
-	fprintf(output, "subscribe [--help] [--filter | --filter-file <file>] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
+	fprintf(output, "subscribe [--help] [--filter [file]] [--begin <time>] [--end <time>] [--output <file>] [<stream>]\n");
 	fprintf(output, "\t<time> has following format:\n");
 	fprintf(output, "\t\t+<num>  - current time plus the given number of seconds.\n");
 	fprintf(output, "\t\t<num>   - absolute time as number of seconds since 1970-01-01.\n");
@@ -3334,8 +3326,7 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	FILE *out = NULL;
 	struct arglist cmd;
 	struct option long_options[] ={
-			{"filter", 0, 0, 'f'},
-			{"filter-file", 1, 0, 'i'},
+			{"filter", 2, 0, 'f'},
 			{"help", 0, 0, 'h'},
 			{"begin", 1, 0, 'b'},
 			{"end", 1, 0, 'e'},
@@ -3352,7 +3343,7 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	init_arglist(&cmd);
 	addargs(&cmd, "%s", arg);
 
-	while ((c = getopt_long(cmd.count, cmd.list, "befi:ho:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(cmd.count, cmd.list, "bef::ho:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'b':
 		case 'e':
@@ -3379,14 +3370,11 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 			}
 			break;
 		case 'f':
-			filter = set_filter("create-subscription", old_input_file, 1, output);
-			if (filter == NULL) {
-				clear_arglist(&cmd);
-				return EXIT_FAILURE;
+			if (optarg == NULL) {
+				filter = set_filter("create-subscription", old_input_file, 1, output);
+			} else {
+				filter = set_filter("create-subscription", optarg, 0, output);
 			}
-			break;
-		case 'i':
-			filter = set_filter("create-subscription", optarg, 0, output);
 			if (filter == NULL) {
 				clear_arglist(&cmd);
 				return EXIT_FAILURE;
