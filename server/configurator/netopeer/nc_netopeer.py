@@ -240,8 +240,9 @@ class nc_netopeer(ncmodule.ncmodule):
 		for module in self.modules:
 			xml_module = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:name=\'{s}\']/n:enabled'.format(s=module.name))
 			if not xml_module:
-				return(True)
-			if (xml_module[0].getContent() == 'true' and not module.enabled) or\
+				if module.enabled:
+					return(True)
+			elif (xml_module[0].getContent() == 'true' and not module.enabled) or\
 					(xml_module[0].getContent() == 'false' and module.enabled):
 				return(True)
 
