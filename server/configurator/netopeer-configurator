@@ -47,13 +47,19 @@ class netopeer_configuration:
 			exit(1)
 
 		i = 0
-		while i < len(self.ncmodules)-1:
+		while i < len(self.ncmodules):
 			module_name = self.ncmodules[i].__class__.__name__
 
 			# make Netopeer first
 			if module_name == 'nc_netopeer':
 				class_ins = self.ncmodules.pop(i)
 				self.ncmodules.insert(0, class_ins);
+
+			# remove unsupported modules
+			if (module_name == 'nc_sshauth' and config.options['ssh'] != 'yes') or\
+					(module_name == 'nc_tlsauth' and config.options['tls'] != 'yes'):
+				self.ncmodules.pop(i)
+				continue
 
 			i += 1
 
@@ -176,7 +182,7 @@ def create_windows(stdscr):
 	changes_height = 5
 	changes = configurator_window(stdscr, changes_height, changes_width, maxy/2-changes_height/2, maxx/2-changes_width/2)
 
-	return(menu, content,  messages, tools, changes)
+	return(menu, content, messages, tools, changes)
 
 def cli(stdscr, config):
 	# use default terminal colors
@@ -315,7 +321,7 @@ def cli(stdscr, config):
 			del(w_content)
 			del(w_messages)
 			del(w_tools)
-			(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
+			(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
 		elif c == ord('\t'):
 			window = (window + 1) % len(windows)
 		elif c == curses.KEY_RIGHT and windows[window] == 'Menu':

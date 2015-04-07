@@ -280,6 +280,9 @@ if test "$TLS" = "yes"; then
 
 	# libcrypto
 	AC_SEARCH_LIBS([X509_free], [crypto], [], [AC_MSG_ERROR([Missing the libcrypto library.])])
+
+	# M2Crypto python module
+	AX_PYTHON_MODULE(M2Crypto, fatal)
 fi
 
 # libnetconf
