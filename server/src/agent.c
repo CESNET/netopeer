@@ -84,12 +84,14 @@ struct ntf_thread_config {
 };
 
 // RESTCONF FUNCTIONS - START
-NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc);
+NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con);
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc);
 void rc_send_error(int status, int fd);
 void save(const char* str, const char* file);
 
-int rc_send_reply(int outfd, nc_reply* reply, char* json_dump);
+int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump);
+int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con);
+json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con);
 // RESTCONF FUNCTIONS - END
 
 /*!
@@ -414,7 +416,7 @@ int main (int argc, char** argv)
 			} else if (fds.revents & POLLIN) { /* data ready */
 				/* read data from input */
 				clb_print(NC_VERB_DEBUG, "Reading message from client.");
-				msg_type = rc_recv_rpc(fds, infd, outfd, &rpc);
+				msg_type = rc_recv_rpc(fds, infd, outfd, &rpc, con);
 				switch (msg_type) {
 				case NC_MSG_NONE:
 					clb_print(NC_VERB_VERBOSE, "A message has been process without sending to the server");
@@ -494,7 +496,7 @@ int main (int argc, char** argv)
 						rc_send_error(-2, outfd);
 						break;
 					}
-					if (rc_send_reply(outfd, reply, json_dumps(json_obj, 0))) {
+					if (rc_send_reply(outfd/*, reply*/, json_dumps(json_obj, 0))) {
 						clb_print(NC_VERB_WARNING, "Sending reply failed.");
 					}
 
@@ -523,7 +525,8 @@ cleanup:
 // 3, if the message can be processed without sending to server, processes it and replies
 // 4, if the message has to be sent to the server, it is converted to nc_rpc and the function returns NC_MSG_RPC
 // 4.5, the rpc then has to be sent to the server and a reply has to be sent but that is done in another function
-NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc) {
+NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con) {
+	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: receiving restconf message");
 	/* TODO: make this scalable */
 	char buffer[RC_MSG_BUFF_SIZE_MAX];
 	int ptr = 0;
@@ -546,10 +549,30 @@ NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc) {
 		clb_print(NC_VERB_VERBOSE, "Done reading HTTP message.");
 	}
 
+	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: parsing HTTP message");
 	httpmsg* msg = parse_req(buffer);
 
+	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: creating netconf rpc from parsed HTTP message");
 	int status = rc_create_rpc(msg, rpc);
 	if (status < 0) {
+		clb_print(NC_VERB_DEBUG, "rc_recv_rpc: ");
+		rc_send_error(status, outfd);
+	}
+
+	switch (status) {
+	case 1:
+		// no rpc but valid response, create response based on resource locator value
+		clb_print(NC_VERB_DEBUG, "rc_recv_rpc: HTTP message cannot be converted to netconf rpc, creating restconf only response");
+		if (-1 == rc_send_auto_response(outfd, msg, con)) {
+			// internal error occurred
+			rc_send_error(2, outfd);
+		}
+		return NC_MSG_NONE;
+		break;
+	case 0:
+		// nothing, rpc has been created
+		break;
+	default:
 		rc_send_error(status, outfd);
 	}
 
@@ -558,14 +581,18 @@ NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc) {
 
 int rc_create_rpc(httpmsg* msg, nc_rpc** rpc) {
 	if (!strcmp(msg->method, "GET")) {
-		if (!strcmp(msg->resource_locator, "/restconf/data")) {
-			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
-//			*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get-config><source><running/></source></get-config></rpc>", NULL);
+		if (!strncmp(msg->resource_locator, "/restconf", strlen("/restconf"))) {
+			if (!strcmp(msg->resource_locator, "/restconf/data")) {
+				*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
+			} else if (!strncmp(msg->resource_locator, "/restconf/modules", strlen("/restconf/modules"))) { // starts with /modules
+				*rpc = NULL;
+				return 1; // no rpc but valid response, create response based on resource locator value
+			}
 			if (*rpc == NULL) {
 				return -2; // internal error
 			}
 		} else {
-			return -1; // not implemented
+			return -3; // bad resource locator start, should be /restconf
 		}
 	} else if (!strcmp(msg->method, "OPTIONS")) {
 		return -1; // not implemented
@@ -616,7 +643,7 @@ void rc_send_error(int status, int fd) {
 	}
 }
 
-int rc_send_reply(int outfd, nc_reply* reply, char* json_dump) {
+int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump) {
 	clb_print(NC_VERB_VERBOSE, "Replying to client");
 	/* prepare message */
 //	int payload_size = strlen(nc_reply_get_data(reply));
@@ -670,6 +697,151 @@ int rc_send_reply(int outfd, nc_reply* reply, char* json_dump) {
 
 	free(json_dump);
 	return EXIT_SUCCESS;
+}
+
+json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con) {
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: started retrieving from capability:");
+	clb_print(NC_VERB_DEBUG, cpblt);
+	json_t* obj = json_object();
+	char* module_id = strchr(cpblt, '?') == NULL ? NULL : strchr(cpblt, '?') + 1;
+	if (module_id == NULL || (strncmp("module", module_id, 6))) {
+		return NULL; // this is not a module declaration
+	}
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: creating copy");
+	char* cpblt_copy = malloc(strlen(cpblt) + 1);
+	memset(cpblt_copy, 0, strlen(cpblt) + 1);
+	strncpy(cpblt_copy, cpblt, strlen(cpblt));
+
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting namespace");
+	// set namespace
+	char* delim = strchr(cpblt_copy, '?');
+	if (delim != NULL) {
+		delim[0] = '\0';
+		json_object_set(obj, "namespace", json_string(cpblt_copy));
+		delim[0] = '?';
+	}
+
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting name");
+	// set name
+	delim = strstr(cpblt_copy, "module=") + 7;
+	char* end_del = strchr(delim, '&');
+	if (end_del == NULL) end_del = strchr(delim, ';');
+	if (delim != NULL) {
+		if (end_del != NULL) end_del[0] = '\0';
+		json_object_set(obj, "name", json_string(delim));
+		if (end_del != NULL) end_del[0] = '&';
+	}
+
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting revision");
+	// set revision
+	delim = strstr(cpblt_copy, "revision=") + 9;
+	end_del = strchr(delim, '&');
+	if (end_del == NULL) end_del = strchr(delim, ';');
+	if (delim != NULL) {
+		if (end_del != NULL) end_del[0] = '\0';
+		json_object_set(obj, "revision", json_string(delim));
+		if (end_del != NULL) end_del[0] = '&';
+	}
+
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting features");
+	// set features
+	json_object_set(obj, "features", json_array());
+	delim = strstr(cpblt_copy, "features=") == NULL ? NULL : strstr(cpblt_copy, "features=") + 9;
+	if (delim != NULL) {
+		char* features = delim;
+		end_del = strchr(features, ',');
+		do {
+			if (end_del != NULL) end_del[0] = '\0';
+			json_array_append(json_object_get(obj, "features"), json_string(features));
+			if (end_del != NULL) end_del[0] = ',';
+			features = strchr(features, ',') == NULL ? NULL : strchr(features, ',') + 1;
+			end_del = strchr(features, ',');
+		} while (features != NULL);
+	}
+
+	// set schema
+	if (with_schema) {
+		clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting schema");
+		char* schema = get_schema(json_string_value(json_object_get(obj, "name")), con, "1"); // TODO: correct message id - unified message id setup for all communication with the server
+		json_object_set(obj, "schema", json_string(schema));
+		free(schema);
+	}
+
+	clb_print(NC_VERB_DEBUG, "create_module_json_obj: freeing capability copy and returning json object");
+	free(cpblt_copy);
+	return obj;
+}
+
+/* creates response based on msg resource locator - serves /modules resources */
+int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending response based on resource locator");
+//	json_t* response = json_object();
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: getting server capabilities");
+	char** cpblts = comm_get_srv_cpblts(con);
+	if (cpblts == NULL) {
+		// some internal error occurred
+		rc_send_error(-2, outfd);
+	}
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: counting capabilities size for dump");
+	int total_size = 0, i = 0;
+	while (cpblts[i] != NULL) {
+		clb_print(NC_VERB_DEBUG, cpblts[i]);
+		total_size += strlen(cpblts[i]);
+		total_size += 1;
+		i++;
+	}
+	total_size += 1; // null byte
+
+	char* cpblt_dump = malloc(total_size * sizeof(char*));
+	memset(cpblt_dump, 0, total_size);
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: dumping capabilities");
+	i = 0;
+	while (cpblts[i] != NULL) {
+		strcat(cpblt_dump, cpblts[i]);
+		strcat(cpblt_dump, "\n");
+		i++;
+	}
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving capabilities");
+	save(cpblt_dump, "cpblt_dump");
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving empty modules dump");
+	json_t* modules_obj = json_object();
+	json_object_set(modules_obj, "modules", json_array());
+	char* dump_1 = json_dumps(modules_obj, JSON_INDENT(2));
+	save(dump_1, "json_dump_empty");
+	free(dump_1);
+
+	i = 0;
+	while (cpblts[i] != NULL) {
+		json_t* module = create_module_json_obj(cpblts[i], 0, con);
+		if (module != NULL) {
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: appending module");
+			json_array_append(json_object_get(modules_obj, "modules"), module);
+		}
+		i++;
+	}
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving modules dump");
+	char* dump_2 = json_dumps(modules_obj, JSON_INDENT(2));
+	save(dump_2, "json_dump_full");
+	free(dump_2); // TODO: send instead of dumping
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending capabilities");
+	rc_send_reply(outfd/*, NULL*/, cpblt_dump);
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: freeing capabilities");
+	i = 0;
+	while (cpblts[i] != NULL) {
+		free(cpblts[i]);
+		i++;
+	}
+	free(cpblt_dump);
+
+	return 0;
 }
 
 void save(const char* str, const char* file) {
