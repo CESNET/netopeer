@@ -51,9 +51,10 @@ class netopeer_configuration:
 			module_name = self.ncmodules[i].__class__.__name__
 
 			# make Netopeer first
-			if module_name == 'nc_netopeer':
+			if i > 0 and module_name == 'nc_netopeer':
 				class_ins = self.ncmodules.pop(i)
 				self.ncmodules.insert(0, class_ins);
+				continue
 
 			# remove unsupported modules
 			if (module_name == 'nc_sshauth' and config.options['ssh'] != 'yes') or\
