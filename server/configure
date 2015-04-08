@@ -670,8 +670,6 @@ RPMBUILD
 LNCTOOL
 PYANG
 UNAME
-GROUPDEFINE
-GROUP
 ROFF2HTML
 PKG_CONFIG
 CONFIGURE_PWD
@@ -721,7 +719,6 @@ ac_user_opts='
 enable_option_checking
 with_distro
 enable_debug
-with_group
 enable_configurator
 enable_ssh
 enable_tls
@@ -1365,8 +1362,6 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-distro=DISTRO    Compile for specific Linux distribution
-  --with-group=GROUP      Limit access to Netopeer server only to the
-                          specified group of users
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
   --with-modules-dir=DIR  path to directory where netopeer modules
@@ -2616,28 +2611,6 @@ else
   CFLAGS="$CFLAGS -O3"
 
 fi
-
-
-# Add --with-group parameter
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for group" >&5
-$as_echo_n "checking for group... " >&6; }
-
-# Check whether --with-group was given.
-if test "${with_group+set}" = set; then :
-  withval=$with_group;
-		GROUP="$with_group"
-		GROUPDEFINE="#define GROUP \"$with_group\""
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
-
-else
-  GROUP=""
-	GROUPDEFINE="#undef GROUP"
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $GROUP" >&5
-$as_echo "$GROUP" >&6; }
-
 
 
 # --enable-configurator
