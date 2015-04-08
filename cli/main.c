@@ -105,6 +105,7 @@ void clb_error_print(const char* tag,
 
 void print_version() {
 	fprintf(stdout, "Netopeer CLI client, version %s\n", VERSION);
+	fprintf(stdout, "%s\n", RCSID);
 	fprintf(stdout, "compile time: %s, %s\n", __DATE__, __TIME__);
 }
 
