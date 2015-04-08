@@ -563,9 +563,14 @@ NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, co
 	case 1:
 		// no rpc but valid response, create response based on resource locator value
 		clb_print(NC_VERB_DEBUG, "rc_recv_rpc: HTTP message cannot be converted to netconf rpc, creating restconf only response");
-		if (-1 == rc_send_auto_response(outfd, msg, con)) {
+		int auto_status = rc_send_auto_response(outfd, msg, con);
+		if (-1 == auto_status) {
 			// internal error occurred
 			rc_send_error(2, outfd);
+		}
+		if (-2 == auto_status) {
+			// unknown resource locator value, unimplemented
+			rc_send_error(1, outfd);
 		}
 		return NC_MSG_NONE;
 		break;
@@ -781,7 +786,7 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 	char** cpblts = comm_get_srv_cpblts(con);
 	if (cpblts == NULL) {
 		// some internal error occurred
-		rc_send_error(-2, outfd);
+		return -1;
 	}
 
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: counting capabilities size for dump");
@@ -817,7 +822,7 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 
 	i = 0;
 	while (cpblts[i] != NULL) {
-		json_t* module = create_module_json_obj(cpblts[i], 0, con);
+		json_t* module = create_module_json_obj(cpblts[i], 1, con);
 		if (module != NULL) {
 			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: appending module");
 			json_array_append(json_object_get(modules_obj, "modules"), module);
@@ -828,10 +833,66 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving modules dump");
 	char* dump_2 = json_dumps(modules_obj, JSON_INDENT(2));
 	save(dump_2, "json_dump_full");
-	free(dump_2); // TODO: send instead of dumping
 
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending capabilities");
-	rc_send_reply(outfd/*, NULL*/, cpblt_dump);
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending modules dump"); // TODO: create only what is needed
+	if (!strncmp(msg->resource_locator, "/restconf/modules", strlen("/restconf/modules"))) {
+		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: resource locator start is valid");
+		if (!strcmp(msg->resource_locator, "/restconf/modules/module") ||
+				!strcmp(msg->resource_locator, "/restconf/modules/module/") ||
+				!strcmp(msg->resource_locator, "/restconf/modules") ||
+				!strcmp(msg->resource_locator, "/restconf/modules/")) {
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending whole dump");
+			// send whole dump
+			rc_send_reply(outfd, dump_2);
+		} else {
+			if (strncmp(msg->resource_locator, "/restconf/modules/module/", strlen("/restconf/modules/module/"))) { // wrong resource locator value
+				clb_print(NC_VERB_DEBUG, "rc_send_auto_response: wrong resource locator value");
+				free(dump_2);
+				clb_print(NC_VERB_DEBUG, "rc_send_auto_response: freeing capabilities");
+				i = 0;
+				while (cpblts[i] != NULL) {
+					free(cpblts[i]);
+					i++;
+				}
+				free(cpblt_dump);
+				return -2; // unknown resource locator value
+			}
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: parsing module name");
+			char* module_id = msg->resource_locator + strlen("/restconf/modules/module/");
+//			char* revision_id = strstr(module_id, "%20") == NULL ? NULL : strstr(module_id, "%20") + 3; // TODO: check by revision too
+			unsigned int i = 0;
+			for (i = 0; i < json_array_size(json_object_get(modules_obj, "modules")); i++) {
+				json_t* module = json_array_get(json_object_get(modules_obj, "modules"), i);
+				char* end_del = strstr(module_id, "%20") == NULL ? NULL : strstr(module_id, "%20");
+				if (end_del != NULL) end_del[0] = '\0';
+				if (!strcmp(module_id, json_string_value(json_object_get(module, "name")))) {
+					clb_print(NC_VERB_DEBUG, "rc_send_auto_response: found module name");
+					char* module_dump = json_dumps(module, JSON_INDENT(2));
+					rc_send_reply(outfd, module_dump);
+					free(module_dump);
+					if (end_del != NULL) end_del[0] = '%';
+					break;
+				}
+				if (end_del != NULL) end_del[0] = '%';
+			}
+		}
+	} else {
+		free(dump_2);
+		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: freeing capabilities");
+		i = 0;
+		while (cpblts[i] != NULL) {
+			free(cpblts[i]);
+			i++;
+		}
+		free(cpblt_dump);
+		return -2; // unknown resource locator value
+	}
+//	rc_send_reply(outfd, dump_2);
+
+	free(dump_2);
+
+//	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending capabilities");
+//	rc_send_reply(outfd/*, NULL*/, cpblt_dump);
 
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: freeing capabilities");
 	i = 0;
