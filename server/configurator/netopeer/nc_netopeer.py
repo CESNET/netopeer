@@ -4,7 +4,9 @@
 import curses
 import os
 import copy
+import string
 import libxml2
+import subprocess
 import ncmodule
 import messages
 import config
@@ -30,6 +32,7 @@ class nc_netopeer(ncmodule.ncmodule):
 	modules_maxlen = 0
 
 	server_path = None
+	server_version = None
 	modules_path = None
 
 	netopeer_path = None
@@ -44,6 +47,14 @@ class nc_netopeer(ncmodule.ncmodule):
 		for path in list(set([config.paths['bindir']] + (os.environ['PATH'].split(os.pathsep)))):
 			if not self.server_path and os.path.exists(os.path.join(path,'netopeer-server')):
 				self.server_path = os.path.join(path,'netopeer-server')
+				try:
+					p = subprocess.Popen([self.server_path, '-V'], stdout=subprocess.PIPE)
+					version_line = p.communicate()[0].split(os.linesep)[0]
+					ver_idx = string.find(version_line, 'version ')
+					if ver_idx > -1:
+						self.server_version = version_line[ver_idx+8:]
+				except:
+					pass
 
 		if os.path.exists(config.paths['modulesdir']):
 			self.modules_path = config.paths['modulesdir']
@@ -217,7 +228,8 @@ class nc_netopeer(ncmodule.ncmodule):
 
 		try:
 			window.addstr('The netopeer-server binary found in path:\n')
-			window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('{s}'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr(' ver {s}\n'.format(s=self.server_version))
 			window.addstr('\n')
 
 			window.addstr('Using modules instaled in path:\n')
