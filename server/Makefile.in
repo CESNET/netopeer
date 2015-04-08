@@ -34,8 +34,11 @@
 #
 
 NAME = @PACKAGE_NAME@
-VERSION = $(shell cut -f1 ./VERSION | tr -d '\n')
+VERSION = @PACKAGE_VERSION@
 RELEASE = @RELEASE@
+
+IDGIT = "built from git $(shell git show --pretty=oneline | head -1 | cut -c -20)"
+IDNOGIT = "released as version $(VERSION)"
 
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
 prefix = @prefix@

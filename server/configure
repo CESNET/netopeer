@@ -2457,6 +2457,12 @@ PACKAGE_VERSION=`cut -f1 ./VERSION | tr -d '\n'`
 RELEASE=1
 
 
+if test "`git show > /dev/null 2>&1;echo $?`" = "0"; then
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDGIT)\\\""
+else
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDNOGIT)\\\""
+fi
+
 USERNAME=`git config --get user.name`
 USERMAIL=`git config --get user.email`
 

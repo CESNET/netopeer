@@ -26,6 +26,8 @@
 
 #include "../server.h"
 
+static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
+
 extern int quit, restart_soft;
 
 extern struct np_options netopeer_options;

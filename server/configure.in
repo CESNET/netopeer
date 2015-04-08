@@ -48,6 +48,12 @@ AC_SUBST(PACKAGE_VERSION)
 RELEASE=1
 AC_SUBST(RELEASE)
 
+if test "`git show > /dev/null 2>&1;echo $?`" = "0"; then
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDGIT)\\\""
+else
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDNOGIT)\\\""
+fi
+
 USERNAME=`git config --get user.name`
 USERMAIL=`git config --get user.email`
 AC_SUBST(USERNAME)

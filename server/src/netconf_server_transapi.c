@@ -69,6 +69,8 @@
 
 #include "server.h"
 
+static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
+
 extern struct np_options netopeer_options;
 extern int quit;
 

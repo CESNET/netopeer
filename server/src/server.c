@@ -63,6 +63,8 @@
 
 #include "server.h"
 
+static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
+
 extern struct np_options netopeer_options;
 
 #ifndef DISABLE_CALLHOME
@@ -110,7 +112,9 @@ void print_debug(const char* format, ...) {
 }
 
 static void print_version(char* progname) {
-	fprintf(stdout, "%s version: %s\n", progname, VERSION);
+	fprintf(stdout, "%s version %s\n", progname, VERSION);
+	fprintf(stdout, "%s\n", RCSID);
+	fprintf(stdout, "compile time: %s, %s\n", __DATE__, __TIME__);
 	exit(0);
 }
 
