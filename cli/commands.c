@@ -2168,7 +2168,7 @@ int cmd_test(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 }
 
 void cmd_auth_help(FILE* output) {
-	fprintf(output, "auth (--help | pref (publickey | interactive | password) [<preference>] | keys [add <key_path>] [remove <key_path>])\n");
+	fprintf(output, "auth (--help | pref [(publickey | interactive | password) <preference>] | keys [add <key_path>] [remove <key_path>])\n");
 }
 
 int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
@@ -2184,14 +2184,28 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 	} else if (strcmp(cmd, "pref") == 0) {
 		cmd = strtok_r(NULL, " ", &ptr);
 		if (cmd == NULL) {
-			ERROR("auth pref", "Missing the SSH authentication method argument");
-			return EXIT_FAILURE;
-		}
+			fprintf(output, "The SSH authentication method preferences:\n");
+			if (opts->pubkey_auth_pref < 0) {
+				fprintf(output, "\t'publickey':   disabled\n");
+			} else {
+				fprintf(output, "\t'publickey':   %d\n", opts->pubkey_auth_pref);
+			}
+			if (opts->passwd_auth_pref < 0) {
+				fprintf(output, "\t'password':    disabled\n");
+			} else {
+				fprintf(output, "\t'password':    %d\n", opts->passwd_auth_pref);
+			}
+			if (opts->inter_auth_pref < 0) {
+				fprintf(output, "\t'interactive': disabled\n");
+			} else {
+				fprintf(output, "\t'interactive': %d\n", opts->inter_auth_pref);
+			}
 
-		if (strcmp(cmd, "publickey") == 0) {
+		} else if (strcmp(cmd, "publickey") == 0) {
 			cmd = strtok_r(NULL, " ", &ptr);
 			if (cmd == NULL) {
-				fprintf(output, "The 'publickey' SSH authentication method preference: %d\n", opts->pubkey_auth_pref);
+				ERROR("auth pref publickey", "Missing the preference argument");
+				return EXIT_FAILURE;
 			} else {
 				nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, atoi(cmd));
 				opts->pubkey_auth_pref = atoi(cmd);
@@ -2199,7 +2213,8 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 		} else if (strcmp(cmd, "interactive") == 0) {
 			cmd = strtok_r(NULL, " ", &ptr);
 			if (cmd == NULL) {
-				fprintf(output, "The 'interactive' SSH authentication method preference: %d\n", opts->inter_auth_pref);
+				ERROR("auth pref interactive", "Missing the preference argument");
+				return EXIT_FAILURE;
 			} else {
 				nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, atoi(cmd));
 				opts->inter_auth_pref = atoi(cmd);
@@ -2207,7 +2222,8 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 		} else if (strcmp(cmd, "password") == 0) {
 			cmd = strtok_r(NULL, " ", &ptr);
 			if (cmd == NULL) {
-				fprintf(output, "The 'password' SSH authentication method preference: %d\n", opts->passwd_auth_pref);
+				ERROR("auth pref password", "Missing the preference argument");
+				return EXIT_FAILURE;
 			} else {
 				nc_ssh_pref(NC_SSH_AUTH_PASSWORD, atoi(cmd));
 				opts->passwd_auth_pref = atoi(cmd);

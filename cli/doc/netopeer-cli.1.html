@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.22.2 -->
-<!-- CreationDate: Mon Mar 23 14:10:51 2015 -->
+<!-- CreationDate: Thu Apr  9 11:05:00 2015 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -1122,22 +1122,23 @@ Manage SSH authentication options - authentication
 preferences and private keys.</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>auth</b>
-[&minus;&minus;help] [pref (publickey | password |
-interactive) [<i>preference</i>]] [keys [(add | remove)
+[&minus;&minus;help] [pref [(publickey | password |
+interactive) <i>preference</i>]] [keys [(add | remove)
 <i>path_to_the_key</i>]]</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>pref</b></p>
 
-<p style="margin-left:23%;">Manage specific authentication
+<p style="margin-left:23%;">Print the current
+authentication method preferences or change a specific
 method preference.</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><i>preference</i></p>
 
-<p style="margin-left:23%;">If specified, set it to the
-authentication method. If not, show the current preference
-of this method.</p>
+<p style="margin-left:23%;">The new preference of the
+authentication method. Negative values disable the
+authentication method.</p>
 
 
 <p style="margin-left:17%; margin-top: 1em"><b>keys</b></p>

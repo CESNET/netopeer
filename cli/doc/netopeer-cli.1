@@ -691,17 +691,17 @@ command output.
 Manage SSH authentication options - authentication preferences and private keys.
 .PP
 .B auth
-[\-\-help] [pref (publickey | password | interactive) [\fIpreference\fR]] [keys [(add | remove) \fIpath_to_the_key\fR]]
+[\-\-help] [pref [(publickey | password | interactive) \fIpreference\fR]] [keys [(add | remove) \fIpath_to_the_key\fR]]
 .PP
 .RS 4
 .B pref
 .RS 4
-Manage specific authentication method preference.
+Print the current authentication method preferences or change a specific method preference.
 .RE
 .PP
 \fIpreference\fR
 .RS 4
-If specified, set it to the authentication method. If not, show the current preference of this method.
+The new preference of the authentication method. Negative values disable the authentication method.
 .RE
 .PP
 .B keys
