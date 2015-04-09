@@ -25,8 +25,8 @@ NETOPEER_MANAGER = @NETOPEER_MANAGER@
 NETOPEER_DIR = @NETOPEER_DIR@
 
 MODEL = turing-machine.yin \
-	turing-machine-data.rng \
-	turing-machine-gdefs.rng \
+	turing-machine-config.rng \
+	turing-machine-gdefs-config.rng \
 	turing-machine-schematron.xsl
 
 SRCS = @PROJECTNAME@.c
