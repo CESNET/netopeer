@@ -452,7 +452,13 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: no error\n", tests->name, test_no+1, cmd_struct->cmd);
 						free(cmd);
 						break;
-					} else if (strcmp(cmd_struct->result_err_tag, error_tag) != 0 && strcmp(cmd_struct->result_err_tag, "any") != 0) {
+					} else if (strcmp(cmd_struct->result_err_tag, "any") == 0) {
+						fprintf(output, "Test \"%s\" #%d cmd \"%s\": INFO: error %s", tests->name, test_no+1, cmd_struct->cmd, error_tag);
+						if (error_info != NULL) {
+							fprintf(output, " - %s", error_info);
+						}
+						fprintf(output, " (%s)\n", error_message);
+					} else if (strcmp(cmd_struct->result_err_tag, error_tag) != 0) {
 						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, cmd_struct->result_err_tag);
 						free(error_tag);
 						error_tag = NULL;
