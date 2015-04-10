@@ -130,13 +130,6 @@ by default. To disable starting a specific module, netopeer-configurator(1) can
 be used or it can be done directly via NETCONF modifying the Netopeer's
 configuration data.
 
-TLS transport
--------------
-
-To learn more about the TLS transport implementation and how to use it, please
-refer to "server/certs/README" or the Wiki section on the netopeer project
-homepage.
-
 Example
 ~~~~~~~
 
@@ -159,3 +152,12 @@ Disable 'my_magic_module':
     </config>
   </edit-config>
 </rpc>
+
+
+TLS transport
+-------------
+
+If compiled with --enable-tls configure option, the server is ready to accept
+connections from clients that present themselves with the client certificate in
+"server/certs". For more information read the specific Wiki section on
+the Netopeer project homepage.
