@@ -1,0 +1,70 @@
+submodule sub-mod2 {
+	belongs-to "main-mod" {
+		prefix "mmod";
+	}
+
+	include sub-mod1 {
+		revision-date 2015-03-25;
+	}
+
+	identity derived-ident {
+		base new-ident;
+	}
+
+	identity double-derived-ident {
+		base derived-ident;
+	}
+
+	typedef type2 {
+		type type1 {
+			length "15";
+		}
+		status deprecated;
+	}
+
+	typedef type3 {
+		type type2;
+		units "unknown";
+		status deprecated;
+	}
+
+	container cont2 {
+		leaf leaf8 {
+			type type1;
+		}
+
+		uses group1 {
+			refine group-leaf1 {
+				mandatory true;
+			}
+		}
+
+		mmod:ext1 "somearg";
+
+		list list1 {
+			key "leaf4";
+			unique "leaf5";
+			ordered-by user;
+			max-elements 2;
+
+			leaf leaf4 {
+				type bits {
+					bit bit0 {
+						position 0;
+					}
+					bit bit1;
+					bit bit2;
+					bit bit10 {
+						position 10;
+					}
+				}
+			}
+
+			leaf leaf5 {
+				type string;
+			}
+
+			must "leaf5 != 'empty'";
+		}
+	}
+}

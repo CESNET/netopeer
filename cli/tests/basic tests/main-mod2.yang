@@ -1,0 +1,90 @@
+module main-mod2 {
+	namespace "http://test.org/main-mod2";
+
+	prefix mmod2;
+
+	import main-mod {
+		prefix mmod;
+	}
+
+	deviation "/mmod:cont1/mmod:leaf1" {
+		deviate add {
+			default 10;
+		}
+	}
+
+	feature feat2 {
+		if-feature mmod:feat1;
+	}
+
+	container cont3 {
+		if-feature feat2;
+		presence "it means that this container has a meaning";
+	}
+
+	container cont4 {
+		leaf leaf7 {
+			config false;
+			type empty;
+		}
+
+		leaf-list llist1 {
+			when "../../cont3";
+			min-elements 1;
+			type mmod:type3;
+		}
+
+		leaf leaf9 {
+			type enumeration {
+				enum "jedna" {
+					value 1;
+				}
+				enum "dva" {
+					value 2;
+				}
+				enum "tri";
+				enum "patdesiat" {
+					value 50;
+				}
+			}
+		}
+
+		choice choic1 {
+			case case1 {
+				leaf leaf4 {
+					type union {
+						type int32 {
+							range "100..max";
+						}
+						type string;
+					}
+				}
+			}
+			container case2 {
+				leaf leaf5 {
+					type leafref {
+						path "../../leaf9";
+					}
+				}
+				leaf leaf6 {
+					type instance-identifier {
+						require-instance true;
+					}
+				}
+			}
+		}
+	}
+
+	notification notif1 {
+		leaf leaf05 {
+			type identityref {
+				base mmod:double-derived-ident;
+			}
+		}
+		leaf leaf06 {
+			type decimal64 {
+				fraction-digits 9;
+			}
+		}
+	}
+}
