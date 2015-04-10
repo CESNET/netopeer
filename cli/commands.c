@@ -348,6 +348,7 @@ userinput:
 			}
 			fprintf(output, "): ");
 			if (fscanf(input, "%1023s", datastore) == EOF) {
+				free(datastore);
 				ERROR(operation, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
 				return NC_DATASTORE_ERROR;
 			}
