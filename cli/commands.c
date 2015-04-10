@@ -2027,9 +2027,9 @@ static struct np_test_cmd* test_parse_cmds(xmlNodePtr node_list) {
 			ret = ret_cur;
 		} else {
 			/* new item is not the first */
-			for (ret_ptr = ret; ret_ptr->next != NULL && ret_cur->id < ret_ptr->id; ret_ptr = ret_ptr->next);
+			for (ret_ptr = ret; ret_ptr->next != NULL && ret_cur->id > ret_ptr->id; ret_ptr = ret_ptr->next);
 
-			if (ret_cur->id < ret_ptr->id) {
+			if (ret_cur->id > ret_ptr->id) {
 				/* new item is last but one */
 				ret_cur->next = ret_ptr->next;
 				ret_ptr->next = ret_cur;
