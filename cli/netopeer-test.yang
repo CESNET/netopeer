@@ -13,6 +13,15 @@ module netopeer-test {
     "Module specifying any NETCONF server test cases,
       which are executed using netopeer-cli(1).";
 
+  revision 2015-04-10 {
+    description
+      "Option to require not to have some feature,
+        to require additional attributes from
+        capabilities, any result-error, enable
+        checking error messages, optional
+        description for tests.";
+  }
+
   revision 2015-03-17 {
     description
       "Initial revision";
@@ -48,6 +57,12 @@ module netopeer-test {
         type string;
         description
           "The name of the test.";
+      }
+
+      leaf description {
+        type string;
+        description
+          "Test description.";
       }
 
       leaf count {
@@ -136,11 +151,27 @@ module netopeer-test {
           }
 
           case error {
-            leaf result-error {
-              type nc:error-tag-type;
+            container result-error {
               description
                 "The expected error this command should end
                   with.";
+              leaf tag {
+                mandatory true;
+                type union {
+                  type nc:error-tag-type;
+                  type enumeration {
+                    enum "any";
+                  }
+                }
+                description
+                  "The expected NETCONF error-tag.";
+              }
+
+              leaf message {
+                type string;
+                description
+                  "The expected error-message.";
+              }
             }
           }
 
@@ -162,10 +193,31 @@ module netopeer-test {
       "The expected supported capabilities as
         advertised in the server 'hello' message.";
 
-    leaf-list capability {
-      type string;
-      description
-        "The required capabilities for this test.";
+    list capability {
+      key "name";
+      leaf name {
+        type string;
+        description
+          "The required capability name.";
+      }
+
+      container attribute {
+        description
+          "A required attribute of the capability.";
+        leaf name {
+          mandatory true;
+          type string;
+          description
+            "The name of the attribute.";
+        }
+
+        leaf value {
+          mandatory true;
+          type string;
+          description
+            "The value of the attribute.";
+        }
+      }
     }
 
     list model {
@@ -204,6 +256,13 @@ module netopeer-test {
         type string;
         description
           "These features must be enabled in the model.";
+      }
+
+      leaf-list not-feature {
+        type string;
+        description
+          "These features cannot be enabled in
+            the model.";
       }
     }
   }

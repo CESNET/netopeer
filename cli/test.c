@@ -27,6 +27,7 @@ extern void clb_error_print(const char* tag,
 		const char* sid);
 
 char* error_tag;
+char* error_message;
 char* error_info;
 
 void np_test_capab_free(struct np_test_capab* capab) {
@@ -38,12 +39,24 @@ void np_test_capab_free(struct np_test_capab* capab) {
 		capab = capab->next;
 
 		free(to_free->capab);
+		for (i = 0; i < to_free->attr_count; ++i) {
+			free(to_free->attributes[i]);
+			free(to_free->values[i]);
+		}
+		free(to_free->attributes);
+		free(to_free->values);
+
 		free(to_free->not_older_revision);
 		free(to_free->exact_revision);
 		for (i = 0; i < to_free->feature_count; ++i) {
 			free(to_free->features[i]);
 		}
 		free(to_free->features);
+		for (i = 0; i < to_free->not_feature_count; ++i) {
+			free(to_free->not_features[i]);
+		}
+		free(to_free->not_features);
+
 		free(to_free);
 	}
 }
@@ -74,7 +87,8 @@ void np_test_cmd_free(struct np_test_cmd* cmd) {
 
 		free(to_free->cmd);
 		free(to_free->file);
-		free(to_free->result_err);
+		free(to_free->result_err_tag);
+		free(to_free->result_err_msg);
 		free(to_free->result_file);
 		free(to_free);
 	}
@@ -107,26 +121,25 @@ static void clb_test_error(const char* tag,
 		const char* sid) {
 
 	error_tag = strdup(tag);
+	error_message = strdup(message);
 
 	if (path != NULL) {
-		asprintf(&error_info, "%s (%s)\n", message, path);
+		asprintf(&error_info, "%s\n", path);
 	} else if (attribute != NULL) {
-		asprintf(&error_info, "%s (%s)\n", message, attribute);
+		asprintf(&error_info, "%s\n", attribute);
 	} else if (element != NULL) {
-		asprintf(&error_info, "%s (%s)\n", message, element);
+		asprintf(&error_info, "%s\n", element);
 	} else if (ns != NULL) {
-		asprintf(&error_info, "%s (%s)\n", message, ns);
+		asprintf(&error_info, "%s\n", ns);
 	} else if (sid != NULL) {
-		asprintf(&error_info, "%s (%s)\n", message, sid);
-	} else {
-		asprintf(&error_info, "%s\n", message);
+		asprintf(&error_info, "%s\n", sid);
 	}
 }
 
 static int test_capab_check(const struct nc_cpblts* capabs, struct np_test_capab* req_capabs, char** msg) {
 	int i;
 	const char* capab_str, *ptr;
-	char* features;
+	char* features, *tmp;
 
 	for (; req_capabs != NULL; req_capabs = req_capabs->next) {
 
@@ -135,6 +148,26 @@ static int test_capab_check(const struct nc_cpblts* capabs, struct np_test_capab
 		if (capab_str == NULL) {
 			asprintf(msg, "Capability \"%s\" not supported by the server.", req_capabs->capab);
 			return EXIT_FAILURE;
+		}
+
+		/* attribute check */
+		if (req_capabs->attributes != NULL) {
+			for (i = 0; i < req_capabs->attr_count; ++i) {
+				asprintf(&tmp, "%s=", req_capabs->attributes[i]);
+				ptr = strstr(capab_str, tmp);
+				if (ptr == NULL) {
+					free(tmp);
+					asprintf(msg, "Capability \"%s\" did not advertise the attribute \"%s\".", req_capabs->capab, req_capabs->attributes[i]);
+					return EXIT_FAILURE;
+				}
+				ptr += strlen(tmp);
+				free(tmp);
+
+				if (strncmp(req_capabs->values[i], ptr, strlen(req_capabs->values[i])) != 0) {
+					asprintf(msg, "Capability \"%s\", attribute \"%s\" expected value \"%s\", the advertised was \"%.*s\".", req_capabs->capab, req_capabs->attributes[i], req_capabs->values[i], (int)strlen(req_capabs->values[i]), ptr);
+					return EXIT_FAILURE;
+				}
+			}
 		}
 
 		/* revision check */
@@ -147,11 +180,11 @@ static int test_capab_check(const struct nc_cpblts* capabs, struct np_test_capab
 			ptr += 9;
 
 			if (req_capabs->not_older_revision != NULL && strncmp(req_capabs->not_older_revision, ptr, strlen(req_capabs->not_older_revision)) < 0) {
-				asprintf(msg, "Capability \"%s\" oldest revision required is %s, but the server has %10s.", req_capabs->capab, req_capabs->not_older_revision, ptr);
+				asprintf(msg, "Capability \"%s\" oldest revision required is %s, but the server has %.10s.", req_capabs->capab, req_capabs->not_older_revision, ptr);
 				return EXIT_FAILURE;
 			}
 			if (req_capabs->exact_revision != NULL && strncmp(req_capabs->exact_revision, ptr, strlen(req_capabs->exact_revision)) != 0) {
-				asprintf(msg, "Capability \"%s\" revision required is %s, but the server has %10s.", req_capabs->capab, req_capabs->exact_revision, ptr);
+				asprintf(msg, "Capability \"%s\" revision required is %s, but the server has %.10s.", req_capabs->capab, req_capabs->exact_revision, ptr);
 				return EXIT_FAILURE;
 			}
 		}
@@ -184,6 +217,30 @@ static int test_capab_check(const struct nc_cpblts* capabs, struct np_test_capab
 				}
 			}
 			free(features);
+		}
+
+		/* not feature check */
+		if (req_capabs->not_features != NULL) {
+			ptr = strstr(capab_str, "features=");
+			if (ptr != NULL) {
+				ptr += 9;
+
+				features = strdup(ptr);
+				if (strchr(features, '&') != NULL) {
+					*strchr(features,  '&') = '\0';
+				}
+
+				for (i = 0; i < req_capabs->not_feature_count; ++i) {
+					for (ptr = features; ptr != ((char*)NULL)+1; ptr = strchr(ptr, ',')+1) {
+						if (strncmp(req_capabs->not_features[i], ptr, strlen(req_capabs->not_features[i])) == 0) {
+							asprintf(msg, "Capability \"%s\" supports the forbidden feature \"%s\".", req_capabs->capab, req_capabs->not_features[i]);
+							free(features);
+							return EXIT_FAILURE;
+						}
+					}
+				}
+				free(features);
+			}
 		}
 	}
 
@@ -389,16 +446,31 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 				}
 
 				/* check result */
-				if (cmd_struct->result_err != NULL) {
+				if (cmd_struct->result_err_tag != NULL) {
 					/* error result */
 					if (error_tag == NULL) {
 						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: no error\n", tests->name, test_no+1, cmd_struct->cmd);
 						free(cmd);
 						break;
-					} else if (strcmp(cmd_struct->result_err, error_tag) != 0) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, cmd_struct->result_err);
+					} else if (strcmp(cmd_struct->result_err_tag, error_tag) != 0 && strcmp(cmd_struct->result_err_tag, "any") != 0) {
+						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, cmd_struct->result_err_tag);
 						free(error_tag);
 						error_tag = NULL;
+						free(error_message);
+						error_message = NULL;
+						free(error_info);
+						error_info = NULL;
+						free(cmd);
+						test_fail = 1;
+						break;
+					}
+
+					if (cmd_struct->result_err_msg != NULL && strcmp(cmd_struct->result_err_msg, error_message) != 0) {
+						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error message (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_message, cmd_struct->result_err_msg);
+						free(error_tag);
+						error_tag = NULL;
+						free(error_message);
+						error_message = NULL;
 						free(error_info);
 						error_info = NULL;
 						free(cmd);
@@ -408,14 +480,18 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 
 					free(error_tag);
 					error_tag = NULL;
+					free(error_message);
+					error_message = NULL;
 					free(error_info);
 					error_info = NULL;
 				} else {
 					/* success result */
 					if (error_tag != NULL) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: error %s (%s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, error_info);
+						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: error %s (%s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, error_message);
 						free(error_tag);
 						error_tag = NULL;
+						free(error_message);
+						error_message = NULL;
 						free(error_info);
 						error_info = NULL;
 						free(cmd);

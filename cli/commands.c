@@ -1778,7 +1778,7 @@ void cmd_test_help(FILE* output) {
 }
 
 static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
-	xmlNodePtr model;
+	xmlNodePtr model, capab, attr;
 	struct np_test_capab* ret = NULL, *ret_cur;
 
 	for (; node_list != NULL; node_list = node_list->next) {
@@ -1796,7 +1796,50 @@ static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
 		}
 
 		if (xmlStrEqual(node_list->name, BAD_CAST "capability")) {
-			ret_cur->capab = (char*)xmlNodeGetContent(node_list);
+			for (capab = node_list->children; capab != NULL; capab = capab->next) {
+				if (xmlStrEqual(capab->name, BAD_CAST "name")) {
+					if (ret_cur->capab != NULL) {
+						ERROR("test_parse_capabs", "Double \"name\" node.");
+						np_test_capab_free(ret);
+						return NULL;
+					}
+					ret_cur->capab = (char*)xmlNodeGetContent(capab);
+				}
+
+				if (xmlStrEqual(capab->name, BAD_CAST "attribute")) {
+					++ret_cur->attr_count;
+					ret_cur->attributes = realloc(ret_cur->attributes, ret_cur->attr_count*sizeof(char*));
+					ret_cur->attributes[ret_cur->attr_count-1] = NULL;
+					ret_cur->values = realloc(ret_cur->values, ret_cur->attr_count*sizeof(char*));
+					ret_cur->values[ret_cur->attr_count-1] = NULL;
+
+					for (attr = capab->children; attr != NULL; attr = attr->next) {
+						if (xmlStrEqual(attr->name, BAD_CAST "name")) {
+							if (ret_cur->attributes[ret_cur->attr_count-1] != NULL) {
+								ERROR("test_parse_capabs", "Double \"name\" node in an attribute.");
+								np_test_capab_free(ret);
+								return NULL;
+							}
+							ret_cur->attributes[ret_cur->attr_count-1] = (char*)xmlNodeGetContent(attr);
+						}
+
+						if (xmlStrEqual(attr->name, BAD_CAST "value")) {
+							if (ret_cur->values[ret_cur->attr_count-1] != NULL) {
+								ERROR("test_parse_capabs", "Double \"value\" node in an attribute.");
+								np_test_capab_free(ret);
+								return NULL;
+							}
+							ret_cur->values[ret_cur->attr_count-1] = (char*)xmlNodeGetContent(attr);
+						}
+					}
+
+					if (ret_cur->attributes[ret_cur->attr_count-1] == NULL || ret_cur->values[ret_cur->attr_count-1] == NULL) {
+						ERROR("test_parse_capabs", "Missing some attribute nodes.");
+						np_test_capab_free(ret);
+						return NULL;
+					}
+				}
+			}
 		} else {
 			for (model = node_list->children; model != NULL; model = model->next) {
 				if (xmlStrEqual(model->name, BAD_CAST "namespace")) {
@@ -1830,6 +1873,12 @@ static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
 					++ret_cur->feature_count;
 					ret_cur->features = realloc(ret_cur->features, ret_cur->feature_count*sizeof(char*));
 					ret_cur->features[ret_cur->feature_count-1] = (char*)xmlNodeGetContent(model);
+				}
+
+				if (xmlStrEqual(model->name, BAD_CAST "not-feature")) {
+					++ret_cur->not_feature_count;
+					ret_cur->not_features = realloc(ret_cur->not_features, ret_cur->not_feature_count*sizeof(char*));
+					ret_cur->not_features[ret_cur->not_feature_count-1] = (char*)xmlNodeGetContent(model);
 				}
 			}
 		}
@@ -1937,7 +1986,7 @@ static struct np_test_var* test_parse_vars(xmlNodePtr node_list) {
 
 static struct np_test_cmd* test_parse_cmds(xmlNodePtr node_list) {
 	char* error_val;
-	xmlNodePtr cmd;
+	xmlNodePtr cmd, err;
 	xmlBufferPtr buf;
 	struct np_test_cmd* ret = NULL, *ret_cur = NULL, *ret_ptr;
 
@@ -1978,20 +2027,40 @@ static struct np_test_cmd* test_parse_cmds(xmlNodePtr node_list) {
 					np_test_cmd_free(ret_cur);
 					return NULL;
 				}
-				error_val = (char*)xmlNodeGetContent(cmd);
-				if (strchr(error_val, ':') == NULL) {
-					ERROR("test_parse_cmds", "Result-error in the wrong namespace.");
-					free(error_val);
+
+				for (err = cmd->children; err != NULL; err = err->next) {
+					if (xmlStrEqual(err->name, BAD_CAST "tag")) {
+						error_val = (char*)xmlNodeGetContent(err);
+						if (strcmp(error_val, "any") == 0) {
+							ret_cur->result_err_tag = error_val;
+						} else {
+							if (strchr(error_val, ':') == NULL) {
+								ERROR("test_parse_cmds", "Result-error in the wrong namespace.");
+								free(error_val);
+								np_test_cmd_free(ret);
+								np_test_cmd_free(ret_cur);
+								return NULL;
+							}
+							ret_cur->result_err_tag = strdup(strchr(error_val, ':')+1);
+							free(error_val);
+						}
+					}
+
+					if (xmlStrEqual(err->name, BAD_CAST "message")) {
+						ret_cur->result_err_msg = (char*)xmlNodeGetContent(err);
+					}
+				}
+
+				if (ret_cur->result_err_tag == NULL) {
+					ERROR("test_parse_cmds", "Missing the result-error tag.");
 					np_test_cmd_free(ret);
 					np_test_cmd_free(ret_cur);
 					return NULL;
 				}
-				ret_cur->result_err = strdup(strchr(error_val, ':')+1);
-				free(error_val);
 			}
 
 			if (xmlStrEqual(cmd->name, BAD_CAST "result-file")) {
-				if (ret_cur->result_err != 0) {
+				if (ret_cur->result_err_tag != NULL) {
 					ERROR("test_parse_cmds", "Double result specified.");
 					np_test_cmd_free(ret);
 					np_test_cmd_free(ret_cur);

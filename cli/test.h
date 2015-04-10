@@ -3,10 +3,16 @@
 
 struct np_test_capab {
 	char* capab;
+	char** attributes;
+	char** values;
+	unsigned int attr_count;
+
 	char* not_older_revision;
 	char* exact_revision;
 	char** features;
 	unsigned int feature_count;
+	char** not_features;
+	unsigned int not_feature_count;
 	struct np_test_capab* next;
 };
 
@@ -29,7 +35,8 @@ struct np_test_cmd {
 	unsigned int id;
 	char* cmd;
 	char* file;
-	char* result_err;
+	char* result_err_tag;
+	char* result_err_msg;
 	char* result_file;
 	struct np_test_cmd* next;
 };
