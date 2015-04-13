@@ -325,7 +325,7 @@ static void test_cmd_subst_file(char** cmd, const char* file_name) {
 static int test_xmlfile_cmp(const char* cmd_output, const char* expected_output, char** msg) {
 	/* TODO come up with something better */
 	if (strcmp(cmd_output, expected_output) != 0) {
-		asprintf(msg, "Expected and actual output differ");
+		asprintf(msg, "Expected output:\n%s\nActual output:\n%s\n", expected_output, cmd_output);
 		return EXIT_FAILURE;
 	}
 
