@@ -401,7 +401,10 @@ class nc_tlsauth(ncmodule.ncmodule):
 					pass
 			else:
 				# cert name width (or) valid width (or) subject longest line + issuer longest line
-				if width-2 < 34 or width-2 < 4 + self.ca_certs[self.selected][1] + 1 + 4 + self.ca_certs[self.selected][2] + 1:
+				sub_len = self.server_cert[1] if self.selected == -3 else self.ca_certs[self.selected][1]
+				iss_len = self.server_cert[2] if self.selected == -3 else self.ca_certs[self.selected][2]
+
+				if width-2 < 34 or width-2 < 4 + sub_len + 1 + 4 + iss_len + 1:
 					self.show_cert = False
 					tools.pop()
 					tools.append(('ENTER', 'show'))
@@ -414,35 +417,35 @@ class nc_tlsauth(ncmodule.ncmodule):
 						else:
 							window.addstr('CA cert {d}\n\n'.format(d=self.selected))
 						msg = 'Subject'
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + 'Issuer\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + 'Issuer\n')
 
 						msg = 'C:  ' + str(subject.C)
 						msg2 = 'C:  ' + str(issuer.C)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'ST: ' + str(subject.ST)
 						msg2 = 'ST: ' + str(issuer.ST)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'L:  ' + str(subject.L)
 						msg2 = 'L:  ' + str(issuer.L)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'O:  ' + str(subject.O)
 						msg2 = 'O:  ' + str(issuer.O)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'OU: ' + str(subject.OU)
 						msg2 = 'OU: ' + str(issuer.OU)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'CN: ' + str(subject.CN)
 						msg2 = 'CN: ' + str(issuer.CN)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						msg = 'EA: ' + str(subject.emailAddress)
 						msg2 = 'EA: ' + str(issuer.emailAddress)
-						window.addstr(msg + ' '*(5 + self.ca_certs[self.selected][1]-len(msg)) + msg2 + '\n')
+						window.addstr(msg + ' '*(5 + sub_len-len(msg)) + msg2 + '\n')
 
 						window.addstr('\nValid: ' + str(valid) + '\n');
 					except curses.error:
