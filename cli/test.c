@@ -451,6 +451,7 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 					if (error_tag == NULL) {
 						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: no error\n", tests->name, test_no+1, cmd_struct->cmd);
 						free(cmd);
+						test_fail = 1;
 						break;
 					} else if (strcmp(cmd_struct->result_err_tag, "any") == 0) {
 						fprintf(output, "Test \"%s\" #%d cmd \"%s\": INFO: error %s", tests->name, test_no+1, cmd_struct->cmd, error_tag);
