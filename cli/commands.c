@@ -461,7 +461,7 @@ static struct nc_filter* set_filter(const char* operation, const char* file, int
 
 	if (!interactive) {
 		/* open filter from the file */
-		filter_fd = open(optarg, O_RDONLY);
+		filter_fd = open(file, O_RDONLY);
 		if (filter_fd == -1) {
 			ERROR(operation, "unable to open the filter file (%s).", strerror(errno));
 			return NULL;
