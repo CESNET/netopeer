@@ -7,6 +7,10 @@ module aug-sub-mod1 {
 		prefix "mmod";
 	}
 
+	reference "main-mod";
+
+	organization "some org";
+
 	augment "/mmod:cont1" {
 		leaf aug-leaf1 {
 			type empty;

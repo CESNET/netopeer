@@ -18,10 +18,20 @@
 	</requirements>
 	<test>
 		<name>clean running</name>
-		<description>It is assumed there is no configuration of the required models</description>
 		<command>
 			<id>1</id>
 			<cmd>get-config --out old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod" nc:operation="remove"/>
+				<cont2 xmlns="http://test.org/main-mod2" nc:operation="remove"/>
+				<cont3 xmlns="http://test.org/main-mod" nc:operation="remove"/>
+				<cont4 xmlns="http://test.org/main-mod" nc:operation="remove"/>
+			</cmd-file>
 			<result-success/>
 		</command>
 	</test>
