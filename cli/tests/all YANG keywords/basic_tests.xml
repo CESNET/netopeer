@@ -20,12 +20,12 @@
 		<name>clean running</name>
 		<command>
 			<id>1</id>
-			<cmd>get-config --out old_config.xml running</cmd>
+			<cmd>get-config --out=old_config.xml running</cmd>
 			<result-success/>
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont1 xmlns="http://test.org/main-mod" nc:operation="remove"/>
 				<cont2 xmlns="http://test.org/main-mod2" nc:operation="remove"/>
@@ -39,7 +39,7 @@
 		<name>augment test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont1 xmlns="http://test.org/main-mod">
 					<aug-leaf1 xmlns="http://test.org/aug-sub-mod1"/>
@@ -49,7 +49,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont1 xmlns="http://test.org/main-mod">
 					<aug-leaf1 xmlns="http://test.org/aug-sub-mod1"/>
@@ -66,7 +66,7 @@
 		<name>choice test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2">
 					<leaf4>1000</leaf4>
@@ -76,7 +76,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2"/>
 			</cmd-file>
@@ -91,7 +91,7 @@
 		<name>config test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2">
 					<leaf7/>
@@ -116,7 +116,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --defaults report-all --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --defaults=report-all --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont1 xmlns="http://test.org/main-mod"/>
 			</cmd-file>
@@ -131,7 +131,7 @@
 		<name>refine, mandatory test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod"/>
 			</cmd-file>
@@ -144,7 +144,7 @@
 		<name>uses, grouping test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<group-leaf1/>
@@ -154,7 +154,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod"/>
 			</cmd-file>
@@ -169,7 +169,7 @@
 		<name>typedef, pattern, error-app-tag, error-message test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<leaf8>ahojnazdar485</leaf8>
@@ -195,7 +195,7 @@
 		</test-requirements>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2">
 					<llist1>hello world!!!!</llist1>
@@ -207,7 +207,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont3 xmlns="http://test.org/main-mod2"/>
 			</cmd-file>
@@ -215,7 +215,7 @@
 		</command>
 		<command>
 			<id>3</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont3 xmlns="http://test.org/main-mod2"/>
 			</cmd-file>
@@ -228,7 +228,7 @@
 		<name>list, bits test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1>
@@ -244,7 +244,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1/>
@@ -272,7 +272,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1>
@@ -292,7 +292,7 @@
 		<name>unique test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1>
@@ -314,7 +314,7 @@
 		<name>max-elements test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1>
@@ -338,7 +338,7 @@
 		<name>must test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont2 xmlns="http://test.org/main-mod">
 					<list1>
@@ -356,7 +356,7 @@
 		<name>leaf-list, length test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2">
 					<llist1>hello world!!!!</llist1>
@@ -367,7 +367,7 @@
 		</command>
 		<command>
 			<id>2</id>
-			<cmd-with-file>get-config --filter (file) running</cmd-with-file>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont4 xmlns="http://test.org/main-mod2"/>
 			</cmd-file>
@@ -383,7 +383,7 @@
 		<name>range test</name>
 		<command>
 			<id>1</id>
-			<cmd-with-file>edit-config --config (file) running</cmd-with-file>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
 			<cmd-file>
 				<cont1 xmlns="http://test.org/main-mod">
 					<leaf1>5</leaf1>
@@ -398,7 +398,7 @@
 		<name>restore running</name>
 		<command>
 			<id>1</id>
-			<cmd>copy-config --config old_config.xml running</cmd>
+			<cmd>copy-config --config=old_config.xml running</cmd>
 			<result-success/>
 		</command>
 	</test>
