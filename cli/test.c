@@ -419,7 +419,11 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 					}
 				}
 				if (commands[i].name == NULL) {
-					fprintf(output, "Test \"%s\" #%d cmd \"%s\": COMMAND NOT FOUND\n", tests->name, test_no+1, cmd_struct->cmd);
+					fprintf(output, "Test \"%s\" ", tests->name);
+					if (tests->count > 1) {
+						fprintf(output, "#%d ", test_no+1);
+					}
+					fprintf(output, "cmd \"%s\": COMMAND NOT FOUND\n", cmd_struct->cmd);
 					free(cmd);
 					test_fail = 1;
 					break;
@@ -437,7 +441,11 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 
 				/* finally execute the command */
 				if (commands[i].func(cmd, NULL, file_cookie, file_cookie) != EXIT_SUCCESS) {
-					fprintf(output, "Test \"%s\" #%d cmd \"%s\": COMMAND FAIL\n", tests->name, test_no+1, cmd_struct->cmd);
+					fprintf(output, "Test \"%s\" ", tests->name);
+					if (tests->count > 1) {
+						fprintf(output, "#%d ", test_no+1);
+					}
+					fprintf(output, "cmd \"%s\": COMMAND FAIL\n", cmd_struct->cmd);
 					free(cmd);
 					free(cmd_output_file);
 					cmd_output_file = NULL;
@@ -449,18 +457,30 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 				if (cmd_struct->result_err_tag != NULL) {
 					/* error result */
 					if (error_tag == NULL) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: no error\n", tests->name, test_no+1, cmd_struct->cmd);
+						fprintf(output, "Test \"%s\" ", tests->name);
+						if (tests->count > 1) {
+							fprintf(output, "#%d ", test_no+1);
+						}
+						fprintf(output, "cmd \"%s\": FAIL: no error\n", cmd_struct->cmd);
 						free(cmd);
 						test_fail = 1;
 						break;
 					} else if (strcmp(cmd_struct->result_err_tag, "any") == 0) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": INFO: error %s", tests->name, test_no+1, cmd_struct->cmd, error_tag);
+						fprintf(output, "Test \"%s\" ", tests->name);
+						if (tests->count > 1) {
+							fprintf(output, "#%d ", test_no+1);
+						}
+						fprintf(output, "cmd \"%s\": INFO: error %s", cmd_struct->cmd, error_tag);
 						if (error_info != NULL) {
-							fprintf(output, " - %s", error_info);
+							fprintf(output, " - %s\n", error_info);
 						}
 						fprintf(output, " (%s)\n", error_message);
 					} else if (strcmp(cmd_struct->result_err_tag, error_tag) != 0) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, cmd_struct->result_err_tag);
+						fprintf(output, "Test \"%s\" ", tests->name);
+						if (tests->count > 1) {
+							fprintf(output, "#%d ", test_no+1);
+						}
+						fprintf(output, "cmd \"%s\": FAIL: wrong error (%s instead %s)\n", cmd_struct->cmd, error_tag, cmd_struct->result_err_tag);
 						free(error_tag);
 						error_tag = NULL;
 						free(error_message);
@@ -473,7 +493,11 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 					}
 
 					if (cmd_struct->result_err_msg != NULL && strcmp(cmd_struct->result_err_msg, error_message) != 0) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: wrong error message (%s instead %s)\n", tests->name, test_no+1, cmd_struct->cmd, error_message, cmd_struct->result_err_msg);
+						fprintf(output, "Test \"%s\" ", tests->name);
+						if (tests->count > 1) {
+							fprintf(output, "#%d ", test_no+1);
+						}
+						fprintf(output, "cmd \"%s\": FAIL: wrong error message (%s instead %s)\n", cmd_struct->cmd, error_message, cmd_struct->result_err_msg);
 						free(error_tag);
 						error_tag = NULL;
 						free(error_message);
@@ -494,7 +518,11 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 				} else {
 					/* success result */
 					if (error_tag != NULL) {
-						fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: error %s (%s)\n", tests->name, test_no+1, cmd_struct->cmd, error_tag, error_message);
+						fprintf(output, "Test \"%s\" ", tests->name);
+						if (tests->count > 1) {
+							fprintf(output, "#%d ", test_no+1);
+						}
+						fprintf(output, "cmd \"%s\": FAIL: error %s (%s)\n", cmd_struct->cmd, error_tag, error_message);
 						free(error_tag);
 						error_tag = NULL;
 						free(error_message);
@@ -539,7 +567,11 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 						close(fd);
 
 						if (test_xmlfile_cmp(result_file, cmd_struct->result_file, &msg) != EXIT_SUCCESS) {
-							fprintf(output, "Test \"%s\" #%d cmd \"%s\": FAIL: output file differs from the expected result (%s)\n", tests->name, test_no+1, cmd_struct->cmd, msg);
+							fprintf(output, "Test \"%s\" ", tests->name);
+							if (tests->count > 1) {
+								fprintf(output, "#%d ", test_no+1);
+							}
+							fprintf(output, "cmd \"%s\": FAIL: output file differs from the expected result (%s)\n", cmd_struct->cmd, msg);
 							free(msg);
 							free(result_file);
 							free(cmd);
