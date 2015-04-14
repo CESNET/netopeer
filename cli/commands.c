@@ -526,7 +526,7 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 			break;
 		case NC_REPLY_DATA:
 			if (output_file != NULL) {
-				out_stream = fopen(output_file, "a");
+				out_stream = fopen(output_file, "w");
 				if (out_stream == NULL) {
 					ERROR(operation, "Could not open the output file \"%s\" (%s).", output_file, strerror(errno));
 					ret = EXIT_FAILURE;
