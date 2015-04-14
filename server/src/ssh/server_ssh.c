@@ -213,9 +213,9 @@ static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UN
 static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int UNUSED(is_stderr), void* UNUSED(userdata)) {
 	struct client_struct_ssh* client;
 	struct chan_struct* chan;
-	char* end_rpc;
+	char* end_rpc, *data_ptr;
 	static uint32_t prev_read = 0;
-	int ret;
+	int ret, to_send;
 
 	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
@@ -245,13 +245,24 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 	prev_read = len-(end_rpc-(char*)data);
 
 	/* pass data from the client to the library */
-	if ((ret = write(chan->chan_out[1], data, end_rpc-(char*)data)) != end_rpc-(char*)data) {
-		if (ret == -1) {
-			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
-		} else {
-			nc_verb_error("%s: failed to pass the client data to the library", __func__);
+	errno = 0;
+	to_send = end_rpc-(char*)data;
+	data_ptr = data;
+	do {
+		ret = write(chan->chan_out[1], data_ptr, to_send);
+		if (ret == -1 && errno == EAGAIN) {
+			usleep(10);
+			continue;
 		}
+		to_send -= ret;
+		data_ptr += ret;
+	} while ((ret > 0 || errno == EAGAIN) && to_send > 0);
 
+	if (ret == 0) {
+		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+		return 0;
+	} else if (ret == -1) {
+		nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
 		return 0;
 	}
 
@@ -743,6 +754,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 	struct timeval cur_time;
 	struct timespec ts;
 	int ret, to_send_len, skip_sleep = 0;
+	char* to_send_ptr;
 
 	/* check whether the client shouldn't be freed */
 	if (client->to_free) {
@@ -882,7 +894,19 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 		} else if (ret != -1) {
 			/* we had some data, there may be more, sleeping may be a waste of response time */
 			skip_sleep = 1;
-			ssh_channel_write(chan->ssh_chan, *to_send, to_send_len);
+
+			to_send_ptr = *to_send;
+			do {
+				ret = ssh_channel_write(chan->ssh_chan, to_send_ptr, to_send_len);
+				if (ret != SSH_ERROR) {
+					to_send_len -= ret;
+					to_send_ptr += ret;
+				}
+			} while (ret != SSH_ERROR && to_send_len > 0);
+
+			if (ret == SSH_ERROR) {
+				nc_verb_error("%s: failed to write into SSH channel (sent %d, still left %d)", to_send_ptr-(*to_send), to_send_len);
+			}
 		}
 
 		if (chan->last_send) {
