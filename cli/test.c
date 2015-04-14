@@ -556,6 +556,7 @@ int perform_test(struct np_test* tests, struct np_test_capab* global_capabs, str
 						cmd_output_file = NULL;
 						lseek(fd, 0, SEEK_SET);
 						result_file = malloc(size+1);
+						result_file[size] = '\0';
 
 						if (read(fd, result_file, size) < size) {
 							fprintf(output, "Test \"%s\" #%d cmd \"%s\": INTERNAL ERROR: cmd output file read error\n", tests->name, test_no+1, cmd_struct->cmd);
