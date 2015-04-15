@@ -220,12 +220,12 @@ int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLD
 	xmlNodePtr n1, n2;
 	struct delta_rule *rule = NULL;
 
-	if (op == XMLDIFF_MOD) {
+	if (op & XMLDIFF_MOD) {
 		/* handle modification of a rule as remove + adding */
 		op = op | (XMLDIFF_REM & XMLDIFF_ADD);
 	}
 
-	if (op == XMLDIFF_REM) {
+	if (op & XMLDIFF_REM) {
 		/* Removing an existing rule */
 
 		/* get the key of the delta rule to remove */
@@ -252,7 +252,7 @@ int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLD
 		}
 	}
 
-	if (op == XMLDIFF_ADD) {
+	if (op & XMLDIFF_ADD) {
 		/* Adding a new rule */
 		rule = calloc(1, sizeof(struct delta_rule));
 		rule->out_state = 0xffff; /* not defined */
