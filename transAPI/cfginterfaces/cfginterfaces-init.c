@@ -110,7 +110,6 @@ int main(int argc, char** argv)
 	nc_rpc* rpc;
 	nc_reply* reply;
 	char* new_startup_config;
-	ncds_id id;
 	xmlDocPtr startup_doc = NULL;
 	int ret = 0, i, j;
 
@@ -163,7 +162,7 @@ int main(int argc, char** argv)
 		nc_close();
 		return 1;
 	}
-	if ((id = ncds_init(ds)) < 0) {
+	if (ncds_init(ds) < 0) {
 		nc_verb_error("Failed to nitialize datastore.");
 		nc_close();
 		return 1;
@@ -204,7 +203,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	free(new_startup_config);
-	reply = ncds_apply_rpc(id, dummy_session, rpc);
+	reply = ncds_apply_rpc2all(dummy_session, rpc, NULL);
 	if (nc_reply_get_type(reply) != NC_REPLY_OK) {
 		nc_verb_error("Edit-config RPC failed.");
 		nc_close();
