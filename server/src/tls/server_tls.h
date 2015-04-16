@@ -20,9 +20,9 @@ struct client_struct_tls {
 	int tls_in[2];
 	int tls_out[2];
 	SSL* tls;
-	char* tls_buf;
-	uint32_t tls_buf_size;
-	uint32_t tls_buf_len;
+	char* data_buf;
+	uint32_t data_buf_size;
+	uint32_t data_buf_len;
 	X509* cert;
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
