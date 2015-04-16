@@ -120,7 +120,7 @@ AC_SUBST(NETOPEER_MANAGER)
 export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
 
 PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
-AC_SEARCH_LIBS([ncds_apply_rpc], [netconf], ,AC_MSG_ERROR([libnetconf not found!]))
+AC_SEARCH_LIBS([ncds_apply_rpc2all], [netconf], ,AC_MSG_ERROR([libnetconf not found!]))
 LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
 AC_SUBST(LIBNETCONF_DATADIR)
 
