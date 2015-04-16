@@ -2322,7 +2322,11 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 			}
 
 			asprintf(&pubkey, "%s.pub", cmd);
-			nc_set_keypair_path(cmd, pubkey);
+			if (nc_set_keypair_path(cmd, pubkey) != EXIT_SUCCESS) {
+				ERROR("auth keys add", "Failed to add key");
+				free(pubkey);
+				return EXIT_FAILURE;
+			}
 
 			++opts->key_count;
 			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
@@ -2354,7 +2358,11 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 			}
 
 			asprintf(&pubkey, "%s.pub", cmd);
-			nc_del_keypair_path(cmd, pubkey);
+			if (nc_del_keypair_path(cmd, pubkey) != EXIT_SUCCESS) {
+				ERROR("auth keys remove", "Failed to remove key");
+				free(pubkey);
+				return EXIT_FAILURE;
+			}
 			free(pubkey);
 
 			free(opts->keys[i]);
