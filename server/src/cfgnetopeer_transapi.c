@@ -669,6 +669,8 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 		module = calloc(1, sizeof(struct np_module));
 		module->name = strdup(module_name);
 		if (module_enable(module, 1)) {
+			free(module->name);
+			free(module);
 			return EXIT_FAILURE;
 		}
 	}
