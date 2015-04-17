@@ -38,7 +38,6 @@ void client_free_tls(struct client_struct_tls* client) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
 
-	free(client->data_buf);
 	if (client->nc_sess != NULL) {
 		nc_session_free(client->nc_sess);
 	}
@@ -706,11 +705,15 @@ void* netconf_session_thread(void* arg) {
 
 /* returns how much of the data was processed */
 static int check_tls_data_to_nc(struct client_struct_tls* client) {
-	char* end_rpc;
-	int ret;
-	unsigned int rpc_len, written, to_write;
+	/* the size of the SSL buffer */
+#define BUFFER_LENGTH 16384
 
-	ret = SSL_read(client->tls, client->data_buf + client->data_buf_len, (client->data_buf_size - client->data_buf_len) - 1);
+	static char buf[BUFFER_LENGTH];
+	char* buf_ptr;
+	int ret;
+	unsigned int to_write;
+
+	ret = SSL_read(client->tls, buf, BUFFER_LENGTH);
 	if (ret == 0) {
 		/* The client disconnected, we could find out whether by force
 		 * or SSL "close notify" alert was sent, but we couldn't care less,
@@ -735,33 +738,13 @@ static int check_tls_data_to_nc(struct client_struct_tls* client) {
 		return 1;
 	}
 
-	client->data_buf_len += ret;
-	client->data_buf[client->data_buf_len] = '\0';
-
-	/* if the buffer si too small */
-	if (client->data_buf_len == client->data_buf_size-1) {
-		client->data_buf_size *= 2;
-		client->data_buf = realloc(client->data_buf, client->data_buf_size);
-	}
-
-	/* check if we received a whole NETCONF message, read only the new part */
-	if ((end_rpc = strstr(client->data_buf + client->data_buf_len - ret, NC_V11_END_MSG)) != NULL) {
-		end_rpc += strlen(NC_V11_END_MSG);
-	} else if ((end_rpc = strstr(client->data_buf + client->data_buf_len - ret, NC_V10_END_MSG)) != NULL) {
-		end_rpc += strlen(NC_V10_END_MSG);
-	} else {
-		return 0;
-	}
-
-	rpc_len = end_rpc - client->data_buf;
-
 	/* pass data from the client to the library */
-	written = 0;
-	to_write = rpc_len;
+	buf_ptr = buf;
+	to_write = ret;
 	do {
-		ret = write(client->tls_out[1], client->data_buf+written, to_write);
+		ret = write(client->tls_out[1], buf, to_write);
 		if (ret > 0) {
-			written += ret;
+			buf_ptr += ret;
 			to_write -= ret;
 		}
 		if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -771,22 +754,13 @@ static int check_tls_data_to_nc(struct client_struct_tls* client) {
 
 		if (ret == -1) {
 			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
-			client->data_buf_len = 0;
 			return 1;
 		}
 		if (ret == 0) {
 			nc_verb_error("%s: failed to pass the client data to the library", __func__);
-			client->data_buf_len = 0;
 			return 1;
 		}
 	} while (to_write > 0);
-
-	/* if there were data from 2 RPCs, keep the second unfinished one */
-	if (client->data_buf_len > rpc_len) {
-		memmove(client->data_buf, client->data_buf + client->data_buf_len, client->data_buf_len - rpc_len);
-	}
-	client->data_buf_len -= rpc_len;
-	client->data_buf[client->data_buf_len] = '\0';
 
 	return 0;
 }
@@ -1268,9 +1242,6 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 	/* generate new index for TLS-specific data, for the verify callback */
 	netopeer_state.tls_state->last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 	SSL_set_ex_data(new_client->tls, netopeer_state.tls_state->last_tls_idx, new_client);
-
-	new_client->data_buf_size = BASE_READ_BUFFER_SIZE;
-	new_client->data_buf = malloc(new_client->data_buf_size);
 
 	if (SSL_accept(new_client->tls) != 1) {
 		nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));

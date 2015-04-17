@@ -51,7 +51,6 @@ static inline void _chan_free(struct chan_struct* chan) {
 	close(chan->chan_in[1]);
 	close(chan->chan_out[0]);
 	close(chan->chan_out[1]);
-	free(chan->data_buf);
 }
 
 void client_free_ssh(struct client_struct_ssh* client) {
@@ -214,9 +213,9 @@ static void sshcb_channel_eof(ssh_session session, ssh_channel channel, void *UN
 static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* data, uint32_t len, int UNUSED(is_stderr), void* UNUSED(userdata)) {
 	struct client_struct_ssh* client;
 	struct chan_struct* chan;
-	char* end_rpc;
+	char* data_ptr;
 	int ret;
-	unsigned int rpc_len, to_write, written;
+	unsigned int to_write;
 
 	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL || (chan = client_find_channel_by_sshchan(client, channel)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
@@ -230,34 +229,13 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 
 	//nc_verb_verbose("%s: raw data received:\n%.*s", __func__, len, data);
 
-	if (chan->data_buf_len + len > chan->data_buf_size-1) {
-		chan->data_buf_size *= 2;
-		chan->data_buf = realloc(chan->data_buf, chan->data_buf_size);
-	}
-
-	/* copy the new data into our buffer */
-	memcpy(chan->data_buf + chan->data_buf_len, data, len);
-	chan->data_buf_len += len;
-	chan->data_buf[chan->data_buf_len] = '\0';
-
-	/* check if we received a whole NETCONF message, read only the new part */
-	if ((end_rpc = strstr(chan->data_buf + chan->data_buf_len - len, NC_V11_END_MSG)) != NULL) {
-		end_rpc += strlen(NC_V11_END_MSG);
-	} else if ((end_rpc = strstr(chan->data_buf + chan->data_buf_len - len, NC_V10_END_MSG)) != NULL) {
-		end_rpc += strlen(NC_V10_END_MSG);
-	} else {
-		return len;
-	}
-
-	rpc_len = end_rpc - chan->data_buf;
-
 	/* pass data from the client to the library */
-	written = 0;
-	to_write = rpc_len;
+	data_ptr = (char*)data;
+	to_write = len;
 	do {
-		ret = write(chan->chan_out[1], chan->data_buf+written, to_write);
+		ret = write(chan->chan_out[1], data_ptr, to_write);
 		if (ret > 0) {
-			written += ret;
+			data_ptr += ret;
 			to_write -= ret;
 		}
 		if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -274,13 +252,6 @@ static int sshcb_channel_data(ssh_session session, ssh_channel channel, void* da
 			break;
 		}
 	} while (to_write > 0);
-
-	/* if there were data from 2 RPCs, keep the second unfinished one */
-	if (chan->data_buf_len > rpc_len) {
-		memmove(chan->data_buf, chan->data_buf + chan->data_buf_len, chan->data_buf_len - rpc_len);
-	}
-	chan->data_buf_len -= rpc_len;
-	chan->data_buf[chan->data_buf_len] = '\0';
 
 	return len;
 }
@@ -535,10 +506,6 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 		return NULL;
 	}
 	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
-
-	cur_chan->data_buf_size = BASE_READ_BUFFER_SIZE;
-	cur_chan->data_buf = malloc(cur_chan->data_buf_size);
-
 	ssh_set_channel_callbacks(cur_chan->ssh_chan, &ssh_channel_cb);
 
 	/* CLIENT UNLOCK */

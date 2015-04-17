@@ -26,9 +26,6 @@
 /* maximal value from the sizes of specific client implementations */
 #define CLIENT_STRUCT_MAX_SIZE @CLIENT_STRUCT_SIZE@
 
-/* the initial size of the reading buffer */
-#define BASE_READ_BUFFER_SIZE 2048
-
 /* end tags of NETCONF messages */
 #define NC_V10_END_MSG "]]>]]>"
 #define NC_V11_END_MSG "\n##\n"
