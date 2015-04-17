@@ -27,8 +27,8 @@ NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
 MODEL = model/ietf-interfaces.yin \
 	model/ietf-ip.yin \
-	model/ietf-interfaces-data.rng \
-	model/ietf-interfaces-gdefs.rng \
+	model/ietf-interfaces-config.rng \
+	model/ietf-interfaces-gdefs-config.rng \
 	model/ietf-interfaces-schematron.xsl
 
 SRCS = $(TARGET).c \
