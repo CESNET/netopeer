@@ -160,6 +160,24 @@ AC_ARG_ENABLE([tls],
 	TLS=no
 )
 
+AC_ARG_WITH([libnetconf],
+	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
+	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
+	LIBNETCONF_DATADIR="$withval/share/"
+	],[
+	# get info from pkg-config about installed package
+	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
+	LIBS="$LIBNETCONF_LIBS $LIBS"
+	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
+)
+REQS="$REQS libnetconf"
+BUILDREQS="$BUILDREQS libnetconf-devel"
+SERVER_LIBS=$LIBS
+
+
 ############################ Check for programs ################################
 
 # in case of cross-compilation, try to gues cross-compiler if not set
@@ -287,26 +305,8 @@ AC_SEARCH_LIBS([nc_callhome_listen], [netconf], [],
 			AC_MSG_ERROR([libnetconf does not support notifications.]);
 			AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found!]))
 		])
-	])
-
-AC_ARG_WITH([libnetconf],
-	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
-	LIBNETCONF_DATADIR="$withval/share/"
-	],[
-	# get info from pkg-config about installed package
-	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
-	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
-	LIBS="$LIBNETCONF_LIBS $LIBS"
-	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
+	]
 )
-
-REQS="$REQS libnetconf"
-BUILDREQS="$BUILDREQS libnetconf-devel"
-
-SERVER_LIBS=$LIBS
 
 # pthread
 AX_PTHREAD([
