@@ -276,7 +276,6 @@ REQS="$REQS libxml2"
 if test "$SSH" = "yes"; then
 	# libssh
 	AC_SEARCH_LIBS([ssh_pki_key_ecdsa_name], [ssh], [], [AC_MSG_ERROR([Missing the libssh library (>= 0.6.4).])])
-	AC_SEARCH_LIBS([ssh_threads_get_pthread], [ssh_threads], [], [AC_MSG_ERROR([Missing the libssh_threads library.])])
 
 	# libcrypt
 	AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the libcrypt library.])])

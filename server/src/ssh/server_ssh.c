@@ -912,8 +912,6 @@ static struct ssh_server_callbacks_struct ssh_server_cb = {
 };
 
 void np_ssh_init(void) {
-	ssh_threads_set_callbacks(ssh_threads_get_pthread());
-	ssh_init();
 	ssh_set_log_level(netopeer_options.verbose);
 	ssh_callbacks_init(&ssh_server_cb);
 	ssh_callbacks_init(&ssh_channel_cb);
@@ -1028,5 +1026,5 @@ int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind)
 }
 
 void np_ssh_cleanup(void) {
-	ssh_finalize();
+	/* nothing to do here, libssh finalize is called by libnetconf */
 }
