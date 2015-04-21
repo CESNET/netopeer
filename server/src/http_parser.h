@@ -18,11 +18,6 @@ typedef struct httpmsg {
 } httpmsg;
 
 /*
- * returns the length of the string until the first whitespace (not included)
- */
-//int strlen_until_whitespace(const char* string);
-
-/*
  * returns a newly allocated string with the contents of string until the first whitespace (not included)
  */
 char* read_until_space(const char* string);
@@ -51,7 +46,13 @@ char* read_body(const char* body);
 httpmsg* parse_req(const char* request);
 
 /*
+ * creates httpmsg structures with everything set to NULL
+ */
+httpmsg* httpmsg_create();
+
+/*
  * disposes of httpmsg structure
+ * don't forget that structure elements always need to contain malloc'd pointers or NULL's otherwise the clean method will fail with segfault
  */
 void httpmsg_clean(httpmsg* msg);
 
