@@ -42,7 +42,7 @@ item. All requirements are checked by the configure script.
 - libpthreads
 - libxml2 (including headers from the devel package)
 - libnetconf (including headers from the devel package)
-- libssh (including headers)
+- libssh >= 0.6.4 (including headers)
  - can be skipped if using --disable-ssh
 - pyang >= 1.5.0
 - python 2.6 or higher with the following modules:
