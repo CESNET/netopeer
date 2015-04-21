@@ -84,8 +84,8 @@ struct ntf_thread_config {
 };
 
 // RESTCONF FUNCTIONS - START
-NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con);
-int rc_create_rpc(httpmsg* msg, nc_rpc** rpc);
+NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con);
+int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
 void rc_send_error(int status, int fd);
 void save(const char* str, const char* file);
 
@@ -373,7 +373,7 @@ int main (int argc, char** argv)
 	}
 
 	clb_print(NC_VERB_VERBOSE, "Opening log");
-	/*TODO remove this, debug*/FILE* log = fopen("/home/rjanik/agent_cap.log", "w");
+	/*TODO remove this, debug*/FILE* log = fopen("/home/rjanik/Documents/agent_cap.log", "w");
 	if (log == NULL) {
 		clb_print(NC_VERB_ERROR, "Could not open log");
 //		nc_cpblts_free(capabilities);
@@ -416,7 +416,7 @@ int main (int argc, char** argv)
 			} else if (fds.revents & POLLIN) { /* data ready */
 				/* read data from input */
 				clb_print(NC_VERB_DEBUG, "Reading message from client.");
-				msg_type = rc_recv_rpc(fds, infd, outfd, &rpc, con);
+				msg_type = rc_recv_msg(fds, infd, outfd, &rpc, con);
 				switch (msg_type) {
 				case NC_MSG_NONE:
 					clb_print(NC_VERB_VERBOSE, "A message has been process without sending to the server");
@@ -521,70 +521,130 @@ cleanup:
 }
 
 // 1, reads HTTP message from client
-// 2, parses the message
-// 3, if the message can be processed without sending to server, processes it and replies
-// 4, if the message has to be sent to the server, it is converted to nc_rpc and the function returns NC_MSG_RPC
-// 4.5, the rpc then has to be sent to the server and a reply has to be sent but that is done in another function
-NC_MSG_TYPE rc_recv_rpc(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con) {
-	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: receiving restconf message");
-	/* TODO: make this scalable */
-	char buffer[RC_MSG_BUFF_SIZE_MAX];
-	int ptr = 0;
-	ssize_t rc;
+// 2, parses HTTP message
+// 3, if the message can be processed without converting to XML and sending to server, does so, return value: NC_MSG_NONE
+// 4, if the message has to be converted, does so, return value: NC_MSG_RPC, rpc contains the message
+// 5, if an error occurred, NC_MSG_UNKNOWN is returned -> non recoverable, agent has to be killed
+
+NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con) {
+
+	clb_print(NC_VERB_VERBOSE, "rc_recv_msg: receiving restconf message");
+
+	int ptr = 0, buffer_size = RC_MSG_BUFF_SIZE;      // ptr - number of bytes read, buffer_size - number of chars in array allowed
+	ssize_t rc;                                       // rc - read count - number of bytes read in current iteration
+	char* buffer = malloc(buffer_size);
+
+	if (buffer == NULL) {
+		clb_print(NC_VERB_ERROR, "rc_recv_msg: could not allocate memory for buffer");
+		return NC_MSG_UNKNOWN;
+	}
+
+	memset(buffer, 0, buffer_size);
 
 	while (fds.revents & POLLIN) {
-		rc = read(infd, buffer + ptr, sizeof(buffer) - ptr);
+		rc = read(infd, buffer + ptr, (buffer_size - ptr) - 1);
 
 		if (rc <= 0) {
 			break;
 		}
 
 		ptr += rc;
+
+		if (ptr >= buffer_size - 1) {
+			// we are out of space and need to extend the buffer
+			buffer_size += buffer_size;
+			clb_print(NC_VERB_DEBUG, "rc_recv_msg: extending buffer size for HTTP message");
+			char* tmp_buffer = realloc(buffer, buffer_size);
+			if (tmp_buffer == NULL) {
+				clb_print(NC_VERB_ERROR, "rc_recv_msg: could not allocate memory for buffer");
+				free(buffer);
+				return NC_MSG_UNKNOWN;
+			}
+			buffer = tmp_buffer;
+			memset(buffer + ptr, 0, buffer_size - ptr);
+		}
+
 		poll(&fds, 1, 0);
 	}
 
 	if (ptr <= 0) {
-		clb_print(NC_VERB_ERROR, "Reading HTTP message ended in error.");
+		clb_print(NC_VERB_ERROR, "rc_recv_msg: received no message, illegal agent state");
+		free(buffer);
+		return NC_MSG_UNKNOWN;
 	} else {
-		clb_print(NC_VERB_VERBOSE, "Done reading HTTP message.");
+		clb_print(NC_VERB_VERBOSE, "rc_recv_msg: received restconf message");
 	}
 
-	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: parsing HTTP message");
+	clb_print(NC_VERB_DEBUG, "rc_recv_msg: parsing restconf message");
 	httpmsg* msg = parse_req(buffer);
+	free(buffer);
+	if (msg == NULL) {
+		// allocation error
+		return NC_MSG_UNKNOWN;
+	}
 
-	clb_print(NC_VERB_DEBUG, "rc_recv_rpc: creating netconf rpc from parsed HTTP message");
-	int status = rc_create_rpc(msg, rpc);
+	clb_print(NC_VERB_DEBUG, "rc_recv_msg: handling restconf message");
+	int status = rc_handle_msg(msg, rpc, outfd, con);
 	if (status < 0) {
-		clb_print(NC_VERB_DEBUG, "rc_recv_rpc: ");
-		rc_send_error(status, outfd);
+		clb_print(NC_VERB_ERROR, "rc_recv_msg: an error has occurred while handling restconf message");
+		httpmsg_clean(msg);
+		return NC_MSG_UNKNOWN;
 	}
 
-	switch (status) {
-	case 1:
-		// no rpc but valid response, create response based on resource locator value
-		clb_print(NC_VERB_DEBUG, "rc_recv_rpc: HTTP message cannot be converted to netconf rpc, creating restconf only response");
-		int auto_status = rc_send_auto_response(outfd, msg, con);
-		if (-1 == auto_status) {
-			// internal error occurred
-			rc_send_error(2, outfd);
-		}
-		if (-2 == auto_status) {
-			// unknown resource locator value, unimplemented
-			rc_send_error(1, outfd);
-		}
+	clb_print(NC_VERB_DEBUG, "rc_recv_msg: finished handling restconf message");
+
+	if (status == 0) {
+		// there is no rpc to be sent to the server, restconf response has already been dispatched
+		clb_print(NC_VERB_VERBOSE, "rc_recv_msg: restconf request resolved, no netconf communication needed");
+		httpmsg_clean(msg);
 		return NC_MSG_NONE;
-		break;
-	case 0:
-		// nothing, rpc has been created
-		break;
-	default:
-		rc_send_error(status, outfd);
+	} else if (status == 1 && *rpc != NULL) {
+		clb_print(NC_VERB_VERBOSE, "rc_recv_msg: restconf request handled, need to contact netconf server");
+		httpmsg_clean(msg);
+		return NC_MSG_RPC;
+	} else if (status == 1){
+		clb_print(NC_VERB_ERROR, "rc_recv_msg: restconf request handled, no rpc generated but I need to contact netconf server - illegal state");
+		httpmsg_clean(msg);
+		return NC_MSG_UNKNOWN;
+	} else {
+		clb_print(NC_VERB_ERROR, "rc_recv_msg: restconf request not handled correctly");
+		httpmsg_clean(msg);
+		return NC_MSG_UNKNOWN;
 	}
 
-	return (status != 0 || *rpc == NULL) ? NC_MSG_NONE : NC_MSG_RPC;
+//	switch (status) {
+//	case 1:
+//		// no rpc but valid response, create response based on resource locator value
+//		clb_print(NC_VERB_DEBUG, "rc_recv_msg: HTTP message cannot be converted to netconf rpc, creating restconf only response");
+//		int auto_status = rc_send_auto_response(outfd, msg, con);
+//		if (-1 == auto_status) {
+//			// internal error occurred
+//			rc_send_error(2, outfd);
+//		}
+//		if (-2 == auto_status) {
+//			// unknown resource locator value, unimplemented
+//			rc_send_error(1, outfd);
+//		}
+//		return NC_MSG_NONE;
+//		break;
+//	case 0:
+//		// nothing, rpc has been created
+//		break;
+//	default:
+//		rc_send_error(status, outfd);
+//	}
+//
+//	return (status != 0 || *rpc == NULL) ? NC_MSG_NONE : NC_MSG_RPC;
 }
 
-int rc_create_rpc(httpmsg* msg, nc_rpc** rpc) {
+// TODO
+// checks /restconf part of resource identifier
+// checks validity of the next part of resource identifier
+// handles the message based on the rest of the resource identifier and given method, delegates to other functions
+// sends responses to server
+// returns 0 if ok
+// returns -1 on communication error
+int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	if (!strcmp(msg->method, "GET")) {
 		if (!strncmp(msg->resource_locator, "/restconf", strlen("/restconf"))) {
 			if (!strcmp(msg->resource_locator, "/restconf/data")) {
