@@ -544,11 +544,12 @@ callback_restart:
 	}
 	strtol(id, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", id);
 		*error = nc_err_new(NC_ERR_BAD_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/cert-maps/cert-to-name/id");
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", id) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/tls/cert-maps/cert-to-name/id");
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 	if (strcmp(map_type, "specified") == 0 && name == NULL) {

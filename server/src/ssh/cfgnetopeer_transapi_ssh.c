@@ -328,10 +328,11 @@ int callback_n_netopeer_n_ssh_n_auth_attempts(void** UNUSED(data), XMLDIFF_OP op
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -368,10 +369,11 @@ int callback_n_netopeer_n_ssh_n_auth_timeout(void** UNUSED(data), XMLDIFF_OP op,
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 

@@ -431,11 +431,12 @@ int callback_n_netopeer_n_hello_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlN
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_BAD_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/hello-timeout");
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/hello-timeout");
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -472,11 +473,12 @@ int callback_n_netopeer_n_idle_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlNo
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_BAD_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/idle-timeout");
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/idle-timeout");
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -513,11 +515,12 @@ int callback_n_netopeer_n_max_sessions(void** UNUSED(data), XMLDIFF_OP op, xmlNo
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_BAD_ELEM);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/max-sessions");
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			nc_err_set(*error, NC_ERR_PARAM_INFO_BADELEM, "/netopeer/max-sessions");
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -554,10 +557,11 @@ int callback_n_netopeer_n_response_time(void** UNUSED(data), XMLDIFF_OP op, xmlN
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -594,10 +598,11 @@ int callback_n_netopeer_n_client_removal_time(void** UNUSED(data), XMLDIFF_OP op
 
 	num = strtol(content, &ptr, 10);
 	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
 		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
+		if (asprintf(&msg, "Could not convert '%s' to a number.", content) == 0) {
+			nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
+			free(msg);
+		}
 		return EXIT_FAILURE;
 	}
 

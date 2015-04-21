@@ -117,7 +117,9 @@ static X509* base64der_to_cert(const char* in) {
 		return NULL;
 	}
 
-	asprintf(&buf, "%s%s%s", "-----BEGIN CERTIFICATE-----\n", in, "\n-----END CERTIFICATE-----");
+	if (asprintf(&buf, "%s%s%s", "-----BEGIN CERTIFICATE-----\n", in, "\n-----END CERTIFICATE-----") == -1) {
+		return NULL;
+	}
 	bio = BIO_new_mem_buf(buf, strlen(buf));
 	if (bio == NULL) {
 		free(buf);
@@ -145,7 +147,9 @@ static EVP_PKEY* base64der_to_privatekey(const char* in, int rsa) {
 		return NULL;
 	}
 
-	asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----");
+	if (asprintf(&buf, "%s%s%s%s%s%s%s", "-----BEGIN ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----\n", in, "\n-----END ", (rsa ? "RSA" : "DSA"), " PRIVATE KEY-----") == -1) {
+		return NULL;
+	}
 	bio = BIO_new_mem_buf(buf, strlen(buf));
 	if (bio == NULL) {
 		free(buf);
@@ -231,13 +235,21 @@ static int tls_ctn_get_username_from_cert(X509* client_cert, CTN_MAP_TYPE map_ty
 					san_name->type == GEN_IPADD) {
 				ip = san_name->d.iPAddress;
 				if (ip->length == 4) {
-					asprintf(username, "%d.%d.%d.%d", ip->data[0], ip->data[1], ip->data[2], ip->data[3]);
+					if (asprintf(username, "%d.%d.%d.%d", ip->data[0], ip->data[1], ip->data[2], ip->data[3]) == -1) {
+						nc_verb_error("%s: asprintf() failed", __func__);
+						sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+						return 1;
+					}
 					break;
 				} else if (ip->length == 16) {
-					asprintf(username, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-						ip->data[0], ip->data[1], ip->data[2], ip->data[3], ip->data[4], ip->data[5],
-						ip->data[6], ip->data[7], ip->data[8], ip->data[9], ip->data[10], ip->data[11],
-						ip->data[12], ip->data[13], ip->data[14], ip->data[15]);
+					if (asprintf(username, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+							ip->data[0], ip->data[1], ip->data[2], ip->data[3], ip->data[4], ip->data[5],
+							ip->data[6], ip->data[7], ip->data[8], ip->data[9], ip->data[10], ip->data[11],
+							ip->data[12], ip->data[13], ip->data[14], ip->data[15]) == -1) {
+						nc_verb_error("%s: asprintf() failed", __func__);
+						sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+						return 1;
+					}
 					break;
 				} else {
 					nc_verb_warning("%s: SAN IP address in an unknown format (length is %d)", __func__, ip->length);
