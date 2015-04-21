@@ -3025,6 +3025,14 @@ if test "$PYANG" = "no"; then
 	as_fn_error $? "\"pyang not found!\"" "$LINENO" 5
 fi
 
+#Add the standard modules to a variable for pyang to find them
+if test -d "/usr/local/share/yang/modules/"; then
+	export YANG_MODPATH=$YANG_MODPATH:/usr/local/share/yang/modules/
+fi
+if test -d "/usr/share/yang/modules/"; then
+	export YANG_MODPATH=$YANG_MODPATH:/usr/share/yang/modules/
+fi
+
 # Check for lnctool
 # Extract the first word of "lnctool", so it can be a program name with args.
 set dummy lnctool; ac_word=$2
