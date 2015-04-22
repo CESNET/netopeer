@@ -859,10 +859,11 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 
 		to_send_len = 0;
 		while (1) {
-			to_send_len += (ret = read(chan->chan_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len));
+			ret = read(chan->chan_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len);
 			if (ret == -1) {
 				break;
 			}
+			to_send_len += ret;
 
 			/* double the buffer size if too small */
 			if (to_send_len == (*to_send_size)) {
@@ -877,7 +878,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 			chan->to_free = 1;
 			skip_sleep = 1;
-		} else if (ret != -1) {
+		} else if (to_send_len > 0) {
 			/* we had some data, there may be more, sleeping may be a waste of response time */
 			skip_sleep = 1;
 
@@ -892,6 +893,7 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 
 			if (ret == SSH_ERROR) {
 				nc_verb_error("%s: failed to write into SSH channel (sent %d, still left %d)", to_send_ptr-(*to_send), to_send_len);
+				chan->to_free = 1;
 			}
 		}
 

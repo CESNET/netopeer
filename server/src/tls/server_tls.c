@@ -984,7 +984,8 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size) {
 	struct timeval cur_time;
 	struct timespec ts;
-	int ret, to_send_len, skip_sleep = 0;
+	char* to_send_ptr;
+	int ret, ssl_ret, to_send_len, skip_sleep = 0;
 
 	if (client->to_free || quit) {
 		client->to_free = 1;
@@ -1049,13 +1050,13 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		}
 	}
 
-	errno = 0;
 	to_send_len = 0;
 	while (1) {
-		to_send_len += (ret = read(client->tls_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len));
+		ret = read(client->tls_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len);
 		if (ret == -1) {
 			break;
 		}
+		to_send_len += ret;
 
 		/* double the buffer size if too small */
 		if (to_send_len == *to_send_size) {
@@ -1070,13 +1071,15 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
 		client->to_free = 1;
 		skip_sleep = 1;
-	} else if (ret != -1) {
+	} else if (to_send_len > 0) {
 		skip_sleep = 1;
-		ret = SSL_write(client->tls, *to_send, to_send_len);
-		if (ret != to_send_len) {
+
+		to_send_ptr = *to_send;
+		do {
+			ret = SSL_write(client->tls, to_send_ptr, to_send_len);
 			if (ret == -1) {
-				ret = SSL_get_error(client->tls, ret);
-				if (ret < 2 || (ret > 4 && ret < 7) || ret > 8) {
+				ssl_ret = SSL_get_error(client->tls, ret);
+				if (ssl_ret < 2 || (ssl_ret > 4 && ssl_ret < 7) || ssl_ret > 8) {
 					/*
 					* 2 - SSL_ERROR_WANT_READ
 					* 3 - SSL_ERROR_WANT_WRITE
@@ -1086,13 +1089,16 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 					*
 					* errors caused by the non-blocking socket, ignore
 					*/
+
+					nc_verb_error("%s: SSL write failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
+					client->to_free = 1;
+					break;
 				}
-				return 1;
 			}
 
-			nc_verb_error("%s: SSL write failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
-			client->to_free = 1;
-		}
+			to_send_len -= ret;
+			to_send_ptr += ret;
+		} while (to_send_len > 0);
 	}
 
 	if (client->last_send) {
