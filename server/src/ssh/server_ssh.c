@@ -922,7 +922,6 @@ void np_ssh_init(void) {
 }
 
 ssh_bind np_ssh_server_id_check(ssh_bind sshbind) {
-	char verb_str[2];
 	ssh_bind ret;
 
 	/* Check server keys for a change */
@@ -940,8 +939,7 @@ ssh_bind np_ssh_server_id_check(ssh_bind sshbind) {
 			ssh_bind_options_set(ret, SSH_BIND_OPTIONS_DSAKEY, netopeer_options.ssh_opts->dsa_key);
 		}
 
-		sprintf(verb_str, "%d", netopeer_options.verbose);
-		ssh_bind_options_set(ret, SSH_BIND_OPTIONS_LOG_VERBOSITY_STR, verb_str);
+		ssh_bind_options_set(ret, SSH_BIND_OPTIONS_LOG_VERBOSITY, &netopeer_options.verbose);
 
 		netopeer_options.ssh_opts->server_key_change_flag = 0;
 	} else {
