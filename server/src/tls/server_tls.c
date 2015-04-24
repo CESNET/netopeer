@@ -706,14 +706,14 @@ void* netconf_session_thread(void* arg) {
 /* returns how much of the data was processed */
 static int check_tls_data_to_nc(struct client_struct_tls* client) {
 	/* the size of the SSL buffer */
-#define BUFFER_LENGTH 16384
+	#define TLS_BUF_LEN 16384
 
-	static char buf[BUFFER_LENGTH];
+	static char buf[TLS_BUF_LEN];
 	char* buf_ptr;
 	int ret;
 	unsigned int to_write;
 
-	ret = SSL_read(client->tls, buf, BUFFER_LENGTH);
+	ret = SSL_read(client->tls, buf, TLS_BUF_LEN);
 	if (ret == 0) {
 		/* The client disconnected, we could find out whether by force
 		 * or SSL "close notify" alert was sent, but we couldn't care less,

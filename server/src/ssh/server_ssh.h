@@ -36,9 +36,10 @@ struct client_struct_ssh {
 	pthread_mutex_t client_lock;
 	volatile struct timeval conn_time;	// timestamp of the new connection
 	int auth_attempts;					// number of failed auth attempts
+	int authenticated;
 	struct chan_struct* ssh_chans;
 	ssh_session ssh_sess;
-	ssh_event ssh_evt;
+	int new_ssh_msg;
 };
 
 struct ncsess_thread_config {
