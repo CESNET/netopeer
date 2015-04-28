@@ -4786,7 +4786,7 @@ fi
 
 	# - spec file dependencies
 	case $DISTRO in
-		suse )
+		opensuse | suse )
 			BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
 			REQS="$REQS dbus-1 >= 1.0.0"
 			;;
