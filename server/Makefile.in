@@ -122,7 +122,7 @@ CFGS_TAR = $(CFGS) \
 	config/Netopeer.xml.in \
 	config/ietf-netconf-server-data.rng.in \
 	config/netopeer-cfgnetopeer-data.rng.in \
-	stunnel/stunnel.conf.in
+	config/stunnel_config.in
 
 H_IN = src/config.h.in
 
