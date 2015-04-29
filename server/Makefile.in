@@ -260,7 +260,7 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 			fi; \
 			echo "" >> $(CFGDIR)/sshd_config; \
 			echo "# NETCONF SSH Subsystem settings" >> $(CFGDIR)/sshd_config; \
-			echo "Subsystem netconf $(DESTDIR)/$(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
+			echo "Subsystem netconf $(bindir)/$(AGENT)" >> $(CFGDIR)/sshd_config; \
 		fi; \
 		chmod 600 $(CFGDIR)/sshd_config; \
 		echo "NOTE: Check $(CFGDIR)/sshd_config for NETCONF SSH server configuration."; \
