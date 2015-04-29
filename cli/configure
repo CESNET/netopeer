@@ -2594,9 +2594,9 @@ fi
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; CFLAGS="$CFLAGS -g -O0 -DDEBUG"
+	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 else
   CFLAGS="$CFLAGS -O3 -DNDEBUG"
-	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 
 fi
 
@@ -2606,6 +2606,7 @@ tls="no"
 if test "${enable_tls+set}" = set; then :
   enableval=$enable_tls; if test "$enableval" = "yes"; then
 		tls="yes"
+		CONFIGURE_PARAMS="--enable-tls $CONFIGURE_PARAMS"
 	fi
 
 fi
