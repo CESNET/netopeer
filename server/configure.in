@@ -193,6 +193,7 @@ AC_ARG_ENABLE([tls],
 		tls="yes"
 		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
 		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --enable-tls"
 	fi
 	TLS="yes"
 	AC_SUBST(TLS)
