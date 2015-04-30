@@ -1779,7 +1779,7 @@ void cmd_test_help(FILE* output) {
 
 static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
 	xmlNodePtr model, capab, attr;
-	struct np_test_capab* ret = NULL, *ret_cur;
+	struct np_test_capab* ret = NULL, *ret_cur = NULL;
 
 	for (; node_list != NULL; node_list = node_list->next) {
 		if (!xmlStrEqual(node_list->name, BAD_CAST "capability") && !xmlStrEqual(node_list->name, BAD_CAST "model")) {
@@ -1896,7 +1896,7 @@ static struct np_test_capab* test_parse_capabs(xmlNodePtr node_list) {
 static struct np_test_var* test_parse_vars(xmlNodePtr node_list) {
 	char* var_list, *ptr;
 	xmlNodePtr node, var;
-	struct np_test_var* ret = NULL, *ret_cur;
+	struct np_test_var* ret = NULL, *ret_cur = NULL;
 
 	for (; node_list != NULL; node_list = node_list->next) {
 		if (!xmlStrEqual(node_list->name, BAD_CAST "variable")) {
@@ -2170,7 +2170,7 @@ static struct np_test* test_parse_tests(xmlNodePtr node_list) {
 
 int cmd_test(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
 	char* args = strdupa(arg);
-	char* cmd = NULL, *ptr;
+	char* cmd = NULL, *ptr = NULL;
 	struct np_test* tests;
 	struct np_test_capab* test_capabs;
 	struct np_test_var* vars;
