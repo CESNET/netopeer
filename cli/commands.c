@@ -3568,7 +3568,7 @@ void cmd_editor_help(FILE* output) {
 }
 
 int cmd_editor(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
-	char* cmd, *args = strdupa(arg), *ptr;
+	char* cmd, *args = strdupa(arg), *ptr = NULL;
 
 	cmd = strtok_r(args, " ", &ptr);
 	cmd = strtok_r(NULL, " ", &ptr);
