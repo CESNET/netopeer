@@ -4514,11 +4514,11 @@ else
 $as_echo "yes" >&6; }
 
 fi
-	BUILDREQS="$BUILDREQS libnetconf-devel"
+	BUILDREQS="$BUILDREQS libnetconf-devel >= 0.9.2 libnetconf-devel <= 0.10"
 
 fi
 
-REQS="$REQS libnetconf"
+REQS="$REQS libnetconf >= 0.9.2 libnetconf <= 0.10"
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing nc_callhome_listen" >&5
 $as_echo_n "checking for library containing nc_callhome_listen... " >&6; }
 if ${ac_cv_search_nc_callhome_listen+:} false; then :

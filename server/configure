@@ -4553,8 +4553,8 @@ else
   as_fn_error $? "libnetconf does not support notifications." "$LINENO" 5
 fi
 
-REQS="$REQS libnetconf"
-BUILDREQS="$BUILDREQS libnetconf-devel"
+REQS="$REQS libnetconf >= 0.9 libnetconf <= 0.10"
+BUILDREQS="$BUILDREQS libnetconf-devel >= 0.9 libnetconf-devel <= 0.10"
 
 # libdbus
 if test "$dbus" = "yes"; then
