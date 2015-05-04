@@ -630,6 +630,13 @@ int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output, FI
 				return EXIT_FAILURE;
 			}
 
+			/* check that the file exists */
+			if (access(optarg, R_OK) != 0) {
+				ERROR("edit-config", "cannot access the file (%s).", strerror(errno));
+				clear_arglist(&cmd);
+				return EXIT_FAILURE;
+			}
+
 			/* read the configuration */
 			doc = xmlReadFile(optarg, NULL, XML_PARSE_NOBLANKS|XML_PARSE_NSCLEAN|XML_PARSE_NOERROR|XML_PARSE_NOWARNING);
 			if (doc == NULL) {
