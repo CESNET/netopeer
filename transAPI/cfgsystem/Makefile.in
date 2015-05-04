@@ -13,7 +13,6 @@ libdir =  @libdir@
 mandir = @mandir@
 libtool = @libtool@
 sysconfdir = @sysconfdir@
-tls = @tls@
 NETOPEER_DIR = @NETOPEER_DIR@
 
 CC = @CC@
@@ -28,8 +27,8 @@ NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
 MODEL = model/ietf-system.yin \
 	model/iana-crypt-hash.yin \
-	model/ietf-system-data.rng \
-	model/ietf-system-gdefs.rng \
+	model/ietf-system-config.rng \
+	model/ietf-system-gdefs-config.rng \
 	model/ietf-system-schematron.xsl
 
 SRCS = $(TARGET).c \
