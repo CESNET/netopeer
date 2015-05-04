@@ -611,7 +611,7 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_search(void**
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		if (dns_rm_search_domain(get_node_content(new_node), &msg) != EXIT_SUCCESS) {
+		if (dns_rm_search_domain(get_node_content(old_node), &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else {
