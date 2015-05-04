@@ -32,7 +32,9 @@ class netopeer_configuration:
 		files = os.listdir(nc_dir)
 
 		for fil in files:
-			if fil[:3] == 'nc_' and fil[-3:] == '.py':
+			if fil[:3] == 'nc_' and fil[-3:] == '.py' and \
+			(config.options['ssh'] == 'yes' if fil[3:-3] == 'sshauth' else True) and \
+			(config.options['tls'] == 'yes' if fil[3:-3] == 'tlsauth' else True):
 				try:
 					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
 					if getattr(module, fil[:-3]).name != None:
@@ -54,12 +56,6 @@ class netopeer_configuration:
 			if i > 0 and module_name == 'nc_netopeer':
 				class_ins = self.ncmodules.pop(i)
 				self.ncmodules.insert(0, class_ins);
-				continue
-
-			# remove unsupported modules
-			if (module_name == 'nc_sshauth' and config.options['ssh'] != 'yes') or\
-					(module_name == 'nc_tlsauth' and config.options['tls'] != 'yes'):
-				self.ncmodules.pop(i)
 				continue
 
 			i += 1
