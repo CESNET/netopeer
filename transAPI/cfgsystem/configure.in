@@ -75,8 +75,23 @@ if test -n "$USERADD" -a -n "$USERDEL"; then
 else
 	OFF_FEATURES="$OFF_FEATURES authentication local-users"
 fi
-ntpd_service="$(systemctl is-active ntpd.service)"
-if test -f "/etc/ntp.conf" -a "$ntpd_service" = "active"; then
+
+NTP="no"
+AC_CHECK_PROG(SYSTEMCTL, systemctl, yes)
+if test "$SYSTEMCTL" = "yes"; then
+	ntpd_service="$(systemctl is-active ntpd.service)"
+	if test "$ntpd_service" = "active"; then
+		NTP="yes"
+	fi
+else
+	ntpd_service="$(service ntpd status)"
+	case "$ntpd_service" in
+	*running*)
+		NTP="yes"
+	;;
+	esac
+fi
+if test "$NTP" = "yes"; then
 	FEATURES="$FEATURES ntp"
 	if test "${LNC_FEATURES: -1}" = ":"; then
 		LNC_FEATURES="${LNC_FEATURES}ntp"
