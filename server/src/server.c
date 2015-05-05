@@ -402,6 +402,11 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 			continue;
 		}
 
+		if (fcntl(npsock->pollsock[npsock->count-1].fd, F_SETFD, FD_CLOEXEC) != 0) {
+			nc_verb_error("%s: fcntl failed (%s)", __func__, strerror(errno));
+			continue;
+		}
+
 		bzero(&saddr, sizeof(struct sockaddr_storage));
 		if (is_ipv4) {
 			saddr4 = (struct sockaddr_in*)&saddr;
