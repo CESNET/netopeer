@@ -337,23 +337,36 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 	return EXIT_SUCCESS;
 }
 
-int dns_rm_nameserver(int i, char** msg)
+int dns_rm_nameserver(const char* address, char** msg)
 {
-	char* path = NULL;
+	char* path;
+	const char* value;
+	int i, ret;
 
-	asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, i);
-	switch (aug_match(sysaugeas, path, NULL)) {
-	case -1:
-		asprintf(msg, "Augeas match for \"%s\" failed: %s", path, aug_error_message(sysaugeas));
+	for (i = 1;; ++i) {
+		asprintf(&path, "/files/%s/nameserver[%d]", AUGEAS_DNS_CONF, i);
+		ret = aug_get(sysaugeas, path, (const char**)&value);
+
+		assert(ret >= 0);
+
+		if (ret == 0) {
+			break;
+		}
+
+		if (strcmp(value, address) == 0) {
+			break;
+		}
+
+		free(path);
+	}
+
+	if (ret == 0) {
+		asprintf(msg, "Removing a nameserver failed (No such nameserver found)");
 		free(path);
 		return EXIT_FAILURE;
-	case 0:
-		/* do nothing */
-		break;
-	default:
-		/* 1 */
-		aug_rm(sysaugeas, path);
 	}
+
+	aug_rm(sysaugeas, path);
 	free(path);
 
 	return EXIT_SUCCESS;

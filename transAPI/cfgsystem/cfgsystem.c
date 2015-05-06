@@ -672,25 +672,27 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 	} else {
 		node = (op & XMLDIFF_REM ? old_node : new_node);
 
-		/* Get the index of this nameserver */
+		/* Get the index of this nameserver
+		 *
+		 * We care about it on ADD and MOD, otherwise
+		 * we just need the address.
+		 */
 		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
 			if (cur->type != XML_ELEMENT_NODE) {
 				continue;
 			} else if (cur == node) {
-				if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
-					/* get node with added/changed address */
-					for (cur = node->children; cur != NULL; cur = cur->next) {
-						if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "udp-and-tcp")) {
+				/* get node with added/changed address */
+				for (cur = node->children; cur != NULL; cur = cur->next) {
+					if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "udp-and-tcp")) {
+						continue;
+					}
+					for (cur = cur->children; cur != NULL; cur = cur->next) {
+						if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "address")) {
 							continue;
-						}
-						for (cur = cur->children; cur != NULL; cur = cur->next) {
-							if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "address")) {
-								continue;
-							}
-							break;
 						}
 						break;
 					}
+					break;
 				}
 				break;
 			} else if (xmlStrcmp(cur->name, node->name) == 0) {
@@ -699,12 +701,9 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 		}
 
 		if (op & XMLDIFF_REM) {
-			if (dns_rm_nameserver(i, &msg) != EXIT_SUCCESS) {
+			if (cur == NULL || dns_rm_nameserver(get_node_content(cur), &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
-			/* remove it due to getting index in other siblings */
-			xmlUnlinkNode(node);
-			xmlFreeNode(node);
 		} else if (op & XMLDIFF_ADD) {
 			if (cur == NULL || dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);

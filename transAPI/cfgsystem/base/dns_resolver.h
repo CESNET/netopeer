@@ -100,7 +100,7 @@ int dns_mod_nameserver(const char* address, int index, char** msg);
  * @param msg[out] error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int dns_rm_nameserver(int index, char** msg);
+int dns_rm_nameserver(const char* address, char** msg);
 
 /**
  * @brief remove all nameservers from the /etc/resolv.conf configuration file
