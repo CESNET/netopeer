@@ -27,6 +27,7 @@ NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
 MODEL = model/ietf-interfaces.yin \
 	model/ietf-ip.yin \
+	model/iana-if-type.yin \
 	model/ietf-interfaces-config.rng \
 	model/ietf-interfaces-gdefs-config.rng \
 	model/ietf-interfaces-schematron.xsl
@@ -69,6 +70,8 @@ install: $(MODULE) $(TARGET)-init
 		$(NETOPEER_MANAGER) add --name ietf-interfaces \
 			--augment $(NETOPEER_DIR)/ietf-interfaces/ietf-ip.yin \
 			--features ipv4-non-contiguous-netmasks ipv6-privacy-autoconf; \
+		$(NETOPEER_MANAGER) add --name ietf-interfaces \
+			--import $(NETOPEER_DIR)/ietf-interfaces/iana-if-type.yin; \
 	fi
 	./$(TARGET)-init $(NETOPEER_DIR)/ietf-interfaces/datastore.xml ipv4-non-contiguous-netmasks ipv6-privacy-autoconf
 
