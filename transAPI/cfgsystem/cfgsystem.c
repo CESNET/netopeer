@@ -547,6 +547,9 @@ PUBLIC int callback_systemns_system_systemns_ntp(void** data, XMLDIFF_OP op, xml
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
+	} else if (op & XMLDIFF_ADD) {
+		/* NTP was already started/nothing to be done
+		 * based on the 'enabled' node value, in its callback. */
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the system-ntp callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
@@ -713,7 +716,6 @@ PUBLIC int callback_systemns_system_systemns_dns_resolver_systemns_server(void**
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
-
 	}
 
 	return EXIT_SUCCESS;
