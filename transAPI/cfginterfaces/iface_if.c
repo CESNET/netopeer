@@ -3525,26 +3525,27 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 			ip = NULL;
 		}
 
-		line = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES", NULL);
-		for (ip = strtok(line, ";"); ip != NULL; ip = strtok(NULL, ";")) {
-			if (strchr(ip, '/') == NULL) {
-				continue;
+		if ((line = read_ifcfg_var(if_name, "IPV6ADDR_SECONDARIES", NULL)) != NULL) {
+			for (ip = strtok(line, ";"); ip != NULL; ip = strtok(NULL, ";")) {
+				if (strchr(ip, '/') == NULL) {
+					continue;
+				}
+
+				prefix = strchr(ip, '/')+1;
+
+				/* add a new IP */
+				if (ips->count == 0) {
+					ips->ip = malloc(sizeof(char*));
+					ips->prefix_or_mac = malloc(sizeof(char*));
+				} else {
+					ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
+					ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
+				}
+
+				ips->ip[ips->count] = strndup(ip, strchr(ip, '/')-ip);
+				ips->prefix_or_mac[ips->count] = strdup(prefix);
+				++ips->count;
 			}
-
-			prefix = strchr(ip, '/')+1;
-
-			/* add a new IP */
-			if (ips->count == 0) {
-				ips->ip = malloc(sizeof(char*));
-				ips->prefix_or_mac = malloc(sizeof(char*));
-			} else {
-				ips->ip = realloc(ips->ip, (ips->count+1)*sizeof(char*));
-				ips->prefix_or_mac = realloc(ips->prefix_or_mac, (ips->count+1)*sizeof(char*));
-			}
-
-			ips->ip[ips->count] = strndup(ip, strchr(ip, '/')-ip);
-			ips->prefix_or_mac[ips->count] = strdup(prefix);
-			++ips->count;
 		}
 #endif
 #ifdef SUSE
