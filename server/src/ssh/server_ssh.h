@@ -8,14 +8,11 @@
 /* for each SSH channel of each SSH session */
 struct chan_struct {
 	ssh_channel ssh_chan;
-	int chan_in[2];				// pipe - libssh channel read, libnetconf write
-	int chan_out[2];			// pipe - libssh channel write, libnetconf read
 	int netconf_subsystem;
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	volatile int to_free;		// is this channel valid?
-	volatile int last_send;
 	struct chan_struct* next;
 };
 
@@ -49,7 +46,7 @@ struct ncsess_thread_config {
 
 void np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
 
-int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to_send_size);
+int np_ssh_client_data(struct client_struct_ssh* client);
 
 void np_ssh_init(void);
 

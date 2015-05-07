@@ -286,11 +286,7 @@ void* netconf_rpc_thread(void* UNUSED(arg)) {
 
 void* data_thread(void* UNUSED(arg)) {
 	struct client_struct* client;
-	int skip_sleep, to_send_size;
-	char* to_send;
-
-	to_send_size = BASE_READ_BUFFER_SIZE;
-	to_send = malloc(to_send_size);
+	int skip_sleep;
 
 	do {
 		skip_sleep = 0;
@@ -303,12 +299,12 @@ void* data_thread(void* UNUSED(arg)) {
 			switch (client->transport) {
 #ifdef NP_SSH
 			case NC_TRANSPORT_SSH:
-				skip_sleep = np_ssh_client_data((struct client_struct_ssh*)client, &to_send, &to_send_size);
+				skip_sleep = np_ssh_client_data((struct client_struct_ssh*)client);
 				break;
 #endif
 #ifdef NP_TLS
 			case NC_TRANSPORT_TLS:
-				skip_sleep = np_tls_client_data((struct client_struct_tls*)client, &to_send, &to_send_size);
+				skip_sleep = np_tls_client_data((struct client_struct_tls*)client);
 				break;
 #endif
 			default:
@@ -330,7 +326,6 @@ void* data_thread(void* UNUSED(arg)) {
 		}
 	} while (!quit || netopeer_state.clients != NULL);
 
-	free(to_send);
 #ifdef NP_TLS
 	np_tls_thread_cleanup();
 #endif

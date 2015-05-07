@@ -8,12 +8,14 @@
 #endif
 
 #ifdef NP_SSH
+#	include <libnetconf_ssh.h>
 #	include "./ssh/server_ssh.h"
 #	include "./ssh/cfgnetopeer_transapi_ssh.h"
 #	include "./ssh/netconf_server_transapi_ssh.h"
 #endif
 
 #ifdef NP_TLS
+#	include <libnetconf_tls.h>
 #	include "./tls/server_tls.h"
 #	include "./tls/cfgnetopeer_transapi_tls.h"
 #	include "./tls/netconf_server_transapi_tls.h"

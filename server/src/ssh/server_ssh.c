@@ -36,6 +36,7 @@ extern struct np_options netopeer_options;
 static inline void _chan_free(struct chan_struct* chan) {
 	if (chan->nc_sess != NULL) {
 		nc_verb_error("%s: internal error: freeing a channel with an opened NC session", __func__);
+		nc_session_free(chan->nc_sess);
 	}
 
 	if (chan->new_sess_tid != 0) {
@@ -44,13 +45,6 @@ static inline void _chan_free(struct chan_struct* chan) {
 	if (chan->ssh_chan != NULL) {
 		ssh_channel_free(chan->ssh_chan);
 	}
-	if (chan->nc_sess != NULL) {
-		nc_session_free(chan->nc_sess);
-	}
-	close(chan->chan_in[0]);
-	close(chan->chan_in[1]);
-	close(chan->chan_out[0]);
-	close(chan->chan_out[1]);
 }
 
 void client_free_ssh(struct client_struct_ssh* client) {
@@ -169,7 +163,7 @@ static void* netconf_session_thread(void* arg) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	nstc->chan->nc_sess = nc_session_accept_inout(caps, nstc->client->username, nstc->chan->chan_out[0], nstc->chan->chan_in[1]);
+	nstc->chan->nc_sess = nc_session_accept_libssh_channel(caps, nstc->client->username, nstc->chan->ssh_chan);
 	nc_cpblts_free(caps);
 	if (nstc->chan->to_free == 1) {
 		/* probably a signal received */
@@ -193,58 +187,6 @@ static void* netconf_session_thread(void* arg) {
 	free(nstc);
 
 	return NULL;
-}
-
-/* return 0 - no data, -1 - error, 1 - some data */
-static int check_ssh_data_to_nc(struct client_struct_ssh* client, struct chan_struct* channel) {
-	#define SSH_BUF_LEN 32710
-
-	static char buf[SSH_BUF_LEN];
-	char* buf_ptr;
-	int ret;
-	unsigned int to_write;
-
-	if (!channel->netconf_subsystem) {
-		return 0;
-	}
-
-	ret = ssh_channel_read_nonblocking(channel->ssh_chan, buf, SSH_BUF_LEN, 0);
-	if (ret == SSH_EOF) {
-		nc_verb_verbose("%s: channel EOF", __func__);
-		return -1;
-	} else if (ret == SSH_AGAIN || ret == 0) {
-		/* we'll just read later */
-		return 0;
-	} else if (ret == SSH_ERROR) {
-		nc_verb_error("%s: failed to read from an SSH channel (%s)", __func__, ssh_get_error(client->ssh_sess));
-		return -1;
-	}
-
-	/* pass data from the client to the library */
-	buf_ptr = buf;
-	to_write = ret;
-	do {
-		ret = write(channel->chan_out[1], buf_ptr, to_write);
-		if (ret > 0) {
-			buf_ptr += ret;
-			to_write -= ret;
-		}
-		if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			usleep(10);
-			continue;
-		}
-
-		if (ret == -1) {
-			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
-			break;
-		}
-		if (ret == 0) {
-			nc_verb_error("%s: failed to pass the client data to the library", __func__);
-			break;
-		}
-	} while (to_write > 0);
-
-	return 1;
 }
 
 /* return 0 - OK, -1 error */
@@ -457,17 +399,6 @@ static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel chan
 	}
 	cur_chan->ssh_chan = channel;
 
-	if ((ret = pipe(cur_chan->chan_in)) != 0 || (ret = pipe(cur_chan->chan_out)) != 0) {
-		nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
-		cur_chan->to_free = 1;
-		return -1;
-	}
-	if (fcntl(cur_chan->chan_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(cur_chan->chan_in[1], F_SETFL, O_NONBLOCK) != 0 ||
-			fcntl(cur_chan->chan_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(cur_chan->chan_out[1], F_SETFL, O_NONBLOCK) != 0) {
-		nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
-		cur_chan->to_free = 1;
-		return -1;
-	}
 	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
 
 	/* CLIENT UNLOCK */
@@ -526,7 +457,7 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 	pthread_mutex_lock(&client->client_lock);
 
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->to_free || chan->last_send || chan->nc_sess == NULL) {
+		if (chan->to_free || chan->nc_sess == NULL) {
 			continue;
 		}
 
@@ -687,7 +618,7 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 		nc_rpc_free(rpc);
 
 		if (closing) {
-			chan->last_send = 1;
+			chan->to_free = 1;
 			closing = 0;
 		}
 	}
@@ -697,12 +628,11 @@ void np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 }
 
 /* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep), 2 - client deleted */
-int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to_send_size) {
+int np_ssh_client_data(struct client_struct_ssh* client) {
 	struct chan_struct* chan;
 	struct timeval cur_time;
 	struct timespec ts;
-	int ret, to_send_len, skip_sleep = 0;
-	char* to_send_ptr;
+	int ret, skip_sleep = 0;
 
 	/* check whether the client shouldn't be freed */
 	if (client->to_free) {
@@ -781,10 +711,6 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 
 	/* check every channel of the client for pending data */
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->last_send) {
-			goto send;
-		}
-
 		if (chan->to_free || quit) {
 			chan->to_free = 1;
 
@@ -813,20 +739,6 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			pthread_mutex_unlock(&client->client_lock);
 		}
 
-		/* check if there aren't some SSH data pending */
-		if ((ret = check_ssh_data_to_nc(client, chan)) == -1) {
-			nc_verb_warning("Failed to read from a channel, it was probably disconnected.");
-			/* this invalid socket may have been reused and we would close
-			 * it during cleanup */
-			if (client->ssh_chans->next == NULL) {
-				client->sock = -1;
-			}
-			chan->to_free = 1;
-		}
-		if (ret == 1) {
-			skip_sleep = 1;
-		}
-
 		/* check the channel for hello timeout */
 		if (chan->nc_sess == NULL && timeval_diff(cur_time, chan->last_rpc_time) >= netopeer_options.hello_timeout) {
 			if (chan->new_sess_tid == 0) {
@@ -846,50 +758,6 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 				nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.", client->username);
 				chan->to_free = 1;
 			}
-		}
-
-send:
-		to_send_len = 0;
-		while (1) {
-			to_send_len += (ret = read(chan->chan_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len));
-			if (ret == -1) {
-				break;
-			}
-
-			/* double the buffer size if too small */
-			if (to_send_len == (*to_send_size)) {
-				*to_send_size *= 2;
-				*to_send = realloc(*to_send, *to_send_size);
-			} else {
-				break;
-			}
-		}
-
-		if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-			nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-			chan->to_free = 1;
-			skip_sleep = 1;
-		} else if (ret != -1) {
-			/* we had some data, there may be more, sleeping may be a waste of response time */
-			skip_sleep = 1;
-
-			to_send_ptr = *to_send;
-			do {
-				ret = ssh_channel_write(chan->ssh_chan, to_send_ptr, to_send_len);
-				if (ret != SSH_ERROR) {
-					to_send_len -= ret;
-					to_send_ptr += ret;
-				}
-			} while (ret != SSH_ERROR && to_send_len > 0);
-
-			if (ret == SSH_ERROR) {
-				nc_verb_error("%s: failed to write into SSH channel (sent %d, still left %d)", to_send_ptr-(*to_send), to_send_len);
-			}
-		}
-
-		if (chan->last_send) {
-			chan->to_free = 1;
-			skip_sleep = 1;
 		}
 	}
 
@@ -1015,7 +883,6 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 	}
 
 	nc_verb_verbose("Received an SSH message \"%s\" of subtype \"%s\".", str_type, str_subtype);
-
 
 	if ((client = client_find_by_sshsession(netopeer_state.clients, session)) == NULL) {
 		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
