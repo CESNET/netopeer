@@ -997,8 +997,27 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 	return 1;
 }
 
+void sshcb_log(int priority, const char* UNUSED(function), const char* buffer, void* UNUSED(userdata)) {
+	switch(priority) {
+	case 1:
+		nc_verb_error("SSH log: %s", buffer);
+		break;
+	case 2:
+		nc_verb_warning("SSH log: %s", buffer);
+		break;
+	case 3:
+		nc_verb_verbose("SSH log: %s", buffer);
+		break;
+	default:
+		nc_verb_error("SSH log callback called with an unknown priority %d.", priority);
+		nc_verb_error("SSH log: %s", buffer);
+		break;
+	}
+}
+
 void np_ssh_init(void) {
 	ssh_set_log_level(netopeer_options.verbose);
+	ssh_set_log_callback(sshcb_log);
 }
 
 ssh_bind np_ssh_server_id_check(ssh_bind sshbind) {
