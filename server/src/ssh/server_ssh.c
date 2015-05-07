@@ -682,7 +682,11 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 	/* check the client for authentication timeout and failed attempts */
 	if (!client->authenticated) {
 		if (timeval_diff(cur_time, client->conn_time) >= netopeer_options.ssh_opts->auth_timeout) {
-			nc_verb_warning("Failed to authenticate for too long, dropping a client.");
+			if (client->username == NULL) {
+				nc_verb_warning("Failed to authenticate for too long, dropping a client.");
+			} else {
+				nc_verb_warning("Failed to authenticate for too long, dropping client '%s'.", client->username);
+			}
 
 			/* mark client for deletion */
 			client->to_free = 1;
@@ -690,7 +694,12 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 		}
 
 		if (client->auth_attempts >= netopeer_options.ssh_opts->auth_attempts) {
-			nc_verb_warning("Reached the number of failed authentication attempts, dropping a client.");
+			if (client->username == NULL) {
+				nc_verb_warning("Reached the number of failed authentication attempts, dropping a client.");
+			} else {
+				nc_verb_warning("Reached the number of failed authentication attempts, dropping client '%s'.", client->username);
+			}
+
 			client->to_free = 1;
 			return 0;
 		}
@@ -709,7 +718,12 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 	}
 
 	if (ssh_execute_message_callbacks(client->ssh_sess) != SSH_OK) {
-		nc_verb_error("Failed to receive new messages (%s), disconnecting a client.", ssh_get_error(client->ssh_sess));
+		if (client->username == NULL) {
+			nc_verb_error("Failed to receive new messages (%s), dropping a client.", ssh_get_error(client->ssh_sess));
+		} else {
+			nc_verb_error("Failed to receive new messages (%s), dropping client '%s'.", ssh_get_error(client->ssh_sess), client->username);
+		}
+
 		if (client->ssh_chans != NULL) {
 			for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
 				chan->to_free = 1;
@@ -733,6 +747,7 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 
 			/* don't sleep, we may have been asked to quit */
 			skip_sleep = 1;
+			nc_verb_verbose("Freeing session for '%s'", client->username);
 			nc_session_free(chan->nc_sess);
 			chan->nc_sess = NULL;
 

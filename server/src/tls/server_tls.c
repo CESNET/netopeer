@@ -38,6 +38,7 @@ void client_free_tls(struct client_struct_tls* client) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
 	if (client->nc_sess != NULL) {
+		nc_verb_error("%s: internal error: freeing a client with an opened NC session", __func__);
 		nc_session_free(client->nc_sess);
 	}
 
@@ -45,9 +46,7 @@ void client_free_tls(struct client_struct_tls* client) {
 		pthread_cancel(client->new_sess_tid);
 	}
 	if (client->tls != NULL) {
-		if (SSL_shutdown(client->tls) == 0) {
-			nc_verb_verbose("%s: dropping client without waiting for \"close_alert\"", __func__);
-		}
+		SSL_shutdown(client->tls);
 		SSL_free(client->tls);
 	}
 	if (client->sock != -1) {
@@ -910,6 +909,7 @@ int np_tls_client_data(struct client_struct_tls* client) {
 	if (client->to_free || quit) {
 		client->to_free = 1;
 
+		nc_verb_verbose("Freeing session for '%s'", client->username);
 		nc_session_free(client->nc_sess);
 		client->nc_sess = NULL;
 
@@ -1132,7 +1132,7 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 
 	/* start a separate thread for NETCONF session accept */
 	if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
-		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
+		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", __func__, strerror(ret));
 		return 1;
 	}
 	pthread_detach(new_client->new_sess_tid);
