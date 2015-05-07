@@ -282,29 +282,50 @@ static int auth_password_compare_pwd(const char* pass_hash, const char* pass_cle
 	return strcmp(new_pass_hash, pass_hash);
 }
 
-/* return 0 - auth OK, -1 - auth failure */
-static int sshcb_auth_password(struct client_struct_ssh* client, const char* pass) {
+static void sshcb_auth_password(struct client_struct_ssh* client, ssh_message msg) {
 	char* pass_hash;
 
-	if (client->auth_attempts >= netopeer_options.ssh_opts->auth_attempts) {
-		return -1;
-	}
-
-	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested password authentication.", client->username);
-		return -1;
-	}
-
 	pass_hash = auth_password_get_pwd_hash(client->username);
-	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, pass) == 0) {
+	if (pass_hash != NULL && auth_password_compare_pwd(pass_hash, ssh_message_auth_password(msg)) == 0) {
 		nc_verb_verbose("User '%s' authenticated.", client->username);
-		return 0;
+		ssh_message_auth_reply_success(msg, 0);
+		client->authenticated = 1;
+		return;
 	}
 
 	client->auth_attempts++;
 	nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", client->username, client->auth_attempts);
+	ssh_message_reply_default(msg);
+}
 
-	return -1;
+static void sshcb_auth_kbdint(struct client_struct_ssh* client, ssh_message msg) {
+	char* pass_hash;
+
+	if (!ssh_message_auth_kbdint_is_response(msg)) {
+		const char* prompts[] = {"Password: "};
+		char echo[] = {0};
+
+		ssh_message_auth_interactive_request(msg, "Interactive SSH Authentication", "Type your password", 1, prompts, echo);
+	} else {
+		if (ssh_userauth_kbdint_getnanswers(client->ssh_sess) != 1) {
+			ssh_message_reply_default(msg);
+			return;
+		}
+		pass_hash = auth_password_get_pwd_hash(client->username);
+		if (pass_hash == NULL) {
+			ssh_message_reply_default(msg);
+			return;
+		}
+		if (auth_password_compare_pwd(pass_hash, ssh_userauth_kbdint_getanswer(client->ssh_sess, 0)) == 0) {
+			nc_verb_verbose("User '%s' authenticated.", client->username);
+			client->authenticated = 1;
+			ssh_message_auth_reply_success(msg, 0);
+		} else {
+			client->auth_attempts++;
+			nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", client->username, client->auth_attempts);
+			ssh_message_reply_default(msg);
+		}
+	}
 }
 
 static char* auth_pubkey_compare_key(ssh_key key) {
@@ -343,25 +364,19 @@ static char* auth_pubkey_compare_key(ssh_key key) {
 	return username;
 }
 
-/* return 0 - auth OK, 1 - pubkey use OK, -1 - auth failure */
-static int sshcb_auth_pubkey(struct client_struct_ssh* client, ssh_key pubkey, char signature_state) {
+static void sshcb_auth_pubkey(struct client_struct_ssh* client, ssh_message msg) {
 	char* username;
+	int signature_state;
 
-	if (client->auth_attempts >= netopeer_options.ssh_opts->auth_attempts) {
-		return -1;
-	}
-
-	if (client->authenticated) {
-		nc_verb_warning("User '%s' authenticated, but requested pubkey authentication.", client->username);
-		return -1;
-	}
-
+	signature_state = ssh_message_auth_publickey_state(msg);
 	if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
 		nc_verb_verbose("User '%s' authenticated.", client->username);
-		return 0;
+		client->authenticated = 1;
+		ssh_message_auth_reply_success(msg, 0);
+		return;
 
 	} else if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		if ((username = auth_pubkey_compare_key(pubkey)) == NULL) {
+		if ((username = auth_pubkey_compare_key(ssh_message_auth_pubkey(msg))) == NULL) {
 			nc_verb_verbose("User '%s' tried to use an unknown (unauthorized) public key.", client->username);
 
 		} else if (strcmp(client->username, username) != 0) {
@@ -371,19 +386,18 @@ static int sshcb_auth_pubkey(struct client_struct_ssh* client, ssh_key pubkey, c
 		} else {
 			free(username);
 			/* accepting only the use of a public key */
-			return 1;
+			ssh_message_auth_reply_pk_ok_simple(msg);
+			return;
 		}
 	}
 
 	client->auth_attempts++;
 	nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", client->username, client->auth_attempts);
-
-	return -1;
+	ssh_message_reply_default(msg);
 }
 
 /* return 0 - OK, -1 error */
 static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel channel) {
-	int ret;
 	struct chan_struct* cur_chan;
 
 	/* CLIENT LOCK */
@@ -766,7 +780,7 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 
 int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 	const char* str_type, *str_subtype, *username;
-	int subtype, type, ret;
+	int subtype, type;
 	struct client_struct_ssh* client;
 	struct chan_struct* channel;
 
@@ -902,6 +916,18 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 	 * process known messages
 	 */
 	if (type == SSH_REQUEST_AUTH) {
+		if (client->authenticated) {
+			nc_verb_warning("User '%s' authenticated, but requested another authentication.", client->username);
+			ssh_message_reply_default(msg);
+			return 0;
+		}
+
+		if (client->auth_attempts >= netopeer_options.ssh_opts->auth_attempts) {
+			/* too many failed attempts */
+			ssh_message_reply_default(msg);
+			return 0;
+		}
+
 		if (subtype == SSH_AUTH_METHOD_NONE) {
 			/* libssh will return the supported auth methods */
 			return 1;
@@ -925,51 +951,13 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		}
 
 		if (subtype == SSH_AUTH_METHOD_PASSWORD) {
-			if (sshcb_auth_password(client, ssh_message_auth_password(msg)) == 0) {
-				ssh_message_auth_reply_success(msg, 0);
-				client->authenticated = 1;
-			} else {
-				ssh_message_reply_default(msg);
-			}
+			sshcb_auth_password(client, msg);
 			return 0;
 		} else if (subtype == SSH_AUTH_METHOD_PUBLICKEY) {
-			ret = sshcb_auth_pubkey(client, ssh_message_auth_pubkey(msg), ssh_message_auth_publickey_state(msg));
-			if (ret == 1) {
-				ssh_message_auth_reply_pk_ok_simple(msg);
-			} else if (ret == 0) {
-				ssh_message_auth_reply_success(msg, 0);
-				client->authenticated = 1;
-			} else {
-				ssh_message_reply_default(msg);
-			}
+			sshcb_auth_pubkey(client, msg);
 			return 0;
 		} else if (subtype == SSH_AUTH_METHOD_INTERACTIVE) {
-			char* pass_hash;
-
-			if (!ssh_message_auth_kbdint_is_response(msg)) {
-				const char* prompts[] = {"Password: "};
-				char echo[] = {0};
-
-				ssh_message_auth_interactive_request(msg, "Interactive SSH Authentication", "Type your password", 1, prompts, echo);
-			} else {
-				if (ssh_userauth_kbdint_getnanswers(session) != 1) {
-					ssh_message_reply_default(msg);
-					return 0;
-				}
-				pass_hash = auth_password_get_pwd_hash(client->username);
-				if (pass_hash == NULL) {
-					ssh_message_reply_default(msg);
-					return 0;
-				}
-				if (auth_password_compare_pwd(pass_hash, ssh_userauth_kbdint_getanswer(session, 0)) == 0) {
-					ssh_message_auth_reply_success(msg, 0);
-					client->authenticated = 1;
-				} else {
-					ssh_message_reply_default(msg);
-					client->auth_attempts++;
-					nc_verb_verbose("Failed user '%s' authentication attempt (#%d).", client->username, client->auth_attempts);
-				}
-			}
+			sshcb_auth_kbdint(client, msg);
 			return 0;
 		}
 	} else if (client->authenticated) {
