@@ -35,6 +35,7 @@ int cmd_auth(const char* arg, const char* old_input_file, FILE* output, FILE* in
 int cmd_cert(const char* arg, const char* old_input_file, FILE* output, FILE* input);
 int cmd_crl(const char* arg, const char* old_input_file, FILE* output, FILE* input);
 #endif
+int cmd_knownhosts(const char* arg, const char* old_input_file, FILE* output, FILE* input);
 int cmd_quit(const char* arg, const char* old_input_file, FILE* output, FILE* input);
 int cmd_debug(const char *arg, const char* old_input_file, FILE* output, FILE* input);
 int cmd_verbose(const char *arg, const char* old_input_file, FILE* output, FILE* input);
@@ -51,6 +52,5 @@ typedef struct
 	int (*func)(const char*, const char*, FILE*, FILE*); /* Function to call to do the command. */
 	char *helpstring; /* Documentation for this function.  */
 } COMMAND;
-
 
 #endif /* COMMANDS_H_ */

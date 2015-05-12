@@ -47,6 +47,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <errno.h>
+#include <pwd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -120,6 +121,7 @@ COMMAND commands[] = {
 	{"cert", cmd_cert, "Manage trusted or your own certificates"},
 	{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
 #endif
+	{"knownhosts", cmd_knownhosts, "Manage known hosts in the \"~/.ssh/known_hosts\" file"},
 	{"status", cmd_status, "Print information about the current NETCONF session"},
 	{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
 	{"verbose", cmd_verbose, "Enable/disable verbose messages"},
@@ -3408,6 +3410,201 @@ void* notification_thread(void* arg) {
 	free(config);
 
 	return NULL;
+}
+
+void cmd_knownhosts_help(FILE* output) {
+	fprintf(output, "knownhosts [--help] [--del <pubkey-num>]\n");
+}
+
+int cmd_knownhosts(const char* arg, const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
+	char* ptr, *kh_file, *line = NULL, **pkeys = NULL, *text;
+	int del_idx = -1, i, j, pkey_len = 0, written;
+	size_t line_len, text_len;
+	FILE* file;
+	struct passwd* pwd;
+	struct arglist cmd;
+	struct option long_options[] = {
+		{"help", 0, 0, 'h'},
+		{"del", 1, 0, 'd'},
+		{0, 0, 0, 0}
+	};
+	int option_index = 0, c;
+
+	optind = 0;
+
+	init_arglist(&cmd);
+	addargs(&cmd, "%s", arg);
+
+	while ((c = getopt_long(cmd.count, cmd.list, "hd:", long_options, &option_index)) != -1) {
+		switch (c) {
+		case 'h':
+			cmd_knownhosts_help(output);
+			clear_arglist(&cmd);
+			return EXIT_SUCCESS;
+			break;
+		case 'd':
+			del_idx = strtol(optarg, &ptr, 10);
+			if (*ptr != '\0' || del_idx < 0) {
+				ERROR("knownhosts", "%s is not a natural number", optarg);
+				clear_arglist(&cmd);
+				return EXIT_FAILURE;
+			}
+			break;
+		default:
+			ERROR("knownhosts", "unknown option -%c", c);
+			cmd_knownhosts_help(output);
+			clear_arglist(&cmd);
+			return EXIT_FAILURE;
+		}
+	}
+
+	clear_arglist(&cmd);
+
+	errno = 0;
+	pwd = getpwuid(getuid());
+	if (pwd == NULL) {
+		if (errno == 0) {
+			ERROR("knownhosts", "failed to get the home directory of UID %d, it does not exist", getuid());
+		} else {
+			ERROR("knownhosts", "failed to get a pwd entry (%s)", strerror(errno));
+		}
+		return EXIT_FAILURE;
+	}
+
+	asprintf(&kh_file, "%s/.ssh/known_hosts", pwd->pw_dir);
+
+	if ((file = fopen(kh_file, "r+")) == NULL) {
+		ERROR("knownhosts", "cannot open \"%s\" (%s)", kh_file, strerror(errno));
+		free(kh_file);
+		return EXIT_FAILURE;
+	}
+	free(kh_file);
+
+	/* list */
+	if (del_idx == -1) {
+		fprintf(output, "ID Hostname Algorithm Key\n\n");
+
+		errno = 0;
+		i = 0;
+		while (getline(&line, &line_len, file) > 0) {
+			/* host number */
+			fprintf(output, "%d ", i);
+
+			/* host name */
+			ptr = strtok(line, " ");
+			if (ptr == NULL) {
+				fprintf(output, "INVALID\n");
+				++i;
+				continue;
+			}
+			if (ptr[0] == '|' && ptr[2] == '|') {
+				fprintf(output, "(hashed hostname) ");
+			} else {
+				fprintf(output, "%s ", ptr);
+			}
+
+			/* host key algorithm */
+			ptr = strtok(NULL, " ");
+			if (ptr == NULL) {
+				fprintf(output, "INVALID\n");
+				++i;
+				continue;
+			}
+			fprintf(output, "%s: ", ptr);
+
+			/* host key */
+			ptr = strtok(NULL, " ");
+			if (ptr == NULL) {
+				fprintf(output, "INVALID\n");
+				++i;
+				continue;
+			}
+			for (j = 0; j < pkey_len; ++j) {
+				if (strcmp(ptr, pkeys[j]) == 0) {
+					break;
+				}
+			}
+			if (j == pkey_len) {
+				++pkey_len;
+				pkeys = realloc(pkeys, pkey_len*sizeof(char*));
+				pkeys[j] = strdup(ptr);
+			}
+			fprintf(output, "(key %d)\n", j);
+
+			++i;
+		}
+
+		if (i == 0) {
+			fprintf(output, "(none)\n");
+		}
+		fprintf(output, "\n");
+		fflush(output);
+
+		for (j = 0; j < pkey_len; ++j) {
+			free(pkeys[j]);
+		}
+		free(pkeys);
+		free(line);
+
+	/* delete */
+	} else {
+		fseek(file, 0, SEEK_END);
+		text_len = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
+		text = malloc(text_len+1);
+		text[text_len] = '\0';
+
+		if (fread(text, 1, text_len, file) < text_len) {
+			ERROR("knownhosts", "cannot read known hosts file (%s)", strerror(ferror(file)));
+			free(text);
+			fclose(file);
+			return EXIT_FAILURE;
+		}
+		fseek(file, 0, SEEK_SET);
+
+		for (i = 0, ptr = text; i < del_idx && ptr != NULL; ++i, ptr = strchr(ptr+1, '\n'));
+
+		if (ptr == NULL || strlen(ptr) < 2) {
+			ERROR("knownhosts", "key index %d does not exist", del_idx);
+			free(text);
+			fclose(file);
+			return EXIT_FAILURE;
+		}
+
+		if (ptr[0] == '\n') {
+			++ptr;
+		}
+
+		/* write the old beginning */
+		written = fwrite(text, 1, ptr-text, file);
+		if (written < ptr-text) {
+			ERROR("knownhosts", "failed to write to known hosts file (%s)", strerror(ferror(file)));
+			free(text);
+			fclose(file);
+			return EXIT_FAILURE;
+		}
+
+		ptr = strchr(ptr, '\n');
+		if (ptr != NULL) {
+			++ptr;
+
+			/* write the rest */
+			if (fwrite(ptr, 1, strlen(ptr), file) < strlen(ptr)) {
+				ERROR("knownhosts", "failed to write to known hosts file (%s)", strerror(ferror(file)));
+				free(text);
+				fclose(file);
+				return EXIT_FAILURE;
+			}
+			written += strlen(ptr);
+		}
+		free(text);
+
+		ftruncate(fileno(file), written);
+	}
+
+	fclose(file);
+	return EXIT_SUCCESS;
 }
 
 void cmd_subscribe_help(FILE* output) {
