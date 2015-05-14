@@ -664,7 +664,6 @@ CFLAGS
 CC
 RPMBUILD
 LNCTOOL
-PYANG
 UNAME
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
@@ -2981,49 +2980,6 @@ $as_echo "$target_cpu" >&6; }
         as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
         ;;
 esac
-
-#Check for pyang
-# Extract the first word of "pyang", so it can be a program name with args.
-set dummy pyang; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_PYANG+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$PYANG"; then
-  ac_cv_prog_PYANG="$PYANG" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_PYANG="yes"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_prog_PYANG" && ac_cv_prog_PYANG="no"
-fi
-fi
-PYANG=$ac_cv_prog_PYANG
-if test -n "$PYANG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYANG" >&5
-$as_echo "$PYANG" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test "$PYANG" = "no"; then
-	as_fn_error $? "\"pyang not found!\"" "$LINENO" 5
-fi
 
 #Add the standard modules to a variable for pyang to find them
 if test -d "/usr/local/share/yang/modules/"; then

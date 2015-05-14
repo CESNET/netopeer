@@ -217,12 +217,6 @@ case $target_cpu in
         ;;
 esac
 
-#Check for pyang
-AC_CHECK_PROG([PYANG], [pyang], [yes], [no])
-if test "$PYANG" = "no"; then
-	AC_MSG_ERROR(["pyang not found!"])
-fi
-
 #Add the standard modules to a variable for pyang to find them
 if test -d "/usr/local/share/yang/modules/"; then
 	export YANG_MODPATH=$YANG_MODPATH:/usr/local/share/yang/modules/
