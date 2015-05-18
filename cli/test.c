@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <libxml/tree.h>
+
 #include "test.h"
 #include "commands.h"
 
@@ -323,8 +325,49 @@ static void test_cmd_subst_file(char** cmd, const char* file_name) {
 }
 
 static int test_xmlfile_cmp(const char* cmd_output, const char* expected_output, char** msg) {
-	/* TODO come up with something better */
-	if (strcmp(cmd_output, expected_output) != 0) {
+	/*
+	 * TODO come up with something better
+	 *
+	 * The problem is how to handle user-ordered-lists.
+	 * Mainly, there is no way to know that there is
+	 * such list, we do not have the model loaded
+	 * (it could be retrieved from the server, but that
+	 * does not seem to be a good idea). Therefore we
+	 * could, for example, sort all the nodes, but we
+	 * would also sort these lists, which is wrong.
+	 * There could be a rule that server will return
+	 * the configuration in the order strictly
+	 * following the model, but that is not a good idea
+	 * either.
+	 */
+
+	int ret;
+	/*xmlDocPtr doc1, doc2;
+	xmlBufferPtr buf1, buf2;
+
+	doc1 = xmlReadMemory(cmd_output, strlen(cmd_output), NULL, NULL, XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
+	doc2 = xmlReadMemory(expected_output, strlen(expected_output), NULL, NULL, XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
+	if (doc1 == NULL || doc2 == NULL) {
+		asprintf(msg, "Internal error (%s:%d)\n", __FILE__, __LINE__);
+		return EXIT_FAILURE;
+	}
+
+	buf1 = xmlBufferCreate();
+	buf2 = xmlBufferCreate();
+
+	xmlNodeDump(buf1, doc1, doc1->children, 1, 1);
+	xmlNodeDump(buf2, doc2, doc2->children, 1, 1);
+
+	xmlFreeDoc(doc1);
+	xmlFreeDoc(doc2);
+
+	ret = strcmp((char*)xmlBufferContent(buf1), (char*)xmlBufferContent(buf2));
+	xmlBufferFree(buf1);
+	xmlBufferFree(buf2);*/
+
+	ret = strcmp(expected_output, cmd_output);
+
+	if (ret != 0) {
 		asprintf(msg, "Expected output:\n%s\nActual output:\n%s\n", expected_output, cmd_output);
 		return EXIT_FAILURE;
 	}
