@@ -1,0 +1,116 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/choice-mod</namespace>
+			<not-feature>feat1</not-feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>mandatory test</name>
+		<description>"cont1" cannot be created, because "choice4" is mandatory and is missing</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<llist1>5</llist1>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>default, when test</name>
+		<description>create "cont1", get should also return the default for "choice3", but not the state node (when not satisfied)</description>
+		<test-requirements>
+			<capability>
+				<name>urn:ietf:params:netconf:capability:with-defaults:1.0</name>
+			</capability>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf8>-25</leaf8>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get --filter=(file) --defaults=report-all</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf8>-25</leaf8>
+					<leaf6>test</leaf6>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>config, when test</name>
+		<description>satisfy when, state should get returned now</description>
+		<test-requirements>
+			<capability>
+				<name>urn:ietf:params:netconf:capability:with-defaults:1.0</name>
+			</capability>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf9>true</leaf9>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get --filter=(file) --defaults=report-all</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf9>true</leaf9>
+					<leaf10>test</leaf10>
+					<leaf6>test</leaf6>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

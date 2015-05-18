@@ -1,0 +1,99 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:validate:1.1</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/anyxml-mod</namespace>
+			<feature>feat1</feature>
+			<not-feature>feat2</not-feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>config, when test</name>
+		<description>There should be no configuration and 'when' in "axml1" is not satisfied, so there is nothing to return.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>get --filter=(file)</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod"/>
+			</cmd-file>
+			<result-file></result-file>
+		</command>
+	</test>
+	<test>
+		<name>when, if-feature test</name>
+		<description>We create "axml3" first, so now all the conditions for returning "axml1" are satisfied.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml3>
+						<some-empty-node/>
+					</axml3>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get --filter=(file)</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml1>
+						<test/>
+					</axml1>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>if-feature test</name>
+		<description>We cannot create "axml2", 'feat2' is not supported.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml2>
+						<some-xml-node>with some content</some-xml-node>
+					</axml2>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

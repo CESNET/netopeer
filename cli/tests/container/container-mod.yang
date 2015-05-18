@@ -1,0 +1,66 @@
+module container-mod {
+	namespace "http://test.org/container-mod";
+
+	prefix contmod;
+
+	feature feat1;
+
+	container cont1 {
+		anyxml axml1;
+
+		choice choice1 {
+			case case1 {
+				leaf leaf2 {
+					type string;
+				}
+			}
+			case case2 {
+				leaf leaf3 {
+					type int16;
+				}
+			}
+		}
+
+		container cont2 {
+			config false;
+			leaf leaf6 {
+				description "must contain 'test'";
+				type string;
+			}
+		}
+
+		container cont3 {
+			if-feature feat1;
+			must "../leaf1 = 5";
+			when "../case1";
+			presence "cont3 presence";
+		}
+
+		grouping grouping1 {
+			leaf leaf4 {
+				type empty;
+			}
+		}
+
+		leaf leaf1 {
+			type int8;
+		}
+
+		leaf-list llist1 {
+			type string;
+		}
+
+		list list1 {
+			key "leaf5";
+			leaf leaf5 {
+				type typedef1;
+			}
+		}
+
+		typedef typedef1 {
+			type uint32;
+		}
+
+		uses grouping1;
+	}
+}

@@ -1,0 +1,151 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/choice-mod</namespace>
+			<feature>feat1</feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>feature, default, when test</name>
+		<description>get should return the default for "choice3", default "leaf3" node, but no state</description>
+		<test-requirements>
+			<capability>
+				<name>urn:ietf:params:netconf:capability:with-defaults:1.0</name>
+			</capability>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf4>55</leaf4>
+					<leaf9>false</leaf9>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get --filter=(file) --defaults=report-all</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf4>55</leaf4>
+					<leaf9>false</leaf9>
+					<leaf3>empty</leaf3>
+					<leaf6>test</leaf6>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>when, mandatory test</name>
+		<description>first fails cause of when, second cause of mandatory</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<cont3>
+						<llist2>20</llist2>
+						<leaf7>string</leaf7>
+					</cont3>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<list1>
+						<leaf5>hey</leaf5>
+					</list1>
+					<cont3>
+						<llist2>20</llist2>
+					</cont3>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>choice test</name>
+		<description>try to set 2 cases in a choice, then set one (the other should get deleted), check result</description>
+		<test-requirements>
+			<capability>
+				<name>urn:ietf:params:netconf:capability:with-defaults:1.0</name>
+			</capability>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf1>hello</leaf1>
+					<leaf2>3</leaf2>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf1>hello</leaf1>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>3</id>
+			<cmd-with-file>get-config --filter=(file) --defaults=report-all running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/choice-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/choice-mod">
+					<leaf1>hello</leaf1>
+					<leaf9>false</leaf9>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

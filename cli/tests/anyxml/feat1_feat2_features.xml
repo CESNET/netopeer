@@ -1,0 +1,153 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:validate:1.1</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/anyxml-mod</namespace>
+			<feature>feat1</feature>
+			<feature>feat2</feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>must, if-feature test</name>
+		<description>We create "axml4" with a specific content, so adding "axml2" should first result in a validation error, then added successfully since the 'must' condition will be satisfied.</description>
+			<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml3>
+						<some-other-xml>...</some-other-xml>
+					</axml3>
+					<axml4>
+						<some-xml/>
+					</axml4>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml2>
+						<some-wrong-xml>wrong</some-wrong-xml>
+					</axml2>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>3</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml2>
+						<some-xml/>
+					</axml2>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>operation error test</name>
+		<description>Just trying to 'create' and existing anyxml, then 'delete' a non-existing one.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+					<axml4 nc:operation="create">
+						<some-new-node>with value</some-new-node>
+					</axml4>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>nc:data-exists</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+					<axml1 nc:operation="delete"/>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>nc:data-missing</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>operation test</name>
+		<description>Any operations within an anyxml must be ignored, but still stored.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml3>
+						<some-other-xml xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove">...</some-other-xml>
+					</axml3>
+					<axml4>
+						<some-xml/>
+					</axml4>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml2>
+						<some-xml/>
+					</axml2>
+					<axml3>
+						<some-other-xml xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove">...</some-other-xml>
+					</axml3>
+					<axml4>
+						<some-xml/>
+					</axml4>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

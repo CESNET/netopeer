@@ -1,0 +1,98 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/anyxml-mod</namespace>
+			<not-feature>feat1</not-feature>
+			<not-feature>feat2</not-feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>mandatory test</name>
+		<description>"cont1" cannot be created, because "axml3" mandatory child is missing</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod"/>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>config, if-feature test</name>
+		<description>We first create "cont1" with "axml3", which satisfies 'when' in "axml1", but we still miss feature 'feat1', so "axml1" cannot be returned as state.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml3>
+						<something>bla</something>
+					</axml3>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get --filter=(file)</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml3>
+						<something>bla</something>
+					</axml3>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>if-feature test</name>
+		<description>We cannot create "axml2", because we do not have neither 'feat1' nor 'feat2'.</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/anyxml-mod">
+					<axml2>
+						<some-xml-node>with some content</some-xml-node>
+					</axml2>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>
