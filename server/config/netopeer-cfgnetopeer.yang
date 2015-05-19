@@ -301,6 +301,7 @@ module netopeer-cfgnetopeer {
     }
   }
   rpc reload-module {
+    if-feature dynamic-modules;
     description
       "Unload and load any loaded module." ;
     input {
