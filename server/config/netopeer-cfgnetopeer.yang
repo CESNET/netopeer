@@ -13,6 +13,10 @@ module netopeer-cfgnetopeer {
   description
     "Module specifying Netopeer module data model and RPC operation.";
 
+  revision 2015-05-19 {
+    description
+      "client-removal-time removed, dynamic modules are an optional feature.";
+  }
   revision 2015-01-15 {
     description
       "Netopeer-specific NETCONF server options added.";
@@ -32,12 +36,18 @@ module netopeer-cfgnetopeer {
 
   feature ssh {
     description
-      "Enable SSH transport.";
+      "Enables SSH transport.";
   }
 
   feature tls {
     description
-      "Enable TLS transport.";
+      "Enables TLS transport.";
+  }
+
+  feature dynamic-modules {
+    description
+      "Enables dynamic loading and unloading
+        of transAPI modules.";
   }
 
   container netopeer {
@@ -100,18 +110,6 @@ module netopeer-cfgnetopeer {
       description
         "Maximum number of miliseconds any client request
           will almost certainly be responded to.";
-    }
-
-    leaf client-removal-time {
-      type uint16;
-      units "miliseconds";
-      default 10;
-      description
-        "Number of miliseconds that the server is willing
-          to wait for removing an invalid client before
-          bailing out and trying again later. Response
-          time plus client removal time is the theoretical
-          maximum response time.";
     }
 
     container ssh {
@@ -269,6 +267,7 @@ module netopeer-cfgnetopeer {
     }
 
     container modules {
+      if-feature dynamic-modules;
       list module {
         key "name";
         leaf name {
