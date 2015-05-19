@@ -64,6 +64,8 @@ void client_free_tls(struct client_struct_tls* client) {
 		pthread_mutex_unlock(&client->callhome_st->ch_lock);
 	}
 #endif
+
+	free(client);
 }
 
 static char* asn1time_to_str(ASN1_TIME *t) {
@@ -928,10 +930,13 @@ int np_tls_client_data(struct client_struct_tls* client) {
 			return 1;
 		}
 
-		np_client_remove(&netopeer_state.clients, (struct client_struct*)client);
+		np_client_detach(&netopeer_state.clients, (struct client_struct*)client);
 
 		/* GLOBAL WRITE UNLOCK */
 		pthread_rwlock_unlock(&netopeer_state.global_lock);
+
+		client_free_tls(client);
+
 		/* GLOBAL READ LOCK */
 		pthread_rwlock_rdlock(&netopeer_state.global_lock);
 

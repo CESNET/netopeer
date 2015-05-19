@@ -178,7 +178,7 @@ static void client_append(struct client_struct** root, struct client_struct* cli
 	cur->next = clients;
 }
 
-void np_client_remove(struct client_struct** root, struct client_struct* del_client) {
+void np_client_detach(struct client_struct** root, struct client_struct* del_client) {
 	struct client_struct* client, *prev_client = NULL;
 
 	for (client = *root; client != NULL; client = client->next) {
@@ -198,22 +198,6 @@ void np_client_remove(struct client_struct** root, struct client_struct* del_cli
 	} else {
 		prev_client->next = client->next;
 	}
-
-	switch (client->transport) {
-#ifdef NP_SSH
-	case NC_TRANSPORT_SSH:
-		client_free_ssh((struct client_struct_ssh*)client);
-		break;
-#endif
-#ifdef NP_TLS
-	case NC_TRANSPORT_TLS:
-		client_free_tls((struct client_struct_tls*)client);
-		break;
-#endif
-	default:
-		nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-	}
-	free(client);
 }
 
 /* return seconds rounded down */

@@ -52,6 +52,6 @@ unsigned int timeval_diff(struct timeval tv1, struct timeval tv2);
 
 void* client_notif_thread(void* arg);
 
-void np_client_remove(struct client_struct** root, struct client_struct* del_client);
+void np_client_detach(struct client_struct** root, struct client_struct* del_client);
 
 #endif /* _SERVER_H_ */
