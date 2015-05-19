@@ -992,7 +992,7 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		SSL_shutdown(client->tls);
 
 		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_nsec += netopeer_options.client_removal_time*1000000;
+		ts.tv_nsec += CLIENT_REMOVAL_TIME*1000000;
 		/* GLOBAL READ UNLOCK */
 		pthread_rwlock_unlock(&netopeer_state.global_lock);
 		/* GLOBAL WRITE LOCK */

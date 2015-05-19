@@ -43,6 +43,9 @@
 /* every number-of-secs will the last sent or received data timestamp be checked */
 #define CALLHOME_PERIODIC_LINGER_CHECK 5
 
+/* number of msec a thread will wait to acquire client removal lock */
+#define CLIENT_REMOVAL_TIME 10
+
 /* secs the server is going to wait on exiting for all the threads to finish */
 #define THREAD_JOIN_QUIT_TIMEOUT 1
 

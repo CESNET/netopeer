@@ -9,7 +9,6 @@ struct np_options {
 	uint32_t idle_timeout;
 	uint16_t max_sessions;
 	uint16_t response_time;
-	uint16_t client_removal_time;
 
 	struct np_options_ssh* ssh_opts;
 	struct np_options_tls* tls_opts;
