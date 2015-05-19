@@ -566,46 +566,6 @@ int callback_n_netopeer_n_response_time(void** UNUSED(data), XMLDIFF_OP op, xmlN
 }
 
 /**
- * @brief This callback will be run when node in path /n:netopeer/n:client-removal-time changes
- *
- * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
- * @param[in] op	Observed change in path. XMLDIFF_OP type.
- * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
- * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
- *
- * @return EXIT_SUCCESS or EXIT_FAILURE
- */
-/* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_n_netopeer_n_client_removal_time(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error) {
-	char* content = NULL, *ptr, *msg;
-	uint16_t num;
-
-	if (op & XMLDIFF_REM) {
-		netopeer_options.client_removal_time = 10;
-		return EXIT_SUCCESS;
-	}
-
-	content = get_node_content(new_node);
-	if (content == NULL) {
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_verb_error("%s: node content missing", __func__);
-		return EXIT_FAILURE;
-	}
-
-	num = strtol(content, &ptr, 10);
-	if (*ptr != '\0') {
-		asprintf(&msg, "Could not convert '%s' to a number.", content);
-		*error = nc_err_new(NC_ERR_OP_FAILED);
-		nc_err_set(*error, NC_ERR_PARAM_MSG, msg);
-		free(msg);
-		return EXIT_FAILURE;
-	}
-
-	netopeer_options.client_removal_time = num;
-	return EXIT_SUCCESS;
-}
-
-/**
  * @brief This callback will be run when node in path /n:netopeer/n:modules/n:module/n:module/n:enabled changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -684,9 +644,9 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 */
 struct transapi_data_callbacks netopeer_clbks = {
 #if defined(NP_SSH) && defined(NP_TLS)
-	.callbacks_count = 18,
+	.callbacks_count = 17,
 #else
-	.callbacks_count = 12,
+	.callbacks_count = 11,
 #endif
 	.data = NULL,
 	.callbacks = {
@@ -694,7 +654,6 @@ struct transapi_data_callbacks netopeer_clbks = {
 		{.path = "/n:netopeer/n:idle-timeout", .func = callback_n_netopeer_n_idle_timeout},
 		{.path = "/n:netopeer/n:max-sessions", .func = callback_n_netopeer_n_max_sessions},
 		{.path = "/n:netopeer/n:response-time", .func = callback_n_netopeer_n_response_time},
-		{.path = "/n:netopeer/n:client-removal-time", .func = callback_n_netopeer_n_client_removal_time},
 #ifdef NP_SSH
 		{.path = "/n:netopeer/n:ssh/n:server-keys/n:rsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_rsa_key},
 		{.path = "/n:netopeer/n:ssh/n:server-keys/n:dsa-key", .func = callback_n_netopeer_n_ssh_n_server_keys_n_dsa_key},
@@ -739,7 +698,7 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 
 	nc_verb_verbose("Setting the default configuration for the cfgnetopeer module...");
 
-	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><response-time>50</response-time><client-removal-time>10</client-removal-time></netopeer>",
+	doc = xmlReadDoc(BAD_CAST "<netopeer xmlns=\"urn:cesnet:tmc:netopeer:1.0\"><hello-timeout>600</hello-timeout><idle-timeout>3600</idle-timeout><max-sessions>8</max-sessions><response-time>50</response-time></netopeer>",
 		NULL, NULL, 0);
 	if (doc == NULL) {
 		nc_verb_error("Unable to parse the default cfgnetopeer configuration.");
@@ -794,17 +753,6 @@ int netopeer_transapi_init(xmlDocPtr* UNUSED(running)) {
 		return EXIT_FAILURE;
 	}
 
-	if (callback_n_netopeer_n_client_removal_time(NULL, XMLDIFF_ADD, NULL, doc->children->children->next->next->next->next, &error) != EXIT_SUCCESS) {
-		if (error != NULL) {
-			str_err = nc_err_get(error, NC_ERR_PARAM_MSG);
-			if (str_err != NULL) {
-				nc_verb_error(str_err);
-			}
-			nc_err_free(error);
-		}
-		xmlFreeDoc(doc);
-		return EXIT_FAILURE;
-	}
 	xmlFreeDoc(doc);
 
 #ifdef NP_SSH

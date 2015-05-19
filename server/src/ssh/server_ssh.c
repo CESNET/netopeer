@@ -673,7 +673,7 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 	/* check whether the client shouldn't be freed */
 	if (client->to_free) {
 		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_nsec += netopeer_options.client_removal_time*1000000;
+		ts.tv_nsec += CLIENT_REMOVAL_TIME*1000000;
 		/* GLOBAL READ UNLOCK */
 		pthread_rwlock_unlock(&netopeer_state.global_lock);
 		/* GLOBAL WRITE LOCK */
