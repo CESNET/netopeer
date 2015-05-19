@@ -5228,10 +5228,10 @@ SERVER_TLS_CFGS=""
 CLIENT_STRUCT_SIZE=""
 
 NCSERVER_FEATURES=""
-NETOPEER_FEATURES=""
+NETOPEER_FEATURES="<feature>dynamic-modules</feature>"
 
 IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
-CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:"
+CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:dynamic-modules"
 
 if test "$SSH" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_SSH"
@@ -5242,10 +5242,10 @@ if test "$SSH" = "yes"; then
 	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_ssh)"
 
 	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
-	NETOPEER_FEATURES="<feature>ssh</feature>"
+	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>ssh</feature>"
 
 	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh"
-	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES}ssh"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},ssh"
 
 	if test "$callhome" = "yes"; then
 		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
@@ -5270,11 +5270,10 @@ if test "$TLS" = "yes"; then
 
 	if test "$SSH" = "yes"; then
 		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
-		CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},"
 	fi
 
 	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls"
-	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES}tls"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},tls"
 
 	if test "$callhome" = "yes"; then
 		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
