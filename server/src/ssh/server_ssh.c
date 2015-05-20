@@ -817,10 +817,10 @@ int np_ssh_client_data(struct client_struct_ssh* client) {
 }
 
 int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
-	const char* str_type, *str_subtype, *username;
+	const char* str_type, *str_subtype = NULL, *username;
 	int subtype, type;
 	struct client_struct_ssh* client;
-	struct chan_struct* channel;
+	struct chan_struct* channel = NULL;
 
 	type = ssh_message_type(msg);
 	subtype = ssh_message_subtype(msg);
