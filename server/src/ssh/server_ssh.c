@@ -41,11 +41,11 @@ static inline void _chan_free(struct chan_struct* chan) {
 	if (chan->new_sess_tid != 0) {
 		pthread_cancel(chan->new_sess_tid);
 	}
-	if (chan->ssh_chan != NULL) {
-		ssh_channel_free(chan->ssh_chan);
-	}
 	if (chan->nc_sess != NULL) {
 		nc_session_free(chan->nc_sess);
+	}
+	if (chan->ssh_chan != NULL) {
+		ssh_channel_free(chan->ssh_chan);
 	}
 	close(chan->chan_in[0]);
 	close(chan->chan_in[1]);
