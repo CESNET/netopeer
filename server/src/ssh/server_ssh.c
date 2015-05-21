@@ -54,6 +54,8 @@ static inline void _chan_free(struct chan_struct* chan) {
 }
 
 void client_free_ssh(struct client_struct_ssh* client) {
+	int ret;
+
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
@@ -69,7 +71,10 @@ void client_free_ssh(struct client_struct_ssh* client) {
 		ssh_free(client->ssh_sess);
 	}
 
-	pthread_mutex_destroy(&client->client_lock);
+	ret = pthread_mutex_destroy(&client->client_lock);
+	if (ret != 0) {
+		nc_verb_warning("%s: mutex destroy failed (%s)", __func__, strerror(ret));
+	}
 
 	if (client->sock != -1) {
 		close(client->sock);
