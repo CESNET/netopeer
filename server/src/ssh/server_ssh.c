@@ -490,9 +490,6 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 		return NULL;
 	}
 
-	/* CLIENT LOCK */
-	pthread_mutex_lock(&client->client_lock);
-
 	if (client->ssh_chans == NULL) {
 		client->ssh_chans = calloc(1, sizeof(struct chan_struct));
 		cur_chan = client->ssh_chans;
@@ -514,9 +511,6 @@ static ssh_channel sshcb_channel_open(ssh_session session, void* UNUSED(userdata
 	}
 	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
 	ssh_set_channel_callbacks(cur_chan->ssh_chan, &ssh_channel_cb);
-
-	/* CLIENT UNLOCK */
-	pthread_mutex_unlock(&client->client_lock);
 
 	return cur_chan->ssh_chan;
 }
@@ -780,22 +774,6 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 		return 2;
 	}
 
-	/* poll the client for SSH events, the callbacks are called accordingly */
-	if (ssh_event_dopoll(client->ssh_evt, 0) == SSH_ERROR) {
-		nc_verb_warning("Failed to poll a client, it has probably disconnected.");
-		/* this invalid socket may have been reused and we would close
-		 * it during cleanup */
-		client->sock = -1;
-		if (client->ssh_chans != NULL) {
-			for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-				chan->to_free = 1;
-			}
-		} else {
-			client->to_free = 1;
-			return 1;
-		}
-	}
-
 	gettimeofday(&cur_time, NULL);
 
 	/* check the client for authentication timeout and failed attempts */
@@ -815,13 +793,33 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 		}
 	}
 
+	/* CLIENT LOCK */
+	pthread_mutex_lock(&client->client_lock);
+
+	/* poll the client for SSH events, the callbacks are called accordingly */
+	if (ssh_event_dopoll(client->ssh_evt, 0) == SSH_ERROR) {
+		nc_verb_warning("Failed to poll a client, it has probably disconnected.");
+		/* this invalid socket may have been reused and we would close
+		 * it during cleanup */
+		client->sock = -1;
+		if (client->ssh_chans != NULL) {
+			for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
+				chan->to_free = 1;
+			}
+		} else {
+			client->to_free = 1;
+
+			/* CLIENT UNLOCK */
+			pthread_mutex_unlock(&client->client_lock);
+
+			return 1;
+		}
+	}
+
 	/* check every channel of the client for pending data */
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
 		if (chan->to_free || quit) {
 			chan->to_free = 1;
-
-			/* CLIENT LOCK */
-			pthread_mutex_lock(&client->client_lock);
 
 			/* don't sleep, we may have been asked to quit */
 			skip_sleep = 1;
@@ -836,13 +834,8 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 					client->to_free = 1;
 				}
 
-				/* CLIENT UNLOCK */
-				pthread_mutex_unlock(&client->client_lock);
 				break;
 			}
-
-			/* CLIENT UNLOCK */
-			pthread_mutex_unlock(&client->client_lock);
 		}
 
 		/* check the channel for hello timeout */
@@ -911,6 +904,9 @@ int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to
 			skip_sleep = 1;
 		}
 	}
+
+	/* CLIENT UNLOCK */
+	pthread_mutex_unlock(&client->client_lock);
 
 	return skip_sleep;
 }
