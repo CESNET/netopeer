@@ -44,7 +44,7 @@ static inline void _chan_free(struct chan_struct* chan) {
 	if (chan->nc_sess != NULL) {
 		nc_session_free(chan->nc_sess);
 	}
-	if (chan->ssh_chan != NULL) {
+	if (chan->ssh_chan != NULL && ssh_is_connected(ssh_channel_get_session(chan->ssh_chan))) {
 		ssh_channel_free(chan->ssh_chan);
 	}
 	close(chan->chan_in[0]);
