@@ -610,13 +610,12 @@ void listen_loop(int do_init) {
 #endif
 			default:
 				nc_verb_error("Client with an unknown transport protocol, dropping it.");
-				new_client->to_free = 1;
+				free(new_client);
 				ret = 1;
 			}
 
 			/* client is not valid, some error occured */
 			if (ret != 0) {
-				free(new_client);
 				continue;
 			}
 
