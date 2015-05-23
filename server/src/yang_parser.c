@@ -455,6 +455,46 @@ void print_module_with_indentation(const module* mod, int indentation_level) {
 /* ------------------------------------ FUNCTIONS FOR PARSING ------------------------------------ */
 /* ----------------------------------------------------------------------------------------------- */
 
+int ietf_netconf_monitoring_quickfix(FILE* file, module* mod) {
+	fpos_t pos;
+	fgetpos(file, &pos);
+
+	rewind(file);
+
+	fpos_t pos_grouping;
+	char* word = read_word_dyn(file);
+	fgetpos(file, &pos_grouping);
+
+	while (word != NULL) {
+		if (!strcmp(Y_GROUPING, word)) {
+			free(word);
+			word = read_word_dyn(file);
+			word = normalize_name(word);
+			if (!strcmp("lock-info", word)) {
+				fsetpos(file, &pos_grouping);
+				grouping* grp = read_grouping_from_file(file, mod);
+
+				int grp_num = get_module_grouping_count(mod);
+				mod->grouping_list = realloc(mod->grouping_list, (sizeof(grouping*) * (grp_num + 2)));
+				if (mod->grouping_list == NULL) {
+					error_and_quit(EXIT_FAILURE, "ietf_netconf_monitoring_quickstart: Could not allocate memory for new grouping.");
+				}
+				mod->grouping_list[grp_num + 1] = NULL;
+				mod->grouping_list[grp_num] = grp;
+
+
+				free(word);
+				break;
+			}
+		}
+		free(word);
+		word = read_word_dyn(file);
+	}
+
+	fsetpos(file, &pos);
+	return 0;
+}
+
 module* read_module_from_file(FILE* file) {
 	dprint(D_TRACE, "Entered read_module_from_file.\n");
 	if (file == NULL) {
@@ -472,9 +512,19 @@ module* read_module_from_file(FILE* file) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '{' after %s (module name).\n", module_name);
 	}
 	module* mod = create_module(module_name);
+	// This is a quickfix for a parser defect that has been detected too late. The parser does not know how to parse groupings inside
+	// the node structure. This fixes the defect for a single module that comes with the Netopeer server.
+	int quickfix_flag = !strcmp("ietf-netconf-monitoring",module_name) ? 1 : 0 ;
 	destroy_string(module_name);
 
 	fill_module(file, mod);
+	if (quickfix_flag) {
+		int result = ietf_netconf_monitoring_quickfix(file, mod);
+		if (result != 0) {
+			dprint(D_TRACE, "monitoring quickfix unsuccessful");
+		}
+		quickfix_flag = 0;
+	}
 	mod->node = read_yang_node_from_file(file, mod);
 	fill_module_with_augments(file, mod);
 
