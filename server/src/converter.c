@@ -159,7 +159,6 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 }
 
 char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
-//	FILE* rjanik_log = fopen("/home/rjanik/Documents/agent.log", "w");
 	char buffer[1000];
 	snprintf(buffer, 1000,
 			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -170,7 +169,6 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 			"</rpc>", message_id, identifier);
 	nc_rpc* schema_rpc = nc_rpc_build(buffer , NULL);
 	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
-//	fprintf(rjanik_log, "%s\n\n=====\n\n", str_schema_rpc);
 	if (NULL != str_schema_rpc) {
 		clb_print(NC_VERB_WARNING, "Could not dump rpc for get_schema!");
 		free(str_schema_rpc);
@@ -179,14 +177,10 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 	if (schema_reply == NULL) {
 		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
 		return NULL;
-//		fprintf(rjanik_log, "Schema request sending failed.");
 	}
 	char* str_reply = nc_rpc_dump(schema_reply);
 	clb_print(NC_VERB_VERBOSE, "Getting data from schema.");
 	char* schema = get_data(str_reply);
-//	clb_print(NC_VERB_DEBUG, schema); // DANGEROUS! big chunk of text into syslog
-//	fprintf(rjanik_log, "%s", str_reply);
-//	fclose(rjanik_log);
 	clb_print(NC_VERB_VERBOSE, "get_schema: sending schema back");
 	if (str_reply != NULL) {
 		clb_print(NC_VERB_WARNING, "get_schema: str_reply is NULL when freeing");

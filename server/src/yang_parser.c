@@ -465,10 +465,8 @@ module* read_module_from_file(FILE* file) {
 		dprint(D_TRACE, "Leaving read_module_from_file(read no module).\n");
 		return NULL;
 	}
-	clb_print(NC_VERB_VERBOSE, "module name is");
 	char* module_name = read_word_dyn(file);
 	module_name = normalize_name(module_name);
-	clb_print(NC_VERB_VERBOSE, module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '{' after %s (module name).\n", module_name);
@@ -478,6 +476,7 @@ module* read_module_from_file(FILE* file) {
 
 	fill_module(file, mod);
 	mod->node = read_yang_node_from_file(file, mod);
+	fill_module_with_augments(file, mod);
 
 	if (read_words_on_this_level_until(file, "}") <= 0) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file: Corrupt file, expected '}' after module.\n");
@@ -487,22 +486,14 @@ module* read_module_from_file(FILE* file) {
 }
 
 module* read_module_from_string(const char* string) {
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: started");
 	FILE* tmp_file = tmpfile();
 	if (tmp_file == NULL) {
-		clb_print(NC_VERB_ERROR, "read_module_from_string: returning NULL, could not get file");
 		return NULL;
 	}
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: writing file");
 	fprintf(tmp_file, "%s", string);
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: rewinding");
 	rewind(tmp_file);
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: reading");
-//	sleep(15);
 	module* mod = read_module_from_file(tmp_file);
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: closing");
 	fclose(tmp_file);
-	clb_print(NC_VERB_VERBOSE, "read_module_from_string: finished");
 	return mod;
 }
 
@@ -547,7 +538,6 @@ grouping* read_grouping_from_file(FILE* file, module* mod) {
 
 yang_node* read_yang_node_from_file(FILE* file, module* mod) {
 	dprint(D_TRACE, "Entered read_yang_node_from_file(is module NULL?: %s).\n", mod == NULL ? "yes" : "no");
-	clb_print(NC_VERB_VERBOSE, "started reading yang nodes");
 	if (file == NULL) {
 		dprint(D_TRACE, "Leaving read_yang_node_from_file(file is NULL).\n");
 		return NULL;
@@ -1233,6 +1223,7 @@ void print_file_and_reset(FILE* file) {
 	dprint(D_TRACE, "Leaving print_file_and_reset.\n");
 }
 
+// deprecated
 int add_groupings(module* to_this, module* from_this) {
 	int i = 0;
 	grouping* grp = from_this->grouping_list[i];
@@ -1279,7 +1270,7 @@ int add_groupings(module* to_this, module* from_this) {
 	return 0;
 }
 
-
+// deprecated
 module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_this) {
 	if (file == NULL || groupings_from_this == NULL) {
 		dprint(D_TRACE, "Invalid arguments.\n");

@@ -38,3 +38,8 @@ exec = {BINDIR}/{AGENT}
 ; **************************************************************************
 
 ; SSL server mode services
+[restconf8080]
+accept = 8080
+exec = usr/local/bin/restconf-agent
+execargs = restconf-agent
+pty = no

@@ -80,25 +80,17 @@ int run_example1() {
 }
 
 int run_example2() {
-	char filename[] = "test-resources/ietf-system.yang";
-	char filename2[] = "test-resources/ietf-system-tls-auth.yang";
-	char filename3[] = "test-resources/ietf-x509-cert-to-name.yang";
+	char filename[] = "test-resources/ietf-system-tls-auth.yang";
 	FILE* file = load_file(filename);
-	FILE* file2 = load_file(filename2);
-	FILE* file3 = load_file(filename3);
 
-	printf("This example loads ietf-system yang model augmented by ietf-system-tls-auth and parses it.\n\n");
+	printf("This example loads ietf-system-tls-auth yang model -> %s\n\twhich contains augment declarations and parses it.\n\n", filename);
 
-	module* mod = read_module_from_file(file3);
-	module* mod2 = read_module_from_file_with_groupings(file2, mod);
-
-	print_module(mod2);
-	destroy_module(mod);
-	destroy_module(mod2);
+	module* mod = read_module_from_file(file);
 
 	fclose(file);
-	fclose(file2);
-	fclose(file3);
+
+	print_module(mod);
+	destroy_module(mod);
 
 	return EXIT_SUCCESS;
 }
@@ -107,9 +99,7 @@ int run_example3() {
 	char filename[] = "test-resources/sample-yang-1.yang";
 	FILE* file = load_file(filename);
 
-	printf("This example loads a simple custom made yang model.\n");
-
-//	module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
+	printf("This example loads a simple custom made yang model -> %s\n\twhich contains all important data structures and parses it.\n\n", filename);
 
 	module* mod = read_module_from_file(file);
 	print_module(mod);

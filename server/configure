@@ -622,6 +622,7 @@ ac_subst_vars='LTLIBOBJS
 MODULESDIR
 NCSERVER_FEATURES
 AGENT_LIBS
+RC_AGENT_LIBS
 SERVER_LIBS
 SERVER_HDRS_COMM
 AGENT_HDRS_COMM
@@ -5259,7 +5260,8 @@ fi
 # Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
 if test x"$ax_pthread_ok" = xyes; then
 
-	AGENT_LIBS="$PTHREAD_LIBS $LIBS `pkg-config --cflags --libs jansson`"
+	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
+	RC_AGENT_LIBS="$PTHREAD_LIBS $LIBS `pkg-config --cflags --libs jansson`"
 	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 	CC="$PTHREAD_CC"
         :
