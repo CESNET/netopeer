@@ -1,0 +1,59 @@
+module some-module {
+	namespace "http://some_namespace";
+	prefix "some_prefix";
+	
+	grouping grp1 {
+		leaf grpleaf1 {
+			type string;
+		}
+		leaf-list leaf-list1 {
+			type string;
+		}
+	}
+	
+	container system {
+        leaf host-name {
+            type string;
+        }
+
+        leaf-list domain-search {
+            type string;
+        }
+
+        list interface {
+            key "name";
+            leaf name {
+                type string;
+            }
+            leaf type {
+                type string;
+            }
+            leaf mtu {
+                type int32;
+            }
+        }
+        container someother {
+        	uses grp1;
+        }
+        container somewithchoice {
+        	choice achoice {
+        		case firstcase {
+        			leaf firstcaseleaf1 {
+        				type string;
+        			}
+        			leaf firstcaseleaf2 {
+        				type string;
+        			}
+        		}
+        		case secondcase {
+        			leaf secondcaseleaf1 {
+        				type string;
+        			}
+        			leaf secondcaseleaf2 {
+        				type string;
+        			}
+        		}
+        	}
+        }
+    }
+}

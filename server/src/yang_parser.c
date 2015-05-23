@@ -467,7 +467,7 @@ module* read_module_from_file(FILE* file) {
 	}
 	clb_print(NC_VERB_VERBOSE, "module name is");
 	char* module_name = read_word_dyn(file);
-//	module_name = normalize_name(module_name);
+	module_name = normalize_name(module_name);
 	clb_print(NC_VERB_VERBOSE, module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
@@ -528,6 +528,7 @@ grouping* read_grouping_from_file(FILE* file, module* mod) {
 	}
 
 	char* grouping_name = read_word_dyn(file);
+	grouping_name = normalize_name(grouping_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
 		error_and_quit(EXIT_FAILURE, "read_grouping_from_file: Corrupt file, expected '{' after %s (grouping name).\n", grouping_name);
@@ -559,6 +560,7 @@ yang_node* read_yang_node_from_file(FILE* file, module* mod) {
 	}
 
 	char* node_name = read_word_dyn(file);
+	node_name = normalize_name(node_name);
 	char* bracket = read_word_dyn(file);
 	if (strcmp(bracket, "{")) {
 		// the file is corrupt, we expect a '{' after a yang node type and its name
@@ -674,7 +676,6 @@ char* find_attribute(FILE* file, char* attr_name) {
 		error_and_quit(EXIT_FAILURE, "find_attribute: fgetpos: %s", strerror(errno));
 	}
 
-	// TODO: screws us up, needs functionality of find_first_of_tl, e.g. incrementing level on \" as well
 	int /*words_read = 0, */status = -1;
 //	if (-1 == (words_read = read_words_on_this_level_until(file, attr_name))) {
 	if (-1 == (status = find_first_of_tl(file, &attr_name, 1))) {
@@ -689,6 +690,7 @@ char* find_attribute(FILE* file, char* attr_name) {
 		if (attribute_value[strlen(attribute_value) - 1] == ';') { // get rid of ; on the end of the word
 			attribute_value[strlen(attribute_value) - 1] = '\0'; // if there is none it won't be expected
 		}
+		attribute_value = normalize_name(attribute_value);
 
 		dprint(D_TRACE, "Leaving find_attribute(found attribute %s with value %s).\n", attr_name, attribute_value);
 		return attribute_value;
@@ -747,9 +749,6 @@ int read_word(FILE* file, char* buff) {
 	return read;
 }
 
-/*
- * TODO: support comments and ';'
- */
 char* read_word_dyn(FILE* file) {
 	dprint(D_TRACE, "Entered read_word_dyn.\n");
 
@@ -1072,6 +1071,7 @@ augment* read_augment_from_file(FILE* file, module* mod) {
 	}
 
 	char* augment_name = read_word_dyn(file);
+	augment_name = normalize_name(augment_name);
 //	printf("Found %s.\n-------------", augment_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
@@ -1290,7 +1290,7 @@ module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_
 		return NULL;
 	}
 	char* module_name = read_word_dyn(file);
-//	module_name = normalize_name(module_name);
+	module_name = normalize_name(module_name);
 	char* bracket = read_word_dyn(file); // expecting {
 	if (strcmp(bracket, "{")) {
 		error_and_quit(EXIT_FAILURE, "read_module_from_file_with_groupings: Corrupt file, expected '{' after %s (module name).\n", module_name);

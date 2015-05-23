@@ -79,6 +79,18 @@ AGENT_HDRS = src/comm.h \
 	@AGENT_HDRS_COMM@
 AGENT_OBJS = $(AGENT_SRCS:%.c=$(OBJDIR)/%.o)
 
+YANG_EXAMPLE = yang_example
+YANG_EXAMPLE_LIBS = @AGENT_LIBS@
+YANG_EXAMPLE_SRCS = src/yang_example.c \
+    src/yang_parser.c \
+    src/common.c
+    #src/agent_comm.c \
+    #@AGENT_SRCS_COMM@
+YANG_EXAMPLE_HDRS = src/yang_parser.h
+    #src/comm.h \
+    #@AGENT_HDRS_COMM@
+YANG_EXAMPLE_OBJS = $(YANG_EXAMPLE_SRCS:%.c=$(OBJDIR)/%.o)
+
 SERVER = netopeer-server
 SERVER_LIBS = @SERVER_LIBS@
 SERVER_SRCS =  src/server.c \
@@ -102,7 +114,7 @@ CONFIGURATOR_SRCS = configurator/setup.py \
 	configurator/netopeer/*.py \
 	configurator/netopeer/*.py.in
 
-CFLAGS = @CFLAGS@
+CFLAGS = @CFLAGS@ -g
 CPPFLAGS = @CPPFLAGS@
 DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
 
@@ -158,7 +170,7 @@ define EXPAND
 sed -e 's|$${prefix}|$(prefix)|g' $(1) > $(2);
 endef
 
-all: $(AGENT) $(SERVER) $(TOOLS)
+all: $(AGENT) $(SERVER) $(TOOLS) $(YANG_EXAMPLE)
 
 $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
@@ -185,6 +197,10 @@ $(AGENT): $(AGENT_OBJS)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
+$(YANG_EXAMPLE): $(YANG_EXAMPLE_OBJS)
+	@rm -f $@;
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(YANG_EXAMPLE_OBJS) $(AGENT_LIBS) -o $@;
+
 manager/netopeer-manager: manager/netopeer-manager.tmp
 	$(call EXPAND,$<,$@)
 	chmod +x $@
@@ -205,10 +221,10 @@ doc: $(MANHTMLS)
 dist: $(NAME).spec tarball rpm
 
 .PHONY: tarball
-tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(MANHTMLS)
+tarball: $(SERVER_SRCS) $(AGENT_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(MANHTMLS) $(YANG_EXAMPLE_SRCS) $(YANG_EXAMPLE_HDRS)
 	@rm -rf $(NAME)-$(VERSION);
 	@mkdir $(NAME)-$(VERSION);
-	@for i in $(SERVER_SRCS) $(AGENT_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) $(H_IN) configure.in configure \
+	@for i in $(SERVER_SRCS) $(AGENT_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(AGENT_HDRS) $(YANG_EXAMPLE_SRCS) $(YANG_EXAMPLE_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) $(H_IN) configure.in configure \
 	    Makefile.in VERSION $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) $(MANHTMLS) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
 	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
 		cp $$i $(NAME)-$(VERSION)/$$i; \

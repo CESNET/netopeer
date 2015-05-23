@@ -35,3 +35,5 @@ server/netopeer-server
 server/netopeer-server.spec
 server/netopeer.rc
 server/src/config.h
+server/yang_example
+server/restconf-agent

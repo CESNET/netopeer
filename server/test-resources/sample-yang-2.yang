@@ -1,0 +1,64 @@
+module a_module {
+	grouping group1 {
+		container simple {
+			leaf simpler {
+				type string;
+			}
+		}
+		list a_list {
+			key some-key;
+			leaf leaffromlist1 {
+				type sometype;
+			}
+			leaf leaffromlist2 {
+				type sometype2;
+			}
+		}		
+	}
+
+	grouping group2 {
+		uses group1; // this does not work yet
+		leaf from_group2 {
+			type string;
+		}
+	}
+
+	container system {
+		leaf host-name {
+			type string;
+		}
+
+		leaf-list domain-search {
+			type string;
+		}
+
+		list interface {
+			key "name";
+			leaf name {
+				type string;
+			}
+			leaf type {
+				type string;
+			}
+			leaf mtu {
+				type int32;
+			}
+		}
+
+		container hello {
+			leaf 1 {
+				type int32;
+			}
+			leaf 2 {
+				type int32;
+			}
+			leaf 3 {
+				type int32;
+			}
+		}
+
+		container withuses {
+			uses group2;
+		}
+	}
+}
