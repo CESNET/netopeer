@@ -160,6 +160,8 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 
 char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 	char buffer[1000];
+	clb_print(NC_VERB_VERBOSE, "get_schema: getting schema:");
+	clb_print(NC_VERB_VERBOSE, identifier);
 	snprintf(buffer, 1000,
 			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 			"<rpc message-id=\"%s\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
@@ -170,16 +172,16 @@ char* get_schema(const char* identifier, conn_t* con, const char* message_id) {
 	nc_rpc* schema_rpc = nc_rpc_build(buffer , NULL);
 	char* str_schema_rpc = nc_rpc_dump(schema_rpc);
 	if (NULL != str_schema_rpc) {
-		clb_print(NC_VERB_WARNING, "Could not dump rpc for get_schema!");
+		clb_print(NC_VERB_WARNING, "get_schema: Could not dump rpc for get_schema!");
 		free(str_schema_rpc);
 	}
 	nc_reply* schema_reply = comm_operation(con, schema_rpc);
 	if (schema_reply == NULL) {
-		clb_print(NC_VERB_WARNING, "Schema request sending failed.");
+		clb_print(NC_VERB_WARNING, "get_schema: Schema request sending failed.");
 		return NULL;
 	}
 	char* str_reply = nc_rpc_dump(schema_reply);
-	clb_print(NC_VERB_VERBOSE, "Getting data from schema.");
+	clb_print(NC_VERB_VERBOSE, "get_schema: Getting data from schema.");
 	char* schema = get_data(str_reply);
 	clb_print(NC_VERB_VERBOSE, "get_schema: sending schema back");
 	if (str_reply != NULL) {

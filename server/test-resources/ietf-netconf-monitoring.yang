@@ -215,35 +215,6 @@ module ietf-netconf-monitoring {
           "Number of <notification> messages sent.";
       }
     }  // grouping common-counters
-    
-    grouping lock-info {
-              description
-                "Lock related parameters, common to both global and
-               partial locks.";
-              leaf locked-by-session {
-                type uint32;
-                mandatory true;
-                description
-                  "The session ID of the session that has locked
-                 this resource.  Both a global lock and a partial
-                 lock MUST contain the NETCONF session-id.
-
-                 If the lock is held by a session that is not managed
-                 by the NETCONF server (e.g., a CLI session), a session
-                 id of 0 (zero) is reported.";
-                reference
-                  "RFC 4741: NETCONF Configuration Protocol";
-
-              }
-
-              leaf locked-time {
-                type yang:date-and-time;
-                mandatory true;
-                description
-                  "The date and time of when the resource was
-                 locked.";
-              }
-            }  // grouping lock-info
 
     container netconf-state {
       config false;
@@ -291,7 +262,34 @@ module ietf-netconf-monitoring {
              the lock, the type of lock (global or partial) and the
              list of locked resources.  Multiple locks per datastore
              are supported.";
-            
+            grouping lock-info {
+              description
+                "Lock related parameters, common to both global and
+               partial locks.";
+              leaf locked-by-session {
+                type uint32;
+                mandatory true;
+                description
+                  "The session ID of the session that has locked
+                 this resource.  Both a global lock and a partial
+                 lock MUST contain the NETCONF session-id.
+
+                 If the lock is held by a session that is not managed
+                 by the NETCONF server (e.g., a CLI session), a session
+                 id of 0 (zero) is reported.";
+                reference
+                  "RFC 4741: NETCONF Configuration Protocol";
+
+              }
+
+              leaf locked-time {
+                type yang:date-and-time;
+                mandatory true;
+                description
+                  "The date and time of when the resource was
+                 locked.";
+              }
+            }  // grouping lock-info
             choice lock-type {
               description
                 "Indicates if a global lock or a set of partial locks

@@ -89,9 +89,11 @@ int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
 void rc_send_error(int status, int fd);
 void save(const char* str, const char* file);
 
+void rc_send_version_response(httpmsg* msg, int outfd);
 int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump);
 int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con);
 json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con);
+char* jump_resource_identifier(char* identifier, int times);
 // RESTCONF FUNCTIONS - END
 
 /*!
@@ -302,7 +304,7 @@ int main (int argc, char** argv)
 	sigaction(SIGTERM, &action, NULL);
 	sigaction(SIGKILL, &action, NULL);
 
-	openlog("restapeer-agent", LOG_PID, LOG_DAEMON);
+	openlog("restconf-agent", LOG_PID, LOG_DAEMON);
 	nc_callback_print(clb_print);
 
 	/* normalize value if not from the enum */
@@ -356,9 +358,6 @@ int main (int argc, char** argv)
 
 	nc_cpblts_add(capabilities, "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring");
 
-
-
-	/* TODO: the username is always root for now, use get_tls_username later */
 	if (comm_session_info_send(con, "root", nc_session_id, nc_cpblts_count(capabilities), capabilities)) {
 		clb_print(NC_VERB_ERROR, "Failed to communicate with server.");
 		nc_cpblts_free(capabilities);
@@ -371,27 +370,6 @@ int main (int argc, char** argv)
 		nc_cpblts_free(capabilities);
 		return EXIT_FAILURE;
 	}
-
-	clb_print(NC_VERB_VERBOSE, "Opening log");
-	/*TODO remove this, debug*/FILE* log = fopen("/home/rjanik/Documents/agent_cap.log", "w");
-	if (log == NULL) {
-		clb_print(NC_VERB_ERROR, "Could not open log");
-//		nc_cpblts_free(capabilities);
-		return EXIT_FAILURE;
-	}
-	clb_print(NC_VERB_VERBOSE, "Getting capabilities from session.");
-	struct nc_cpblts* cpb2 = nc_session_get_cpblts(netconf_con_dummy);
-	clb_print(NC_VERB_VERBOSE, "Starting iteration");
-	nc_cpblts_iter_start(cpb2);
-	const char* cpblt = NULL;
-	clb_print(NC_VERB_VERBOSE, "Iterating");
-	while (NULL != (cpblt = nc_cpblts_iter_next(cpb2))) {
-		fprintf(log, "%s\n", cpblt);
-	}
-	clb_print(NC_VERB_VERBOSE, "Closing log");
-	fclose(log);
-	nc_cpblts_free(cpb2);
-//	nc_cpblts_iter_start(capabilities);
 
 	clb_print(NC_VERB_VERBOSE, "Handshake finished");
 
@@ -421,85 +399,87 @@ int main (int argc, char** argv)
 				case NC_MSG_NONE:
 					clb_print(NC_VERB_VERBOSE, "A message has been processed without sending to the server");
 					/* TODO: optionally, log the processed message (what the request was, what the response was */
-					/* TODO: the netconf agent doesn't do this by default so that would require some more support */
+					/* TODO: the netconf-agent doesn't do this by default so that would require some more support */
 					break;
 				case NC_MSG_UNKNOWN:
 					clb_print(NC_VERB_ERROR, "Could not parse clients message");
 					/* TODO: optionally, log the message */
 					break;
 				case NC_MSG_RPC:
-					clb_print(NC_VERB_VERBOSE, "Processing client message");
-
-					nc_reply* reply = comm_operation(con, rpc);
-
-					// TODO: testing
-					char* ietf_system = get_schema("ietf-system", con, "2");
-					save(ietf_system, "ietf-system.log");
-					char* ietf_system_tls_auth = get_schema("ietf-system-tls-auth", con, "3");
-					save(ietf_system_tls_auth, "ietf-system-tls-auth.log");
-					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
-					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
-
-					// TODO: extract needed modules dynamically + conversion from capabilities
-
-					// this works, good
-					module* cert_to_name_mod = read_module_from_string(ietf_x509_cert_to_name);
-					module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
-					module* ietf_system_mod = read_module_from_string(ietf_system);
-
-					xmlDocPtr doc = xmlParseDoc((const xmlChar*)nc_reply_dump(reply));
-					if (doc == NULL) {
-						clb_print(NC_VERB_ERROR, "Message processing failed: could not read xml doc");
-						break;
-					}
-					xmlNodePtr root = xmlDocGetRootElement(doc);
-					if (root == NULL) {
-						clb_print(NC_VERB_ERROR, "Message processing failed: could not get root element");
-						break;
-					}
-					xmlNodePtr data = root->xmlChildrenNode;
-					while (data != NULL && strcmp((char*)data->name, "data")) {
-						clb_print(NC_VERB_WARNING, "Node name is not data, it is:");
-						clb_print(NC_VERB_WARNING, (char*) data->name);
-						data = data->next;
-					}
-					xmlBufferPtr buffer = xmlBufferCreate();
-					xmlNodeDump(buffer, doc, data, 0, 1);
-					save((char*)buffer->content, "data-dump");
-					xmlBufferFree(buffer);
-
-					xmlNodePtr system = data->xmlChildrenNode;
-					while (system != NULL && strcmp((char*) system->name, "system")) {
-						clb_print(NC_VERB_WARNING, "Node name is not system, it is:");
-						clb_print(NC_VERB_WARNING, (char*) system->name);
-						system = system->next;
-					}
-
-					xmlBufferPtr buffer2 = xmlBufferCreate();
-					xmlNodeDump(buffer2, doc, system, 0, 1);
-					save((char*)buffer2->content, "system-dump");
-
-					// convert
-					path* p = new_path(5000);
-					json_t* json_obj = xml_to_json(system, p, ietf_system_mod, ietf_system_tls_auth_mod, NULL, 0, NULL);
-					clb_print(NC_VERB_WARNING, "dumping to json");
-					save(json_dumps(json_obj, 0), "json-dump");
-					free_path(p);
-
-					xmlBufferFree(buffer2);
-
-					destroy_string(ietf_system);
-					destroy_string(ietf_system_tls_auth);
-					destroy_string(ietf_x509_cert_to_name);
-
-					if (reply == NULL) {
-						clb_print(NC_VERB_WARNING, "Message processing failed");
-						rc_send_error(-2, outfd);
-						break;
-					}
-					if (rc_send_reply(outfd/*, reply*/, json_dumps(json_obj, 0))) {
-						clb_print(NC_VERB_WARNING, "Sending reply failed.");
-					}
+					clb_print(NC_VERB_VERBOSE, "Processed client message");
+//
+//					clb_print(NC_VERB_VERBOSE, "Processing client message");
+//
+//					nc_reply* reply = comm_operation(con, rpc);
+//
+//					// TODO: testing
+//					char* ietf_system = get_schema("ietf-system", con, "2");
+//					save(ietf_system, "ietf-system.log");
+//					char* ietf_system_tls_auth = get_schema("ietf-system-tls-auth", con, "3");
+//					save(ietf_system_tls_auth, "ietf-system-tls-auth.log");
+//					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
+//					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
+//
+//					// TODO: extract needed modules dynamically + conversion from capabilities
+//
+//					// this works, good
+//					module* cert_to_name_mod = read_module_from_string(ietf_x509_cert_to_name);
+//					module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
+//					module* ietf_system_mod = read_module_from_string(ietf_system);
+//
+//					xmlDocPtr doc = xmlParseDoc((const xmlChar*)nc_reply_dump(reply));
+//					if (doc == NULL) {
+//						clb_print(NC_VERB_ERROR, "Message processing failed: could not read xml doc");
+//						break;
+//					}
+//					xmlNodePtr root = xmlDocGetRootElement(doc);
+//					if (root == NULL) {
+//						clb_print(NC_VERB_ERROR, "Message processing failed: could not get root element");
+//						break;
+//					}
+//					xmlNodePtr data = root->xmlChildrenNode;
+//					while (data != NULL && strcmp((char*)data->name, "data")) {
+//						clb_print(NC_VERB_WARNING, "Node name is not data, it is:");
+//						clb_print(NC_VERB_WARNING, (char*) data->name);
+//						data = data->next;
+//					}
+//					xmlBufferPtr buffer = xmlBufferCreate();
+//					xmlNodeDump(buffer, doc, data, 0, 1);
+//					save((char*)buffer->content, "data-dump");
+//					xmlBufferFree(buffer);
+//
+//					xmlNodePtr system = data->xmlChildrenNode;
+//					while (system != NULL && strcmp((char*) system->name, "system")) {
+//						clb_print(NC_VERB_WARNING, "Node name is not system, it is:");
+//						clb_print(NC_VERB_WARNING, (char*) system->name);
+//						system = system->next;
+//					}
+//
+//					xmlBufferPtr buffer2 = xmlBufferCreate();
+//					xmlNodeDump(buffer2, doc, system, 0, 1);
+//					save((char*)buffer2->content, "system-dump");
+//
+//					// convert
+//					path* p = new_path(5000);
+//					json_t* json_obj = xml_to_json(system, p, ietf_system_mod, ietf_system_tls_auth_mod, NULL, 0, NULL);
+//					clb_print(NC_VERB_WARNING, "dumping to json");
+//					save(json_dumps(json_obj, 0), "json-dump");
+//					free_path(p);
+//
+//					xmlBufferFree(buffer2);
+//
+//					destroy_string(ietf_system);
+//					destroy_string(ietf_system_tls_auth);
+//					destroy_string(ietf_x509_cert_to_name);
+//
+//					if (reply == NULL) {
+//						clb_print(NC_VERB_WARNING, "Message processing failed");
+//						rc_send_error(-2, outfd);
+//						break;
+//					}
+//					if (rc_send_reply(outfd/*, reply*/, json_dumps(json_obj, 0))) {
+//						clb_print(NC_VERB_WARNING, "Sending reply failed.");
+//					}
 
 					break;
 				default:
@@ -523,9 +503,7 @@ cleanup:
 
 // 1, reads HTTP message from client
 // 2, parses HTTP message
-// 3, if the message can be processed without converting to XML and sending to server, does so, return value: NC_MSG_NONE
-// 4, if the message has to be converted, does so, return value: NC_MSG_RPC, rpc contains the message
-// 5, if an error occurred, NC_MSG_UNKNOWN is returned -> non recoverable, agent has to be killed
+// 3, sends the message to the handler for further operations
 
 NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con) {
 
@@ -593,52 +571,9 @@ NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, co
 	}
 
 	clb_print(NC_VERB_DEBUG, "rc_recv_msg: finished handling restconf message");
-
-	if (status == 0) {
-		// there is no rpc to be sent to the server, restconf response has already been dispatched
-		clb_print(NC_VERB_VERBOSE, "rc_recv_msg: restconf request resolved, no netconf communication needed");
-		httpmsg_clean(msg);
-		return NC_MSG_NONE;
-	} else if (status == 1 && *rpc != NULL) {
-		clb_print(NC_VERB_VERBOSE, "rc_recv_msg: restconf request handled, need to contact netconf server");
-		httpmsg_clean(msg);
-		return NC_MSG_RPC;
-	} else if (status == 1){
-		clb_print(NC_VERB_ERROR, "rc_recv_msg: restconf request handled, no rpc generated but I need to contact netconf server - illegal state");
-		httpmsg_clean(msg);
-		return NC_MSG_UNKNOWN;
-	} else {
-		clb_print(NC_VERB_ERROR, "rc_recv_msg: restconf request not handled correctly");
-		httpmsg_clean(msg);
-		return NC_MSG_UNKNOWN;
-	}
-
-//	switch (status) {
-//	case 1:
-//		// no rpc but valid response, create response based on resource locator value
-//		clb_print(NC_VERB_DEBUG, "rc_recv_msg: HTTP message cannot be converted to netconf rpc, creating restconf only response");
-//		int auto_status = rc_send_auto_response(outfd, msg, con);
-//		if (-1 == auto_status) {
-//			// internal error occurred
-//			rc_send_error(2, outfd);
-//		}
-//		if (-2 == auto_status) {
-//			// unknown resource locator value, unimplemented
-//			rc_send_error(1, outfd);
-//		}
-//		return NC_MSG_NONE;
-//		break;
-//	case 0:
-//		// nothing, rpc has been created
-//		break;
-//	default:
-//		rc_send_error(status, outfd);
-//	}
-//
-//	return (status != 0 || *rpc == NULL) ? NC_MSG_NONE : NC_MSG_RPC;
+	return NC_MSG_RPC;
 }
 
-// TODO
 // checks /restconf part of resource identifier
 // checks validity of the next part of resource identifier
 // handles the message based on the rest of the resource identifier and given method, delegates to other functions
@@ -648,52 +583,80 @@ NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, co
 int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	char* restconf_resource = msg->resource_locator;
 	if (strncmp(restconf_resource, "/restconf", strlen("/restconf"))) {
-		// /restconf resource expected
+		rc_send_error(-3, outfd);
+		return 0; // correctly processed
+	}
+	if (!strcmp(restconf_resource, "/restconf") ||
+			!strcmp(restconf_resource, "/restconf/") ) {
+//		rc_handle_pure_restconf(msg, outfd, con);
+		return 0;
 	}
 
 	char* subresource = msg->resource_locator + strlen("/restconf");
-	if (!strncmp(subresource, "/data", sizeof("/data"))) {
-
-	} else if (!strncmp(subresource, "/modules", sizeof("/modules"))) {
-
-	} else if (!strncmp(subresource, "/version", sizeof("/version"))) {
-
-	} else if (!strncmp(subresource, "/streams", sizeof("/streams"))) {
-
-	} else if (!strncmp(subresource, "/operations", sizeof("/operations"))) {
-
+	if (!strncmp(subresource, "/data", strlen("/data"))) {
+		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /data branch");
+//		if (!strcmp()) {
+//
+//		} else {
+//			rc_send_error(-3, outfd);
+//		}
+		return 0;
+	} else if (!strncmp(subresource, "/modules", strlen("/modules"))) {
+		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /modules branch");
+		return rc_send_auto_response(outfd, msg, con);
+	} else if (!strncmp(subresource, "/version", strlen("/version"))) {
+		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /version branch");
+		rc_send_version_response(msg, outfd);
+		return 0;
+	} else if (!strncmp(subresource, "/streams", strlen("/streams"))) {
+		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /streams branch");
+		rc_send_error(-1, outfd);
+		return 0;
+	} else if (!strncmp(subresource, "/operations", strlen("/operations"))) {
+		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /operations branch");
+		rc_send_error(-1, outfd);
+		return 0;
 	}
 
+	rc_send_error(-3, outfd); // unknown /restconf subresource
 	return 0;
-//	if (!strcmp(msg->method, "GET")) {
-//		if (!strncmp(msg->resource_locator, "/restconf", strlen("/restconf"))) {
-//			if (!strcmp(msg->resource_locator, "/restconf/data")) {
-//				*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
-//			} else if (!strncmp(msg->resource_locator, "/restconf/modules", strlen("/restconf/modules"))) { // starts with /modules
-//				*rpc = NULL;
-//				return 1; // no rpc but valid response, create response based on resource locator value
-//			}
-//			if (*rpc == NULL) {
-//				return -2; // internal error
-//			}
-//		} else {
-//			return -3; // bad resource locator start, should be /restconf
-//		}
-//	} else if (!strcmp(msg->method, "OPTIONS")) {
-//		return -1; // not implemented
-//	} else if (!strcmp(msg->method, "HEAD")) {
-//		return -1; // not implemented
-//	} else if (!strcmp(msg->method, "POST")) {
-//		return -1; // not implemented
-//	} else if (!strcmp(msg->method, "PUT")) {
-//		return -1; // not implemented
-//	} else if (!strcmp(msg->method, "PATCH")) {
-//		return -1; // not implemented
-//	} else if (!strcmp(msg->method, "DELETE")) {
-//		return -1; // not implemented
-//	}
-//
-//	return 0;
+}
+
+void rc_send_version_response(httpmsg* msg, int outfd) {
+
+	if (strcmp(msg->method, "GET")) {
+		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received bad method");
+		rc_send_error(-3, outfd); // Bad Request, no such method is supported on the /version resource
+		return;
+	}
+
+	int hdr_c = 0;
+	for (hdr_c = 0; hdr_c < msg->header_num; hdr_c++) {
+		if (!strcmp(msg->headers[hdr_c], "Accept: application/yang.api+json") ||
+				!strcmp(msg->headers[hdr_c], "Accept: */*")) {
+			break;
+		}
+		if (hdr_c + 1 == msg->header_num) {
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received request on /modules without proper Accept header");
+			rc_send_error(-3, outfd);
+			return;
+		}
+	}
+
+	if (strcmp(msg->resource_locator, "/restconf/version") &&
+			strcmp(msg->resource_locator, "/restconf/version/")) {
+		rc_send_error(-3, outfd);
+		return;
+	}
+
+	json_t* version = json_object();
+	json_object_set(version, "version", json_string("1.0"));
+
+	char* dump = json_dumps(version, JSON_INDENT(2));
+	rc_send_reply(outfd, dump);
+	free(dump);
+	json_decref(version);
+	return;
 }
 
 void rc_send_error(int status, int fd) {
@@ -722,16 +685,27 @@ void rc_send_error(int status, int fd) {
 		}
 		break;
 	}
+	case -3:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 400 Bad Request\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
+	}
 	default:
 		clb_print(NC_VERB_ERROR, "rc_send_error: received unknown status");
 		break;
 	}
 }
 
-int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump) {
+int rc_send_reply(int outfd, char* json_dump) {
 	clb_print(NC_VERB_VERBOSE, "Replying to client");
 	/* prepare message */
-//	int payload_size = strlen(nc_reply_get_data(reply));
 	int payload_size = strlen(json_dump);
 	char* status_line = "HTTP/1.1 200 OK\r\n";
 	char* headers = malloc(50); /* enough to hold "Content-Length: <number>\r\n\r\n" */
@@ -757,7 +731,7 @@ int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump) {
 		return EXIT_FAILURE;
 	}
 	memset(message, 0, message_size + 1);
-	ret = snprintf(message, message_size, "%s%s%s", status_line, headers, /*nc_reply_get_data(reply)*/json_dump);
+	ret = snprintf(message, message_size, "%s%s%s", status_line, headers, json_dump);
 	if (ret < 0) {
 		clb_print(NC_VERB_ERROR, "Could not print message");
 		free(headers);
@@ -857,10 +831,54 @@ json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con) {
 	return obj;
 }
 
+char* jump_resource_identifier(char* identifier, int times) {
+	if (identifier == NULL || identifier[0] == '\0') {
+		clb_print(NC_VERB_WARNING, "Attempting to jump invalid identifier.");
+		return identifier;
+	}
+	char* new_id = identifier;
+	int i = 0;
+	for (i = 0; i < times; i++) {
+		char* tmp_id = strchr(new_id, '/');
+		if (tmp_id == NULL) {
+			break;
+		}
+		new_id = tmp_id + 1;
+	}
+	return new_id;
+}
+
 /* creates response based on msg resource locator - serves /modules resources */
 int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending response based on resource locator");
-//	json_t* response = json_object();
+
+	if (!strcmp(msg->method, "POST") || !strcmp(msg->method, "PUT") || !strcmp(msg->method, "PATCH")
+			|| !strcmp(msg->method, "OPTIONS") || !strcmp(msg->method, "DELETE") || !strcmp(msg->method, "HEAD")) {
+		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received unimplemented method:");
+		clb_print(NC_VERB_DEBUG, msg->method);
+		rc_send_error(-1, outfd); // Not implemented
+		return 0;
+	}
+
+	if (strcmp(msg->method, "GET")) {
+		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received bad method");
+		rc_send_error(-3, outfd); // Bad Request, this method is not supported by RESTCONF at all
+		return 0;
+	}
+
+	int hdr_c = 0;
+	for (hdr_c = 0; hdr_c < msg->header_num; hdr_c++) {
+		if (!strcmp(msg->headers[hdr_c], "Accept: application/yang") ||
+				!strcmp(msg->headers[hdr_c], "Accept: application/yang.api+json") ||
+				!strcmp(msg->headers[hdr_c], "Accept: */*")) {
+			break;
+		}
+		if (hdr_c + 1 == msg->header_num) {
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received request on /modules without proper Accept header");
+			rc_send_error(-3, outfd);
+			return 0;
+		}
+	}
 
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: getting server capabilities");
 	char** cpblts = comm_get_srv_cpblts(con);
@@ -869,52 +887,51 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 		return -1;
 	}
 
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: counting capabilities size for dump");
-	int total_size = 0, i = 0;
-	while (cpblts[i] != NULL) {
-		clb_print(NC_VERB_DEBUG, cpblts[i]);
-		total_size += strlen(cpblts[i]);
-		total_size += 1;
-		i++;
-	}
-	total_size += 1; // null byte
+	int i = 0;
 
-	char* cpblt_dump = malloc(total_size * sizeof(char*));
-	memset(cpblt_dump, 0, total_size);
-
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: dumping capabilities");
-	i = 0;
-	while (cpblts[i] != NULL) {
-		strcat(cpblt_dump, cpblts[i]);
-		strcat(cpblt_dump, "\n");
-		i++;
-	}
-
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving capabilities");
-	save(cpblt_dump, "cpblt_dump");
-
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving empty modules dump");
 	json_t* modules_obj = json_object();
-	json_object_set(modules_obj, "modules", json_array());
-	char* dump_1 = json_dumps(modules_obj, JSON_INDENT(2));
-	save(dump_1, "json_dump_empty");
-	free(dump_1);
+	json_object_set(modules_obj, "ietf-restconf:modules", json_array());
+
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: testing for schema only request");
+	char* module_id = jump_resource_identifier(msg->resource_locator, 3);
+	if (!strncmp(module_id, "module", 6)) {
+		char* schema_id = jump_resource_identifier(msg->resource_locator, 5); // /restconf/modules/module/<mod>/schema
+		clb_print(NC_VERB_DEBUG, schema_id);
+		if (!strncmp(schema_id, "schema", 6)) {
+			char* module_id = jump_resource_identifier(msg->resource_locator, 4);
+			if (NULL != strchr(module_id, '/')) {
+				strchr(module_id, '/')[0] = '\0';
+			}
+			if (NULL != strchr(module_id, '&')) {
+				strchr(module_id, '&')[0] = '\0';
+			}
+			if (NULL != strchr(module_id, '#')) {
+				strchr(module_id, '#')[0] = '\0';
+			}
+			clb_print(NC_VERB_VERBOSE, "rc_send_auto_response: getting schema");
+			clb_print(NC_VERB_DEBUG, module_id);
+			char* schema = get_schema(module_id, con, "200");
+			clb_print(NC_VERB_VERBOSE, "rc_send_auto_response: got schema, sending reply");
+			rc_send_reply(outfd, schema);
+			return 0;
+		}
+	}
 
 	i = 0;
 	while (cpblts[i] != NULL) {
+		clb_print(NC_VERB_VERBOSE, "rc_send_auto_response: constructing module JSON structure for capability:");
+		clb_print(NC_VERB_VERBOSE, cpblts[i]);
 		json_t* module = create_module_json_obj(cpblts[i], 1, con);
 		if (module != NULL) {
 			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: appending module");
-			json_array_append(json_object_get(modules_obj, "modules"), module);
+			json_array_append(json_object_get(modules_obj, "ietf-restconf:modules"), module);
 		}
 		i++;
 	}
 
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: saving modules dump");
 	char* dump_2 = json_dumps(modules_obj, JSON_INDENT(2));
-	save(dump_2, "json_dump_full");
 
-	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending modules dump"); // TODO: create only what is needed
+	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending modules dump");
 	if (!strncmp(msg->resource_locator, "/restconf/modules", strlen("/restconf/modules"))) {
 		clb_print(NC_VERB_DEBUG, "rc_send_auto_response: resource locator start is valid");
 		if (!strcmp(msg->resource_locator, "/restconf/modules/module") ||
@@ -934,15 +951,14 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 					free(cpblts[i]);
 					i++;
 				}
-				free(cpblt_dump);
+				rc_send_error(-3, outfd);
 				return -2; // unknown resource locator value
 			}
 			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: parsing module name");
 			char* module_id = msg->resource_locator + strlen("/restconf/modules/module/");
-//			char* revision_id = strstr(module_id, "%20") == NULL ? NULL : strstr(module_id, "%20") + 3; // TODO: check by revision too
 			unsigned int i = 0;
-			for (i = 0; i < json_array_size(json_object_get(modules_obj, "modules")); i++) {
-				json_t* module = json_array_get(json_object_get(modules_obj, "modules"), i);
+			for (i = 0; i < json_array_size(json_object_get(modules_obj, "ietf-restconf:modules")); i++) {
+				json_t* module = json_array_get(json_object_get(modules_obj, "ietf-restconf:modules"), i);
 				char* end_del = strstr(module_id, "%20") == NULL ? NULL : strstr(module_id, "%20");
 				if (end_del != NULL) end_del[0] = '\0';
 				if (!strcmp(module_id, json_string_value(json_object_get(module, "name")))) {
@@ -964,38 +980,19 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 			free(cpblts[i]);
 			i++;
 		}
-		free(cpblt_dump);
+		rc_send_error(-3, outfd);
 		return -2; // unknown resource locator value
 	}
-//	rc_send_reply(outfd, dump_2);
 
 	free(dump_2);
-
-//	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending capabilities");
-//	rc_send_reply(outfd/*, NULL*/, cpblt_dump);
-
 	clb_print(NC_VERB_DEBUG, "rc_send_auto_response: freeing capabilities");
 	i = 0;
 	while (cpblts[i] != NULL) {
 		free(cpblts[i]);
 		i++;
 	}
-	free(cpblt_dump);
+
+	rc_send_error(-3, outfd);
 
 	return 0;
-}
-
-void save(const char* str, const char* file) {
-	if (str == NULL || file == NULL) {
-		clb_print(NC_VERB_WARNING, "save: str or file is NULL");
-		return;
-	}
-	char buffer[1000];
-	snprintf(buffer, 1000, "/home/rjanik/Documents/%s", file);
-	FILE* f = fopen(buffer, "w");
-	if (f == NULL) {
-		return;
-	}
-	fprintf(f, "%s", str);
-	fclose(f);
 }

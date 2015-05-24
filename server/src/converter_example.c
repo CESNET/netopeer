@@ -86,7 +86,7 @@ int run_example1() {
 
 	path* p = new_path(5000);
 	json_t* json_doc = xml_to_json(root, p, new_module, NULL, NULL, 0, NULL);
-	json_dumpf(json_doc, stdout, 0);
+	json_dumpf(json_doc, stdout, JSON_INDENT(2));
 
 	destroy_module(new_module);
 	xmlFreeDoc(doc);
@@ -125,7 +125,7 @@ int run_example2() {
 
 	path* p = new_path(5000);
 	json_t* json_doc = xml_to_json(root, p, new_module, augment_module, NULL, 0, NULL);
-	json_dumpf(json_doc, stdout, 0);
+	json_dumpf(json_doc, stdout, JSON_INDENT(2));
 
 	destroy_module(new_module);
 	destroy_module(augment_module);
