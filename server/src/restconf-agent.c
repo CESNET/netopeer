@@ -781,12 +781,14 @@ void rc_handle_post_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: parsing reply");
 	xmlDocPtr reply_doc = xmlParseDoc((const xmlChar*) reply_dump);
 	xmlNodePtr reply_root = xmlDocGetRootElement(reply_doc);
-	xmlNodePtr ok_node = reply_root->xmlChildrenNode;
+	xmlNodePtr ok_node = reply_root->xmlChildrenNode->next;
 
 	free(reply_dump);
 
 	if (ok_node == NULL || strcmp((char*)ok_node->name, "ok")) {
 		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: sending reply, not ok");
+		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: node name is:");
+		clb_print(NC_VERB_VERBOSE, ok_node == NULL ? "NULL" : (char*) ok_node->name);
 		rc_send_error(-5, outfd);
 		return;
 	}
