@@ -71,11 +71,6 @@ void destroy_yang_node(yang_node* node, int recursively) {
 	dprint(D_TRACE, "Leaving destroy_yang_node.\n");
 }
 
-/*
- * TODO:
- *   unite modules, groupings into yang_nodes and then unite these and fill_* functions
- *   or better yet, use tokenizers and more complex models (proper parser)
- */
 int get_yang_node_children_count(yang_node* node) {
 	dprint(D_TRACE, "Entered get_yang_node_children_count(node name: %s).\n", (node != NULL && node->name != NULL) ? node->name : "NULL");
 	if (node == NULL || node->node_list == NULL || node->node_list[0] == NULL) {
@@ -134,6 +129,22 @@ int get_module_grouping_count(module* mod) {
 		current_grouping = mod->grouping_list[children_count];
 	}
 	dprint(D_TRACE, "Leaving get_module_grouping_count(result: %d).\n", children_count);
+	return children_count;
+}
+
+int get_module_yang_node_count(module* mod) {
+	dprint(D_TRACE, "Entered get_module_yang_node_count(module name: %s).\n", (mod != NULL && mod->name != NULL) ? mod->name : "NULL");
+	if (mod == NULL || mod->node_list == NULL || mod->node_list[0] == NULL) {
+		dprint(D_TRACE, "Leaving get_module_grouping_count(result: 0).\n");
+		return 0;
+	}
+	int children_count = 0;
+	yang_node* current_node = mod->node_list[0];
+	while (current_node != NULL) {
+		children_count++;
+		current_node = mod->node_list[children_count];
+	}
+	dprint(D_TRACE, "Leaving get_module_yang_node_count(result: %d).\n", children_count);
 	return children_count;
 }
 
@@ -354,7 +365,7 @@ module* create_module(char* name) {
 	mod->name = NULL;
 	copy_string(&mod->name, name);
 	mod->grouping_list = NULL;
-	mod->node = NULL;
+	mod->node_list = NULL;
 	mod->augment_list = NULL;
 	dprint(D_TRACE, "Leaving create_module.\n");
 	return mod;
@@ -377,8 +388,15 @@ void destroy_module(module* mod) {
 		}
 		free(mod->grouping_list);
 	}
-	if (mod->node != NULL) {
-		destroy_yang_node(mod->node, 1);
+	if (mod->node_list != NULL) {
+		int node_index = 0;
+		yang_node* current_node = mod->node_list[node_index];
+		while (current_node != NULL) {
+			destroy_yang_node(current_node, 1);
+			node_index++;
+			current_node = mod->node_list[node_index];
+		}
+		free(mod->node_list);
 	}
 	if (mod->augment_list != NULL) {
 		int augment_index = 0;
@@ -425,7 +443,13 @@ void print_module_with_indentation(const module* mod, int indentation_level) {
 	printf("%s}\n", indentation);
 	printf("%smodule yang node: {\n", indentation);
 
-	print_yang_node_with_indentation(mod->node, indentation_level + 1);
+	int node_index = 0;
+	yang_node* current_node = mod->node_list[node_index];
+	while (current_node != NULL) {
+		print_yang_node_with_indentation(current_node, indentation_level + 1);
+		node_index++;
+		current_node = mod->node_list[node_index];
+	}
 
 	printf("%s}\n", indentation);
 
@@ -456,6 +480,7 @@ void print_module_with_indentation(const module* mod, int indentation_level) {
 /* ----------------------------------------------------------------------------------------------- */
 
 int ietf_netconf_monitoring_quickfix(FILE* file, module* mod) {
+	clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: entered quickfix");
 	fpos_t pos;
 	fgetpos(file, &pos);
 
@@ -471,13 +496,18 @@ int ietf_netconf_monitoring_quickfix(FILE* file, module* mod) {
 			word = read_word_dyn(file);
 			word = normalize_name(word);
 			if (!strcmp("lock-info", word)) {
+				clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: found lock-info");
+
 				fsetpos(file, &pos_grouping);
 				grouping* grp = read_grouping_from_file(file, mod);
+				clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: grouping info:");
+				clb_print(NC_VERB_DEBUG, grp->name);
+				clb_print(NC_VERB_DEBUG, grp->node_list[0]->name);
 
 				int grp_num = get_module_grouping_count(mod);
 				mod->grouping_list = realloc(mod->grouping_list, (sizeof(grouping*) * (grp_num + 2)));
 				if (mod->grouping_list == NULL) {
-					error_and_quit(EXIT_FAILURE, "ietf_netconf_monitoring_quickstart: Could not allocate memory for new grouping.");
+					error_and_quit(EXIT_FAILURE, "ietf_netconf_monitoring_quickfix: Could not allocate memory for new grouping.");
 				}
 				mod->grouping_list[grp_num + 1] = NULL;
 				mod->grouping_list[grp_num] = grp;
@@ -488,8 +518,20 @@ int ietf_netconf_monitoring_quickfix(FILE* file, module* mod) {
 			}
 		}
 		free(word);
+		fgetpos(file, &pos_grouping);
 		word = read_word_dyn(file);
 	}
+
+	// TODO
+	clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: starting iteration");
+	int i = 0;
+	grouping* curr = mod->grouping_list[i];
+	while (curr != NULL) {
+		clb_print(NC_VERB_DEBUG, curr->name);
+		i++;
+		curr = mod->grouping_list[i];
+	}
+	clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: done iterating");
 
 	fsetpos(file, &pos);
 	return 0;
@@ -514,7 +556,7 @@ module* read_module_from_file(FILE* file) {
 	module* mod = create_module(module_name);
 	// This is a quickfix for a parser defect that has been detected too late. The parser does not know how to parse groupings inside
 	// the node structure. This fixes the defect for a single module that comes with the Netopeer server.
-	int quickfix_flag = !strcmp("ietf-netconf-monitoring",module_name) ? 1 : 0 ;
+	int quickfix_flag = !strcmp("ietf-netconf-monitoring", module_name) ? 1 : 0 ;
 	destroy_string(module_name);
 
 	fill_module(file, mod);
@@ -525,7 +567,22 @@ module* read_module_from_file(FILE* file) {
 		}
 		quickfix_flag = 0;
 	}
-	mod->node = read_yang_node_from_file(file, mod);
+
+	yang_node* new_node = NULL;
+	if (mod->node_list == NULL) {
+		mod->node_list = malloc(sizeof(yang_node*));
+		mod->node_list[0] = NULL;
+	}
+
+	while (NULL != (new_node = read_yang_node_from_file(file, mod))) {
+		int new_node_count = get_module_yang_node_count(mod) + 1;
+		if (NULL == (mod->node_list = realloc(mod->node_list, (new_node_count + 1) * sizeof(yang_node*)))) {
+			error_and_quit(EXIT_FAILURE, "read_module_from_file: Could not reallocate with enough memory.");
+		}
+		mod->node_list[new_node_count - 1] = new_node;
+		mod->node_list[new_node_count] = NULL;
+	}
+
 	fill_module_with_augments(file, mod);
 
 	if (read_words_on_this_level_until(file, "}") <= 0) {
@@ -547,6 +604,7 @@ module* read_module_from_string(const char* string) {
 	return mod;
 }
 
+// deprecated
 module* read_module_from_string_with_groupings(char* string, module* groupings_from_this) {
 	FILE* tmp_file = tmpfile();
 	fprintf(tmp_file, "%s", string);
@@ -685,6 +743,8 @@ char* find_uses(FILE* file, module* mod) {
 		int grouping_index = 0;
 		grouping* current_grouping = mod->grouping_list[0];
 		while (current_grouping != NULL) {
+			clb_print(NC_VERB_DEBUG, "find_uses: found grouping:");
+			clb_print(NC_VERB_DEBUG, current_grouping->name);
 			if (!strcmp(grouping_name, current_grouping->name)) {
 				break; // found it
 			}
@@ -1134,11 +1194,9 @@ void fill_module_with_augments(FILE* file, module* mod) {
 			mod->augment_list = malloc(sizeof(augment*));
 			mod->augment_list[0] = NULL;
 		}
-//	mod->grouping_list = malloc(sizeof(grouping**));
-//	mod->grouping_list[0] = new_grouping;
 	while (NULL != (new_a = read_augment_from_file(file, mod))) {
 		int new_children_count = get_module_augment_count(mod) + 1;
-		// TODO: memory leak in case of error in realloc
+		// TODO: memory leak in case of error in realloc, not very relevant since the program quits right away
 		if (NULL == (mod->augment_list = realloc(mod->augment_list, (new_children_count + 1) * sizeof(augment*)))) {
 			error_and_quit(EXIT_FAILURE, "fill_module: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(augment*));
 		}
@@ -1346,7 +1404,7 @@ module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_
 
 	fill_module(file, mod);
 
-	mod->node = read_yang_node_from_file(file, mod);
+//	mod->node = read_yang_node_from_file(file, mod);
 
 	fill_module_with_augments(file, mod);
 

@@ -94,6 +94,10 @@ int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump);
 int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con);
 json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con);
 char* jump_resource_identifier(char* identifier, int times);
+char* jump_colons(char* identifier, int times);
+void rc_handle_get_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
+void save(const char* str, const char* file);
+char* jump_string(char* identifier, int times, char character);
 // RESTCONF FUNCTIONS - END
 
 /*!
@@ -595,11 +599,17 @@ int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	char* subresource = msg->resource_locator + strlen("/restconf");
 	if (!strncmp(subresource, "/data", strlen("/data"))) {
 		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /data branch");
-//		if (!strcmp()) {
-//
-//		} else {
-//			rc_send_error(-3, outfd);
-//		}
+		if (!strcmp("GET", msg->method)) {
+			rc_handle_get_data(msg, rpc, outfd, con);
+		} else if (!strcmp("PUT", msg->method)) {
+			rc_send_error(-1, outfd);
+		} else if (!strcmp("POST", msg->method)) {
+			rc_send_error(-1, outfd);
+		} else if (!strcmp("DELETE", msg->method)) {
+			rc_send_error(-1, outfd);
+		} else {
+			rc_send_error(-3, outfd); // bad request, method is not known on this resource
+		}
 		return 0;
 	} else if (!strncmp(subresource, "/modules", strlen("/modules"))) {
 		clb_print(NC_VERB_DEBUG, "rc_handle_msg: processing /modules branch");
@@ -620,6 +630,196 @@ int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 
 	rc_send_error(-3, outfd); // unknown /restconf subresource
 	return 0;
+}
+
+void rc_handle_get_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
+	char* resource_id = msg->resource_locator;
+	char* query = strchr(msg->resource_locator, '&');
+	char* fragment = strchr(msg->resource_locator, '#');
+	if (fragment != NULL) {
+		fragment[0] = '\0'; // and ignore
+	}
+	if (query != NULL) {
+		query[0] = '\0';
+		query = query + 1;
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: request query is not null:");
+		clb_print(NC_VERB_DEBUG, query);
+	} else {
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: request query is null");
+	}
+
+	if (!strcmp(resource_id, "/restconf/data") ||
+			!strcmp(resource_id, "/restconf/data/")) {
+		// this is the simple get scenario, print everything
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: handling simple get");
+		*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
+		nc_reply* reply = comm_operation(con, *rpc);
+		if (reply == NULL) {
+			clb_print(NC_VERB_ERROR, "rc_handle_get_data: failed sending get-config request");
+			rc_send_error(-2, outfd);
+			return;
+		}
+
+		clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: dumping reply");
+		char* str_reply = nc_rpc_dump(reply);
+		if (str_reply == NULL) {
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: failed sending get-config request");
+			nc_rpc_free(reply);
+			rc_send_error(-2, outfd);
+			return;
+		}
+
+//		save(str_reply, "str_reply.txt");
+
+		clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting data element");
+		char* data = get_data(str_reply);
+		if (data == NULL) {
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: no data element in netconf reply");
+			nc_rpc_free(reply);
+//			rc_send_reply(outfd, str_reply); // TODO
+			rc_send_error(-2, outfd);
+			return;
+		}
+
+		save(data, "data.txt");
+
+		if (str_reply != NULL) {
+			free(str_reply);
+		}
+		nc_rpc_free(reply);
+
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: converting reply");
+
+		xmlDocPtr doc = xmlParseDoc((xmlChar*)data);
+		if (doc == NULL) { // could not parse xml
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse xml");
+			rc_send_error(-2, outfd);
+			return;
+		}
+		xmlNodePtr root = xmlDocGetRootElement(doc);
+		if (root == NULL) { // there is no root element
+			xmlFreeDoc(doc);
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: no root element in doc");
+			rc_send_error(-2, outfd);
+			return;
+		}
+		if (strcmp((char*)root->name, "data")) { // the root element is not data
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: the root element is not data, this should not happen");
+			xmlFreeDoc(doc);
+			xmlFreeNode(root);
+			rc_send_error(-2, outfd);
+			return;
+		}
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsed xml");
+		xmlNodePtr xmodule = root->xmlChildrenNode;
+		json_t* wrapper = json_object();
+		while(xmodule != NULL && xmodule->name != NULL) {
+			if (!strcmp((char*)xmodule->name, "text")) {
+				xmodule = xmlNextElementSibling(xmodule);
+				continue;
+			}
+
+			clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found module with name:");
+			clb_print(NC_VERB_VERBOSE, (char*) xmodule->name);
+
+			module* mod = NULL;
+			if (xmodule->ns != NULL) {
+				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting module identifier");
+				char* ns = NULL;
+				copy_string(&ns, (char*) xmodule->ns->href);
+
+				if (ns == NULL) {
+					clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse namespace, ignoring node");
+					xmodule = xmlNextElementSibling(xmodule);
+					continue;
+				}
+				ns = normalize_name(ns); // remove " if any
+
+				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: node namespace:");
+				clb_print(NC_VERB_VERBOSE, ns);
+
+				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting capabilities");
+				char** cpblts = comm_get_srv_cpblts(con);
+				if (cpblts == NULL) {
+					// some internal error occurred
+					clb_print(NC_VERB_ERROR, "rc_handle_get_data: could not get capabilities");
+					free(ns);
+					rc_send_error(-2, outfd);
+					return;
+				}
+
+				int i = 0;
+				char* c_cpblt = cpblts[i];
+				while (c_cpblt != NULL) {
+					if (!strncmp(c_cpblt, ns, strlen(ns))) {
+						clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found matching capability:");
+						clb_print(NC_VERB_VERBOSE, c_cpblt);
+						char* module_to_ask_tmp = strstr(c_cpblt, "?module=");
+						if (module_to_ask_tmp == NULL) {
+							clb_print(NC_VERB_ERROR, "rc_handle_get_data: matching capability is invalid, fail");
+							free(ns);
+							rc_send_error(-2, outfd);
+							return;
+						}
+						module_to_ask_tmp += strlen("?module=");
+						char* module_to_ask = NULL;
+						copy_string(&module_to_ask, module_to_ask_tmp);
+						char* amp_to_del = strchr(module_to_ask, '&');
+						if (amp_to_del != NULL) {
+							amp_to_del[0] = '\0';
+						}
+
+						clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: asking for the following module:");
+						clb_print(NC_VERB_VERBOSE, module_to_ask);
+
+						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: getting module schema");
+						char* module_text = get_schema(module_to_ask, con, "500");
+						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsing module");
+						save(module_text, module_to_ask);
+						mod = read_module_from_string(module_text);
+						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done parsing module, freeing...");
+
+						free(module_to_ask);
+						free(module_text);
+						break;
+					}
+					c_cpblt = cpblts[++i];
+				}
+
+				free(ns);
+
+			} else {
+				clb_print(NC_VERB_WARNING, "rc_handle_get_data: missing module namespace, ignoring node");
+				xmodule = xmlNextElementSibling(xmodule);
+				continue;
+			}
+
+			if (mod == NULL) {
+				clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse yang module (it is NULL), ignoring node in xml");
+				xmodule = xmlNextElementSibling(xmodule);
+				continue;
+			}
+
+			path* p = new_path(5000);
+			clb_print(NC_VERB_DEBUG, "rc_handle_get_data: transforming module to json");
+			json_t* curr_module = xml_to_json(xmodule, p, mod, NULL, NULL, 0, con); // TODO: have the converter self augment or ietf-system conversion will not work
+			clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done transforming this module");
+			json_object_set(wrapper, (char*)xmodule->name, curr_module);
+
+			char* dump_tmp = json_dumps(wrapper, JSON_INDENT(2));
+			save(dump_tmp, "dump_tmp.txt");
+			free(dump_tmp);
+
+			xmodule = xmlNextElementSibling(xmodule);
+		}
+
+		rc_send_reply(outfd, json_dumps(wrapper, JSON_INDENT(2)));
+		json_decref(wrapper);
+
+		return;
+	}
+
+	rc_send_error(-3, outfd);
 }
 
 void rc_send_version_response(httpmsg* msg, int outfd) {
@@ -832,14 +1032,22 @@ json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con) {
 }
 
 char* jump_resource_identifier(char* identifier, int times) {
+	return jump_string(identifier, times, '/');
+}
+
+char* jump_colons(char* identifier, int times) {
+	return jump_string(identifier, times, ':');
+}
+
+char* jump_string(char* identifier, int times, char character) {
 	if (identifier == NULL || identifier[0] == '\0') {
-		clb_print(NC_VERB_WARNING, "Attempting to jump invalid identifier.");
+		clb_print(NC_VERB_WARNING, "jump_string: attempting to jump invalid string.");
 		return identifier;
 	}
 	char* new_id = identifier;
 	int i = 0;
 	for (i = 0; i < times; i++) {
-		char* tmp_id = strchr(new_id, '/');
+		char* tmp_id = strchr(new_id, character);
 		if (tmp_id == NULL) {
 			break;
 		}
@@ -995,4 +1203,19 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 	rc_send_error(-3, outfd);
 
 	return 0;
+}
+
+void save(const char* str, const char* file) {
+        if (str == NULL || file == NULL) {
+                clb_print(NC_VERB_WARNING, "save: str or file is NULL");
+                return;
+        }
+        char buffer[1000];
+        snprintf(buffer, 1000, "/home/rjanik/Documents/%s", file);
+        FILE* f = fopen(buffer, "w");
+        if (f == NULL) {
+                return;
+        }
+        fprintf(f, "%s", str);
+        fclose(f);
 }

@@ -95,7 +95,7 @@ struct module {
 	/* the list of defined groupings ended by NULL value */
 	grouping** grouping_list;
 	/* the single yang_node in a module */
-	yang_node* node;
+	yang_node** node_list;
 
 	augment** augment_list;
 };
@@ -140,6 +140,11 @@ int get_grouping_yang_node_count(grouping* grp);
  * same as get_yang_node_children_count but returns grouping count of module
  */
 int get_module_grouping_count(module* mod);
+
+/*
+ * same as get_module_grouping_count but returns yang node count
+ */
+int get_module_yang_node_count(module* mod);
 
 /*
  * creates a deep copy of yang_node
