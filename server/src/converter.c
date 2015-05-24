@@ -5,20 +5,36 @@
 #include <ctype.h>
 #include "converter.h"
 
-// TODO: remove
-void save_todo(const char* str, const char* file) {
-	if (str == NULL || file == NULL) {
-		clb_print(NC_VERB_WARNING, "save: str or file is NULL");
-		return;
+char* get_ns_by_module(char* module_id, conn_t* con) {
+
+	clb_print(NC_VERB_VERBOSE, "get_ns_by_module: getting capabilities");
+	char** cpblts = comm_get_srv_cpblts(con);
+	if (cpblts == NULL) {
+		clb_print(NC_VERB_ERROR, "get_ns_by_module: could not get capabilities");
+		return NULL;
 	}
-	char buffer[1000];
-	snprintf(buffer, 1000, "/home/rjanik/Documents/%s", file);
-	FILE* f = fopen(buffer, "w");
-	if (f == NULL) {
-		return;
+
+	int i = 0;
+	char* c_cpblt = cpblts[i];
+	while (c_cpblt != NULL) {
+		char* module_cpblt_id_tmp = strstr(c_cpblt, "?module=");
+		if (module_cpblt_id_tmp != NULL) {
+			module_cpblt_id_tmp += strlen("?module=");
+			char* module_cpblt_id = read_until(module_cpblt_id_tmp, '&');
+			if (!strcmp(module_cpblt_id, module_id)) {
+				clb_print(NC_VERB_DEBUG, "get_ns_by_module: found matching capability, namespace:");
+				char* ret = read_until(c_cpblt, '?');
+				clb_print(NC_VERB_DEBUG, ret);
+				return ret;
+			}
+		}
+
+		i++;
+		c_cpblt = cpblts[i];
 	}
-	fprintf(f, "%s", str);
-	fclose(f);
+
+	clb_print(NC_VERB_DEBUG, "get_ns_by_module: did not find any matching capability");
+	return NULL;
 }
 
 void print_jansson_error(json_error_t j_error) {
@@ -67,13 +83,8 @@ char* get_schema_by_namespace(char* ns, conn_t* con) {
 			clb_print(NC_VERB_DEBUG, "get_schema_by_namespace: getting module schema");
 			char* module_text = get_schema(module_to_ask, con, "500");
 			clb_print(NC_VERB_DEBUG, "get_schema_by_namespace: done getting module schema");
-//			clb_print(NC_VERB_DEBUG, "get_schema_by_namespace: parsing module");
-//			save(module_text, module_to_ask);
-//			mod = read_module_from_string(module_text);
-//			clb_print(NC_VERB_DEBUG, "get_schema_by_namespace: done parsing module, freeing...");
 
 			free(module_to_ask);
-//			free(module_text);
 			return module_text;
 		}
 		c_cpblt = cpblts[++i];
@@ -111,7 +122,7 @@ char* get_schema_by_namespace(char* ns, conn_t* con) {
 
 // returns list of nodes
 xmlNodePtr json_to_xml(json_t* root, int indentation_level,
-		const char* array_name) {
+		const char* array_name, int static_conversion) {
 	char* indentation = prepare_indentation(indentation_level);
 
 	xmlNodePtr dummy = xmlNewNode(NULL, (xmlChar*) "dummy");
@@ -125,7 +136,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 						(xmlChar*) json_object_iter_key(iterator));
 				xmlNodePtr content = json_to_xml(
 						json_object_iter_value(iterator), indentation_level + 1,
-						NULL);
+						NULL, static_conversion);
 				if (content != NULL) {
 					xmlAddChild(child, content);
 				}
@@ -139,7 +150,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 				xmlNodePtr curr =
 						(json_to_xml(json_object_iter_value(iterator),
 								indentation_level + 1,
-								json_object_iter_key(iterator)))->xmlChildrenNode;
+								json_object_iter_key(iterator), static_conversion))->xmlChildrenNode;
 				while (curr != NULL) {
 					xmlAddChild(dummy, curr);
 					curr = curr->next;
@@ -154,7 +165,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 						(xmlChar*) json_object_iter_key(iterator));
 				xmlNodePtr parsed_dummy = json_to_xml(
 						json_object_iter_value(iterator), indentation_level + 1,
-						NULL);
+						NULL, static_conversion);
 				xmlNodePtr curr = parsed_dummy->xmlChildrenNode;
 				xmlAttrPtr attr = parsed_dummy->properties;
 				while (attr != NULL) {
@@ -182,7 +193,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 			if (json_array_get(root, i)->type > 1) {
 				xmlNodePtr child = xmlNewNode(NULL, (xmlChar*) array_name);
 				xmlNodePtr content = json_to_xml(json_array_get(root, i),
-						indentation_level + 1, NULL);
+						indentation_level + 1, NULL, static_conversion);
 				if (content != NULL) {
 					xmlAddChild(child, content);
 				}
@@ -198,7 +209,7 @@ xmlNodePtr json_to_xml(json_t* root, int indentation_level,
 			if (json_array_get(root, i)->type == 0) { // object
 				xmlNodePtr child = xmlNewNode(NULL, (xmlChar*) array_name);
 				xmlNodePtr parsed_dummy = json_to_xml(json_array_get(root, i),
-						indentation_level + 1, NULL);
+						indentation_level + 1, NULL, static_conversion);
 				xmlNodePtr curr = parsed_dummy->xmlChildrenNode;
 				xmlAttrPtr attr = parsed_dummy->properties;
 				while (attr != NULL) {
@@ -362,10 +373,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 			mod_augment = mod_a;
 		}
 
-//		char* schema = get_schema(namespace_name, con, "1");
-//		mod = read_module_from_string(schema);
-//		free(schema);
-		// request yang model from server through con
 	} else {
 		clb_print(NC_VERB_VERBOSE, "xml_to_json: namespace didn't change");
 	}
@@ -385,14 +392,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 		strncpy(str, "string", strlen("string"));
 		t->data_type = str;
 	}
-
-//	clb_print(NC_VERB_VERBOSE, "xml_to_json: received tuple");
-//	clb_print(NC_VERB_VERBOSE, "xml_to_json: tuple: data type");
-//	clb_print(NC_VERB_VERBOSE, t->data_type);
-//	clb_print(NC_VERB_VERBOSE, t->container_type == CONTAINER ? "container" : "something else");
-//	clb_print(NC_VERB_VERBOSE, "returned from query_yang_augmented; old module is:");
-//	clb_print(NC_VERB_VERBOSE, mod->name);
-//	clb_print(NC_VERB_VERBOSE, mod->node->name);
 
 	switch (t->container_type) {
 	case LIST: // TODO: what if list is first in the structure?
@@ -440,9 +439,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 			clb_print(NC_VERB_VERBOSE, "appending to path");
 			append_to_path(p, (char*) listp->strings[i]);
 			clb_print(NC_VERB_VERBOSE, "going for query");
-//			tuple* childt = (strcmp(child_namespace_name, namespace_name) || augmented) ?
-//					query_yang_augmented(p->string,mod, mod_augment) :
-//					query_yang(p->string, mod);
 			tuple* childt = NULL;
 			if (strcmp(child_namespace_name, namespace_name) || augmented) {
 				// need to get the new module as augmenter
@@ -453,7 +449,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 				clb_print(NC_VERB_VERBOSE, "xml_to_json: getting schema by namespace");
 				char* schema = get_schema_by_namespace(norm_namespace, con);
 				clb_print(NC_VERB_VERBOSE, "xml_to_json: parsing new module");
-				save_todo(schema, "this.txt");
 				module* mod_a = read_module_from_string(schema);
 				clb_print(NC_VERB_VERBOSE, "xml_to_json: done parsing new module");
 				free(schema);
@@ -594,13 +589,6 @@ json_t* xml_to_json(xmlNodePtr node, path* p, const module* mod, const module* m
 	clb_print(NC_VERB_VERBOSE, "xml_to_json: freeing tuple (2)");
 	free_tuple(t);
 	clb_print(NC_VERB_VERBOSE, "xml_to_json: done freeing tuple (2)");
-//	if (namespace_changed) {
-//		destroy_module(mod);
-//	}
-
-//	clb_print(NC_VERB_VERBOSE, "returning json node; old module is:");
-//	clb_print(NC_VERB_VERBOSE, mod->name);
-//	clb_print(NC_VERB_VERBOSE, mod->node->name);
 
 	clb_print(NC_VERB_VERBOSE, "done with xml_to_json");
 	return json_node;
@@ -615,54 +603,8 @@ tuple* query_yang(char* path, const module* mod) {
 	int string_length = strlen(path);
 	int length_read = 0;
 
-//	char* module_name = read_until_colon(path);
-//	length_read += strlen(module_name) + 1;
-//	path += strlen(module_name) + 1;
-//	if (safe_normalized_compare(module_name, mod->name)) {
-//		error_and_quit(EXIT_FAILURE,
-//				"query_yang: No such module: %s. Known module name is %s.",
-//				module_name, mod->name);
-//	} else if (length_read >= string_length) {
-//		tuple* t = malloc(sizeof(tuple));
-//		t->data_type = NULL;
-//		t->container_type = CONTAINER; /*TODO: this is a module, not a container*/
-//		free(module_name);
-//		return t;
-//	}
-//
-//	free(module_name);
-
 	clb_print(NC_VERB_VERBOSE, "query_yang: on module:");
 	clb_print(NC_VERB_VERBOSE, mod->name);
-//	clb_print(NC_VERB_VERBOSE, "query_yang: first node name:");
-//	clb_print(NC_VERB_VERBOSE, mod->node->name);
-//	clb_print(NC_VERB_VERBOSE, "query_yang: first node name from path");
-//	char* first_node_name = read_until_colon(path);
-//	clb_print(NC_VERB_VERBOSE, "query_yang: read until colon finished");
-//	length_read += strlen(first_node_name) + 1;
-//	path += strlen(first_node_name) + 1;
-//	clb_print(NC_VERB_VERBOSE, "query_yang: going to compare");
-//	if (safe_normalized_compare(first_node_name, mod->node->name)) {
-//		error_and_quit(EXIT_FAILURE,
-//				"query_yang: No such first node: %s. Known first node name is %s.",
-//				first_node_name, mod->node->name);
-//	} else if (length_read >= string_length) {
-//		clb_print(NC_VERB_VERBOSE, "query_yang: found node name, finished");
-//		tuple* t = malloc(sizeof(tuple));
-//		t->container_type = mod->node->type;
-//		t->data_type = NULL;
-//		clb_print(NC_VERB_VERBOSE, "query_yang: copying data type");
-//		copy_string(&(t->data_type), mod->node->value);
-//		clb_print(NC_VERB_VERBOSE, "query_yang: freeing first node name, finished");
-//		free(first_node_name);
-//		return t;
-//	}
-//
-//	clb_print(NC_VERB_VERBOSE, "query_yang: freeing first node name");
-//	free(first_node_name);
-//	clb_print(NC_VERB_VERBOSE, "query_yang: first node name - done");
-
-//	yang_node** node_list = mod->node->node_list;
 	yang_node** node_list = mod->node_list;
 
 	while (length_read < string_length) {
@@ -713,21 +655,11 @@ tuple* query_yang_augmented(char* path, const module* mod, const module* mod_aug
 	clb_print(NC_VERB_WARNING, "path is");
 	clb_print(NC_VERB_WARNING, path);
 
-//	error_and_quit(EXIT_FAILURE, "query_yang_augmented: not implemented yet");
-
-//	return query_yang(path, mod_augment);
-
 	clb_print(NC_VERB_VERBOSE, "on aug module:");
 	clb_print(NC_VERB_VERBOSE, mod_augment->name);
 	clb_print(NC_VERB_VERBOSE, "old module is:");
 	clb_print(NC_VERB_VERBOSE, mod->name);
-//	clb_print(NC_VERB_VERBOSE, mod->node->name);
-//	clb_print(NC_VERB_VERBOSE, "query_yang_augmented: getting aug_nodes");
-//	clb_print(NC_VERB_VERBOSE, mod_augment == NULL ? "NULL" : "OK");
-//	clb_print(NC_VERB_VERBOSE, mod_augment->augment_list == NULL ? "NULL" : "OK");
-//	clb_print(NC_VERB_VERBOSE, mod_augment->augment_list[0]->node_list == NULL ? "NULL" : "OK");
 	yang_node** aug_nodes = mod_augment->augment_list[0]->node_list;
-//	clb_print(NC_VERB_VERBOSE, "query_yang_augmented: done getting aug_nodes");
 
 	int length_read = 0, string_length = strlen(path);
 
@@ -792,7 +724,11 @@ yang_node* find_by_name(char* name, yang_node** node_list) {
 }
 
 char* read_until_colon(const char* string) {
-	char* colon = strchr(string, ':');
+	return read_until(string, ':');
+}
+
+char* read_until(const char* string, char character) {
+	char* colon = strchr(string, character);
 
 	if (colon == NULL) {
 		char* res = NULL;
@@ -852,6 +788,9 @@ json_data_types map_to_json_data_type(char* yang_data_type) {
 	}
 	if (!strcmp(yang_data_type, Y_BOOLEAN)) {
 		return J_BOOLEAN;
+	}
+	if (!strcmp(yang_data_type, "yang:zero-based-counter32")) { // while typedef is not supported, this is how types have to be mapped
+		return J_INTEGER;
 	}
 	return J_STRING; // was J_NULL
 }
@@ -993,7 +932,6 @@ char* get_data(const char* resp) {
 
 	xmlDocPtr doc = xmlParseDoc((xmlChar*)resp);
 	if (doc == NULL) { // could not parse xml
-		// TODO: syslog, TODO, this is required for all instances where the program ends, it should never end
 		clb_print(NC_VERB_WARNING, "get_data: could not parse xml");
 		return NULL;
 	}
@@ -1025,12 +963,10 @@ char* get_data(const char* resp) {
 
 	xmlBufferPtr buffer = xmlBufferCreate();
 	xmlNodeDump(buffer, doc, data, 0, 1);
-//	save_todo((char*) buffer->content, "get_data-copying.txt");
 
 	copy_string(&ret, (char*) buffer->content);
 	xmlBufferFree(buffer);
 
-//	xmlFreeNode(root);
 	xmlFreeDoc(doc);
 
 	return ret;
@@ -1039,20 +975,12 @@ char* get_data(const char* resp) {
 int safe_normalized_compare(const char* first, const char* second) {
 	if (first == NULL || second == NULL) {
 		clb_print(NC_VERB_WARNING, "safe_normalized_compare: at least one of our arguments is NULL");
-	} else {
-//		clb_print(NC_VERB_WARNING, "received:");
-//		clb_print(NC_VERB_WARNING, first);
-//		clb_print(NC_VERB_WARNING, second);
 	}
 	char* first_norm = NULL, *second_norm = NULL;
 	copy_string(&first_norm, first);
 	copy_string(&second_norm, second);
-//	clb_print(NC_VERB_WARNING, first_norm);
-//	clb_print(NC_VERB_WARNING, second_norm);
 	first_norm = normalize_name(first_norm);
 	second_norm = normalize_name(second_norm);
-//	clb_print(NC_VERB_WARNING, first_norm);
-//	clb_print(NC_VERB_WARNING, second_norm);
 	int ret = strcmp(first_norm, second_norm);
 	free(first_norm);
 	free(second_norm);

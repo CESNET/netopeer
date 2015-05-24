@@ -522,17 +522,6 @@ int ietf_netconf_monitoring_quickfix(FILE* file, module* mod) {
 		word = read_word_dyn(file);
 	}
 
-	// TODO
-	clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: starting iteration");
-	int i = 0;
-	grouping* curr = mod->grouping_list[i];
-	while (curr != NULL) {
-		clb_print(NC_VERB_DEBUG, curr->name);
-		i++;
-		curr = mod->grouping_list[i];
-	}
-	clb_print(NC_VERB_DEBUG, "ietf_netconf_monitoring_quickfix: done iterating");
-
 	fsetpos(file, &pos);
 	return 0;
 }
@@ -776,15 +765,9 @@ char* find_attribute(FILE* file, char* attr_name) {
 		error_and_quit(EXIT_FAILURE, "find_attribute: fgetpos: %s", strerror(errno));
 	}
 
-	int /*words_read = 0, */status = -1;
-//	if (-1 == (words_read = read_words_on_this_level_until(file, attr_name))) {
+	int status = -1;
 	if (-1 == (status = find_first_of_tl(file, &attr_name, 1))) {
-		 // this shouldn't happen, attributes should never be on the lowest level
-//		error_and_quit(EXIT_FAILURE, "find_attribute: got EOF before \"%s\"", attr_name);
 
-		// didn't find
-
-//	} else if (words_read > 0) {
 	} else {
 		char* attribute_value = read_word_dyn(file);
 		if (attribute_value[strlen(attribute_value) - 1] == ';') { // get rid of ; on the end of the word
@@ -1006,8 +989,7 @@ int read_words_on_this_level_until_one_of(FILE* file, const char** const words, 
 				goto found_word;
 			}
 			level++;
-		} else if (!strcmp("}", wrd)/* || !strncmp("\"", wrd + (strlen(wrd) - 1), 1) ||
-				((strlen(wrd) > 2) && !strncmp("\"", wrd + (strlen(wrd) - 2), 1))*/) {
+		} else if (!strcmp("}", wrd)) {
 			if (!level && !check_words(words, wrd, num_of_words)) {
 				goto found_word;
 			}
@@ -1149,7 +1131,7 @@ void fill_module(FILE* file, module* mod) {
 //	mod->grouping_list[0] = new_grouping;
 	while (NULL != (new_grouping = read_grouping_from_file(file, mod))) {
 		int new_children_count = get_module_grouping_count(mod) + 1;
-		// TODO: memory leak in case of error in realloc
+		// TODO: memory leak in case of error in realloc, not very relevant since the program quits right away
 		if (NULL == (mod->grouping_list = realloc(mod->grouping_list, (new_children_count + 1) * sizeof(grouping*)))) {
 			error_and_quit(EXIT_FAILURE, "fill_module: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(grouping*));
 		}
@@ -1242,29 +1224,24 @@ void copy_string(char** where, const char* what) {
 	}
 
 	if (*where == NULL && what == NULL) {
-//		clb_print(NC_VERB_VERBOSE, "copy_string: not copying");
 		dprint(D_TRACE, "Leaving copy_string, didn't copy, both NULL.\n");
 		return;
 	}
 	if (*where == NULL && what != NULL) {
-//		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying");
 		*where = malloc(strlen(what) + 1);
 		if (*where == NULL) {
 			error_and_quit(EXIT_FAILURE, "copy_string: Could not allocate memory for new string location. Memory amount requested (in bytes): %d.", strlen(what) + 1);
 		}
 		strncpy(*where, what, strlen(what) + 1);
 		dprint(D_TRACE, "Leaving copy_string, created destination and copied.\n");
-//		clb_print(NC_VERB_VERBOSE, "copy_string: creating and copying - all ok");
 		return;
 	}
 	if (what == NULL) {
-//		clb_print(NC_VERB_VERBOSE, "copy_string: freeing");
 		free(*where);
 		*where = NULL;
 		dprint(D_TRACE, "Leaving copy_string, freed destination, source NULL.\n");
 		return;
 	}
-//	clb_print(NC_VERB_VERBOSE, "copy_string: freeing and copying");
 	free(*where);
 	*where = malloc(strlen(what) + 1);
 	if (*where == NULL) {
@@ -1343,7 +1320,7 @@ int add_groupings(module* to_this, module* from_this) {
 
 	while (grp != NULL) {
 		char* to_free = grp->name;
-		// TODO: get this from prefix (it is currently not parsed, easyfix)
+		// TODO: get this from prefix (it is currently not parsed, easyfix), edit: this function is deprecated, ignore
 		int len = strlen("x509c2n:") + strlen(grp->name) + 1;
 		grp->name = malloc(len);
 		memset(grp->name, 0, len);
@@ -1358,19 +1335,6 @@ int add_groupings(module* to_this, module* from_this) {
 		}
 		to_this->grouping_list[new_children_count - 1] = grp;
 		to_this->grouping_list[new_children_count] = NULL;
-
-//		grouping* new_grouping = NULL;
-//		mod->grouping_list = malloc(sizeof(grouping**));
-//		mod->grouping_list[0] = new_grouping;
-//		while (NULL != (new_grouping = read_grouping_from_file(file, mod))) {
-//			int new_children_count = get_module_grouping_count(mod) + 1;
-//			// TODO: memory leak in case of error in realloc
-//			if (NULL == (mod->grouping_list = realloc(mod->grouping_list, (new_children_count + 1) * sizeof(grouping*)))) {
-//				error_and_quit(EXIT_FAILURE, "fill_module: Could not reallocate with enough memory: %d bytes.", new_children_count * sizeof(grouping*));
-//			}
-//			mod->grouping_list[new_children_count - 1] = new_grouping;
-//			mod->grouping_list[new_children_count] = NULL;
-//		}
 
 		i++;
 		grp = from_this->grouping_list[i];
@@ -1403,8 +1367,6 @@ module* read_module_from_file_with_groupings(FILE* file, module* groupings_from_
 		}
 
 	fill_module(file, mod);
-
-//	mod->node = read_yang_node_from_file(file, mod);
 
 	fill_module_with_augments(file, mod);
 

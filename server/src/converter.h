@@ -24,7 +24,7 @@ typedef struct unique_list {
 } unique_list;
 
 void print_jansson_error(json_error_t j_error);
-xmlNodePtr json_to_xml(json_t* root, int indentation_level, const char* array_name);
+xmlNodePtr json_to_xml(json_t* root, int indentation_level, const char* array_name, int static_conversion);
 /*
  * TODO: split this function so that internal variables are not part of the API
  * namespace - set this to the namespace of root element, the function will try to find out by itself if null
@@ -36,6 +36,7 @@ tuple* query_yang(char* path, const module* mod);
 tuple* query_yang_augmented(char* path, const module* mod, const module* mod_augment); // TODO
 yang_node* find_by_name(char* name, yang_node** node_list);
 char* read_until_colon(const char* string);
+char* read_until(const char* string, char character);
 json_data_types map_to_json_data_type(char* yang_data_type);
 void free_tuple(tuple* t);
 path* new_path(int characters); // returns new path with allocated string, there can later be a function that reallocates the string
@@ -43,6 +44,7 @@ void append_to_path(path* p, char* string); // appends a string to a path
 void remove_last_from_path(path* p); // removes last element from path (until ':')
 void free_path(path* p);
 void print_by_char(char* string);
+char* get_ns_by_module(char* module_id, conn_t* con);
 
 unique_list* create_unique_list() ;
 int list_contains(const unique_list* list, const char* string);

@@ -65,10 +65,10 @@ int run_example1() {
 	char filename2[] = "test-resources/system-response.xml";
 	FILE* file = load_file(filename);
 
-	printf("This example transforms a simple un-augmented response from ietf-system module -> %s\n\n", filename2);
+	printf("This example transforms a simple un-augmented response from ietf-system module -> %s\n\taugmented"
+			" responses require an active connection to the netopeer server since they have to request module schemas while the conversion is under way\n\n", filename2);
 
 	module* new_module = read_module_from_file(file);
-//	print_module(new_module);
 
 	xmlDocPtr doc = xmlParseFile(filename2);
 
@@ -96,20 +96,16 @@ int run_example1() {
 }
 
 int run_example2() {
-	char filename[] = "test-resources/ietf-system.yang";
-	char filename2[] = "test-resources/ietf-system-tls-auth.yang";
-	char filename3[] = "test-resources/system-response-full.xml";
+	char filename[] = "test-resources/ietf-netconf-acm.yang";
+	char filename2[] = "test-resources/system-response-full.xml";
 	FILE* file = load_file(filename);
-	FILE* file2 = load_file(filename2);
 
-	printf("This example transforms an augmented response from ietf-system module -> %s\n\n", filename3);
+	printf("This example transforms a simple un-augmented response from ietf-system module -> %s\n\taugmented"
+			" responses require an active connection to the netopeer server since they have to request module schemas while the conversion is under way\n\n", filename);
 
 	module* new_module = read_module_from_file(file);
-	module* augment_module = read_module_from_file(file2);
-//	print_module(new_module);
-//	print_module(augment_module);
 
-	xmlDocPtr doc = xmlParseFile(filename3);
+	xmlDocPtr doc = xmlParseFile(filename2);
 
 	if (doc == NULL) {
 		fprintf(stderr, "Could not open file %s. Exiting.\n", filename2);
@@ -124,11 +120,10 @@ int run_example2() {
 	}
 
 	path* p = new_path(5000);
-	json_t* json_doc = xml_to_json(root, p, new_module, augment_module, NULL, 0, NULL);
+	json_t* json_doc = xml_to_json(root, p, new_module, NULL, NULL, 0, NULL);
 	json_dumpf(json_doc, stdout, JSON_INDENT(2));
 
 	destroy_module(new_module);
-	destroy_module(augment_module);
 	xmlFreeDoc(doc);
 	printf("\n");
 
@@ -136,6 +131,28 @@ int run_example2() {
 }
 
 int run_example3() {
+
+	char filename[] = "test-resources/json-request.json";
+	FILE* file = load_file(filename);
+
+	printf("This example transforms a sample JSON request into XML. The transformation is static - it doesn't fill out namespaces, since connection to Netopeer server is necessary for that.\n\n");
+
+	json_error_t j_error;
+	json_t* root = json_loadf(file, 0, &j_error);
+
+	xmlNodePtr xml_root = json_to_xml(root, 0, NULL, 1);
+
+	xmlDocPtr doc = xmlNewDoc((xmlChar*) "1.0");
+
+	if (xmlChildElementCount(xml_root) != 1) {
+		xmlDocSetRootElement(doc, xml_root);
+	} else {
+		xmlDocSetRootElement(doc, xml_root->xmlChildrenNode);
+	}
+
+	xmlDocDump(stdout, doc);
+	xmlFreeDoc(doc);
+	json_decref(root);
 
 	return EXIT_SUCCESS;
 }

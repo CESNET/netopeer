@@ -87,16 +87,16 @@ struct ntf_thread_config {
 NC_MSG_TYPE rc_recv_msg(struct pollfd fds, int infd, int outfd, nc_rpc** rpc, conn_t* con);
 int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
 void rc_send_error(int status, int fd);
-void save(const char* str, const char* file);
 
+void rc_handle_post_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
+void rc_handle_delete_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
 void rc_send_version_response(httpmsg* msg, int outfd);
-int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump);
+int rc_send_reply(int outfd/*, nc_reply* reply*/, char* json_dump, char* data_type);
 int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con);
 json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con);
 char* jump_resource_identifier(char* identifier, int times);
 char* jump_colons(char* identifier, int times);
 void rc_handle_get_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con);
-void save(const char* str, const char* file);
 char* jump_string(char* identifier, int times, char character);
 // RESTCONF FUNCTIONS - END
 
@@ -250,8 +250,6 @@ static void print_usage (char * progname)
 	exit (0);
 }
 
-/* TODO */ extern char **environ;
-
 int main (int argc, char** argv)
 {
 	conn_t *con;							/* connection to NETCONF server */
@@ -267,13 +265,6 @@ int main (int argc, char** argv)
 	int next_option;
 	int verbose;
 	char *aux_string = NULL;
-
-	/* TODO remove this */
-	char **var;
-	for (var = environ; *var != NULL; ++var) {
-		clb_print(NC_VERB_DEBUG, *var);
-	}
-	/* TODO until here */
 
 	infd = STDIN_FILENO;
 	outfd = STDOUT_FILENO;
@@ -411,80 +402,6 @@ int main (int argc, char** argv)
 					break;
 				case NC_MSG_RPC:
 					clb_print(NC_VERB_VERBOSE, "Processed client message");
-//
-//					clb_print(NC_VERB_VERBOSE, "Processing client message");
-//
-//					nc_reply* reply = comm_operation(con, rpc);
-//
-//					// TODO: testing
-//					char* ietf_system = get_schema("ietf-system", con, "2");
-//					save(ietf_system, "ietf-system.log");
-//					char* ietf_system_tls_auth = get_schema("ietf-system-tls-auth", con, "3");
-//					save(ietf_system_tls_auth, "ietf-system-tls-auth.log");
-//					char* ietf_x509_cert_to_name = get_schema("ietf-x509-cert-to-name", con, "4");
-//					save(ietf_x509_cert_to_name, "ietf-x509-cert-to-name.log");
-//
-//					// TODO: extract needed modules dynamically + conversion from capabilities
-//
-//					// this works, good
-//					module* cert_to_name_mod = read_module_from_string(ietf_x509_cert_to_name);
-//					module* ietf_system_tls_auth_mod = read_module_from_string_with_groupings(ietf_system_tls_auth, cert_to_name_mod);
-//					module* ietf_system_mod = read_module_from_string(ietf_system);
-//
-//					xmlDocPtr doc = xmlParseDoc((const xmlChar*)nc_reply_dump(reply));
-//					if (doc == NULL) {
-//						clb_print(NC_VERB_ERROR, "Message processing failed: could not read xml doc");
-//						break;
-//					}
-//					xmlNodePtr root = xmlDocGetRootElement(doc);
-//					if (root == NULL) {
-//						clb_print(NC_VERB_ERROR, "Message processing failed: could not get root element");
-//						break;
-//					}
-//					xmlNodePtr data = root->xmlChildrenNode;
-//					while (data != NULL && strcmp((char*)data->name, "data")) {
-//						clb_print(NC_VERB_WARNING, "Node name is not data, it is:");
-//						clb_print(NC_VERB_WARNING, (char*) data->name);
-//						data = data->next;
-//					}
-//					xmlBufferPtr buffer = xmlBufferCreate();
-//					xmlNodeDump(buffer, doc, data, 0, 1);
-//					save((char*)buffer->content, "data-dump");
-//					xmlBufferFree(buffer);
-//
-//					xmlNodePtr system = data->xmlChildrenNode;
-//					while (system != NULL && strcmp((char*) system->name, "system")) {
-//						clb_print(NC_VERB_WARNING, "Node name is not system, it is:");
-//						clb_print(NC_VERB_WARNING, (char*) system->name);
-//						system = system->next;
-//					}
-//
-//					xmlBufferPtr buffer2 = xmlBufferCreate();
-//					xmlNodeDump(buffer2, doc, system, 0, 1);
-//					save((char*)buffer2->content, "system-dump");
-//
-//					// convert
-//					path* p = new_path(5000);
-//					json_t* json_obj = xml_to_json(system, p, ietf_system_mod, ietf_system_tls_auth_mod, NULL, 0, NULL);
-//					clb_print(NC_VERB_WARNING, "dumping to json");
-//					save(json_dumps(json_obj, 0), "json-dump");
-//					free_path(p);
-//
-//					xmlBufferFree(buffer2);
-//
-//					destroy_string(ietf_system);
-//					destroy_string(ietf_system_tls_auth);
-//					destroy_string(ietf_x509_cert_to_name);
-//
-//					if (reply == NULL) {
-//						clb_print(NC_VERB_WARNING, "Message processing failed");
-//						rc_send_error(-2, outfd);
-//						break;
-//					}
-//					if (rc_send_reply(outfd/*, reply*/, json_dumps(json_obj, 0))) {
-//						clb_print(NC_VERB_WARNING, "Sending reply failed.");
-//					}
-
 					break;
 				default:
 					clb_print(NC_VERB_ERROR, "Illegal state reached, received unsupported NC_MSG_TYPE");
@@ -602,11 +519,11 @@ int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 		if (!strcmp("GET", msg->method)) {
 			rc_handle_get_data(msg, rpc, outfd, con);
 		} else if (!strcmp("PUT", msg->method)) {
-			rc_send_error(-1, outfd);
+			rc_handle_post_data(msg, rpc, outfd, con);
 		} else if (!strcmp("POST", msg->method)) {
-			rc_send_error(-1, outfd);
+			rc_handle_post_data(msg, rpc, outfd, con);
 		} else if (!strcmp("DELETE", msg->method)) {
-			rc_send_error(-1, outfd);
+			rc_handle_delete_data(msg, rpc, outfd, con);
 		} else {
 			rc_send_error(-3, outfd); // bad request, method is not known on this resource
 		}
@@ -632,6 +549,255 @@ int rc_handle_msg(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	return 0;
 }
 
+void rc_handle_delete_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
+	clb_print(NC_VERB_DEBUG, "rc_handle_post_data: handling post");
+	char* resource_id = msg->resource_locator;
+	char* query = strchr(msg->resource_locator, '&');
+	char* fragment = strchr(msg->resource_locator, '#');
+	if (fragment != NULL) {
+		fragment[0] = '\0'; // and ignore
+	}
+	if (query != NULL) {
+		query[0] = '\0';
+		query = query + 1;
+		clb_print(NC_VERB_DEBUG, "rc_handle_delete_data: request query is not null:");
+		clb_print(NC_VERB_DEBUG, query);
+	} else {
+		clb_print(NC_VERB_DEBUG, "rc_handle_delete_data: request query is null");
+	}
+
+	if (msg->body == NULL) {
+		clb_print(NC_VERB_ERROR, "rc_handle_delete_data: a body is expected with DELETE request");
+		return;
+	}
+
+	char* module_ptr = jump_resource_identifier(resource_id, 3);
+	char* module = read_until(module_ptr, '/');
+	char* module_id = read_until(module, ':');
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: getting ns");
+	char* ns = get_ns_by_module(module_id, con);
+
+	json_error_t j_error;
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: loading body");
+	json_t* root = json_loads(msg->body, 0, &j_error);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: converting body");
+	xmlNodePtr xml_root = json_to_xml(root, 0, NULL, 0);
+
+	json_decref(root);
+
+	xmlDocPtr doc = NULL;
+	xmlNodePtr root_ptr = NULL;
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: creating root");
+	doc = xmlNewDoc(BAD_CAST "1.0");
+	if (NULL != strchr(module_ptr, ':')) {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: creating root with ns");
+		char* module_name_tmp = jump_string(module_ptr, 1, ':');
+		char* module_name = read_until(module_name_tmp, '/');
+		root_ptr = xmlNewNode(NULL, BAD_CAST module_name);
+		xmlNsPtr ns1 = xmlNewNs(root_ptr, BAD_CAST ns, NULL);
+		xmlSetNs(root_ptr, ns1);
+		free(module_name);
+	} else {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: creating root without ns");
+		char* module_name = read_until(module_ptr, '/');
+		root_ptr = xmlNewNode(NULL, BAD_CAST module_ptr);
+		free(module_name);
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: setting root");
+	xmlNodePtr last = root_ptr;
+	module_ptr = jump_string(module_ptr, 1, '/');
+	while (strchr(module_ptr, '/') != NULL) {
+		char* name = read_until(module_ptr, '/');
+		clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: jump to another resource identifier part:");
+		clb_print(NC_VERB_VERBOSE, name);
+		xmlNodePtr newNode = xmlNewNode(NULL, (const xmlChar*) name);
+		xmlAddChild(last, newNode);
+		last = newNode;
+		module_ptr = jump_string(module_ptr, 1, '/');
+		free(name);
+	}
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: done reading resource identifier");
+	xmlAddChild(last, xml_root->xmlChildrenNode);
+
+	xmlNodePtr xmlRpc = xmlNewNode(NULL, BAD_CAST "rpc");
+	xmlNsPtr rpcNs = xmlNewNs(xmlRpc, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", NULL);
+	xmlSetNs(xmlRpc, rpcNs);
+	xmlSetProp(xmlRpc, BAD_CAST "message-id", BAD_CAST "103");
+	xmlNodePtr edit_config = xmlNewNode(NULL, BAD_CAST "delete-config");
+	xmlAddChild(xmlRpc, edit_config);
+	xmlNodePtr target = xmlNewNode(NULL, BAD_CAST "target");
+	xmlAddChild(edit_config, target);
+	xmlNodePtr running = xmlNewNode(NULL, BAD_CAST "running");
+	xmlAddChild(target, running);
+
+	xmlNodePtr config = xmlNewNode(NULL, BAD_CAST "config");
+	xmlAddChild(edit_config, config);
+	xmlAddChild(config, root_ptr);
+	xmlDocSetRootElement(doc, xmlRpc);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: dumping...");
+	xmlBufferPtr buffer = xmlBufferCreate();
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: done reading resource identifier");
+	xmlNodeDump(buffer, doc, xmlRpc, 0, 1);
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: done dumping, sending...");
+	*rpc = nc_rpc_build((char*) buffer->content, NULL);
+	xmlBufferFree(buffer);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: sending operation");
+	nc_reply* reply = comm_operation(con, *rpc);
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: dumping reply");
+	char* reply_dump = nc_reply_dump(reply);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: parsing reply");
+	xmlDocPtr reply_doc = xmlParseDoc((const xmlChar*) reply_dump);
+	xmlNodePtr reply_root = xmlDocGetRootElement(reply_doc);
+	xmlNodePtr ok_node = reply_root->xmlChildrenNode;
+
+	free(reply_dump);
+
+	if (ok_node == NULL || strcmp((char*)ok_node->name, "ok")) {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: sending reply, not ok");
+		rc_send_error(-4, outfd);
+		return;
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_delete_data: sending reply, ok");
+
+	rc_send_error(1, outfd); // OK
+
+	return;
+}
+
+void rc_handle_post_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
+	clb_print(NC_VERB_DEBUG, "rc_handle_post_data: handling post");
+	char* resource_id = msg->resource_locator;
+	char* query = strchr(msg->resource_locator, '&');
+	char* fragment = strchr(msg->resource_locator, '#');
+	if (fragment != NULL) {
+		fragment[0] = '\0'; // and ignore
+	}
+	if (query != NULL) {
+		query[0] = '\0';
+		query = query + 1;
+		clb_print(NC_VERB_DEBUG, "rc_handle_post_data: request query is not null:");
+		clb_print(NC_VERB_DEBUG, query);
+	} else {
+		clb_print(NC_VERB_DEBUG, "rc_handle_post_data: request query is null");
+	}
+
+	if (msg->body == NULL) {
+		clb_print(NC_VERB_ERROR, "rc_handle_post_data: a body is expected with POST request");
+		return;
+	}
+
+	char* module_ptr = jump_resource_identifier(resource_id, 3);
+	char* module = read_until(module_ptr, '/');
+	char* module_id = read_until(module, ':');
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: getting ns");
+	char* ns = get_ns_by_module(module_id, con);
+
+	json_error_t j_error;
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: loading body");
+	json_t* root = json_loads(msg->body, 0, &j_error);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: converting body");
+	xmlNodePtr xml_root = json_to_xml(root, 0, NULL, 0);
+
+	json_decref(root);
+
+	xmlDocPtr doc = NULL;
+	xmlNodePtr root_ptr = NULL;
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: creating root");
+	doc = xmlNewDoc(BAD_CAST "1.0");
+	if (NULL != strchr(module_ptr, ':')) {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: creating root with ns");
+		char* module_name_tmp = jump_string(module_ptr, 1, ':');
+		char* module_name = read_until(module_name_tmp, '/');
+		root_ptr = xmlNewNode(NULL, BAD_CAST module_name);
+		xmlNsPtr ns1 = xmlNewNs(root_ptr, BAD_CAST ns, NULL);
+		xmlSetNs(root_ptr, ns1);
+		free(module_name);
+	} else {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: creating root without ns");
+		char* module_name = read_until(module_ptr, '/');
+		root_ptr = xmlNewNode(NULL, BAD_CAST module_ptr);
+		free(module_name);
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: setting root");
+	xmlNodePtr last = root_ptr;
+	module_ptr = jump_string(module_ptr, 1, '/');
+	while (strchr(module_ptr, '/') != NULL) {
+		char* name = read_until(module_ptr, '/');
+		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: jump to another resource identifier part:");
+		clb_print(NC_VERB_VERBOSE, name);
+		xmlNodePtr newNode = xmlNewNode(NULL, (const xmlChar*) name);
+		xmlAddChild(last, newNode);
+		last = newNode;
+		module_ptr = jump_string(module_ptr, 1, '/');
+		free(name);
+	}
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: done reading resource identifier");
+	xmlAddChild(last, xml_root->xmlChildrenNode);
+
+	xmlNodePtr xmlRpc = xmlNewNode(NULL, BAD_CAST "rpc");
+	xmlNsPtr rpcNs = xmlNewNs(xmlRpc, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", NULL);
+	xmlSetNs(xmlRpc, rpcNs);
+	xmlSetProp(xmlRpc, BAD_CAST "message-id", BAD_CAST "103");
+	xmlNodePtr edit_config = xmlNewNode(NULL, BAD_CAST "edit-config");
+	xmlAddChild(xmlRpc, edit_config);
+	xmlNodePtr target = xmlNewNode(NULL, BAD_CAST "target");
+	xmlAddChild(edit_config, target);
+	xmlNodePtr running = xmlNewNode(NULL, BAD_CAST "running");
+	xmlAddChild(target, running);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: going to reset root element");
+
+	xmlNodePtr config = xmlNewNode(NULL, BAD_CAST "config");
+	xmlAddChild(edit_config, config);
+	xmlAddChild(config, root_ptr);
+	xmlDocSetRootElement(doc, xmlRpc);
+
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: dumping...");
+	xmlBufferPtr buffer = xmlBufferCreate();
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: done reading resource identifier");
+	xmlNodeDump(buffer, doc, xmlRpc, 0, 1);
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: done dumping, sending...");
+	*rpc = nc_rpc_build((char*) buffer->content, NULL);
+	xmlBufferFree(buffer);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: sending operation");
+	nc_reply* reply = comm_operation(con, *rpc);
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: dumping reply");
+	char* reply_dump = nc_reply_dump(reply);
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: parsing reply");
+	xmlDocPtr reply_doc = xmlParseDoc((const xmlChar*) reply_dump);
+	xmlNodePtr reply_root = xmlDocGetRootElement(reply_doc);
+	xmlNodePtr ok_node = reply_root->xmlChildrenNode;
+
+	free(reply_dump);
+
+	if (ok_node == NULL || strcmp((char*)ok_node->name, "ok")) {
+		clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: sending reply, not ok");
+		rc_send_error(-5, outfd);
+		return;
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_post_data: sending reply, ok");
+
+	rc_send_error(1, outfd); // OK
+
+	return;
+}
+
 void rc_handle_get_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 	char* resource_id = msg->resource_locator;
 	char* query = strchr(msg->resource_locator, '&');
@@ -648,174 +814,166 @@ void rc_handle_get_data(httpmsg* msg, nc_rpc** rpc, int outfd, conn_t* con) {
 		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: request query is null");
 	}
 
+	// this is the simple get scenario, print everything
+	clb_print(NC_VERB_DEBUG, "rc_handle_get_data: handling simple get");
+	*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
+	nc_reply* reply = comm_operation(con, *rpc);
+	if (reply == NULL) {
+		clb_print(NC_VERB_ERROR, "rc_handle_get_data: failed sending get-config request");
+		rc_send_error(-2, outfd);
+		return;
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: dumping reply");
+	char* str_reply = nc_rpc_dump(reply);
+	if (str_reply == NULL) {
+		clb_print(NC_VERB_WARNING, "rc_handle_get_data: failed sending get-config request");
+		nc_rpc_free(reply);
+		rc_send_error(-2, outfd);
+		return;
+	}
+
+	clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting data element");
+	char* data = get_data(str_reply);
+	if (data == NULL) {
+		clb_print(NC_VERB_WARNING, "rc_handle_get_data: no data element in netconf reply");
+		nc_rpc_free(reply);
+		rc_send_error(-2, outfd);
+		return;
+	}
+
+	if (str_reply != NULL) {
+		free(str_reply);
+	}
+	nc_rpc_free(reply);
+
+	clb_print(NC_VERB_DEBUG, "rc_handle_get_data: converting reply");
+
+	xmlDocPtr doc = xmlParseDoc((xmlChar*)data);
+	if (doc == NULL) { // could not parse xml
+		clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse xml");
+		rc_send_error(-2, outfd);
+		return;
+	}
+	xmlNodePtr root = xmlDocGetRootElement(doc);
+	if (root == NULL) { // there is no root element
+		xmlFreeDoc(doc);
+		clb_print(NC_VERB_WARNING, "rc_handle_get_data: no root element in doc");
+		rc_send_error(-2, outfd);
+		return;
+	}
+	if (strcmp((char*)root->name, "data")) { // the root element is not data
+		clb_print(NC_VERB_WARNING, "rc_handle_get_data: the root element is not data, this should not happen");
+		xmlFreeDoc(doc);
+		xmlFreeNode(root);
+		rc_send_error(-2, outfd);
+		return;
+	}
+	clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsed xml");
+	xmlNodePtr xmodule = root->xmlChildrenNode;
+	json_t* wrapper = json_object();
+	while(xmodule != NULL && xmodule->name != NULL) {
+		if (!strcmp((char*)xmodule->name, "text")) {
+			xmodule = xmlNextElementSibling(xmodule);
+			continue;
+		}
+
+		clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found module with name:");
+		clb_print(NC_VERB_VERBOSE, (char*) xmodule->name);
+
+		module* mod = NULL;
+		if (xmodule->ns != NULL) {
+			clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting module identifier");
+			char* ns = NULL;
+			copy_string(&ns, (char*) xmodule->ns->href);
+
+			if (ns == NULL) {
+				clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse namespace, ignoring node");
+				xmodule = xmlNextElementSibling(xmodule);
+				continue;
+			}
+			ns = normalize_name(ns); // remove " if any
+
+			clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: node namespace:");
+			clb_print(NC_VERB_VERBOSE, ns);
+
+			clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting capabilities");
+			char** cpblts = comm_get_srv_cpblts(con);
+			if (cpblts == NULL) {
+				// some internal error occurred
+				clb_print(NC_VERB_ERROR, "rc_handle_get_data: could not get capabilities");
+				free(ns);
+				rc_send_error(-2, outfd);
+				return;
+			}
+
+			int i = 0;
+			char* c_cpblt = cpblts[i];
+			while (c_cpblt != NULL) {
+				if (!strncmp(c_cpblt, ns, strlen(ns))) {
+					clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found matching capability:");
+					clb_print(NC_VERB_VERBOSE, c_cpblt);
+					char* module_to_ask_tmp = strstr(c_cpblt, "?module=");
+					if (module_to_ask_tmp == NULL) {
+						clb_print(NC_VERB_ERROR, "rc_handle_get_data: matching capability is invalid, fail");
+						free(ns);
+						rc_send_error(-2, outfd);
+						return;
+					}
+					module_to_ask_tmp += strlen("?module=");
+					char* module_to_ask = NULL;
+					copy_string(&module_to_ask, module_to_ask_tmp);
+					char* amp_to_del = strchr(module_to_ask, '&');
+					if (amp_to_del != NULL) {
+						amp_to_del[0] = '\0';
+					}
+
+					clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: asking for the following module:");
+					clb_print(NC_VERB_VERBOSE, module_to_ask);
+
+					clb_print(NC_VERB_DEBUG, "rc_handle_get_data: getting module schema");
+					char* module_text = get_schema(module_to_ask, con, "500");
+					clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsing module");
+					mod = read_module_from_string(module_text);
+					clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done parsing module, freeing...");
+
+					free(module_to_ask);
+					free(module_text);
+					break;
+				}
+				c_cpblt = cpblts[++i];
+			}
+
+			free(ns);
+
+		} else {
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: missing module namespace, ignoring node");
+			xmodule = xmlNextElementSibling(xmodule);
+			continue;
+		}
+
+		if (mod == NULL) {
+			clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse yang module (it is NULL), ignoring node in xml");
+			xmodule = xmlNextElementSibling(xmodule);
+			continue;
+		}
+
+		path* p = new_path(5000);
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: transforming module to json");
+		json_t* curr_module = xml_to_json(xmodule, p, mod, NULL, NULL, 0, con);
+		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done transforming this module");
+		json_object_set(wrapper, (char*)xmodule->name, curr_module);
+
+		char* dump_tmp = json_dumps(wrapper, JSON_INDENT(2));
+		free(dump_tmp);
+
+		xmodule = xmlNextElementSibling(xmodule);
+	}
+
 	if (!strcmp(resource_id, "/restconf/data") ||
 			!strcmp(resource_id, "/restconf/data/")) {
-		// this is the simple get scenario, print everything
-		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: handling simple get");
-		*rpc = nc_rpc_build("<rpc message-id=\"1\" xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><get/></rpc>", NULL);
-		nc_reply* reply = comm_operation(con, *rpc);
-		if (reply == NULL) {
-			clb_print(NC_VERB_ERROR, "rc_handle_get_data: failed sending get-config request");
-			rc_send_error(-2, outfd);
-			return;
-		}
-
-		clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: dumping reply");
-		char* str_reply = nc_rpc_dump(reply);
-		if (str_reply == NULL) {
-			clb_print(NC_VERB_WARNING, "rc_handle_get_data: failed sending get-config request");
-			nc_rpc_free(reply);
-			rc_send_error(-2, outfd);
-			return;
-		}
-
-//		save(str_reply, "str_reply.txt");
-
-		clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting data element");
-		char* data = get_data(str_reply);
-		if (data == NULL) {
-			clb_print(NC_VERB_WARNING, "rc_handle_get_data: no data element in netconf reply");
-			nc_rpc_free(reply);
-//			rc_send_reply(outfd, str_reply); // TODO
-			rc_send_error(-2, outfd);
-			return;
-		}
-
-		save(data, "data.txt");
-
-		if (str_reply != NULL) {
-			free(str_reply);
-		}
-		nc_rpc_free(reply);
-
-		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: converting reply");
-
-		xmlDocPtr doc = xmlParseDoc((xmlChar*)data);
-		if (doc == NULL) { // could not parse xml
-			clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse xml");
-			rc_send_error(-2, outfd);
-			return;
-		}
-		xmlNodePtr root = xmlDocGetRootElement(doc);
-		if (root == NULL) { // there is no root element
-			xmlFreeDoc(doc);
-			clb_print(NC_VERB_WARNING, "rc_handle_get_data: no root element in doc");
-			rc_send_error(-2, outfd);
-			return;
-		}
-		if (strcmp((char*)root->name, "data")) { // the root element is not data
-			clb_print(NC_VERB_WARNING, "rc_handle_get_data: the root element is not data, this should not happen");
-			xmlFreeDoc(doc);
-			xmlFreeNode(root);
-			rc_send_error(-2, outfd);
-			return;
-		}
-		clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsed xml");
-		xmlNodePtr xmodule = root->xmlChildrenNode;
-		json_t* wrapper = json_object();
-		while(xmodule != NULL && xmodule->name != NULL) {
-			if (!strcmp((char*)xmodule->name, "text")) {
-				xmodule = xmlNextElementSibling(xmodule);
-				continue;
-			}
-
-			clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found module with name:");
-			clb_print(NC_VERB_VERBOSE, (char*) xmodule->name);
-
-			module* mod = NULL;
-			if (xmodule->ns != NULL) {
-				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting module identifier");
-				char* ns = NULL;
-				copy_string(&ns, (char*) xmodule->ns->href);
-
-				if (ns == NULL) {
-					clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse namespace, ignoring node");
-					xmodule = xmlNextElementSibling(xmodule);
-					continue;
-				}
-				ns = normalize_name(ns); // remove " if any
-
-				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: node namespace:");
-				clb_print(NC_VERB_VERBOSE, ns);
-
-				clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: getting capabilities");
-				char** cpblts = comm_get_srv_cpblts(con);
-				if (cpblts == NULL) {
-					// some internal error occurred
-					clb_print(NC_VERB_ERROR, "rc_handle_get_data: could not get capabilities");
-					free(ns);
-					rc_send_error(-2, outfd);
-					return;
-				}
-
-				int i = 0;
-				char* c_cpblt = cpblts[i];
-				while (c_cpblt != NULL) {
-					if (!strncmp(c_cpblt, ns, strlen(ns))) {
-						clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: found matching capability:");
-						clb_print(NC_VERB_VERBOSE, c_cpblt);
-						char* module_to_ask_tmp = strstr(c_cpblt, "?module=");
-						if (module_to_ask_tmp == NULL) {
-							clb_print(NC_VERB_ERROR, "rc_handle_get_data: matching capability is invalid, fail");
-							free(ns);
-							rc_send_error(-2, outfd);
-							return;
-						}
-						module_to_ask_tmp += strlen("?module=");
-						char* module_to_ask = NULL;
-						copy_string(&module_to_ask, module_to_ask_tmp);
-						char* amp_to_del = strchr(module_to_ask, '&');
-						if (amp_to_del != NULL) {
-							amp_to_del[0] = '\0';
-						}
-
-						clb_print(NC_VERB_VERBOSE, "rc_handle_get_data: asking for the following module:");
-						clb_print(NC_VERB_VERBOSE, module_to_ask);
-
-						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: getting module schema");
-						char* module_text = get_schema(module_to_ask, con, "500");
-						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: parsing module");
-						save(module_text, module_to_ask);
-						mod = read_module_from_string(module_text);
-						clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done parsing module, freeing...");
-
-						free(module_to_ask);
-						free(module_text);
-						break;
-					}
-					c_cpblt = cpblts[++i];
-				}
-
-				free(ns);
-
-			} else {
-				clb_print(NC_VERB_WARNING, "rc_handle_get_data: missing module namespace, ignoring node");
-				xmodule = xmlNextElementSibling(xmodule);
-				continue;
-			}
-
-			if (mod == NULL) {
-				clb_print(NC_VERB_WARNING, "rc_handle_get_data: could not parse yang module (it is NULL), ignoring node in xml");
-				xmodule = xmlNextElementSibling(xmodule);
-				continue;
-			}
-
-			path* p = new_path(5000);
-			clb_print(NC_VERB_DEBUG, "rc_handle_get_data: transforming module to json");
-			json_t* curr_module = xml_to_json(xmodule, p, mod, NULL, NULL, 0, con); // TODO: have the converter self augment or ietf-system conversion will not work
-			clb_print(NC_VERB_DEBUG, "rc_handle_get_data: done transforming this module");
-			json_object_set(wrapper, (char*)xmodule->name, curr_module);
-
-			char* dump_tmp = json_dumps(wrapper, JSON_INDENT(2));
-			save(dump_tmp, "dump_tmp.txt");
-			free(dump_tmp);
-
-			xmodule = xmlNextElementSibling(xmodule);
-		}
-
-		rc_send_reply(outfd, json_dumps(wrapper, JSON_INDENT(2)));
+		rc_send_reply(outfd, json_dumps(wrapper, JSON_INDENT(2)), "application/yang.data");
 		json_decref(wrapper);
-
 		return;
 	}
 
@@ -837,7 +995,7 @@ void rc_send_version_response(httpmsg* msg, int outfd) {
 			break;
 		}
 		if (hdr_c + 1 == msg->header_num) {
-			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received request on /modules without proper Accept header");
+			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: received request on /version without proper Accept header");
 			rc_send_error(-3, outfd);
 			return;
 		}
@@ -853,7 +1011,7 @@ void rc_send_version_response(httpmsg* msg, int outfd) {
 	json_object_set(version, "version", json_string("1.0"));
 
 	char* dump = json_dumps(version, JSON_INDENT(2));
-	rc_send_reply(outfd, dump);
+	rc_send_reply(outfd, dump, "application/yang.api");
 	free(dump);
 	json_decref(version);
 	return;
@@ -861,6 +1019,18 @@ void rc_send_version_response(httpmsg* msg, int outfd) {
 
 void rc_send_error(int status, int fd) {
 	switch(status) {
+	case 1:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 200 OK\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
+	}
 	case -1:
 	{
 		char string[50];
@@ -897,25 +1067,53 @@ void rc_send_error(int status, int fd) {
 		}
 		break;
 	}
+	case -4:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 401 Access Denied\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
+	}
+	case -5:
+	{
+		char string[50];
+		memset(string, 0, 50);
+		snprintf(string, 49, "HTTP/1.1 409 Conflict\r\n"
+				"\r\n\r\n");
+		int count = write(fd, string, strlen(string));
+		if (count < 0) {
+			clb_print(NC_VERB_ERROR, "Write failed.");
+		}
+		break;
+	}
 	default:
 		clb_print(NC_VERB_ERROR, "rc_send_error: received unknown status");
 		break;
 	}
 }
 
-int rc_send_reply(int outfd, char* json_dump) {
+int rc_send_reply(int outfd, char* json_dump, char* data_type) {
+	if (data_type == NULL) {
+		clb_print(NC_VERB_ERROR, "nc_send_reply: bad data type");
+		return EXIT_FAILURE;
+	}
 	clb_print(NC_VERB_VERBOSE, "Replying to client");
 	/* prepare message */
 	int payload_size = strlen(json_dump);
 	char* status_line = "HTTP/1.1 200 OK\r\n";
-	char* headers = malloc(50); /* enough to hold "Content-Length: <number>\r\n\r\n" */
+	char* headers = malloc(500); /* enough to hold "Content-Length: <number>\r\n\r\n" */
 	if (headers == NULL) {
 		clb_print(NC_VERB_ERROR, "Could not allocate memory for headers");
 		free(json_dump);
 		return EXIT_FAILURE;
 	}
-	memset(headers, 0, 50);
-	int ret = snprintf(headers, 49, "Content-Length: %d\r\n\r\n", payload_size);
+	memset(headers, 0, 500);
+	int ret = snprintf(headers, 499, "Content-Length: %d\r\nContent-Type: %s\r\n\r\n", payload_size, data_type);
 	if (ret < 0) {
 		clb_print(NC_VERB_ERROR, "Could not print headers");
 		free(headers);
@@ -1021,7 +1219,7 @@ json_t* create_module_json_obj(char* cpblt, int with_schema, conn_t* con) {
 	// set schema
 	if (with_schema) {
 		clb_print(NC_VERB_DEBUG, "create_module_json_obj: setting schema");
-		char* schema = get_schema(json_string_value(json_object_get(obj, "name")), con, "1"); // TODO: correct message id - unified message id setup for all communication with the server
+		char* schema = get_schema(json_string_value(json_object_get(obj, "name")), con, "1");
 		json_object_set(obj, "schema", json_string(schema));
 		free(schema);
 	}
@@ -1120,7 +1318,7 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 			clb_print(NC_VERB_DEBUG, module_id);
 			char* schema = get_schema(module_id, con, "200");
 			clb_print(NC_VERB_VERBOSE, "rc_send_auto_response: got schema, sending reply");
-			rc_send_reply(outfd, schema);
+			rc_send_reply(outfd, schema, "application/yang");
 			return 0;
 		}
 	}
@@ -1148,7 +1346,7 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 				!strcmp(msg->resource_locator, "/restconf/modules/")) {
 			clb_print(NC_VERB_DEBUG, "rc_send_auto_response: sending whole dump");
 			// send whole dump
-			rc_send_reply(outfd, dump_2);
+			rc_send_reply(outfd, dump_2, "application/yang.api");
 		} else {
 			if (strncmp(msg->resource_locator, "/restconf/modules/module/", strlen("/restconf/modules/module/"))) { // wrong resource locator value
 				clb_print(NC_VERB_DEBUG, "rc_send_auto_response: wrong resource locator value");
@@ -1172,7 +1370,7 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 				if (!strcmp(module_id, json_string_value(json_object_get(module, "name")))) {
 					clb_print(NC_VERB_DEBUG, "rc_send_auto_response: found module name");
 					char* module_dump = json_dumps(module, JSON_INDENT(2));
-					rc_send_reply(outfd, module_dump);
+					rc_send_reply(outfd, module_dump, "application/yang.api");
 					free(module_dump);
 					if (end_del != NULL) end_del[0] = '%';
 					break;
@@ -1203,19 +1401,4 @@ int rc_send_auto_response(int outfd, httpmsg* msg, conn_t* con) {
 	rc_send_error(-3, outfd);
 
 	return 0;
-}
-
-void save(const char* str, const char* file) {
-        if (str == NULL || file == NULL) {
-                clb_print(NC_VERB_WARNING, "save: str or file is NULL");
-                return;
-        }
-        char buffer[1000];
-        snprintf(buffer, 1000, "/home/rjanik/Documents/%s", file);
-        FILE* f = fopen(buffer, "w");
-        if (f == NULL) {
-                return;
-        }
-        fprintf(f, "%s", str);
-        fclose(f);
 }
