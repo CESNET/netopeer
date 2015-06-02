@@ -55,16 +55,6 @@ void client_free_tls(struct client_struct_tls* client) {
 	free(client->username);
 	X509_free(client->cert);
 
-#ifndef DISABLE_CALLHOME
-	/* let the callhome thread know the client was freed */
-	if (client->callhome_st != NULL) {
-		pthread_mutex_lock(&client->callhome_st->ch_lock);
-		client->callhome_st->freed = 1;
-		pthread_cond_signal(&client->callhome_st->ch_cond);
-		pthread_mutex_unlock(&client->callhome_st->ch_lock);
-	}
-#endif
-
 	free(client);
 }
 
@@ -726,23 +716,27 @@ int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {
 	return 0;
 }
 
-void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
+/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep) */
+int np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	nc_rpc* rpc = NULL;
 	nc_reply* rpc_reply = NULL;
 	NC_MSG_TYPE rpc_type;
 	xmlNodePtr op;
-	int closing = 0;
+	int closing = 0, skip_sleep = 0;
 	struct nc_err* err;
 
 	if (client->to_free || client->nc_sess == NULL) {
-		return;
+		if (client->to_free) {
+			++skip_sleep;
+		}
+		return skip_sleep;
 	}
 
 	/* receive a new RPC */
 	rpc_type = nc_session_recv_rpc(client->nc_sess, 0, &rpc);
 	if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
 		/* no RPC, or processed internally */
-		return;
+		return skip_sleep;
 	}
 
 	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
@@ -754,7 +748,7 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 			client->to_free = 1;
 		}
 		/* ignore */
-		return;
+		return 1;
 	}
 
 	if (rpc_type != NC_MSG_RPC) {
@@ -762,8 +756,10 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 		nc_verb_warning("%s: received a %s RPC from session %s, ignoring", __func__,
 						(rpc_type == NC_MSG_HELLO ? "hello" : (rpc_type == NC_MSG_REPLY ? "reply" : "notification")),
 						nc_session_get_id(client->nc_sess));
-		return;
+		return 1;
 	}
+
+	++skip_sleep;
 
 	/* process the new RPC */
 	switch (nc_rpc_get_op(rpc)) {
@@ -898,51 +894,31 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	 * this reply gets sent
 	 */
 	if (closing) {
-		client->to_free = 1;
-	}
-}
-
-/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep), 2 - client deleted */
-int np_tls_client_data(struct client_struct_tls* client) {
-	struct timeval cur_time;
-	struct timespec ts;
-	int ret, skip_sleep = 0;
-
-	if (client->to_free || quit) {
-		client->to_free = 1;
-
 		nc_verb_verbose("Freeing session for '%s'", client->username);
 		nc_session_free(client->nc_sess);
 		client->nc_sess = NULL;
+		client->to_free = 1;
+	}
 
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_nsec += CLIENT_REMOVAL_TIME*1000000;
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-		/* GLOBAL WRITE LOCK */
-		if ((ret = pthread_rwlock_timedwrlock(&netopeer_state.global_lock, &ts)) != 0) {
-			if (ret != ETIMEDOUT) {
-				nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
-			}
-			/* GLOBAL READ LOCK */
-			pthread_rwlock_rdlock(&netopeer_state.global_lock);
-			/* continue with the next client again holding the read lock */
-			return 1;
+	return skip_sleep;
+}
+
+/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep) */
+int np_tls_client_transport(struct client_struct_tls* client) {
+	struct timeval cur_time;
+	int skip_sleep = 0;
+
+	if (quit) {
+		if (client->nc_sess != NULL) {
+			nc_verb_verbose("Freeing session for '%s'", client->username);
+			nc_session_free(client->nc_sess);
+			client->nc_sess = NULL;
 		}
+		client->to_free = 1;
+	}
 
-		np_client_detach(&netopeer_state.clients, (struct client_struct*)client);
-
-		/* GLOBAL WRITE UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-
-		client_free_tls(client);
-
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-
-		/* do not sleep, we may be exiting based on a signal received,
-		 * so remove all the clients without wasting time */
-		return 2;
+	if (client->to_free) {
+		return 1;
 	}
 
 	gettimeofday(&cur_time, NULL);
@@ -957,6 +933,7 @@ int np_tls_client_data(struct client_struct_tls* client) {
 		}
 		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
 		client->to_free = 1;
+		++skip_sleep;
 	}
 
 	/* check the session for idle timeout */
@@ -965,6 +942,7 @@ int np_tls_client_data(struct client_struct_tls* client) {
 		if (client->nc_sess == NULL || !ncntf_session_get_active_subscription(client->nc_sess)) {
 			nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.", client->username);
 			client->to_free = 1;
+			++skip_sleep;
 		}
 	}
 

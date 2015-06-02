@@ -401,7 +401,7 @@ static void* app_loop(void* app_v) {
 	struct ch_app* app = (struct ch_app*)app_v;
 	struct ch_server* cur_server = NULL;
 	struct timespec ts;
-	int i;
+	int i, ret;
 
 	/* TODO sigmask for the thread? */
 
@@ -429,7 +429,6 @@ static void* app_loop(void* app_v) {
 		for (;;) {
 			for (i = 0; i < app->rec_count; ++i) {
 				if ((app->client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
-					app->ch_st->freed = 0;
 					break;
 				}
 				sleep(app->rec_interval);
@@ -445,8 +444,6 @@ static void* app_loop(void* app_v) {
 			}
 		}
 
-		app->client->callhome_st = app->ch_st;
-
 		/* publish the new client for the main application loop to create a new SSH session */
 		while (1) {
 			/* CALLHOME LOCK */
@@ -460,16 +457,33 @@ static void* app_loop(void* app_v) {
 			/* CALLHOME UNLOCK */
 			pthread_mutex_unlock(&callhome_lock);
 		}
+
+		/* wait for the listen loop to create the client thread (a bit shady) */
+		i = 0;
+		while (app->client->tid == 0) {
+			usleep(1000*netopeer_options.response_time);
+			++i;
+			if (i == 10) {
+				nc_verb_error("Call Home (app %s) client thread creation timeout, retrying.", app->name);
+				app->client->to_free = 1;
+				break;
+			}
+		}
+		if (i == 10) {
+			continue;
+		}
+
 		cur_server->active = 1;
 
 		if (app->connection) {
 			/* periodic connection */
-			pthread_mutex_lock(&app->ch_st->ch_lock);
-			while (app->ch_st->freed == 0) {
+			while (1) {
 				clock_gettime(CLOCK_REALTIME, &ts);
 				ts.tv_sec += CALLHOME_PERIODIC_LINGER_CHECK;
-				i = pthread_cond_timedwait(&app->ch_st->ch_cond, &app->ch_st->ch_lock, &ts);
-				if (i == ETIMEDOUT) {
+				ret = pthread_timedjoin_np(app->client->tid, NULL, &ts);
+				if (ret == 0) {
+					break;
+				} else if (ret == ETIMEDOUT) {
 					switch (app->client->transport) {
 #ifdef NP_SSH
 					case NC_TRANSPORT_SSH:
@@ -487,20 +501,22 @@ static void* app_loop(void* app_v) {
 					if (i) {
 						break;
 					}
+				} else {
+					nc_verb_error("Call Home (app %s) client thread timed join failed (%s).", app->name, strerror(ret));
+					app->client->to_free = 1;
+					break;
 				}
 			}
-			pthread_mutex_unlock(&app->ch_st->ch_lock);
-			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
 
 		} else {
 			/* persistent connection */
-			pthread_mutex_lock(&app->ch_st->ch_lock);
-			while (app->ch_st->freed == 0) {
-				pthread_cond_wait(&app->ch_st->ch_cond, &app->ch_st->ch_lock);
+			ret = pthread_join(app->client->tid, NULL);
+			if (ret != 0) {
+				nc_verb_error("Call Home (app %s) client thread join failed (%s).", app->name, strerror(ret));
 			}
-			pthread_mutex_unlock(&app->ch_st->ch_lock);
-			nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
 		}
+		app->client = NULL;
+		nc_verb_verbose("Call Home (app %s) disconnected.", app->name);
 
 		if (quit) {
 			pthread_exit(NULL);
@@ -622,12 +638,6 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 		}
 	}
 
-	/* create cond and lock */
-	new->ch_st = malloc(sizeof(struct client_ch_struct));
-	new->ch_st->freed = 0;
-	pthread_mutex_init(&new->ch_st->ch_lock, NULL);
-	pthread_cond_init(&new->ch_st->ch_cond, NULL);
-
 	pthread_create(&(new->thread), NULL, app_loop, new);
 
 	/* insert the created app structure into the list */
@@ -704,8 +714,7 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 	}
 
 	/* a valid client running, mark it for deletion */
-	if (app->ch_st->freed == 0 && app->client != NULL && !quit) {
-		app->client->callhome_st = NULL;
+	if (app->client != NULL && !quit) {
 		switch (app->client->transport) {
 #ifdef NP_SSH
 		case NC_TRANSPORT_SSH:
@@ -722,10 +731,6 @@ static int app_rm(const char* name, NC_TRANSPORT transport) {
 			app->client->to_free = 1;
 		}
 	}
-
-	pthread_mutex_destroy(&app->ch_st->ch_lock);
-	pthread_cond_destroy(&app->ch_st->ch_cond);
-	free(app->ch_st);
 
 	free(app->name);
 	free(app);

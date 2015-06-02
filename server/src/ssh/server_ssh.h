@@ -22,15 +22,11 @@ struct client_struct_ssh {
 
 	int sock;
 	struct sockaddr_storage saddr;
+	pthread_t tid;
 	char* username;
-	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
 
-	/*
-	 * when accessing or adding/removing ssh_chans
-	 */
-	pthread_mutex_t client_lock;
 	volatile struct timeval conn_time;	// timestamp of the new connection
 	int auth_attempts;					// number of failed auth attempts
 	int authenticated;
@@ -44,9 +40,9 @@ struct ncsess_thread_config {
 	struct client_struct_ssh* client;
 };
 
-void np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
+int np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
 
-int np_ssh_client_data(struct client_struct_ssh* client);
+int np_ssh_client_transport(struct client_struct_ssh* client);
 
 void np_ssh_init(void);
 

@@ -12,12 +12,6 @@ struct np_bind_addr {
 
 #ifndef DISABLE_CALLHOME
 
-struct client_ch_struct {
-	int freed;
-	pthread_mutex_t ch_lock;
-	pthread_cond_t ch_cond;
-};
-
 struct ch_app {
 	NC_TRANSPORT transport;
 	char* name;
@@ -36,7 +30,6 @@ struct ch_app {
 	uint8_t rep_linger;         /* connection-type/periodic/linger-secs */
 	pthread_t thread;
 	struct client_struct* client;
-	struct client_ch_struct* ch_st;
 	struct ch_app *next;
 	struct ch_app *prev;
 };
