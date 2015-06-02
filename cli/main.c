@@ -148,6 +148,7 @@ int main(int UNUSED(argc), char** UNUSED(argv)) {
 	initialize_readline();
 
 	/* set verbosity and function to print libnetconf's messages */
+	nc_init(NC_INIT_CLIENT | NC_INIT_LIBSSH_PTHREAD);
 	nc_verbosity(NC_VERB_WARNING);
 	nc_callback_print(clb_print);
 	nc_callback_error_reply(clb_error_print);
@@ -237,6 +238,8 @@ int main(int UNUSED(argc), char** UNUSED(argv)) {
 
 	rl_expand_prompt(NULL);
 	rl_free(rl_prompt);
+
+	nc_close();
 
 	/* bye, bye */
 	return (EXIT_SUCCESS);

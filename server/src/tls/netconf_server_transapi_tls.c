@@ -151,7 +151,6 @@ int np_tls_chapp_linger_check(struct ch_app* app) {
 
 		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
-		app->client->callhome_st = NULL;
 		app->client->to_free = 1;
 		sleep(app->rep_timeout*60);
 		return 1;

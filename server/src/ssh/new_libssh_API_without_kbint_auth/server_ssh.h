@@ -8,11 +8,14 @@
 /* for each SSH channel of each SSH session */
 struct chan_struct {
 	ssh_channel ssh_chan;
+	int chan_in[2];				// pipe - libssh channel read, libnetconf write
+	int chan_out[2];			// pipe - libssh channel write, libnetconf read
 	int netconf_subsystem;
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	volatile int to_free;		// is this channel valid?
+	volatile int last_send;
 	struct chan_struct* next;
 };
 
@@ -22,17 +25,20 @@ struct client_struct_ssh {
 
 	int sock;
 	struct sockaddr_storage saddr;
-	pthread_t tid;
 	char* username;
+	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
 
+	/*
+	 * when accessing or adding/removing ssh_chans
+	 */
+	pthread_mutex_t client_lock;
 	volatile struct timeval conn_time;	// timestamp of the new connection
 	int auth_attempts;					// number of failed auth attempts
-	int authenticated;
 	struct chan_struct* ssh_chans;
 	ssh_session ssh_sess;
-	int new_ssh_msg;
+	ssh_event ssh_evt;
 };
 
 struct ncsess_thread_config {
@@ -40,9 +46,9 @@ struct ncsess_thread_config {
 	struct client_struct_ssh* client;
 };
 
-int np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
+void np_ssh_client_netconf_rpc(struct client_struct_ssh* client);
 
-int np_ssh_client_transport(struct client_struct_ssh* client);
+int np_ssh_client_data(struct client_struct_ssh* client, char** to_send, int* to_send_size);
 
 void np_ssh_init(void);
 

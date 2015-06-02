@@ -37,38 +37,23 @@ void client_free_tls(struct client_struct_tls* client) {
 	if (!client->to_free) {
 		nc_verb_error("%s: internal error: freeing a client not marked for deletion", __func__);
 	}
-
 	if (client->nc_sess != NULL) {
+		nc_verb_error("%s: internal error: freeing a client with an opened NC session", __func__);
 		nc_session_free(client->nc_sess);
 	}
+
 	if (client->new_sess_tid != 0) {
 		pthread_cancel(client->new_sess_tid);
 	}
 	if (client->tls != NULL) {
-		if (SSL_shutdown(client->tls) == 0) {
-			nc_verb_verbose("%s: dropping client without waiting for \"close_alert\"", __func__);
-		}
+		SSL_shutdown(client->tls);
 		SSL_free(client->tls);
 	}
 	if (client->sock != -1) {
 		close(client->sock);
 	}
-	close(client->tls_in[0]);
-	close(client->tls_in[1]);
-	close(client->tls_out[0]);
-	close(client->tls_out[1]);
 	free(client->username);
 	X509_free(client->cert);
-
-#ifndef DISABLE_CALLHOME
-	/* let the callhome thread know the client was freed */
-	if (client->callhome_st != NULL) {
-		pthread_mutex_lock(&client->callhome_st->ch_lock);
-		client->callhome_st->freed = 1;
-		pthread_cond_signal(&client->callhome_st->ch_cond);
-		pthread_mutex_unlock(&client->callhome_st->ch_lock);
-	}
-#endif
 
 	free(client);
 }
@@ -694,7 +679,7 @@ void* netconf_session_thread(void* arg) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	client->nc_sess = nc_session_accept_inout(caps, client->username, client->tls_out[0], client->tls_in[1]);
+	client->nc_sess = nc_session_accept_tls(caps, client->username, client->tls);
 	nc_cpblts_free(caps);
 	if (client->to_free == 1) {
 		/* probably a signal received */
@@ -715,68 +700,6 @@ void* netconf_session_thread(void* arg) {
 	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
 
 	return NULL;
-}
-
-/* returns how much of the data was processed */
-static int check_tls_data_to_nc(struct client_struct_tls* client) {
-	/* the size of the SSL buffer */
-#define BUFFER_LENGTH 16384
-
-	static char buf[BUFFER_LENGTH];
-	char* buf_ptr;
-	int ret;
-	unsigned int to_write;
-
-	ret = SSL_read(client->tls, buf, BUFFER_LENGTH);
-	if (ret == 0) {
-		/* The client disconnected, we could find out whether by force
-		 * or SSL "close notify" alert was sent, but we couldn't care less,
-		 * it was not a proper NETCONF close session either way.
-		 */
-		return 1;
-	} else if (ret < 0) {
-		ret = SSL_get_error(client->tls, ret);
-		if ((ret >= 2 && ret <= 4) || ret == 7 || ret == 8) {
-			/*
-			 * 2 - SSL_ERROR_WANT_READ
-			 * 3 - SSL_ERROR_WANT_WRITE
-			 * 4 - SSL_ERROR_WANT_X509_LOOKUP
-			 * 7 - SSL_ERROR_WANT_CONNECT
-			 * 8 - SSL_ERROR_WANT_ACCEPT
-			 *
-			 * errors caused by the non-blocking socket, ignore
-			 */
-			return 0;
-		}
-		nc_verb_error("%s: SSL read failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
-		return 1;
-	}
-
-	/* pass data from the client to the library */
-	buf_ptr = buf;
-	to_write = ret;
-	do {
-		ret = write(client->tls_out[1], buf, to_write);
-		if (ret > 0) {
-			buf_ptr += ret;
-			to_write -= ret;
-		}
-		if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			usleep(10);
-			continue;
-		}
-
-		if (ret == -1) {
-			nc_verb_error("%s: failed to pass the client data to the library (%s)", __func__, strerror(errno));
-			return 1;
-		}
-		if (ret == 0) {
-			nc_verb_error("%s: failed to pass the client data to the library", __func__);
-			return 1;
-		}
-	} while (to_write > 0);
-
-	return 0;
 }
 
 int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {
@@ -805,23 +728,27 @@ int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {
 	return 0;
 }
 
-void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
+/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep) */
+int np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	nc_rpc* rpc = NULL;
 	nc_reply* rpc_reply = NULL;
 	NC_MSG_TYPE rpc_type;
 	xmlNodePtr op;
-	int closing = 0;
+	int closing = 0, skip_sleep = 0;
 	struct nc_err* err;
 
-	if (client->to_free || client->last_send || client->nc_sess == NULL) {
-		return;
+	if (client->to_free || client->nc_sess == NULL) {
+		if (client->to_free) {
+			++skip_sleep;
+		}
+		return skip_sleep;
 	}
 
 	/* receive a new RPC */
 	rpc_type = nc_session_recv_rpc(client->nc_sess, 0, &rpc);
 	if (rpc_type == NC_MSG_WOULDBLOCK || rpc_type == NC_MSG_NONE) {
 		/* no RPC, or processed internally */
-		return;
+		return skip_sleep;
 	}
 
 	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
@@ -833,7 +760,7 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 			client->to_free = 1;
 		}
 		/* ignore */
-		return;
+		return 1;
 	}
 
 	if (rpc_type != NC_MSG_RPC) {
@@ -841,8 +768,10 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 		nc_verb_warning("%s: received a %s RPC from session %s, ignoring", __func__,
 						(rpc_type == NC_MSG_HELLO ? "hello" : (rpc_type == NC_MSG_REPLY ? "reply" : "notification")),
 						nc_session_get_id(client->nc_sess));
-		return;
+		return 1;
 	}
+
+	++skip_sleep;
 
 	/* process the new RPC */
 	switch (nc_rpc_get_op(rpc)) {
@@ -977,58 +906,31 @@ void np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	 * this reply gets sent
 	 */
 	if (closing) {
-		client->last_send = 1;
-		closing = 0;
+		nc_verb_verbose("Freeing session for '%s'", client->username);
+		nc_session_free(client->nc_sess);
+		client->nc_sess = NULL;
+		client->to_free = 1;
 	}
+
+	return skip_sleep;
 }
 
-/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep), 2 - client deleted */
-int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size) {
+/* return: 0 - nothing happened (sleep), 1 - something happened (skip sleep) */
+int np_tls_client_transport(struct client_struct_tls* client) {
 	struct timeval cur_time;
-	struct timespec ts;
-	char* to_send_ptr;
-	int ret, ssl_ret, to_send_len, skip_sleep = 0;
+	int skip_sleep = 0;
 
-	if (client->to_free || quit) {
-		client->to_free = 1;
-		SSL_shutdown(client->tls);
-
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_nsec += CLIENT_REMOVAL_TIME*1000000;
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-		/* GLOBAL WRITE LOCK */
-		if ((ret = pthread_rwlock_timedwrlock(&netopeer_state.global_lock, &ts)) != 0) {
-			if (ret != ETIMEDOUT) {
-				nc_verb_error("%s: timedlock failed (%s), continuing", __func__, strerror(ret));
-			}
-			/* GLOBAL READ LOCK */
-			pthread_rwlock_rdlock(&netopeer_state.global_lock);
-			/* continue with the next client again holding the read lock */
-			return 1;
+	if (quit) {
+		if (client->nc_sess != NULL) {
+			nc_verb_verbose("Freeing session for '%s'", client->username);
+			nc_session_free(client->nc_sess);
+			client->nc_sess = NULL;
 		}
-
-		np_client_detach(&netopeer_state.clients, (struct client_struct*)client);
-
-		/* GLOBAL WRITE UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-
-		client_free_tls(client);
-
-		/* do not sleep, we may be exiting based on a signal received,
-		 * so remove all the clients without wasting time */
-		return 2;
+		client->to_free = 1;
 	}
 
-	/* check if there aren't some TLS data pending */
-	if (check_tls_data_to_nc(client) != 0) {
-		nc_verb_warning("Failed to read from the client '%s', it has probably disconnected.", client->username);
-		/* this invalid socket may have been reused and we would close
-		 * it during cleanup */
-		client->sock = -1;
-		client->to_free = 1;
+	if (client->to_free) {
+		return 1;
 	}
 
 	gettimeofday(&cur_time, NULL);
@@ -1043,6 +945,7 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		}
 		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
 		client->to_free = 1;
+		++skip_sleep;
 	}
 
 	/* check the session for idle timeout */
@@ -1051,63 +954,8 @@ int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to
 		if (client->nc_sess == NULL || !ncntf_session_get_active_subscription(client->nc_sess)) {
 			nc_verb_warning("Session of client '%s' did not send/receive an RPC for too long, disconnecting.", client->username);
 			client->to_free = 1;
+			++skip_sleep;
 		}
-	}
-
-	to_send_len = 0;
-	while (1) {
-		ret = read(client->tls_in[0], (*to_send)+to_send_len, (*to_send_size)-to_send_len);
-		if (ret == -1) {
-			break;
-		}
-		to_send_len += ret;
-
-		/* double the buffer size if too small */
-		if (to_send_len == *to_send_size) {
-			*to_send_size *= 2;
-			*to_send = realloc(*to_send, *to_send_size);
-		} else {
-			break;
-		}
-	}
-
-	if (ret == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-		nc_verb_error("%s: failed to pass the library data to the client (%s)", __func__, strerror(errno));
-		client->to_free = 1;
-		skip_sleep = 1;
-	} else if (to_send_len > 0) {
-		skip_sleep = 1;
-
-		to_send_ptr = *to_send;
-		do {
-			ret = SSL_write(client->tls, to_send_ptr, to_send_len);
-			if (ret == -1) {
-				ssl_ret = SSL_get_error(client->tls, ret);
-				if (ssl_ret < 2 || (ssl_ret > 4 && ssl_ret < 7) || ssl_ret > 8) {
-					/*
-					* 2 - SSL_ERROR_WANT_READ
-					* 3 - SSL_ERROR_WANT_WRITE
-					* 4 - SSL_ERROR_WANT_X509_LOOKUP
-					* 7 - SSL_ERROR_WANT_CONNECT
-					* 8 - SSL_ERROR_WANT_ACCEPT
-					*
-					* errors caused by the non-blocking socket, ignore
-					*/
-
-					nc_verb_error("%s: SSL write failed (%s)", __func__, ERR_reason_error_string(ERR_get_error()));
-					client->to_free = 1;
-					break;
-				}
-			}
-
-			to_send_len -= ret;
-			to_send_ptr += ret;
-		} while (to_send_len > 0);
-	}
-
-	if (client->last_send) {
-		client->to_free = 1;
-		return 1;
 	}
 
 	return skip_sleep;
@@ -1270,15 +1118,8 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 		return 1;
 	}
 
-	fcntl(new_client->sock, F_SETFL, O_NONBLOCK);
-
-	if ((ret = pipe(new_client->tls_in)) != 0 || (ret = pipe(new_client->tls_out)) != 0) {
-		nc_verb_error("%s: failed to create pipes (%s)", __func__, strerror(errno));
-		return 1;
-	}
-	if (fcntl(new_client->tls_in[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_in[1], F_SETFL, O_NONBLOCK) != 0 ||
-			fcntl(new_client->tls_out[0], F_SETFL, O_NONBLOCK) != 0 || fcntl(new_client->tls_out[1], F_SETFL, O_NONBLOCK) != 0) {
-		nc_verb_error("%s: failed to set pipes to non-blocking mode (%s)", __func__, strerror(errno));
+	if (fcntl(new_client->sock, F_SETFL, O_NONBLOCK) != 0) {
+		nc_verb_error("%s: fcntl failed (%s)", __func__, strerror(errno));
 		return 1;
 	}
 
@@ -1286,7 +1127,7 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 
 	/* start a separate thread for NETCONF session accept */
 	if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
-		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
+		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", __func__, strerror(ret));
 		return 1;
 	}
 	pthread_detach(new_client->new_sess_tid);

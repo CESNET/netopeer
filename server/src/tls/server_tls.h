@@ -12,19 +12,16 @@ struct client_struct_tls {
 
 	int sock;
 	struct sockaddr_storage saddr;
+	pthread_t tid;
 	char* username;
-	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
 
-	int tls_in[2];
-	int tls_out[2];
 	SSL* tls;
 	X509* cert;
 	struct nc_session* nc_sess;
 	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
-	volatile int last_send;
 };
 
 struct np_state_tls {
@@ -32,9 +29,9 @@ struct np_state_tls {
 	pthread_mutex_t* tls_mutex_buf;
 };
 
-void np_tls_client_netconf_rpc(struct client_struct_tls* client);
+int np_tls_client_netconf_rpc(struct client_struct_tls* client);
 
-int np_tls_client_data(struct client_struct_tls* client, char** to_send, int* to_send_size);
+int np_tls_client_transport(struct client_struct_tls* client);
 
 void np_tls_thread_cleanup(void);
 

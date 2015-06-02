@@ -16,8 +16,8 @@ struct client_struct {
 
 	int sock;
 	struct sockaddr_storage saddr;
+	volatile pthread_t tid;
 	char* username;
-	struct client_ch_struct* callhome_st;
 	volatile int to_free;
 	struct client_struct* next;
 
@@ -26,8 +26,6 @@ struct client_struct {
 
 /* one global structure */
 struct np_state {
-	pthread_t data_tid;
-	pthread_t netconf_rpc_tid;
 	/*
 	 * READ - when accessing clients
 	 * WRITE - when adding/removing clients

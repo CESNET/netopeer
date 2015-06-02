@@ -165,7 +165,6 @@ int np_ssh_chapp_linger_check(struct ch_app* app) {
 	if (timeval_diff(cur_time, ((struct client_struct_ssh*)app->client)->ssh_chans->last_rpc_time) >= app->rep_linger) {
 		/* no data flow for too long, disconnect the client, wait for the set timeout and reconnect */
 		nc_verb_verbose("Call Home (app %s) did not communicate for too long, disconnecting.", app->name);
-		app->client->callhome_st = NULL;
 		((struct client_struct_ssh*)app->client)->ssh_chans->to_free = 1;
 		sleep(app->rep_timeout*60);
 		return 1;
