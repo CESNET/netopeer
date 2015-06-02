@@ -1,0 +1,5 @@
+choice
+~~~~~~
+
+The state node /cont1/choice5/leaf10 must
+return "test" for these tests to pass.

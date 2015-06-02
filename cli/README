@@ -25,11 +25,9 @@ Certificate Revocation Lists
 	CRLs of your trusted CAs for netopeer-cli.
 
 
-Generating certificates
-~~~~~~~~~~~~~~~~~~~~~~~
+Certificates
+~~~~~~~~~~~~
 
-To create your own certificate authority and sign peer certificates
-with it, refer to the README in "netopeer/server/stunnel".
-The "./certificates" directory includes copies of the needed example
+The "./certs" directory includes copies of the needed example
 client certificates, which will work with the server example
 certificates.

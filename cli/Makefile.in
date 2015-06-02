@@ -61,7 +61,7 @@ INSTALL_DATA = @INSTALL_DATA@
 RPMBUILD = @RPMBUILD@
 RPMDIR = RPMBUILD
 
-INCLUDES= 
+INCLUDES=
 
 ifeq "$(shell pwd)" "$(shell $(readlink) -f $(srcdir))"
 OBJDIR= .obj
@@ -73,11 +73,13 @@ endif
 SRCS =  main.c \
 	commands.c \
 	configuration.c \
-	mreadline.c
+	readinput.c \
+	test.c
 
 HDRS = 	commands.h \
 	configuration.h \
-	mreadline.h
+	readinput.h \
+	test.h
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
@@ -163,4 +165,8 @@ uninstall:
 
 .PHONY: clean
 clean:
-	rm -rf $(NAME) .obj $(OBJS) $(MANHTMLS); 
+	rm -rf $(NAME) .obj $(OBJS);
+
+.PHONY: cleandoc
+cleandoc:
+	rm -rf $(MANHTMLS);

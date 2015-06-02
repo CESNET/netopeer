@@ -70,6 +70,46 @@ if test "x$PKG_CONFIG" = "xno"; then
 	AC_MSG_ERROR(['pkgconfig' not found.])
 fi
 
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
+
+# check for Linux distribution
+AC_ARG_WITH([distro],
+	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),
+	DISTRO=`echo $withval | tr A-Z a-z`,
+	if test -n "`cat /proc/version | grep 'Red Hat'`"; then
+		DISTRO=redhat;
+	else
+		DISTRO=`cat /etc/*release | grep ^ID= | sed 's/.*=//'`;
+	fi
+)
+AC_MSG_CHECKING([for distro])
+AC_MSG_RESULT([$DISTRO])
+case $DISTRO in
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
+		# ok, supported distros
+		;;
+	* )
+		# unknown
+		AC_MSG_WARN([Unsupported Linux distro \"$DISTRO\", only RHEL and SUSE are fully supported.])
+		;;
+esac
+
 # check for roff2html from groff
 AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
@@ -106,9 +146,9 @@ fi
 
 AC_ARG_ENABLE([debug],
 	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
-	CFLAGS="$CFLAGS -g -O0 -DDEBUG",
+	CFLAGS="$CFLAGS -g -O0 -DDEBUG"
+	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS",
 	CFLAGS="$CFLAGS -O3 -DNDEBUG"
-	CONFIGURE_PARAMS="--enable-debug $CONFIGURE_PARAMS"
 )
 
 tls="no"
@@ -116,6 +156,7 @@ AC_ARG_ENABLE([tls],
 	AC_HELP_STRING([--enable-tls], [Enable support for NETCONF over TLS.]),
 	if test "$enableval" = "yes"; then
 		tls="yes"
+		CONFIGURE_PARAMS="--enable-tls $CONFIGURE_PARAMS"
 	fi
 )
 
@@ -211,6 +252,10 @@ AC_ARG_WITH([libnetconf],
 	BUILDREQS="$BUILDREQS libnetconf-devel"]
 )
 REQS="$REQS libnetconf"
+AC_SEARCH_LIBS([nc_callhome_listen], [netconf],
+	[],
+	[AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]); CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME"]
+)
 if test "$notif" = "yes"; then
 	AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf],
 		[],

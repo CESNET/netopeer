@@ -100,7 +100,7 @@ class ncmodule:
 					variable = variable[:index-1] + variable[index:]
 					index = index-1
 			elif c == curses.KEY_DC:
-				if index < (len(variable)-1):
+				if index < len(variable):
 					variable = variable[:index] + variable[index+1:]
 				elif index == (len(variable)-1):
 					variable = variable[:index]

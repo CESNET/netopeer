@@ -1,0 +1,405 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:validate:1.1</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/main-mod</namespace>
+		</model>
+		<model>
+			<namespace>http://test.org/main-mod2</namespace>
+		</model>
+		<model>
+			<namespace>http://test.org/aug-sub-mod1</namespace>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+				<cont2 xmlns="http://test.org/main-mod2" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+				<cont3 xmlns="http://test.org/main-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+				<cont4 xmlns="http://test.org/main-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>augment test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod">
+					<aug-leaf1 xmlns="http://test.org/aug-sub-mod1"/>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod">
+					<aug-leaf1 xmlns="http://test.org/aug-sub-mod1"/>
+				</cont1>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/main-mod">
+					<aug-leaf1 xmlns="http://test.org/aug-sub-mod1"/>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>choice test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<leaf4>1000</leaf4>
+				</cont4>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2"/>
+			</cmd-file>
+			<result-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<leaf4>1000</leaf4>
+				</cont4>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>config test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<leaf7/>
+				</cont4>
+			</cmd-file>
+			<result-error>
+				<tag>nc:unknown-element</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>deviation, default test</name>
+		<test-requirements>
+			<capability>
+				<name>urn:ietf:params:netconf:capability:with-defaults:1.0</name>
+			</capability>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --defaults=report-all --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/main-mod">
+					<leaf1>10</leaf1>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>refine, mandatory test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod"/>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>uses, grouping test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<group-leaf1/>
+				</cont2>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<group-leaf1/>
+				</cont2>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>typedef, pattern, error-app-tag, error-message test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<leaf8>ahojnazdar485</leaf8>
+				</cont2>
+			</cmd-file>
+			<result-error>
+				<tag>nc:invalid-value</tag>
+				<message>pattern error</message>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>when, feature, if-feature test</name>
+		<test-requirements>
+			<model>
+				<namespace>http://test.org/main-mod</namespace>
+				<feature>feat1</feature>
+			</model>
+			<model>
+				<namespace>http://test.org/main-mod2</namespace>
+				<feature>feat2</feature>
+			</model>
+		</test-requirements>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<llist1>hello world!!!!</llist1>
+				</cont4>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont3 xmlns="http://test.org/main-mod2"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>3</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont3 xmlns="http://test.org/main-mod2"/>
+			</cmd-file>
+			<result-file>
+				<cont3 xmlns="http://test.org/main-mod2"/>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>list, bits test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0</leaf4>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+						<leaf5>wee</leaf5>
+					</list1>
+				</cont2>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1/>
+				</cont2>
+			</cmd-file>
+			<result-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0</leaf4>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+						<leaf5>wee</leaf5>
+					</list1>
+				</cont2>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>key test</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+					</list1>
+				</cont2>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>unique test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0</leaf4>
+						<leaf5>hello</leaf5>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+						<leaf5>hello</leaf5>
+					</list1>
+				</cont2>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>max-elements test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0</leaf4>
+						<leaf5>hi</leaf5>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit2</leaf4>
+					</list1>
+					<list1>
+						<leaf4>bit0 bit1 bit2</leaf4>
+					</list1>
+				</cont2>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>must test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont2 xmlns="http://test.org/main-mod">
+					<list1>
+						<leaf4>bit0</leaf4>
+						<leaf5>empty</leaf5>
+					</list1>
+				</cont2>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>leaf-list, length test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<llist1>hello world!!!!</llist1>
+					<llist1>hi everyone!!!!</llist1>
+				</cont4>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>get-config --filter=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont4 xmlns="http://test.org/main-mod2"/>
+			</cmd-file>
+			<result-file>
+				<cont4 xmlns="http://test.org/main-mod2">
+					<llist1>hello world!!!!</llist1>
+					<llist1>hi everyone!!!!</llist1>
+				</cont4>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>range test</name>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/main-mod">
+					<leaf1>5</leaf1>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

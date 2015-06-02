@@ -1,0 +1,6 @@
+all YANG keywords
+~~~~~~~~~~~~~~~~~
+
+The included models use every YANG keyword at
+least once. The test cases, however, cover only
+the commonly used statements and just briefly.

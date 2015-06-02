@@ -1,0 +1,96 @@
+module choice-mod {
+	namespace "http://test.org/choice-mod";
+
+	prefix choicmod;
+
+	feature feat1;
+
+	container cont1 {
+		choice choice1 {
+			if-feature feat1;
+			case case1 {
+				leaf leaf1 {
+					type string;
+				}
+			}
+			case case2 {
+				leaf leaf2 {
+					type int16;
+				}
+			}
+			anyxml anyxm11;
+			case case3 {
+				leaf leaf3 {
+					type string;
+					default "empty";
+				}
+				leaf leaf4 {
+					type uint32;
+				}
+			}
+			case case4 {
+				choice choice2 {
+					container cont2 {
+						presence "has presence";
+					}
+					list list1 {
+						key "leaf5";
+						leaf leaf5 {
+							type string;
+						}
+					}
+				}
+			}
+		}
+
+		choice choice3 {
+			default leaf6;
+			leaf-list llist1 {
+				type int32;
+			}
+			leaf leaf6 {
+				type string;
+				default "test";
+			}
+			case case5 {
+				when "../../choice1/case4";
+				if-feature feat1;
+				container cont3 {
+					leaf-list llist2 {
+						type int64;
+					}
+					leaf leaf7 {
+						type string;
+						mandatory true;
+					}
+				}
+			}
+		}
+
+		choice choice4 {
+			mandatory true;
+			leaf leaf8 {
+				type int16;
+			}
+			case case6 {
+				leaf leaf9 {
+					type boolean;
+				}
+			}
+		}
+
+		choice choice5 {
+			when "../choice4/leaf9 = 'true'";
+			config false;
+			description "always returns leaf10 with 'test'";
+			leaf leaf10 {
+				type string;
+			}
+			case case7 {
+				leaf leaf11 {
+					type int8;
+				}
+			}
+		}
+	}
+}

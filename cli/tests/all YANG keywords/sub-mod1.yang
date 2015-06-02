@@ -1,0 +1,56 @@
+submodule sub-mod1 {
+	yang-version 1;
+
+	belongs-to "main-mod" {
+		prefix "mmod";
+	}
+
+	revision "2015-03-25" {
+		description "Initial revision.";
+	}
+
+	identity new-ident;
+
+	typedef type1 {
+		type string {
+			length "10..20 | 25 | 30";
+			pattern "[A-Za-z]+" {
+				error-app-tag invalid-value;
+				error-message "pattern error";
+			}
+		}
+	}
+
+	grouping group1 {
+		leaf group-leaf1 {
+			type empty;
+		}
+	}
+
+	extension ext1 {
+		argument ext1-arg {
+			yin-element true;
+		}
+	}
+
+	container cont1 {
+		anyxml data;
+
+		leaf leaf1 {
+			type int16 {
+				range "10..20";
+			}
+		}
+	}
+
+	rpc rpc1 {
+		input {
+			leaf input1 {
+				type string;
+			}
+		}
+		output {
+			anyxml output1;
+		}
+	}
+}

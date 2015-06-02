@@ -1,0 +1,353 @@
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+# standard modules
+import curses
+import os
+import inspect
+
+# netopeer configurator module base
+from netopeer.ncmodule import NCModuleError
+from netopeer.ncmodule import NCModuleOff
+
+# error messages
+import netopeer.messages as messages
+import netopeer.config as config
+
+class netopeer_configuration:
+	"""Top level class of netopeer-configuration script."""
+
+	# configuration modules
+	ncmodules = []
+
+	def __init__(self):
+		if not self.run_as_root():
+			print('Script must be run as root.')
+			exit(1)
+
+		nc_dir = os.path.dirname(inspect.getfile(config))
+		if not os.path.isdir(nc_dir):
+			print('Could not find nc module directory in the standard setup path nor locally.')
+			exit(1)
+		files = os.listdir(nc_dir)
+
+		for fil in files:
+			if fil[:3] == 'nc_' and fil[-3:] == '.py':
+				if config.options['dbus'] and fil[:-3] == 'nc_sock':
+					continue
+				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
+					continue
+				if not config.options['tls'] and (fil[:-3] == 'nc_servcert' or fil[:-3] == 'nc_cacerts' or fil[:-3] == 'nc_crls'):
+					continue
+				try:
+					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
+					if getattr(module, fil[:-3]).name != None:
+						self.ncmodules.append(getattr(module, fil[:-3])(self.ncmodules))
+				except ImportError as e:
+					messages.append(str(e), 'error')
+				except NCModuleError as e:
+					messages.append(str(e), 'error')
+
+		if len(self.ncmodules) == 0:
+			print('Failed to load any module.')
+			exit(1)
+
+		tls_modules = []
+		i = 0
+		while i < len(self.ncmodules)-1:
+			module_name = self.ncmodules[i].__class__.__name__
+
+			# make Netopeer first
+			if module_name == 'nc_netopeer':
+				class_ins = self.ncmodules.pop(i)
+				self.ncmodules.insert(0, class_ins);
+
+			# remember TLS modules, append them at the end
+			if module_name == 'nc_crls' or module_name == 'nc_cacerts' or module_name == 'nc_servcert':
+				tls_modules.append(self.ncmodules.pop(i))
+				i -= 1
+
+			i += 1
+
+		self.ncmodules += tls_modules
+
+	def save_all(self):
+		for ncmodule in self.ncmodules:
+			ncmodule.update()
+
+	def any_unsaved_changes(self):
+		for ncmodule in self.ncmodules:
+			if ncmodule.unsaved_changes():
+				return(True)
+		return(False)
+
+	def run_as_root(self):
+		"""Script must be run as root user."""
+		if os.geteuid() != 0:
+			return(False)
+		else:
+			return(True)
+
+# LAYOUT
+#
+# +---------------------+------------------------------------------------+
+# |                     |                                                |
+# | Menu                | Content                                        |
+# | ( rest_y x menu_x ) | ( rest_y x rest_x )                            |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# |                     |                                                |
+# +---------------------+------------------------------------------------+
+# |                                                                      |
+# | Messages box (w_messages_y x maxx)                                   |
+# |                                                                      |
+# |                                                                      |
+# |                                                                      |
+# +----------------------------------------------------------------------+
+# | Available tools (tools_y x maxx)                                     |
+# +----------------------------------------------------------------------+
+#
+class configurator_window:
+	window = None
+	wrapper = None
+	pos = {'y':0,'x':0}
+	size = {'y':0,'x':0}
+
+	def __init__(self, parent, size_y, size_x, pos_y, pos_x):
+		self.wrapper = parent.derwin(size_y, size_x, pos_y, pos_x)
+		self.window = self.wrapper.derwin(size_y-2, size_x-2, 1, 1)
+		self.pos['y'] = pos_y
+		self.pos['x'] = pos_x
+		self.size = {'y':size_y, 'x':size_x}
+
+	def __del__(self):
+		if self.window:
+			del(self.window)
+		if self.wrapper:
+			del(self.wrapper)
+
+	def erase(self):
+		if self.window:
+			self.window.erase()
+		if self.wrapper:
+			self.wrapper.erase()
+
+def create_windows(stdscr):
+	#get 'window' size
+	(maxy,maxx) = stdscr.getmaxyx()
+	if maxx < 40 or maxy < 23:
+		curses.endwin()
+		print('\n\nTerminal is too small.\n')
+		exit(1)
+
+	# window sizes
+	w_messages_x = maxx
+	if maxy < 40:
+		w_messages_y = 4
+	else:
+		w_messages_y = 13
+
+	tools_x = maxx
+	tools_y = 3
+
+	menu_y = maxy-w_messages_y-tools_y
+	if maxx < 50:
+		menu_x = 15
+	else:
+		menu_x = 21
+
+	content_x = maxx-menu_x
+	content_y = maxy-w_messages_y-tools_y
+
+	# left subwindow with menu items
+	menu = configurator_window(stdscr, menu_y,menu_x, 0,0)
+
+	# right window with content depending on selected menu item
+	content = configurator_window(stdscr, content_y,content_x, 0,menu_x)
+
+	# bottom window with error and other messages
+	messages = configurator_window(stdscr, w_messages_y,w_messages_x, maxy-tools_y-w_messages_y,0)
+
+	# bottom line with avaliable tools/commands
+	tools = configurator_window(stdscr, tools_y,tools_x, maxy-tools_y,0)
+
+	# centered hidden unsaved changes dialogue
+	changes_width = 33
+	changes_height = 5
+	changes = configurator_window(stdscr, changes_height, changes_width, maxy/2-changes_height/2, maxx/2-changes_width/2)
+
+	return(menu, content,  messages, tools, changes)
+
+def cli(stdscr, config):
+	# use default terminal colors
+	curses.use_default_colors()
+	curses.init_pair(1, curses.COLOR_RED, -1)
+	curses.init_pair(2, curses.COLOR_YELLOW, -1)
+
+	colors = {
+			'error' : curses.color_pair(1),\
+			'warning' : curses.color_pair(2),\
+			'note' : curses.color_pair(0),\
+		}
+
+	# cursor invsible
+	curses.curs_set(0)
+
+	(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
+
+	# Defined windows
+	windows = ['Menu', 'Content']
+	window = 0
+	# Menu options
+	module_selected = 0
+	module_tools = []
+
+	while True:
+		# erase all windows
+		w_menu.erase()
+		w_content.erase()
+		w_tools.erase()
+		w_messages.erase()
+		stdscr.erase()
+		# paint window borders
+		stdscr.box()
+		w_menu.wrapper.box()
+		w_content.wrapper.box()
+		w_messages.wrapper.box()
+		w_tools.wrapper.box()
+
+		# Menu window
+		for module in config.ncmodules:
+			try:
+				if module is config.ncmodules[module_selected]:
+					if windows[window] == 'Menu':
+						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_REVERSE)
+					else:
+						w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0) | curses.A_UNDERLINE)
+				else:
+					w_menu.window.addstr('{s}\n'.format(s=module.name), curses.color_pair(0))
+			except curses.error:
+				pass
+
+		# Content window
+		focus = windows[window] == 'Content'
+		module_tools = config.ncmodules[module_selected].paint(w_content.window, focus, w_content.size['y'], w_content.size['x'])
+
+		# Messages window
+		last_messages = messages.last(w_messages.size['y']-2)
+		for message in reversed(last_messages):
+			try:
+				w_messages.window.addstr(message[0], colors[message[1]])
+				if not message is last_messages[0]:
+					w_messages.window.addstr('\n')
+			except curses.error:
+				pass
+
+		# Tools widow
+		try:
+			w_tools.window.addstr('UP', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' | ', curses.color_pair(0))
+			w_tools.window.addstr('DOWN', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr(' | ', curses.color_pair(0))
+			if windows[window] == 'Menu':
+				w_tools.window.addstr('RIGHT', curses.color_pair(0) | curses.A_UNDERLINE)
+			else:
+				w_tools.window.addstr('LEFT', curses.color_pair(0) | curses.A_UNDERLINE)
+
+			if windows[window] == 'Content':
+				# Print module tools
+				for (key,desc) in module_tools:
+					w_tools.window.addstr(' | ', curses.color_pair(0))
+					w_tools.window.addstr(key, curses.color_pair(0) | curses.A_UNDERLINE)
+					w_tools.window.addstr('-{s}'.format(s=desc), curses.color_pair(0))
+
+			w_tools.window.addstr(' | ', curses.color_pair(0))
+			w_tools.window.addstr('F10', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr('-save | ', curses.color_pair(0))
+			w_tools.window.addstr('q', curses.color_pair(0) | curses.A_UNDERLINE)
+			w_tools.window.addstr('-exit', curses.color_pair(0))
+		except curses.error:
+			pass
+
+		stdscr.refresh()
+
+		c = stdscr.getch()
+		if c == ord('q'):
+			if config.any_unsaved_changes():
+				selected = 0
+
+				while True:
+					w_changes.erase()
+					w_changes.wrapper.box()
+					try:
+						w_changes.wrapper.addstr(0, 13, 'Warning', curses.color_pair(1) | curses.A_REVERSE)
+						w_changes.window.addstr('There are some unsaved changes.\n')
+						w_changes.window.addstr(2, 5, 'Save', curses.color_pair(0) | curses.A_REVERSE if selected == 0 else 0)
+						w_changes.window.addstr('  ')
+						w_changes.window.addstr(2, 19, 'Discard', curses.color_pair(0) | curses.A_REVERSE if selected == 1 else 0)
+					except:
+						pass
+					w_changes.wrapper.refresh()
+					c = stdscr.getch()
+					if c == curses.KEY_RIGHT and selected < 1:
+						selected += 1
+					elif c == curses.KEY_LEFT and selected > 0:
+						selected -= 1
+					elif c == ord('\n'):
+						if selected == 0:
+							config.save_all()
+						break
+					elif c == ord('q'):
+						break
+					elif c == curses.KEY_F10:
+						config.save_all()
+						break
+					else:
+						curses.flash()
+			break
+		elif c == curses.KEY_RESIZE:
+			del(w_menu)
+			del(w_content)
+			del(w_messages)
+			del(w_tools)
+			(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
+		elif c == ord('\t'):
+			window = (window + 1) % len(windows)
+		elif c == curses.KEY_RIGHT and windows[window] == 'Menu':
+			window = windows.index('Content')
+		elif c == curses.KEY_LEFT and windows[window] == 'Content':
+			window = windows.index('Menu')
+		elif c == curses.KEY_F10:
+			config.save_all()
+			messages.append('Configuration saved', 'note')
+			config.ncmodules[module_selected].refresh(w_content.window, False, w_content.size['y'], w_content.size['x'])
+		elif windows[window] == 'Menu':
+			if c == curses.KEY_UP and module_selected > 0:
+				module_selected = module_selected-1
+			elif c == curses.KEY_DOWN and module_selected < (len(config.ncmodules)-1):
+				module_selected = module_selected+1
+			elif c == ord('\n'):
+				window = windows.index('Content')
+			else:
+				curses.flash()
+		elif windows[window] == 'Content':
+			config.ncmodules[module_selected].handle(stdscr, w_content.window, w_content.size['y'], w_content.size['x'], c)
+
+
+if __name__ == '__main__':
+	config = netopeer_configuration()
+	curses.wrapper(cli, config)

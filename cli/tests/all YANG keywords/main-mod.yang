@@ -1,0 +1,10 @@
+module main-mod {
+	namespace "http://test.org/main-mod";
+
+	prefix mmod;
+
+	include sub-mod1;
+	include sub-mod2;
+
+	feature feat1;
+}

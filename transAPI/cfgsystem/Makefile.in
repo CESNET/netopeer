@@ -13,7 +13,6 @@ libdir =  @libdir@
 mandir = @mandir@
 libtool = @libtool@
 sysconfdir = @sysconfdir@
-tls = @tls@
 NETOPEER_DIR = @NETOPEER_DIR@
 
 CC = @CC@
@@ -21,23 +20,16 @@ INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 LIBS = @LIBS@
-CFLAGS = -Wall @CFLAGS@
+CFLAGS = -Wall -Wno-unused-result @CFLAGS@
 CPPFLAGS = @CPPFLAGS@ -DNETOPEER_DIR=\"$(NETOPEER_DIR)\"
 LIBTOOL = $(libtool) --tag=CC --quiet
 NETOPEER_MANAGER = @NETOPEER_MANAGER@
 
 MODEL = model/ietf-system.yin \
 	model/iana-crypt-hash.yin \
-	model/ietf-system-data.rng \
-	model/ietf-system-gdefs.rng \
+	model/ietf-system-config.rng \
+	model/ietf-system-gdefs-config.rng \
 	model/ietf-system-schematron.xsl
-
-ifeq ($(tls), yes)
-	MODEL := $(MODEL) model/ietf-system-tls-auth.yin \
-		model/ietf-x509-cert-to-name.yin
-endif
-
-PYMODULES = nc_cfgsystem
 
 SRCS = $(TARGET).c \
 	base/common.c \
@@ -49,18 +41,8 @@ SRCS = $(TARGET).c \
 	base/salt.c \
 	base/local_users.c
 
-ifeq ($(tls), yes)
-	SRCS := $(SRCS) base/cert.c
-endif
-
 OBJDIR = .obj
 LOBJS = $(SRCS:%.c=$(OBJDIR)/%.lo)
-
-define PYINSTALL
-cd $(1); \
-python setup.py install &>/dev/null; \
-cd -;
-endef
 
 all: $(MODULE) $(TARGET)-init
 
@@ -92,27 +74,12 @@ install: $(MODULE) $(TARGET)-init
 			--transapi $(DESTDIR)/$(libdir)/cfgsystem.so \
 			--features @FEATURES@ \
 			--datastore $(NETOPEER_DIR)/ietf-system/datastore.xml; \
-		if test "$(tls)" = "yes"; then \
-			cp ./datastore.xml $(NETOPEER_DIR)/ietf-system/datastore.xml; \
-			chmod og-rwx $(NETOPEER_DIR)/ietf-system/datastore.xml; \
-			$(NETOPEER_MANAGER) add --name ietf-system \
-				--import $(NETOPEER_DIR)/ietf-system/ietf-x509-cert-to-name.yin; \
-			$(NETOPEER_MANAGER) add --name ietf-system \
-				--augment $(NETOPEER_DIR)/ietf-system/ietf-system-tls-auth.yin \
-				--features tls-map-certificates; \
-		fi; \
-	fi
-	if test "$(tls)" = "yes"; then \
-		export STUNNEL_CA_PATH=`sed -n 's/^CApath *= *\(.*\)/\1/p' $(NETOPEER_DIR)/stunnel_config`; \
-			./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@ tls-map-certificates; \
-	else \
-		./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@; \
-	fi
-	$(foreach module,$(PYMODULES),$(call PYINSTALL,$(module)))
+	fi; \
+	./$(TARGET)-init $(NETOPEER_DIR)/ietf-system/datastore.xml @FEATURES@
 
 .PHONY: uninstall
 uninstall:
-	$(LIBTOOL) --mode=uninstall rm -rf q$(DESTDIR)/$(libdir)/$(MODULE);
+	$(LIBTOOL) --mode=uninstall rm -rf $(DESTDIR)/$(libdir)/$(MODULE);
 	rm -rf $(NETOPEER_DIR)/ietf-system/
 	if test -n "$(NETOPEER_MANAGER)"; then \
 		if test -n "`$(NETOPEER_MANAGER) list | grep "^ietf-system ("`"; then \

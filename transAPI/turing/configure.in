@@ -1,0 +1,79 @@
+AC_PREREQ([2.63])
+AC_INIT([turing-machine], [1.0], [BUG-REPORT-ADDRESS])
+AC_CONFIG_SRCDIR([turing-machine.c])
+
+PROJECTNAME=turing-machine
+AC_SUBST(PROJECTNAME)
+
+# --enable-debug option
+AC_ARG_ENABLE([debug],
+	AC_HELP_STRING([--enable-debug],[Compile with debug options]),
+	CFLAGS="$CFLAGS -g -DDEBUG",
+	CFLAGS="$CFLAGS -O3"
+)
+
+AC_ARG_WITH([netopeer-confdir],
+	[AC_HELP_STRING([--with-netopeer-confdir=DIR], [Netopeer server configuration directory (by default ${sysconfdir}/netopeer/)])],
+	[NETOPEER_DIR="$withval"],
+	[NETOPEER_DIR="${sysconfdir}/netopeer/"]
+)
+AC_SUBST(NETOPEER_DIR)
+
+# --with-libxml2=path-to-libxml2-git-repository
+AC_ARG_WITH([libxml2],
+[AC_HELP_STRING([--with-libxml2], [specific libxml2 location])],
+[
+	AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no], [$withval])
+	if test "$XML2_CONFIG" = "no"; then
+		AC_MSG_ERROR([Missing development package of libxml2.])
+	fi
+	CFLAGS="`$withval/xml2-config --cflags` $CFLAGS"
+	LDFLAGS="`$withval/xml2-config --libs` $LDFLAGS"
+	WITH_LIBXML2="$withval"
+]
+)
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+
+# Use libtool
+AC_PROG_LIBTOOL
+# Always use ./libtool unless overridden from command-line
+if test -z "$libtool"; then
+	libtool='./libtool'
+fi
+AC_SUBST(libtool)
+
+AC_PATH_PROG(NETOPEER_MANAGER, [netopeer-manager], [])
+AC_SUBST(NETOPEER_MANAGER)
+
+# Checks for libraries.
+export PKG_CONFIG_PATH=/usr/local/${libdir##*/}/pkgconfig:$PKG_CONFIG_PATH
+
+PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+CPPFLAGS="$CPPFLAGS $LIBNETCONF_CFLAGS"
+LIBS="$LIBS $LIBNETCONF_LIBS"
+LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"
+AC_SUBST(LIBNETCONF_DATADIR)
+
+# Check for libxml2.
+if test -z "$WITH_LIBXML2" ; then
+	AC_CHECK_PROG([XML2_CONFIG], [xml2-config], [yes], [no])
+	if test "$XML2_CONFIG" = "no"; then
+		AC_MSG_ERROR([Missing development package of libxml2.])
+	fi
+	AC_CHECK_LIB([xml2], [main], [LIBS="`xml2-config --libs` $LIBS" CFLAGS="`xml2-config --cflags` $CFLAGS"], AC_MSG_ERROR([Libxml2 not found ]))
+fi
+
+# Checks for header files.
+AC_CHECK_HEADERS([stdlib.h libnetconf.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+#AC_TYPE_UINT32_T
+
+# Checks for library functions.
+#AC_CHECK_FUNCS([strdup])
+
+AC_CONFIG_FILES([Makefile turing-machine-config.rng])
+AC_OUTPUT

@@ -1,6 +1,6 @@
 <?xml version="1.0" standalone="yes"?>
 <!--This XSLT was automatically generated from a Schematron schema.-->
-<axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:dyn="http://exslt.org/dynamic" xmlns:exsl="http://exslt.org/common" xmlns:math="http://exslt.org/math" xmlns:random="http://exslt.org/random" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:axsl="http://www.w3.org/1999/XSL/Transform" xmlns:sch="http://www.ascc.net/xml/schematron" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:ncserver="urn:ietf:params:xml:ns:yang:ietf-netconf-server" xmlns:nacm="urn:ietf:params:xml:ns:yang:ietf-netconf-acm" xmlns:x509c2n="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" extension-element-prefixes="date dyn exsl math random regexp set str" version="1.0"><!--Implementers: please note that overriding process-prolog or process-root is 
+<axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:dyn="http://exslt.org/dynamic" xmlns:exsl="http://exslt.org/common" xmlns:math="http://exslt.org/math" xmlns:random="http://exslt.org/random" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:axsl="http://www.w3.org/1999/XSL/Transform" xmlns:sch="http://www.ascc.net/xml/schematron" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:ncserver="urn:ietf:params:xml:ns:yang:ietf-netconf-server" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" extension-element-prefixes="date dyn exsl math random regexp set str" version="1.0"><!--Implementers: please note that overriding process-prolog or process-root is 
     the preferred method for meta-stylesheets to use where possible. -->
 <axsl:param name="archiveDirParameter"/><axsl:param name="archiveNameParameter"/><axsl:param name="fileNameParameter"/><axsl:param name="fileDirParameter"/>
 
@@ -41,52 +41,37 @@
 <axsl:template match="/"><svrl:schematron-output xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" title="" schemaVersion=""><axsl:comment><axsl:value-of select="$archiveDirParameter"/>   
 		 <axsl:value-of select="$archiveNameParameter"/>  
 		 <axsl:value-of select="$fileNameParameter"/>  
-		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-netconf-server" prefix="ncserver"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-netconf-acm" prefix="nacm"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-x509-cert-to-name" prefix="x509c2n"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-netconf-server</axsl:attribute><axsl:attribute name="name">ietf-netconf-server</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M6"/><svrl:active-pattern><axsl:attribute name="id">idm139740642191280</axsl:attribute><axsl:attribute name="name">idm139740642191280</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M7"/><svrl:active-pattern><axsl:attribute name="id">idm139740642190112</axsl:attribute><axsl:attribute name="name">idm139740642190112</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M8"/></svrl:schematron-output></axsl:template>
+		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-netconf-server" prefix="ncserver"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-netconf-server</axsl:attribute><axsl:attribute name="name">ietf-netconf-server</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M4"/><svrl:active-pattern><axsl:attribute name="id">idp4496</axsl:attribute><axsl:attribute name="name">idp4496</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M5"/></svrl:schematron-output></axsl:template>
 
 <!--SCHEMATRON PATTERNS-->
-<axsl:param name="root" select="/nc:data"/>
+<axsl:param name="root" select="/nc:config"/>
 
 <!--PATTERN ietf-netconf-server-->
-<axsl:template match="text()" priority="-1" mode="M6"/><axsl:template match="@*|node()" priority="-2" mode="M6"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M6"/></axsl:template>
+<axsl:template match="text()" priority="-1" mode="M4"/><axsl:template match="@*|node()" priority="-2" mode="M4"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M4"/></axsl:template>
 
-<!--PATTERN idm139740642191280-->
-
-
-	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:listen/ncserver:interface" priority="1003" mode="M7"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:listen/ncserver:interface"/>
-
-		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "address"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M7"/></axsl:template>
-
-	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application" priority="1002" mode="M7"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application"/>
-
-		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:application[ncserver:name=current()/ncserver:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:application[ncserver:name=current()/ncserver:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M7"/></axsl:template>
-
-	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:servers/ncserver:server" priority="1001" mode="M7"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:servers/ncserver:server"/>
-
-		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:server[ncserver:address=current()/ncserver:address]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:server[ncserver:address=current()/ncserver:address]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "address"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M7"/></axsl:template>
-
-	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:host-keys/ncserver:host-key" priority="1000" mode="M7"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:host-keys/ncserver:host-key"/>
-
-		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:host-key[ncserver:name=current()/ncserver:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:host-key[ncserver:name=current()/ncserver:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M7"/></axsl:template><axsl:template match="text()" priority="-1" mode="M7"/><axsl:template match="@*|node()" priority="-2" mode="M7"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M7"/></axsl:template>
-
-<!--PATTERN idm139740642190112-->
+<!--PATTERN idp4496-->
 
 
 	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:tls/ncserver:listen/ncserver:interface" priority="1001" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:tls/ncserver:listen/ncserver:interface"/>
+<axsl:template match="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:listen/ncserver:interface" priority="1003" mode="M5"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:listen/ncserver:interface"/>
 
 		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "address"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+<axsl:if test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:interface[ncserver:address=current()/ncserver:address]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "address"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M5"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:data/ncserver:netconf/ncserver:tls/ncserver:psk-maps/ncserver:psk-map" priority="1000" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/ncserver:netconf/ncserver:tls/ncserver:psk-maps/ncserver:psk-map"/>
+<axsl:template match="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application" priority="1002" mode="M5"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application"/>
 
 		<!--REPORT -->
-<axsl:if test="preceding-sibling::ncserver:psk-map[ncserver:psk-identity=current()/ncserver:psk-identity]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:psk-map[ncserver:psk-identity=current()/ncserver:psk-identity]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "psk-identity"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template><axsl:template match="text()" priority="-1" mode="M8"/><axsl:template match="@*|node()" priority="-2" mode="M8"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template></axsl:stylesheet>
+<axsl:if test="preceding-sibling::ncserver:application[ncserver:name=current()/ncserver:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:application[ncserver:name=current()/ncserver:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M5"/></axsl:template>
+
+	<!--RULE -->
+<axsl:template match="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:servers/ncserver:server" priority="1001" mode="M5"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:servers/ncserver:server"/>
+
+		<!--REPORT -->
+<axsl:if test="preceding-sibling::ncserver:server[ncserver:address=current()/ncserver:address]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:server[ncserver:address=current()/ncserver:address]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "address"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M5"/></axsl:template>
+
+	<!--RULE -->
+<axsl:template match="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:host-keys/ncserver:host-key" priority="1000" mode="M5"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/ncserver:netconf/ncserver:ssh/ncserver:call-home/ncserver:applications/ncserver:application/ncserver:host-keys/ncserver:host-key"/>
+
+		<!--REPORT -->
+<axsl:if test="preceding-sibling::ncserver:host-key[ncserver:name=current()/ncserver:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ncserver:host-key[ncserver:name=current()/ncserver:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M5"/></axsl:template><axsl:template match="text()" priority="-1" mode="M5"/><axsl:template match="@*|node()" priority="-2" mode="M5"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M5"/></axsl:template></axsl:stylesheet>

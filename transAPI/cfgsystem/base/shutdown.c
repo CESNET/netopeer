@@ -40,6 +40,7 @@
  *
  */
 
+#define _BSD_SOURCE
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -59,25 +60,36 @@
  * @return 1 file not found or execute permission denied
  * @return 2 failed to actually try to shutdown
  */
-static int test_shutdown(void)
-{
+static int test_shutdown(void) {
 	int ret;
 
 	if (eaccess(SHUTDOWN_PATH, X_OK) != 0) {
 		return 1;
 	}
 
-	ret = WEXITSTATUS(system("(" SHUTDOWN_PATH " -P +1 >& /dev/null) && (" SHUTDOWN_PATH " -c >& /dev/null)"));
+	/* Fork shutdown */
+	if ((ret = fork()) == 0) {
+		/* Child */
+		if (WEXITSTATUS(system(SHUTDOWN_PATH " -P +1"))) {
+			exit(1);
+		}
 
-	if (ret == 0) {
-		return 0;
-	} else {
+		exit(0);
+
+	} else if (ret == -1) {
+		/* Parent fork fail */
+		return 1;
+	}
+
+	usleep(10000);
+	if (WEXITSTATUS(system(SHUTDOWN_PATH " -c"))) {
 		return 2;
 	}
+
+	return 0;
 }
 
-int run_shutdown(bool shutdown, char** msg)
-{
+int run_shutdown(bool shutdown, char** msg) {
 	int ret;
 
 	ret = test_shutdown();
@@ -92,11 +104,13 @@ int run_shutdown(bool shutdown, char** msg)
 	/* Fork shutdown */
 	if ((ret = fork()) == 0) {
 		/* Child */
-		sleep(1);
-		execl(SHUTDOWN_PATH, SHUTDOWN_PATH, (shutdown ? "-P" : "-r"), "now", (char*) NULL);
+		usleep(10000);
+		if (WEXITSTATUS(system(shutdown ? (SHUTDOWN_PATH " -P now") : (SHUTDOWN_PATH " -r now")))) {
+			nc_verb_error("Executing %s failed: %s", SHUTDOWN_PATH, strerror(errno));
+			exit(1);
+		}
 
-		nc_verb_error("Executing %s failed: %s", SHUTDOWN_PATH, strerror(errno));
-		exit(1);
+		exit(0);
 
 	} else if (ret == -1) {
 		/* Parent fail */

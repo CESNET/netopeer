@@ -2,12 +2,25 @@ module netopeer-cfgnetopeer {
   namespace "urn:cesnet:tmc:netopeer:1.0";
   prefix cfgnetopeer;
 
+  import ietf-x509-cert-to-name {
+    prefix x509c2n;
+  }
+
   organization "CESNET, z.s.p.o.";
   contact
-    "dkupka@cesnet.cz";
+    "mvasko@cesnet.cz,
+      dkupka@cesnet.cz";
   description
     "Module specifying Netopeer module data model and RPC operation.";
 
+  revision 2015-05-19 {
+    description
+      "client-removal-time removed, dynamic modules are an optional feature.";
+  }
+  revision 2015-01-15 {
+    description
+      "Netopeer-specific NETCONF server options added.";
+  }
   revision 2013-02-14 {
     description
       "Modules are now configurable. Except implemented-rpcs which depends on module data model.";
@@ -21,18 +34,250 @@ module netopeer-cfgnetopeer {
       "Initial revision";
   }
 
+  feature ssh {
+    description
+      "Enables SSH transport.";
+  }
+
+  feature tls {
+    description
+      "Enables TLS transport.";
+  }
+
+  feature dynamic-modules {
+    description
+      "Enables dynamic loading and unloading
+        of transAPI modules.";
+  }
+
   container netopeer {
+    leaf hello-timeout {
+      type uint32 {
+        range "0 | 10 .. 3600";
+      }
+      units "seconds";
+      default '600';
+      description
+        "Specifies the number of seconds that a session
+            may exist before the hello PDU is received.
+            A session will be dropped if no hello PDU
+            is received before this number of seconds elapses.
+
+            If this parameter is set to zero, then the server
+            will wait forever for a hello message, and not
+            drop any sessions stuck in 'hello-wait' state.
+
+            Setting this parameter to zero may permit
+            denial of service attacks, since only a limited
+            number of concurrent sessions are supported
+            by the server.";
+    }
+
+    leaf idle-timeout {
+      type uint32 {
+        range "0 | 10 .. 360000";
+      }
+      units "seconds";
+      default '3600';
+      description
+        "Specifies the number of seconds that a session
+            may remain idle without issuing any RPC requests.
+            A session will be dropped if it is idle for an
+            interval longer than this number of seconds.
+
+            Sessions that have a notification subscription
+            active are never dropped.
+
+            If this parameter is set to zero, then the server
+            will never drop a session because it is idle.";
+    }
+
+    leaf max-sessions {
+      type uint16 {
+        range "0 .. 1024";
+      }
+      default '8';
+      description
+        "Specifies the maximum number of concurrent sessions
+           that can be active at one time.  The value 0 indicates
+           that no artificial session limit should be used.";
+    }
+
+    leaf response-time {
+      type uint16;
+      units "miliseconds";
+      default 50;
+      description
+        "Maximum number of miliseconds any client request
+          will almost certainly be responded to.";
+    }
+
+    container ssh {
+      if-feature ssh;
+      description
+        "Netopeer SSH options.";
+      container server-keys {
+        leaf rsa-key {
+          type string;
+          default "/etc/ssh/ssh_host_rsa_key";
+          description
+            "Path to a private RSA key that will be
+              used by clients for server identity
+              confirmation.";
+        }
+        leaf dsa-key {
+          type string;
+          description
+            "Path to a private DSA key that will be
+              used by clients for server identity
+              confirmation.";
+        }
+      }
+
+      container client-auth-keys {
+        list client-auth-key {
+          key "path";
+          leaf path {
+            type string;
+            description
+              "Path to the public key.";
+          }
+          leaf username {
+            type string;
+            mandatory true;
+            description
+              "SSH and NETCONF username to be used
+                for the session authenticated with
+                this public key.";
+          }
+        }
+      }
+
+      leaf password-auth-enabled {
+        type boolean;
+        default true;
+        description
+          "Decides whether clients can use the 'password'
+            SSH authentication method (RFC 4252).";
+      }
+
+      leaf auth-attempts {
+        type uint8 {
+          range "1 .. max";
+        }
+        default 3;
+        description
+          "Maximum failed authentication attempts after
+            which the client is dropped.";
+      }
+
+      leaf auth-timeout {
+        type uint16 {
+          range "5 .. max";
+        }
+        units "seconds";
+        default 10;
+        description
+          "Maximum number of seconds a client is allowed
+            for authentication after which it is dropped.";
+      }
+    }
+
+    container tls {
+      if-feature tls;
+      description
+        "Netopeer TLS options.";
+      leaf server-cert {
+        type binary;
+        description
+          "Server certificate (in base64-encoded DER) presented to clients.";
+      }
+
+      container server-key {
+        leaf key-data {
+          type binary;
+          mandatory true;
+          description
+            "Server private key (in base64-encoded DER) matching
+              the server certificate.";
+        }
+
+        leaf key-type {
+          type enumeration {
+            enum "DSA" {
+              value 0;
+            }
+            enum "RSA" {
+              value 1;
+            }
+          }
+          mandatory true;
+          description
+            "The type of the server private key.";
+        }
+      }
+
+      container trusted-ca-certs {
+        description
+          "A list of Certificate Authority (CA) certificates that a
+         NETCONF server can use to authenticate a NETCONF client's
+         certificate. A client's certificate is authenticated if
+         its Issuer matches one of the configured trusted CA
+         certificates.";
+        leaf-list trusted-ca-cert {
+          type binary;
+          description
+            "The binary certificate structure (DER) encoded
+              in base64.";
+        }
+      }
+
+      container trusted-client-certs {
+        description
+          "A list of client certificates that a NETCONF server can
+         use to authenticate a NETCONF client's certificate.  A
+         client's certificate is authenticated if it is an exact
+         match to one of the configured trusted client certificates.";
+        leaf-list trusted-client-cert {
+          type binary;
+          description
+            "The binary certificate structure (DER) encoded
+              in base64.";
+        }
+      }
+
+      leaf crl-dir {
+        type string;
+        description
+          "The directory to search for Certificate Revocation List
+            certificates.";
+      }
+
+      container cert-maps {
+        description
+          "The cert-maps container is used by a NETCONF server to
+        map the NETCONF client's presented X.509 certificate to
+        a NETCONF username.
+
+        If no matching and valid cert-to-name list entry can be
+        found, then the NETCONF server MUST close the connection,
+        and MUST NOT accept NETCONF messages over it.";
+        uses x509c2n:cert-to-name;
+      }
+    }
+
     container modules {
+      if-feature dynamic-modules;
       list module {
         key "name";
         leaf name {
           type string;
           description
-            "Name of module";
+            "Name of a module.";
         }
         leaf enabled {
           type boolean;
-          default false;
+          mandatory true;
           description
             "Specify whether or not the module is allowed to be managed over server.";
         }
@@ -56,6 +301,7 @@ module netopeer-cfgnetopeer {
     }
   }
   rpc reload-module {
+    if-feature dynamic-modules;
     description
       "Unload and load any loaded module." ;
     input {

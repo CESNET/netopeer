@@ -1,0 +1,37 @@
+module anyxml-mod {
+	namespace "http://test.org/anyxml-mod";
+
+	prefix amod;
+
+	feature feat1;
+	feature feat2;
+
+	container cont1 {
+		anyxml axml1 {
+			config false;
+			mandatory true;
+			if-feature feat1;
+			when "../axml3";
+			reference "some text somewhere";
+			description "MUST return '<test/>' !!";
+		}
+
+		anyxml axml2 {
+			if-feature feat1;
+			if-feature feat2;
+			status current;
+			must "../axml4 != '<some-xml/>' or . = '<some-xml/>'";
+			description "must condition - if axml4 is '<some-xml/>',
+			  then the same must be in axml2";
+		}
+
+		anyxml axml3 {
+			config true;
+			mandatory true;
+		}
+
+		anyxml axml4 {
+			status deprecated;
+		}
+	}
+}

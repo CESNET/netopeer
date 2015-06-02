@@ -1,0 +1,19 @@
+module aug-sub-mod1 {
+	namespace "http://test.org/aug-sub-mod1";
+
+	prefix asmod;
+
+	import "main-mod" {
+		prefix "mmod";
+	}
+
+	reference "main-mod";
+
+	organization "some org";
+
+	augment "/mmod:cont1" {
+		leaf aug-leaf1 {
+			type empty;
+		}
+	}
+}

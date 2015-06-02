@@ -10,25 +10,23 @@ _Netopeer server_.
 The Netopeer server is the main part of the Netopeer project. It uses
 libnetconf [1] for handling NETCONF messages and applying operations. Running in
 background as a system daemon, it allows centralized access to managed devices.
-It allows multiple access from clients through agents connected through the
-D-Bus [2] system message bus or UNIX sockets (when compiled with
---disable-dbus option).
+It allows multiple access from clients using the standard SSH transport protocol
+or TLS (when compiled with --enable-tls option).
 
-Netopeer server utilize libnetconf transAPI [3] modules to control devices (from
+Netopeer server utilizes libnetconf transAPI [2] modules to control devices (from
 here, referred as the _Netopeer modules_). The default module, called Netopeer,
 is responsible for managing other Netopeer modules specified in the Netopeer
 configuration data (more described below).
 
 To correctly understand how to modify a configuration data in a NETCONF
-datastore, user should be familiar with the NETCONF protocol [4] and YANG
-language [5]. To communicate with the server and operate with the configuration
+datastore, user should be familiar with the NETCONF protocol [3] and YANG
+language [4]. To communicate with the server and operate with the configuration
 data, the Netopeer project includes the netopeer-cli(1) program.
 
 [1] https://code.google.com/p/libnetconf/
-[2] http://www.freedesktop.org/wiki/Software/dbus/
-[3] http://libnetconf.googlecode.com/git/doc/doxygen/html/d9/d25/transapi.html
-[4] http://tools.ietf.org/html/rfc6241
-[5] http://tools.ietf.org/html/rfc6020
+[2] http://libnetconf.googlecode.com/git/doc/doxygen/html/d9/d25/transapi.html
+[3] http://tools.ietf.org/html/rfc6241
+[4] http://tools.ietf.org/html/rfc6020
 
 
 Requirements
@@ -44,25 +42,16 @@ item. All requirements are checked by the configure script.
 - libpthreads
 - libxml2 (including headers from the devel package)
 - libnetconf (including headers from the devel package)
-- libdbus (including headers from the devel package)
- - can be omitted by --disable-dbus configure's option. In that case standard
-   UNIX sockets are used for communication between netopeer-server(8) and
-   netopeer-agent(1)s.
+- libssh >= 0.6.4 (including headers)
+ - can be skipped if using --disable-ssh
+- pyang >= 1.5.0
 - python 2.6 or higher with the following modules:
- - os, string, re, argparse, subprocess, inspect, curses, xml, libxml2
- - if using --enable-tls option also - M2Crypto, shutil, signal
-- sshd
- - openSSH's SSH server, make sure that the correct path to this binary is part
-   of your PATH environment variable or use --with-sshd=/path/to/sshd configure's
-   option.
-- only with TLS enabled by using --enable-tls option
- - libopenssl (including headers from the devel package)
- - c_rehash utility
-  - can be part of your OpenSSL instalation or in openssl-perl package
- - stunnel
-  - make sure that the correct path to this binary is part of your PATH
-    environment variable or use --with-stunnel=/path/to/stunnel configure's
-    option
+ - os, copy, string, re, argparse, subprocess, inspect, curses, xml, libxml2
+ - only with TLS enabled: M2Crypto
+
+- only with TLS enabled by using the --enable-tls option
+ - OpenSSL (libssl, libcrypto, including headers from the devel package)
+
 - roff2html
  - optional, used for building HTML version of man pages (make doc)
 - rpmbuild
@@ -78,56 +67,9 @@ Notorious sequence
 
 will configure, build project and install the following binaries:
  netopeer-server(8)       - the Netopeer server
- netopeer-agent(1)        - NETCONF agent running as an SSH subsystem and
-                            comunicating with the Netopeer server over D-Bus or
-                            UNIX socket.
  netopeer-manager(1)      - tool used to manage the Netopeer modules
  netopeer-configurator(1) - tool used for the Netopeer server first run
                             configuration (mainly focus on NACM section)
-
-*Note*
-Do not change SSH daemon settings. The Netopeer server uses its own instance of
-the SSH daemon which is configured via NETCONF according to the
-ietf-netconf-server data model. By default, the server will listen on port 830,
-so it is good to make sure that no other application (including the default SSH
-daemon) does not use this port.
-
-Generic User Access
--------------------
-
-This section describes how to specify a group of users allowed to communicate
-with the netopeer-server(8). This can be done by limiting users allowed to use
-intercommunication channel between netopeer-agent(1) and netopeer-server(8).
-There are two possibilities of intercommunication: D-Bus and Unix sockets.
-
-By default, all users are allowed to use intercommunication channel. If you
-prefer to limit this access, use --with-group option of the configure script.
-
-D-Bus
-~~~~~
-
-D-Bus is a default intercommunication channel. In this case, access control is
-specified in the D-Bus configuration file for Netopeer
-service org.liberouter.netopeer.conf (usually
-/etc/dbus-1/system.d/org.liberouter.netopeer.conf). Netopeer allows user to
-a) allow access to anybody or b) specify a single group with granted access.
-The group can be specified via configure's --with-group option or via
-Intercommunication section in netopeer-configurator(1). However, D-Bus
-configuration allows you to specify more groups or just specific users with
-access to the service. For more information, see the D-Bus configuration file
-description.
-
-UNIX socket
-~~~~~~~~~~~
-
-UNIX socket is an alternate communication channel when D-Bus cannot be used. To
-switch to the UNIX socket communication, use configure's --disable-dbus option.
-In this case, user access to the communication channel is done via access rights
-to the socket file. Therefore, is it possible to allow access to all users (by
-default) or limit it to a single group (with the configure's --with-group
-option). Furthermore, this setting is compiled into the netopeer-server(8) and
-it can be changed only by recompiling Netopeer server with different value to
-the --with-group option.
 
 Usage
 =====
@@ -169,44 +111,11 @@ the default write action or specify the user(s) with unlimited access. There are
 more configuration switches including a possibility to completely turn off the
 NACM.
 
-Intercommunication
-~~~~~~~~~~~~~~~~~~
-
-This tab provides information about used communication technology between the
-Netopeer server and agents. Currently, there are two possibilities: D-Bus and
-UNIX sockets. In case of D-Bus, user can specify here permissions what users
-group is allowed to connect to the Netopeer server. In case of UNIX sockets,
-this setting can be changed only by recompiling the server with different
-value of the --with-group option. When the Netopeer server is compiled without
-this option, access to the Netopeer server is not limited. However, there is
-NACM which can be used to fine-grained access control.
-
-Server Certificate
-~~~~~~~~~~~~~~~~~~
-
-If compiled with TLS support, this module shows the currently used server
-certificate by stunnel(8) for authentication. It can then be replaced by another.
-
-CA Certificates
-~~~~~~~~~~~~~~~
-
-If compiled with TLS support, this module displays CA certificates used by
-stunnel(8) when authenticating clients. It is also possible to add and remove
-certificates from here.
-
-CRLs
-~~~~
-
-If compiled with TLS support, this module displays CRLs used by stunnel(8)
-to check for revocated certificates during verification. CRLs can also be
-added and deleted here.
 
 Starting the server
 -------------------
 
-If the server was compiled with --with-dbus-services option, the
-netopeer-server(8) is started automatically by D-Bus with the first incoming
-connection. Otherwise, it must be started manually.
+netopeer-server(8) is started manually by:
 
 # netopeer-server -d
 
@@ -220,13 +129,6 @@ added by the netopeer-manager(1) tool. When the module is added, it is enabled
 by default. To disable starting a specific module, netopeer-configurator(1) can
 be used or it can be done directly via NETCONF modifying the Netopeer's
 configuration data.
-
-TLS transport
--------------
-
-To learn more about the TLS transport implementation and how to use it, please
-refer to "server/stunnel/README" or the Wiki section on the netopeer project
-homepage.
 
 Example
 ~~~~~~~
@@ -250,3 +152,12 @@ Disable 'my_magic_module':
     </config>
   </edit-config>
 </rpc>
+
+
+TLS transport
+-------------
+
+If compiled with --enable-tls configure option, the server is ready to accept
+connections from clients that present themselves with the client certificate in
+"server/certs". For more information read the specific Wiki section on
+the Netopeer project homepage.

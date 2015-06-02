@@ -40,6 +40,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -47,19 +48,19 @@
 #include <libnetconf_ssh.h>
 
 #include "commands.h"
-#include "mreadline.h"
+#include "readinput.h"
 #include "configuration.h"
 
 static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 #define PROMPT "netconf> "
 
-volatile int done = 0;
+volatile int done;
+extern int multiline;
+extern char* last_tmpfile;
 extern COMMAND commands[];
-struct nc_cpblts * client_supported_cpblts;
 
-void clb_print(NC_VERB_LEVEL level, const char* msg)
-{
+void clb_print(NC_VERB_LEVEL level, const char* msg) {
 	switch (level) {
 	case NC_VERB_ERROR:
 		fprintf(stderr, "libnetconf ERROR: %s\n", msg);
@@ -80,41 +81,79 @@ void clb_error_print(const char* tag,
 		const char* type,
 		const char* severity,
 		const char* UNUSED(apptag),
-		const char* UNUSED(path),
+		const char* path,
 		const char* message,
-		const char* UNUSED(attribute),
-		const char* UNUSED(element),
-		const char* UNUSED(ns),
-		const char* UNUSED(sid))
-{
-	fprintf(stderr, "NETCONF %s: %s (%s) - %s\n", severity, tag, type, message);
+		const char* attribute,
+		const char* element,
+		const char* ns,
+		const char* sid) {
+	fprintf(stderr, "NETCONF %s: %s (%s) - %s", severity, tag, type, message);
+	if (path != NULL) {
+		fprintf(stderr, " (%s)\n", path);
+	} else if (attribute != NULL) {
+		fprintf(stderr, " (%s)\n", attribute);
+	} else if (element != NULL) {
+		fprintf(stderr, " (%s)\n", element);
+	} else if (ns != NULL) {
+		fprintf(stderr, " (%s)\n", ns);
+	} else if (sid != NULL) {
+		fprintf(stderr, " (session ID %s)\n", sid);
+	} else {
+		fprintf(stderr, "\n");
+	}
 }
 
-void print_version()
-{
+void print_version() {
 	fprintf(stdout, "Netopeer CLI client, version %s\n", VERSION);
+	fprintf(stdout, "%s\n", RCSID);
 	fprintf(stdout, "compile time: %s, %s\n", __DATE__, __TIME__);
 }
 
-int main(int UNUSED(argc), char** UNUSED(argv))
-{
-	char *cmdline, *cmdstart;
+void signal_handler(int sig) {
+	switch (sig) {
+	case SIGINT:
+	case SIGTERM:
+	case SIGQUIT:
+	case SIGABRT:
+		multiline = 0;
+		rl_line_buffer[0] = '\0';
+		rl_end = rl_point = 0;
+		rl_reset_line_state();
+		fprintf(stdout, "\n");
+		rl_redisplay();
+		break;
+	default:
+		exit(EXIT_FAILURE);
+		break;
+	}
+}
+
+int main(int UNUSED(argc), char** UNUSED(argv)) {
+	struct sigaction action;
+	sigset_t block_mask;
+	HIST_ENTRY* hent;
+	char* cmd, *cmdline, *cmdstart;
 	int i, j;
-	char *cmd;
+
+	/* signal handling */
+	sigfillset(&block_mask);
+	action.sa_handler = signal_handler;
+	action.sa_mask = block_mask;
+	action.sa_flags = 0;
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGABRT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
 
 	initialize_readline();
 
 	/* set verbosity and function to print libnetconf's messages */
+	nc_init(NC_INIT_CLIENT | NC_INIT_LIBSSH_PTHREAD);
 	nc_verbosity(NC_VERB_WARNING);
 	nc_callback_print(clb_print);
 	nc_callback_error_reply(clb_error_print);
 
-	/* set authentication preferences */
-	nc_ssh_pref(NC_SSH_AUTH_PUBLIC_KEYS, 3);
-	nc_ssh_pref(NC_SSH_AUTH_PASSWORD, 2);
-	nc_ssh_pref(NC_SSH_AUTH_INTERACTIVE, 1);
-
-	load_config (&client_supported_cpblts);
+	load_config();
 
 	while (!done) {
 		/* get the command from user */
@@ -147,19 +186,61 @@ int main(int UNUSED(argc), char** UNUSED(argv))
 
 		/* execute the command if any valid specified */
 		if (commands[i].name) {
-			commands[i].func((const char*)cmdstart);
+			if (where_history() < history_length) {
+				hent = history_get(where_history()+1);
+				if (hent == NULL) {
+					ERROR("main", "Internal error (%s:%d).", __FILE__, __LINE__);
+					return EXIT_FAILURE;
+				}
+				commands[i].func((const char*)cmdstart, hent->timestamp, stdout, stdin);
+			} else {
+				commands[i].func((const char*)cmdstart, NULL, stdout, stdin);
+			}
 		} else {
 			/* if unknown command specified, tell it to user */
 			fprintf(stdout, "%s: no such command, type 'help' for more information.\n", cmd);
 		}
-		add_history(cmdline);
 
-		free(cmd);
+		hent = history_get(history_length);
+		/* whether to save the last command */
+		if (hent == NULL || strcmp(hent->line, cmdline) != 0) {
+			add_history(cmdline);
+			hent = history_get(history_length);
+			if (hent == NULL) {
+				ERROR("main", "Internal error (%s:%d).", __FILE__, __LINE__);
+				return EXIT_FAILURE;
+			}
+			if (last_tmpfile != NULL) {
+				free(hent->timestamp);
+				hent->timestamp = strdup(last_tmpfile);
+			}
+
+		/* whether to at least replace the tmpfile of the command from the history with this new one */
+		} else if (last_tmpfile != NULL && (hent = current_history()) != NULL && strlen(hent->timestamp) != 0) {
+			free(hent->timestamp);
+			hent->timestamp = strdup(last_tmpfile);
+		}
+
+		free(last_tmpfile);
+		last_tmpfile = NULL;
 		free(cmdline);
+		free(cmd);
 	}
 
-	store_config (client_supported_cpblts);
-	nc_cpblts_free(client_supported_cpblts);
+	store_config();
+
+	clear_history();
+	free(history_list());
+
+	/* cannot call, causes invalid free (seriously readline?), but would free ~650 kb */
+	//rl_discard_keymap(rl_get_keymap_by_name("emacs"));
+	rl_discard_keymap(rl_get_keymap_by_name("vi-insert"));
+
+	rl_expand_prompt(NULL);
+	rl_free(rl_prompt);
+
+	nc_close();
+
 	/* bye, bye */
 	return (EXIT_SUCCESS);
 }

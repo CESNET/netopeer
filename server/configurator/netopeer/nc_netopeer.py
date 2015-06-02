@@ -3,7 +3,10 @@
 
 import curses
 import os
+import copy
+import string
 import libxml2
+import subprocess
 import ncmodule
 import messages
 import config
@@ -29,7 +32,7 @@ class nc_netopeer(ncmodule.ncmodule):
 	modules_maxlen = 0
 
 	server_path = None
-	agent_path = None
+	server_version = None
 	modules_path = None
 
 	netopeer_path = None
@@ -37,14 +40,21 @@ class nc_netopeer(ncmodule.ncmodule):
 	netopeer_ctxt = None
 
 	# curses
+	linewidth = 50
 	selected = -1
 
 	def find(self):
 		for path in list(set([config.paths['bindir']] + (os.environ['PATH'].split(os.pathsep)))):
 			if not self.server_path and os.path.exists(os.path.join(path,'netopeer-server')):
 				self.server_path = os.path.join(path,'netopeer-server')
-			if not self.agent_path and os.path.exists(os.path.join(path,'netopeer-agent')):
-				self.agent_path = os.path.join(path,'netopeer-agent')
+				try:
+					p = subprocess.Popen([self.server_path, '-V'], stdout=subprocess.PIPE)
+					version_line = p.communicate()[0].split(os.linesep)[0]
+					ver_idx = string.find(version_line, 'version ')
+					if ver_idx > -1:
+						self.server_version = version_line[ver_idx+8:]
+				except:
+					pass
 
 		if os.path.exists(config.paths['modulesdir']):
 			self.modules_path = config.paths['modulesdir']
@@ -155,8 +165,13 @@ class nc_netopeer(ncmodule.ncmodule):
 		return(True)
 
 	def update(self):
-		if not self.modules:
+		if not self.modules or not self.netopeer_path:
 			return(True)
+
+		self.netopeer_doc = libxml2.parseFile(self.netopeer_path)
+		self.netopeer_ctxt = self.netopeer_doc.xpathNewContext()
+		self.netopeer_ctxt.xpathRegisterNs('d', 'urn:cesnet:tmc:datastores:file')
+		self.netopeer_ctxt.xpathRegisterNs('n', 'urn:cesnet:tmc:netopeer:1.0')
 
 		# check netopeer config content
 		modules_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules')
@@ -196,42 +211,42 @@ class nc_netopeer(ncmodule.ncmodule):
 		for module in self.modules:
 			xml_module = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:modules/n:module[n:name=\'{s}\']/n:enabled'.format(s=module.name))
 			if not xml_module:
-				return(True)
-			if (xml_module[0].getContent() == 'true' and not module.enabled) or\
+				if module.enabled:
+					return(True)
+			elif (xml_module[0].getContent() == 'true' and not module.enabled) or\
 					(xml_module[0].getContent() == 'false' and module.enabled):
 				return(True)
+
+		return(False)
 
 	def refresh(self, window, focus, height, width):
 		return(True)
 
 	def paint(self, window, focus, height, width):
 		tools = []
+		tools.append(('ENTER','enable/disable'))
+
 		try:
 			window.addstr('The netopeer-server binary found in path:\n')
-			window.addstr('{s}\n'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
-			window.addstr('\n')
-
-			window.addstr('The netopeer-agent binary found in path:\n')
-			window.addstr('{s}\n'.format(s=self.agent_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr('{s}'.format(s=self.server_path), curses.color_pair(0) | curses.A_UNDERLINE)
+			window.addstr(' ver {s}\n'.format(s=self.server_version))
 			window.addstr('\n')
 
 			window.addstr('Using modules instaled in path:\n')
 			window.addstr('{s}\n'.format(s=self.modules_path), curses.color_pair(0) | curses.A_UNDERLINE)
 			window.addstr('\n')
 
-			tools.append(('ENTER','enable/disable'))
 			window.addstr('Curently installed modules:\n')
-			if self.modules_maxlen + 10 > 50:
-				linewidth = self.modules_maxlen + 10
-			else:
-				linewidth = 50
+			if self.modules_maxlen + 10 > self.linewidth:
+				self.linewidth = self.modules_maxlen + 10
 			for module in self.modules:
 				msg = '{s}'.format(s=module.name)
-				window.addstr(msg+' '*(linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and module is self.modules[self.selected] else 0)
+				window.addstr(msg+' '*(self.linewidth - len(msg) - (7 if module.enabled else 8))+('enabled\n' if module.enabled else 'disabled\n'), curses.color_pair(0) | curses.A_REVERSE if focus and self.selected < len(self.modules) and module is self.modules[self.selected] else 0)
 
 			window.addstr('\nTo (un)install Netopeer modules, use ')
 			window.addstr('netopeer-manager(1)', curses.color_pair(0) | curses.A_UNDERLINE)
 			window.addstr('.\n')
+
 		except curses.error:
 			pass
 
@@ -239,12 +254,13 @@ class nc_netopeer(ncmodule.ncmodule):
 
 	def handle(self, stdscr, window, height, width, key):
 		if key == curses.KEY_UP and self.selected > 0:
-				self.selected = self.selected-1
+			self.selected = self.selected-1
 		elif key == curses.KEY_DOWN and self.selected < len(self.modules)-1:
-				self.selected = self.selected+1
+			self.selected = self.selected+1
 		elif key == ord('\n'):
-			if self.selected >= 0:
+			if self.selected >= 0 and self.selected < len(self.modules):
 				self.modules[self.selected].enabled = not self.modules[self.selected].enabled
+
 		else:
 			curses.flash()
 		return(True)

@@ -1,0 +1,2 @@
+tm=http://example.net/turing-machine
+/tm:turing-machine/tm:transition-function/tm:delta

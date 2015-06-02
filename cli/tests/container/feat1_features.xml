@@ -1,0 +1,105 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/container-mod</namespace>
+			<feature>feat1</feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>if-feature, when, must test</name>
+		<description>"cont3" cannot be created, because one condition is left unsatisfied, except the last edit-config</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<leaf3>5</leaf3>
+					<leaf1>5</leaf1>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<cont3/>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>3</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<leaf2>def</leaf2>
+					<leaf1>4</leaf1>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>4</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<cont3/>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+		<command>
+			<id>5</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<leaf1>5</leaf1>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>6</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<cont3/>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

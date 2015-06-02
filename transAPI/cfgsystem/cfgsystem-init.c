@@ -111,7 +111,6 @@ int main(int argc, char** argv)
 	nc_rpc* rpc;
 	nc_reply* reply;
 	char* new_startup_config;
-	ncds_id id;
 	xmlDocPtr startup_doc = NULL, datastore = NULL;
 	xmlNodePtr startup_node = NULL, node;
 	int ret = 0, i;
@@ -121,14 +120,14 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	/* set message printing callback */
+	nc_callback_print(my_print);
+
 	/* init libnetconf for messages  from transAPI function */
-	if (nc_init(NC_INIT_MULTILAYER) == -1) {
+	if (nc_init(NC_INIT_ALL | NC_INIT_MULTILAYER) == -1) {
 		my_print(NC_VERB_ERROR, "Could not initialize libnetconf.");
 		return 1;
 	}
-
-	/* set message printing callback */
-	nc_callback_print(my_print);
 
 	/* register the datastore */
 	if ((ds = ncds_new(NCDS_TYPE_FILE, "./model/ietf-system.yin", NULL)) == NULL) {
@@ -137,8 +136,7 @@ int main(int argc, char** argv)
 	}
 
 	/* add imports and augments */
-	if (ncds_add_model("./model/ietf-x509-cert-to-name.yin") != 0 || ncds_add_model("./model/ietf-yang-types.yin") != 0 ||
-			ncds_add_model("./model/ietf-netconf-acm.yin") != 0 || ncds_add_model("./model/ietf-system-tls-auth.yin") != 0) {
+	if (ncds_add_model("./model/ietf-yang-types.yin") != 0 || ncds_add_model("./model/ietf-netconf-acm.yin") != 0) {
 		nc_verb_error("Could not add import and augment models.");
 		nc_close();
 		return 1;
@@ -146,8 +144,7 @@ int main(int argc, char** argv)
 
 	/* enable features */
 	for (i = 2; i < argc; ++i) {
-		if (strcmp(argv[i], "tls-map-certificates") == 0 ? ncds_feature_enable("ietf-system-tls-auth", argv[i]) != 0 :
-				ncds_feature_enable("ietf-system", argv[i]) != 0) {
+		if (ncds_feature_enable("ietf-system", argv[i]) != 0) {
 			nc_verb_error("Could not enable feature \"%s\".", argv[i]);
 			nc_close();
 			return 1;
@@ -160,7 +157,7 @@ int main(int argc, char** argv)
 		nc_close();
 		return 1;
 	}
-	if ((id = ncds_init(ds)) < 0) {
+	if (ncds_init(ds) < 0) {
 		nc_verb_error("Failed to nitialize datastore.");
 		nc_close();
 		return 1;
@@ -228,7 +225,7 @@ int main(int argc, char** argv)
 		nc_close();
 		return 1;
 	}
-	reply = ncds_apply_rpc(id, dummy_session, rpc);
+	reply = ncds_apply_rpc2all(dummy_session, rpc, NULL);
 	if (nc_reply_get_type(reply) != NC_REPLY_OK) {
 		nc_verb_error("Edit-config RPC failed.");
 		nc_close();

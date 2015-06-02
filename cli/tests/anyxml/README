@@ -1,0 +1,5 @@
+anyxml
+~~~~~~
+
+The state node /cont1/axml1 must return
+"<test/>" for these tests to pass.

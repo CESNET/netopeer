@@ -674,6 +674,7 @@ build_vendor
 build_cpu
 build
 LIBTOOL
+SYSTEMCTL
 SHUTDOWN
 USERDEL
 USERADD
@@ -689,7 +690,6 @@ CFLAGS
 CC
 XML2_CONFIG
 NETOPEER_DIR
-tls
 PROJECTNAME
 target_alias
 host_alias
@@ -733,7 +733,6 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_debug
-enable_tls
 with_netopeer_confdir
 with_libxml2
 with_useradd
@@ -1377,8 +1376,6 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          Compile with debug options
-  --enable-tls            Enable TLS features - cert management and
-                          cert-to-name support.
   --enable-shared[=PKGS]  build shared libraries [default=yes]
   --enable-static[=PKGS]  build static libraries [default=yes]
   --enable-fast-install[=PKGS]
@@ -2215,18 +2212,6 @@ else
   CFLAGS="$CFLAGS -O3 -DNDEBUG"
 
 fi
-
-
-tls="no"
-# Check whether --enable-tls was given.
-if test "${enable_tls+set}" = set; then :
-  enableval=$enable_tls; if test "$enableval" = "yes"; then
-		tls="yes"
-		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-	fi
-
-fi
-
 
 
 
@@ -3358,20 +3343,94 @@ fi
 
 
 
+# Feature check
+LNC_FEATURES="--feature ietf-system:"
+
 if test -d "/usr/share/zoneinfo/"; then
 	FEATURES="timezone-name"
+	LNC_FEATURES="${LNC_FEATURES}timezone-name"
 else
 	OFF_FEATURES="timezone-name"
 fi
 if test -n "$USERADD" -a -n "$USERDEL"; then
 	FEATURES="$FEATURES authentication local-users"
+	if test "${LNC_FEATURES: -1}" = ":"; then
+		LNC_FEATURES="${LNC_FEATURES}authentication,local-users"
+	else
+		LNC_FEATURES="${LNC_FEATURES},authentication,local-users"
+	fi
 else
 	OFF_FEATURES="$OFF_FEATURES authentication local-users"
 fi
-if test -x "/etc/init.d/ntp" -o -x "/etc/init.d/ntpd"; then
+
+NTP="no"
+# Extract the first word of "systemctl", so it can be a program name with args.
+set dummy systemctl; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_SYSTEMCTL+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$SYSTEMCTL"; then
+  ac_cv_prog_SYSTEMCTL="$SYSTEMCTL" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_SYSTEMCTL="yes"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+SYSTEMCTL=$ac_cv_prog_SYSTEMCTL
+if test -n "$SYSTEMCTL"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SYSTEMCTL" >&5
+$as_echo "$SYSTEMCTL" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test "$SYSTEMCTL" = "yes"; then
+	ntpd_service="$(systemctl is-active ntpd.service)"
+	if test "$ntpd_service" = "active"; then
+		NTP="yes"
+	fi
+else
+	ntpd_service="$(service ntpd status)"
+	case "$ntpd_service" in
+	*running*)
+		NTP="yes"
+	;;
+	esac
+fi
+if test "$NTP" = "yes"; then
 	FEATURES="$FEATURES ntp"
+	if test "${LNC_FEATURES: -1}" = ":"; then
+		LNC_FEATURES="${LNC_FEATURES}ntp"
+	else
+		LNC_FEATURES="${LNC_FEATURES},ntp"
+	fi
 else
 	OFF_FEATURES="$OFF_FEATURES ntp"
+fi
+
+# Generate validation files
+{ $as_echo "$as_me:${as_lineno-$LINENO}: generating validation files..." >&5
+$as_echo "$as_me: generating validation files..." >&6;}
+lnctool --model $PWD/model/ietf-system.yang $LNC_FEATURES --search-path $PWD/model/ --output-dir $PWD/model/ validation;
+if test "$?" != "0"; then
+	as_fn_error $? "Generating validation files for ietf-system failed." "$LINENO" 5
 fi
 
 # Use libtool
@@ -11449,7 +11508,7 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "crypt() not found!" "$LINENO" 5
+  as_fn_error $? "libcrypt not found!" "$LINENO" 5
 fi
 
 
@@ -11561,7 +11620,7 @@ fi
 
 
 
-ac_config_files="$ac_config_files Makefile model/ietf-system-data.rng base/common.h"
+ac_config_files="$ac_config_files Makefile base/common.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12557,7 +12616,6 @@ do
   case $ac_config_target in
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "model/ietf-system-data.rng") CONFIG_FILES="$CONFIG_FILES model/ietf-system-data.rng" ;;
     "base/common.h") CONFIG_FILES="$CONFIG_FILES base/common.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

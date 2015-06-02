@@ -32,13 +32,9 @@ class netopeer_configuration:
 		files = os.listdir(nc_dir)
 
 		for fil in files:
-			if fil[:3] == 'nc_' and fil[-3:] == '.py':
-				if config.options['dbus'] and fil[:-3] == 'nc_sock':
-					continue
-				if not config.options['dbus'] and fil[:-3] == 'nc_dbus':
-					continue
-				if not config.options['tls'] and (fil[:-3] == 'nc_servcert' or fil[:-3] == 'nc_cacerts' or fil[:-3] == 'nc_crls'):
-					continue
+			if fil[:3] == 'nc_' and fil[-3:] == '.py' and \
+			(config.options['ssh'] == 'yes' if fil[3:-3] == 'sshauth' else True) and \
+			(config.options['tls'] == 'yes' if fil[3:-3] == 'tlsauth' else True):
 				try:
 					module = __import__(name = 'netopeer.' + fil[:-3], fromlist = [fil[:-3]])
 					if getattr(module, fil[:-3]).name != None:
@@ -52,24 +48,17 @@ class netopeer_configuration:
 			print('Failed to load any module.')
 			exit(1)
 
-		tls_modules = []
 		i = 0
-		while i < len(self.ncmodules)-1:
+		while i < len(self.ncmodules):
 			module_name = self.ncmodules[i].__class__.__name__
 
 			# make Netopeer first
-			if module_name == 'nc_netopeer':
+			if i > 0 and module_name == 'nc_netopeer':
 				class_ins = self.ncmodules.pop(i)
 				self.ncmodules.insert(0, class_ins);
-
-			# remember TLS modules, append them at the end
-			if module_name == 'nc_crls' or module_name == 'nc_cacerts' or module_name == 'nc_servcert':
-				tls_modules.append(self.ncmodules.pop(i))
-				i -= 1
+				continue
 
 			i += 1
-
-		self.ncmodules += tls_modules
 
 	def save_all(self):
 		for ncmodule in self.ncmodules:
@@ -190,22 +179,27 @@ def create_windows(stdscr):
 	changes_height = 5
 	changes = configurator_window(stdscr, changes_height, changes_width, maxy/2-changes_height/2, maxx/2-changes_width/2)
 
-	return(menu, content,  messages, tools, changes)
+	return(menu, content, messages, tools, changes)
 
 def cli(stdscr, config):
 	# use default terminal colors
-	curses.use_default_colors()
-	curses.init_pair(1, curses.COLOR_RED, -1)
-	curses.init_pair(2, curses.COLOR_YELLOW, -1)
+	try:
+		curses.use_default_colors()
+		curses.init_pair(1, curses.COLOR_RED, -1)
+		curses.init_pair(2, curses.COLOR_YELLOW, -1)
+
+		# cursor invsible
+		curses.curs_set(0)
+	except curses.error:
+		# This call can fail with misconfigured terminals, for example
+		# TERM=xterm-color. This is harmless
+		pass
 
 	colors = {
 			'error' : curses.color_pair(1),\
 			'warning' : curses.color_pair(2),\
 			'note' : curses.color_pair(0),\
 		}
-
-	# cursor invsible
-	curses.curs_set(0)
 
 	(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
 
@@ -324,7 +318,7 @@ def cli(stdscr, config):
 			del(w_content)
 			del(w_messages)
 			del(w_tools)
-			(w_menu, w_content, w_messages, w_tools) = create_windows(stdscr)
+			(w_menu, w_content, w_messages, w_tools, w_changes) = create_windows(stdscr)
 		elif c == ord('\t'):
 			window = (window + 1) % len(windows)
 		elif c == curses.KEY_RIGHT and windows[window] == 'Menu':

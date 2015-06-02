@@ -48,6 +48,12 @@ AC_SUBST(PACKAGE_VERSION)
 RELEASE=1
 AC_SUBST(RELEASE)
 
+if test "`git show > /dev/null 2>&1;echo $?`" = "0"; then
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDGIT)\\\""
+else
+	CPPFLAGS="$CPPFLAGS -DRCSID=\\\"\$(IDNOGIT)\\\""
+fi
+
 USERNAME=`git config --get user.name`
 USERMAIL=`git config --get user.email`
 AC_SUBST(USERNAME)
@@ -65,32 +71,23 @@ fi
 # check for roff2html from groff
 AC_PATH_PROG([ROFF2HTML], [roff2html], [no])
 
-# Check for sshd (OpenSSH).
-AC_ARG_WITH([sshd],
-	AC_HELP_STRING([--with-sshd=PATH],[Set absolute path to the SSH daemon (searched in PATH by default)]),
-	if test -z "$with_sshd" -o "x$with_sshd" = "xyes"; then
-		SSHD_EXEC="";
-	else
-		AC_MSG_CHECKING([for sshd])
-		SSHD_EXEC="$with_sshd";
-		AC_MSG_RESULT([$SSHD_EXEC])
-	fi,
-	SSHD_EXEC="";
-)
+# expand libdir
+expanded_libdir=`(
+	case $prefix in
+		NONE) prefix=$ac_default_prefix ;;
+		*) ;;
+	esac
+	case $exec_prefix in
+		NONE) exec_prefix=$prefix ;;
+		*) ;;
+	esac
+	eval echo $libdir
+)`
 
-if test -z "$SSHD_EXEC"; then
-	AC_PATH_PROG([SSHD_EXEC], [sshd], [no])
-fi
-if test "x$SSHD_EXEC" = "xno"; then
-	AC_MSG_ERROR([\"sshd\" not found.])
-fi
-if test ! -x "$SSHD_EXEC"; then
-	AC_MSG_ERROR([SSH daemon \"$SSHD_EXEC\" is not executable file.])
-fi
 
 # check for Linux distribution
 AC_ARG_WITH([distro],
-	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution (RHEL based by default)]),
+	AC_HELP_STRING([--with-distro=DISTRO],[Compile for specific Linux distribution]),
 	DISTRO=`echo $withval | tr A-Z a-z`,
 	if test -n "`cat /proc/version | grep 'Red Hat'`"; then
 		DISTRO=redhat;
@@ -101,7 +98,12 @@ AC_ARG_WITH([distro],
 AC_MSG_CHECKING([for distro])
 AC_MSG_RESULT([$DISTRO])
 case $DISTRO in
-	opensuse | suse | rhel | redhat )
+	rhel | redhat | centos | fedora )
+		# ok, supported distro
+		# pkg-config does not check /usr/local/*/pkgconfig, fix it
+		PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$expanded_libdir/pkgconfig"
+		;;
+	opensuse | suse )
 		# ok, supported distros
 		;;
 	* )
@@ -118,87 +120,63 @@ AC_ARG_ENABLE([debug],
 	CFLAGS="$CFLAGS -O3"
 )
 
-# Add --with-group parameter
-AC_MSG_CHECKING([for group])
-AC_ARG_WITH([group],
-	AC_HELP_STRING([--with-group=GROUP],[Limit access to Netopeer server only to the specified group of users]),
-	[
-		GROUP="$with_group"
-		GROUPDEFINE="#define GROUP \"$with_group\""
-		DBUSPOLICY="group=\"$with_group\""
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-group=$with_group"
-	],
-	GROUP=""
-	GROUPDEFINE="#undef GROUP"
-	DBUSPOLICY="context=\"default\""
-)
-AC_MSG_RESULT([$GROUP])
-AC_SUBST(GROUP)
-AC_SUBST(GROUPDEFINE)
-AC_SUBST(DBUSPOLICY)
-
-AC_ARG_ENABLE([dbus],
-	AC_HELP_STRING([--disable-dbus], [Use UNIX sockets instead of DBus.]),
+# --enable-configurator
+AC_ARG_ENABLE([configurator],
+	AC_HELP_STRING([--disable-configurator], [Compile without netopeer-configurator (python not required)]),
 	if test "$enableval" = "no"; then
-		dbus="no"
-		CPPFLAGS="$CPPFLAGS -DDISABLE_DBUS"
+		NPCONF=no
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-configurator"
 	else
-		dbus="yes"
+		NPCONF=yes
 	fi
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-dbus"
 	,
-	# use DBus by default
-	dbus="yes"
+	NPCONF=yes
 )
-if test "$dbus" = "yes"; then
-	HDRS_COMM="src/netopeer_dbus.h src/server_operations_dbus.h"
-	SRCS_COMM="src/netopeer_dbus.c src/server_operations_dbus.c"
-	HDRS_AGENT_COMM="comm_dbus.h"
-	SRCS_AGENT_COMM="comm_dbus.c"
-else
-	HDRS_AGENT_COMM="comm_socket.h"
-	SRCS_AGENT_COMM="comm_socket.c"
-fi
 
-tls="no"
-NCSERVER_FEATURES=""
+# --enable-ssh
+AC_ARG_ENABLE([ssh],
+	AC_HELP_STRING([--disable-ssh], [Compile without SSH transport]),
+	if test "$enableval" = "no"; then
+		SSH=no
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --disable-ssh"
+	else
+		SSH=yes
+	fi
+	,
+	# SSH is on by default
+	SSH=yes
+)
+
+# --enable-tls
 AC_ARG_ENABLE([tls],
-	AC_HELP_STRING([--enable-tls], [Enable support for NETCONF over TLS using OpenSSL (and Stunnel).]),
-	if test "$enableval" = "yes"; then
-		tls="yes"
-		CPPFLAGS="$CPPFLAGS -DENABLE_TLS"
-		NCSERVER_FEATURES="<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
+	AC_HELP_STRING([--enable-tls], [Compile with TLS transport]),
+	if test "$enableval" = "no"; then
+		TLS=no
+	else
+		TLS=yes
+		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --enable-tls"
 	fi
-	TLS="yes"
-	AC_SUBST(TLS)
+	,
+	TLS=no
 )
 
-AC_ARG_WITH([stunnel],
-	AC_HELP_STRING([--with-stunnel=PATH],[Set absolute path to the stunnel (TLS daemon). Makes sense only with --enable-tls option, by default it is searched in PATH.]),
-	if test -z "$with_stunnel" -o "x$with_stunnel" = "xyes"; then
-		STUNNEL_EXEC="";
-	else
-		STUNNEL_EXEC="$with_stunnel";
-	fi,
-	STUNNEL_EXEC=""
+AC_ARG_WITH([libnetconf],
+	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
+	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
+	LIBNETCONF_DATADIR="$withval/share/"
+	],[
+	# get info from pkg-config about installed package
+	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
+	LIBS="$LIBNETCONF_LIBS $LIBS"
+	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
 )
+REQS="$REQS libnetconf"
+BUILDREQS="$BUILDREQS libnetconf-devel"
+SERVER_LIBS=$LIBS
 
-if test "$tls" = "yes"; then
-	# check stunnel
-	if test -z "$STUNNEL_EXEC"; then
-		AC_PATH_PROG([STUNNEL_EXEC], [stunnel], [no])
-	else
-		AC_MSG_CHECKING([for stunnel])
-		AC_MSG_RESULT([$STUNNEL_EXEC])
-	fi
-	if test "x$STUNNEL_EXEC" = "xno"; then
-		AC_MSG_ERROR([Missing stunnel required for NETCONF over TLS transport.])
-	elif test ! -x "$STUNNEL_EXEC"; then
-		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" is not executable file.])
-	elif ! $STUNNEL_EXEC -version 2>&1 | grep netopeer &>/dev/null; then
-		AC_MSG_ERROR([TLS daemon \"$STUNNEL_EXEC\" not patched, read README in \"server/stunnel\".])
-	fi
-fi
 
 ############################ Check for programs ################################
 
@@ -239,17 +217,23 @@ case $target_cpu in
         ;;
 esac
 
-#check for c_rehash
-if test "$tls" = "yes"; then
-	AC_PATH_PROG([C_REHASH], [c_rehash], [no])
-	if test "$C_REHASH" = "no"; then
-		AC_MSG_ERROR(["c_rehash not found!"])
-	fi
-	AC_SUBST(C_REHASH)
+#Add the standard modules to a variable for pyang to find them
+if test -d "/usr/local/share/yang/modules/"; then
+	export YANG_MODPATH=$YANG_MODPATH:/usr/local/share/yang/modules/
+fi
+if test -d "/usr/share/yang/modules/"; then
+	export YANG_MODPATH=$YANG_MODPATH:/usr/share/yang/modules/
+fi
+
+# Check for lnctool
+AC_CHECK_PROG([LNCTOOL], [lnctool], [yes], [no])
+if test "$LNCTOOL" = "no"; then
+	AC_MSG_ERROR(["lnctool not found!"])
 fi
 
 # Check python for manager and configurator
 AX_PYTHON_MODULE(os, fatal)
+AX_PYTHON_MODULE(copy, fatal)
 AX_PYTHON_MODULE(curses, fatal)
 AX_PYTHON_MODULE(libxml2, fatal)
 AX_PYTHON_MODULE(subprocess, fatal)
@@ -257,13 +241,10 @@ AX_PYTHON_MODULE(re, fatal)
 AX_PYTHON_MODULE(string, fatal)
 AX_PYTHON_MODULE(argparse, fatal)
 AX_PYTHON_MODULE(xml, fatal)
-if test "$tls" = "yes"; then
-	AX_PYTHON_MODULE(M2Crypto, fatal)
-	AX_PYTHON_MODULE(shutil, fatal)
-	AX_PYTHON_MODULE(signal, fatal)
-fi
+BUILDREQS="$BUILDREQS python"
+REQS="$REQS python"
 
-# Check for rpmbuil
+# Check for rpmbuild
 AC_CHECK_PROG(RPMBUILD, rpmbuild, rpmbuild)
 
 # Check for standard programs
@@ -294,116 +275,62 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
-# libnetconf
+if test "$SSH" = "yes"; then
+	# libssh
+	AC_SEARCH_LIBS([ssh_pki_key_ecdsa_name], [ssh], [], [AC_MSG_ERROR([Missing the libssh library (>= 0.6.4).])])
+
+	# libcrypt
+	AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the libcrypt library.])])
+fi
+
+if test "$TLS" = "yes"; then
+	# libssl
+	AC_SEARCH_LIBS([SSL_library_init], [ssl], [], [AC_MSG_ERROR([Missing the libssl library.])])
+
+	# libcrypto
+	AC_SEARCH_LIBS([X509_free], [crypto], [], [AC_MSG_ERROR([Missing the libcrypto library.])])
+
+	# M2Crypto python module
+	AX_PYTHON_MODULE(M2Crypto, fatal)
+fi
+
 AC_ARG_WITH([libnetconf],
-	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-	LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-	CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
-	LIBNETCONF_DATADIR="$withval/share/"
-	],[
-	# get info from pkg-config about installed package
-	PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
-	CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
-	LIBS="$LIBNETCONF_LIBS $LIBS"
-	LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
+        AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
+        [CPPFLAGS="-I$withval/include/ $CPPFLAGS"
+        LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
+        LIBS="-L$withval/lib64/ -Wl,-rpath,$withval/lib64 $LIBS"
+        CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
+        LIBNETCONF_DATADIR="$withval/share/"
+        ],[
+        # get info from pkg-config about installed package
+        PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
+        CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
+        LIBS="$LIBNETCONF_LIBS $LIBS"
+        LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
 )
-AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found.]))
-AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [], AC_MSG_ERROR([libnetconf does not support notifications.]))
+
+# libnetconf
+callhome=yes
+AC_SEARCH_LIBS([nc_callhome_listen], [netconf], [],
+	[
+		AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]);
+		CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME";
+		callhome=no;
+		AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [],
+		[
+			AC_MSG_ERROR([libnetconf does not support notifications.]);
+			AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found!]))
+		])
+	]
+)
+
 REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
-
-# libdbus
-if test "$dbus" = "yes"; then
-
-	AGENT_SRCS_COMM="src/agent_comm_dbus.c"
-	SERVER_SRCS_COMM="src/server_comm_dbus.c"
-	AGENT_HDRS_COMM="src/netopeer_dbus.h"
-	SERVER_HDRS_COMM="src/netopeer_dbus.h"
-
-	# - library
-	AC_ARG_WITH([libdbus],
-		AC_HELP_STRING([--with-libdbus=PATH],[Set explicit installation prefix to the libdbus library]),
-		[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-		LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-		CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libdbus=$withval"
-		],[
-		# get info from pkg-config about installed package
-		PKG_CHECK_MODULES(LIBDBUS, [dbus-1 >= 1.0.0])
-		CPPFLAGS="$LIBDBUS_CFLAGS $CPPFLAGS"
-		LIBS="$LIBDBUS_LIBS $LIBS"]
-	)
-	AC_SEARCH_LIBS([dbus_bus_get], [dbus-1], [], AC_MSG_ERROR([libdbus not found.]))
-
-	# - configuration directory
-	AC_ARG_WITH([dbus-config-dir],
-		AC_HELP_STRING([--with-dbus-config-dir=DIR],[path to D-Bus config files (/etc/dbus-1/system.d/ by default)]),
-		DBUSCONF="$withval"
-		,
-		DBUSCONF="/etc/dbus-1/system.d/"
-	)
-	AC_MSG_CHECKING([for existence of D-Bus configuration directory $DBUSCONF])
-	if test ! -d "$DBUSCONF"; then
-		AC_MSG_RESULT([missing])
-		AC_MSG_ERROR([Wrong D-Bus configuration path, $DBUSCONF does not exist.])
-	else
-		AC_MSG_RESULT([ok])
-		DBUSCONFFILE="$DBUSCONF/org.liberouter.netopeer.conf"
-		AC_SUBST(DBUSCONF)
-		AC_SUBST(DBUSCONFFILE)
-	fi
-
-	# - services directory
-	AC_ARG_WITH([dbus-services],
-		AC_HELP_STRING([--with-dbus-services@<:@=DIR@:>@],
-			[path to D-Bus services directory (/usr/share/dbus-1/system-services/ by default), \
-			if this parameter is not used, service file for netopeer-server is not installed!]),
-			if test "$withval" = "yes"; then
-				DBUSSERVICES="/usr/share/dbus-1/system-services/"
-			else
-				DBUSSERVICES="$withval"
-			fi
-			AC_MSG_CHECKING([for existence of D-Bus services directory $DBUSSERVICES])
-			if test ! -d "$DBUSSERVICES"; then
-				AC_MSG_RESULT([missing])
-				AC_MSG_ERROR([Wrong D-Bus service path, $DBUSSERVICES does not exist.])
-			else
-				AC_MSG_RESULT([ok])
-				AC_SUBST(DBUSSERVICES)
-			fi
-			CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-dbus-services=$DBUSSERVICES"
-			DBUSSERVICESFILE="$DBUSSERVICES/org.liberouter.netopeer.server.service"
-			AC_SUBST(DBUSSERVICES)
-			AC_SUBST(DBUSSERVICESFILE)
-			,
-			# do not install DBus service file anywhere
-			DBUSSERVICES=""
-	)
-
-	# - spec file dependencies
-	case $DISTRO in
-		suse )
-			BUILDREQS="$BUILDREQS dbus-1-devel >= 1.0.0"
-			REQS="$REQS dbus-1 >= 1.0.0"
-			;;
-		* )
-			# RH distros
-			BUILDREQS="$BUILDREQS dbus-devel >= 1.0.0"
-			REQS="$REQS dbus >= 1.0.0"
-			;;
-	esac
-else
-	AGENT_SRCS_COMM="src/agent_comm_socket.c src/comm_socket.c"
-	SERVER_SRCS_COMM="src/server_comm_socket.c src/comm_socket.c"
-	AGENT_HDRS_COMM="src/netopeer_socket.h"
-	SERVER_HDRS_COMM="src/netopeer_socket.h"
-fi
 
 SERVER_LIBS=$LIBS
 
 # pthread
 AX_PTHREAD([
-	AGENT_LIBS="$PTHREAD_LIBS $LIBS"
 	CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 	CC="$PTHREAD_CC"],
 	AC_MSG_ERROR([Missing POSIX threads support.])
@@ -426,9 +353,85 @@ rm -f config/NETCONF-server.xml.orig
 
 ###################### Check for configure parameters ##########################
 
+SERVER_TRANSPORT_SRCS=""
+SERVER_TRANSPORT_HDRS=""
+SERVER_TLS_CFGS=""
+
+CLIENT_STRUCT_SIZE=""
+
+NCSERVER_FEATURES=""
+NETOPEER_FEATURES="<feature>dynamic-modules</feature>"
+
+IETF_NETCONF_SERVER_FEATURES="--feature ietf-netconf-server:"
+CFGNETOPEER_FEATURES="--feature netopeer-cfgnetopeer:dynamic-modules"
+
+if test "$SSH" = "yes"; then
+	CFLAGS="$CFLAGS -DNP_SSH"
+
+	SERVER_TRANSPORT_SRCS="src/ssh/server_ssh.c src/ssh/cfgnetopeer_transapi_ssh.c src/ssh/netconf_server_transapi_ssh.c"
+	SERVER_TRANSPORT_HDRS="src/ssh/server_ssh.h src/ssh/cfgnetopeer_transapi_ssh.h src/ssh/netconf_server_transapi_ssh.h"
+
+	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_ssh)"
+
+	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
+	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>ssh</feature>"
+
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},ssh"
+
+	if test "$callhome" = "yes"; then
+		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-ssh"
+	fi
+fi
+if test "$TLS" = "yes"; then
+	CFLAGS="$CFLAGS -DNP_TLS"
+
+	SERVER_TRANSPORT_SRCS="$SERVER_TRANSPORT_SRCS src/tls/server_tls.c src/tls/cfgnetopeer_transapi_tls.c src/tls/netconf_server_transapi_tls.c"
+	SERVER_TRANSPORT_HDRS="$SERVER_TRANSPORT_HDRS src/tls/server_tls.h src/tls/cfgnetopeer_transapi_tls.h src/tls/netconf_server_transapi_tls.h"
+	SERVER_TLS_CFGS="config/datastore.xml"
+
+	if test "$SSH" = "yes"; then
+		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls) > sizeof(struct client_struct_ssh) ? sizeof(struct client_struct_tls) : sizeof(struct client_struct_ssh)"
+	else
+		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls)"
+	fi
+
+	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
+	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
+
+	if test "$SSH" = "yes"; then
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
+	fi
+
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls"
+	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},tls"
+
+	if test "$callhome" = "yes"; then
+		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
+		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-tls"
+	fi
+fi
+
+if (test "$SSH" = "no") && (test "$TLS" = "no"); then
+	AC_MSG_ERROR([Cannot compile without any transport protocol!])
+fi
+
+# Generate correct validation files
+AC_MSG_NOTICE([generating validation files...])
+lnctool --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+if test "$?" != "0"; then
+	AC_MSG_ERROR([Generating validation files for ietf-netconf-server failed.])
+fi
+
+lnctool --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+if test "$?" != "0"; then
+	AC_MSG_ERROR([Generating validation files for netopeer-cfgnetopeer failed.])
+fi
+
 ######################### Checks for header files ##############################
 AC_CHECK_HEADERS([stdlib.h string.h sys/time.h unistd.h])
-AC_CHECK_HEADERS([dbus/dbus.h libnetconf_xml.h libxml/tree.h])
+AC_CHECK_HEADERS([libnetconf_xml.h libxml/tree.h])
 
 ######## Checks for typedefs, structures, and compiler characteristics #########
 AC_TYPE_INT32_T
@@ -439,40 +442,39 @@ AC_FUNC_MALLOC
 AC_CHECK_FUNCS([select strdup strerror])
 
 ############################### Set output #####################################
-AC_SUBST(SSHD_EXEC)
-AC_SUBST(STUNNEL_EXEC)
 AC_SUBST(ROFF2HTML)
 AC_SUBST(BUILDREQS)
 AC_SUBST(REQS)
 AC_SUBST(CONFIGURE_PARAMS)
 AC_SUBST(LIBNETCONF_DATADIR)
 AC_SUBST(DISTRO)
-AC_SUBST(AGENT_SRCS_COMM)
-AC_SUBST(SERVER_SRCS_COMM)
-AC_SUBST(AGENT_HDRS_COMM)
-AC_SUBST(SERVER_HDRS_COMM)
+AC_SUBST(NPCONF)
 AC_SUBST(SERVER_LIBS)
-AC_SUBST(AGENT_LIBS)
-AC_SUBST(NCSERVER_FEATURES)
 AC_SUBST(MODULESDIR)
+AC_SUBST(SERVER_TRANSPORT_SRCS)
+AC_SUBST(SERVER_TRANSPORT_HDRS)
+AC_SUBST(SERVER_TLS_CFGS)
+AC_SUBST(CLIENT_STRUCT_SIZE)
+AC_SUBST(NCSERVER_FEATURES)
+AC_SUBST(NETOPEER_FEATURES)
+AC_SUBST(SSH)
+AC_SUBST(TLS)
 
 AC_SUBST(RPMBUILD)
 if test -z "$RPMBUILD"; then
-	AC_MSG_WARN([Due to missing rpmbuild you will not able to generate RPM package.])
+	AC_MSG_WARN([Due to missing rpmbuild you will not be able to generate RPM package.])
 fi
 
 AC_CONFIG_FILES(Makefile)
 AC_CONFIG_FILES(manager/netopeer-manager.tmp:manager/netopeer-manager.in)
-AC_CONFIG_FILES(config/org.liberouter.netopeer.conf)
-AC_CONFIG_FILES(config/org.liberouter.netopeer.server.service)
 AC_CONFIG_FILES(config/Netopeer.xml.tmp:config/Netopeer.xml.in)
 AC_CONFIG_FILES(config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in)
-AC_CONFIG_FILES(config/ietf-netconf-server-data.rng)
-AC_CONFIG_FILES(config/netopeer-cfgnetopeer-data.rng)
+AC_CONFIG_FILES(src/config.h)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
-AC_CONFIG_FILES(src/config.h)
-AC_CONFIG_FILES(configurator/netopeer/config.py)
+if test "$NPCONF" = "yes"; then
+	AC_CONFIG_FILES(configurator/netopeer/config.py)
+fi
 
 AC_CONFIG_FILES(src/openwrt/ietf-system.xml)
 AC_CONFIG_FILES(src/openwrt/Makefile.ietf-system)

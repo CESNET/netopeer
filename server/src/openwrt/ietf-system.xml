@@ -1,0 +1,14 @@
+<device>
+	<name>ietf-system</name>
+	<data-models>
+		<model-main>
+			<path>${prefix}/etc/netopeer/ietf-system/ietf-system.yin</path>
+			<transapi>${prefix}/etc/netopeer/ietf-system/ietf-system.so</transapi>
+			<feature>timezone-name</feature>
+		</model-main>
+	</data-models>
+	<repo>
+		<type>file</type>
+		<path>${prefix}/etc/netopeer/ietf-system/datastore.xml</path>
+	</repo>
+</device>

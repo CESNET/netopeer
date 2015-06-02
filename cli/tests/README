@@ -1,0 +1,44 @@
+netopeer-cli tests
+~~~~~~~~~~~~~~~~~~
+
+There is a "test" command available in the CLI.
+Upon establishing a connection to a server, it
+can be used to execute tests of the server.
+These are specififed in the form of an XML
+file, which can include many different tests.
+The format strictly conforms to the
+"netopeer-test.yang" model. Example files that
+test various NETCONF features can be found in
+this directory.
+
+All the tests in a file can require certain
+capabilities or models, or use the same
+variables. Variables change their value in
+every iteration of a test enabling simple
+creation of many instances of nodes. These
+global properties are defined first. Specific
+test definitions follow in a list.
+
+Each test must have a unique name that
+identifies it. Optionally, there can be
+a description and the number of executions
+(each possibly with a different variable
+value). Then the test-specific capablities and
+variables follow. Last is a list of the
+commands the test executes.
+
+Every command has its unique id specifying the
+order - lower is executed first. Then the CLI
+command itself can be written in two ways,
+either simple command that gets executed
+directly (as if writing it in the CLI) or
+one that uses a config or filter file. The
+string "(file)" in the command is replaced
+by a temporary file name with the content
+separately specified in the command container.
+This way the whole test can be in a single
+file. Lastly, the expected result after the
+command execution is chosen from simple
+success, specific data returned, or an error.
+Test is interrupted and fails if a single
+command finishes with an unexpected result.

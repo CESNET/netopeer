@@ -44,13 +44,19 @@
 		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:cesnet:tmc:netopeer:1.0" prefix="cfgnetopeer"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">netopeer-cfgnetopeer</axsl:attribute><axsl:attribute name="name">netopeer-cfgnetopeer</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M4"/></svrl:schematron-output></axsl:template>
 
 <!--SCHEMATRON PATTERNS-->
-<axsl:param name="root" select="/nc:data"/>
+<axsl:param name="root" select="/nc:config"/>
 
 <!--PATTERN netopeer-cfgnetopeer-->
 
 
 	<!--RULE -->
-<axsl:template match="/nc:data/cfgnetopeer:netopeer/cfgnetopeer:modules/cfgnetopeer:module" priority="1000" mode="M4"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:data/cfgnetopeer:netopeer/cfgnetopeer:modules/cfgnetopeer:module"/>
+<axsl:template match="/nc:config/cfgnetopeer:netopeer/cfgnetopeer:ssh/cfgnetopeer:client-auth-keys/cfgnetopeer:client-auth-key" priority="1001" mode="M4"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/cfgnetopeer:netopeer/cfgnetopeer:ssh/cfgnetopeer:client-auth-keys/cfgnetopeer:client-auth-key"/>
+
+		<!--REPORT -->
+<axsl:if test="preceding-sibling::cfgnetopeer:client-auth-key[cfgnetopeer:path=current()/cfgnetopeer:path]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::cfgnetopeer:client-auth-key[cfgnetopeer:path=current()/cfgnetopeer:path]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "cfgnetopeer:path"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M4"/></axsl:template>
+
+	<!--RULE -->
+<axsl:template match="/nc:config/cfgnetopeer:netopeer/cfgnetopeer:modules/cfgnetopeer:module" priority="1000" mode="M4"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/cfgnetopeer:netopeer/cfgnetopeer:modules/cfgnetopeer:module"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::cfgnetopeer:module[cfgnetopeer:name=current()/cfgnetopeer:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::cfgnetopeer:module[cfgnetopeer:name=current()/cfgnetopeer:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "cfgnetopeer:name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M4"/></axsl:template><axsl:template match="text()" priority="-1" mode="M4"/><axsl:template match="@*|node()" priority="-2" mode="M4"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M4"/></axsl:template></axsl:stylesheet>

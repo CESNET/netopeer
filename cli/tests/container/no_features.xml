@@ -1,0 +1,112 @@
+<netopeer-tests xmlns="urn:cesnet:tmc:netopeer:test">
+	<requirements>
+		<capability>
+			<name>urn:ietf:params:netconf:capability:writable-running:1.0</name>
+		</capability>
+		<model>
+			<namespace>http://test.org/container-mod</namespace>
+			<not-feature>feat1</not-feature>
+		</model>
+	</requirements>
+	<test>
+		<name>clean running</name>
+		<command>
+			<id>1</id>
+			<cmd>get-config --out=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" nc:operation="remove"/>
+			</cmd-file>
+			<result-success/>
+		</command>
+	</test>
+	<test>
+		<name>if-feature, when, must test</name>
+		<description>"cont3" cannot be created, because no condition is satisfied</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<cont3/>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>if-feature test</name>
+		<description>"cont3" cannot be created, because "feat1" is off</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<leaf2>abc</leaf2>
+					<leaf1>5</leaf1>
+					<leaf4/>
+					<list1>
+						<leaf5>20</leaf5>
+					</list1>
+					<list1>
+						<leaf5>21</leaf5>
+					</list1>
+				</cont1>
+			</cmd-file>
+			<result-success/>
+		</command>
+		<command>
+			<id>2</id>
+			<cmd-with-file>edit-config --config=(file) running</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<cont3/>
+				</cont1>
+			</cmd-file>
+			<result-error>
+				<tag>any</tag>
+			</result-error>
+		</command>
+	</test>
+	<test>
+		<name>config test</name>
+		<description>just check that get returns what it should</description>
+		<command>
+			<id>1</id>
+			<cmd-with-file>get --filter=(file)</cmd-with-file>
+			<cmd-file>
+				<cont1 xmlns="http://test.org/container-mod"/>
+			</cmd-file>
+			<result-file>
+				<cont1 xmlns="http://test.org/container-mod">
+					<leaf2>abc</leaf2>
+					<leaf1>5</leaf1>
+					<leaf4/>
+					<list1>
+						<leaf5>20</leaf5>
+					</list1>
+					<list1>
+						<leaf5>21</leaf5>
+					</list1>
+					<cont2>
+						<leaf6>test</leaf6>
+					</cont2>
+				</cont1>
+			</result-file>
+		</command>
+	</test>
+	<test>
+		<name>restore running</name>
+		<command>
+			<id>1</id>
+			<cmd>copy-config --config=old_config.xml running</cmd>
+			<result-success/>
+		</command>
+	</test>
+</netopeer-tests>

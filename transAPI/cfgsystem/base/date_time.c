@@ -48,10 +48,12 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -184,8 +186,8 @@ time_t boottime_get(void)
 
 static int ntp_cmd(const char* cmd)
 {
-	int output;
-	char *cmdline = NULL;
+	int status;
+	pid_t pid;
 	const char* service[] = {
 		NULL, /* UNKNOWN */
 		REDHAT_NTP_SERVICE, /* REDHAT */
@@ -202,19 +204,38 @@ static int ntp_cmd(const char* cmd)
 		return EXIT_FAILURE;
 	}
 
-	asprintf(&cmdline, "/sbin/service %s %s 1> /dev/null  2>/dev/null", service[distribution_id], cmd);
-	output = system(cmdline);
-
-	if (WEXITSTATUS(output) != 0) {
-		if (strcmp(cmd, "status")) {
-			nc_verb_error("Unable to %s NTP service (command \"%s\" returned %d).", cmd, cmdline, WEXITSTATUS(output));
-		}
-		free(cmdline);
+	if ((pid = vfork()) == -1) {
+		nc_verb_error("fork failed (%s).", strerror(errno));
 		return EXIT_FAILURE;
-	} else {
-		free(cmdline);
-		return EXIT_SUCCESS;
+	} else if (pid == 0) {
+		/* child */
+		int fd = open("/dev/null", O_RDONLY);
+		if (fd == -1) {
+			nc_verb_warning("Opening NULL dev failed (%s).", strerror(errno));
+		} else {
+			dup2(fd, STDIN_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			dup2(fd, STDERR_FILENO);
+			close(fd);
+		}
+		execl("/sbin/service", "/sbin/service", service[distribution_id], cmd, (char*)NULL);
+		nc_verb_error("exec failed (%s).", strerror(errno));
+		return EXIT_FAILURE;
 	}
+
+	if (waitpid(pid, &status, 0) == -1) {
+		nc_verb_error("Failed to wait for the service child (%s).", strerror(errno));
+		return EXIT_FAILURE;
+	}
+
+	if (WEXITSTATUS(status) != 0) {
+		if (strcmp(cmd, "status")) {
+			nc_verb_error("Unable to %s NTP service (command returned %d).", cmd, WEXITSTATUS(status));
+		}
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }
 
 int ntp_start(void)
