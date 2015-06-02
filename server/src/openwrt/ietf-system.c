@@ -26,7 +26,7 @@
 #endif
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 4;
+int transapi_version = 5;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -662,4 +662,3 @@ struct transapi_rpc_callbacks rpc_clbks = {
 		{.name="system-shutdown", .func=rpc_system_shutdown, .arg_count=0, .arg_order={}}
 	}
 };
-

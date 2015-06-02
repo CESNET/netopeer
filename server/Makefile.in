@@ -59,16 +59,9 @@ CC = @CC@
 RPMBUILD = @RPMBUILD@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
-	#HEAD
-#INSTALL_DATA = @INSTALL@ -m 600
-#ifeq ($(shell id -u $(USER)),0)
-#  INSTALL_OWNER = -o @USER@ -g @GROUP@
-#endif
-#=======
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_DATA_PRIVATE = @INSTALL@ -m 600
 
-#>>>>>>> master
 RPMDIR = RPMBUILD
 
 AGENT = netopeer-agent
@@ -94,13 +87,8 @@ SERVER_MODULES_CONF = config/Netopeer.xml \
 	config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
-#<<<<<<< HEAD
 OPENWRT_MODULES = ietf-system
 
-#CFLAGS = @CFLAGS@
-#CPPFLAGS = @CPPFLAGS@
-#DEFINE = -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(CFGDIR)/modules.conf.d/\" -DVERSION=\"$(VERSION)\"
-#=======
 COMMON_SRCS = src/common.c
 
 MANAGER_SRCS = manager/netopeer-manager.in
@@ -113,7 +101,6 @@ CONFIGURATOR_SRCS = configurator/setup.py \
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 DEFINE = -DBINDIR=\"$(BINDIR)\" -DCFG_DIR=\"$(CFGDIR)\" -DMODULES_CFG_DIR=\"$(DESTDIR)/$(modulesdir)/\" -DVERSION=\"$(VERSION)\"
-#>>>>>>> master
 
 OBJDIR= .obj
 TOOLS = manager/netopeer-manager
@@ -139,7 +126,6 @@ CFGS_TAR = $(CFGS) \
 
 H_IN = src/config.h.in
 
-#<<<<<<< HEAD
 all: $(AGENT) $(SERVER) submakes
 
 .PHONY: submakes
@@ -152,14 +138,13 @@ submakes:
 	for i in $(OPENWRT_MODULES); do \
 		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
 	done
-#=======
+
 MANPAGES = manager/netopeer-manager.1 \
 	netopeer-server.8 \
 	netopeer-agent.1 \
 	configurator/netopeer-configurator.1
 
 MANHTMLS = $(MANPAGES:%=%.html)
-#>>>>>>> master
 
 MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
 define MANINSTALL
@@ -207,16 +192,10 @@ $(AGENT): $(AGENT_OBJS)
 	@rm -f $@;
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
 
-#<<<<<<< HEAD
 src/openwrt/%.so: $(OBJDIR)/src/openwrt/%.o
 	@rm -f $@
 	$(CC) -shared $< $(LIBS) -Wl,-soname -Wl,$@ -o $@;
 
-#$(OBJDIR)/%.o: %.c
-#	@[ -d $$(dirname $@) ] || \
-#		(mkdir -p $$(dirname $@))
-#	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -c $< -o $@
-#=======
 manager/netopeer-manager: manager/netopeer-manager.tmp
 	$(call EXPAND,$<,$@)
 	chmod +x $@
@@ -225,7 +204,6 @@ $(OBJDIR)/%.o: %.c
 	@[ -d $(dir $@) ] || \
 		(mkdir -p $(dir $@))
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
-#>>>>>>> master
 
 .PHONY: clean
 clean:
@@ -321,13 +299,12 @@ install: $(SERVER) $(AGENT) $(TOOLS) $(PYTOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
 			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
 	fi
-#<<<<<<< HEAD
+
 	for i in $(OPENWRT_MODULES); do \
 		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
 		|| exit 1; \
 	done
-#=======
+
 	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
 
-#>>>>>>> master
 
