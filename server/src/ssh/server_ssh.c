@@ -324,7 +324,7 @@ static char* auth_pubkey_compare_key(ssh_key key) {
 
 	for (auth_key = netopeer_options.ssh_opts->client_auth_keys; auth_key != NULL; auth_key = auth_key->next) {
 		if (ssh_pki_import_pubkey_file(auth_key->path, &pub_key) != SSH_OK) {
-			if (eaccess(auth_key->path, R_OK) != 0) {
+			if (access(auth_key->path, R_OK) != 0) {
 				nc_verb_verbose("%s: failed to import the public key \"%s\" (%s)", __func__, auth_key->path, strerror(errno));
 			} else {
 				nc_verb_verbose("%s: failed to import the public key \"%s\": %s", __func__, auth_key->path, ssh_get_error(pub_key));
