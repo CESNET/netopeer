@@ -1490,7 +1490,7 @@ void cmd_getconfig_help(FILE* output) {
 	} else {
 		defaults = "";
 	}
-	fprintf(stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
+	fprintf(output, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
 	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 		fprintf(output, "|startup");
 	}
