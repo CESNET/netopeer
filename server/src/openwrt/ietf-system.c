@@ -26,7 +26,7 @@
 #endif
 
 /* transAPI version which must be compatible with libnetconf */
-int transapi_version = 5;
+int transapi_version = 6;
 
 /* Signal to libnetconf that configuration data were modified by any callback.
  * 0 - data not modified
@@ -491,13 +491,13 @@ struct ns_pair namespace_mapping[] = {{"systemns", "urn:ietf:params:xml:ns:yang:
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_hostname (void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_hostname (void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	const char* hostname;
 	char* msg;
 
 	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
-		hostname = get_node_content(node);
+		hostname = get_node_content(new_node);
 
 		if (set_hostname(hostname) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the hostname.");
@@ -520,13 +520,13 @@ int callback_systemns_system_systemns_hostname (void** UNUSED(data), XMLDIFF_OP 
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_name(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_name(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	const char* zone;
 	char* msg;
 
 	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
-		zone = get_node_content(node);
+		zone = get_node_content(new_node);
 
 		if (set_timezone(zone) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the timezone.");
@@ -549,14 +549,15 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name(void ** UNUSE
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr node, struct nc_err** error)
+int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	int offset;
 	char* msg;
 	int i;
 
+
 	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
-		offset = atoi(get_node_content(node));
+		offset = atoi(get_node_content(new_node));
 
 		for (i = 0; timezones[i].zonename != NULL; ++i) {
 			if (timezones[i].minute_offset == offset) {
@@ -597,13 +598,13 @@ struct transapi_data_callbacks clbks =  {
 * If input was not set in RPC message argument in set to NULL.
 */
 
-nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
+nc_reply * rpc_set_current_datetime (xmlNodePtr input)
 {
-	struct nc_err* err;
-	xmlNodePtr current_datetime = input[0];
+	//struct nc_err* err;
+	xmlNodePtr current_datetime = input;
 	long int offset = 0;
-	int i;
-	char* msg;
+	//int i;
+	//char* msg;
 	time_t t;
 
 	/* we suppose, that NTP is not running */
@@ -635,14 +636,14 @@ nc_reply * rpc_set_current_datetime (xmlNodePtr input[])
 	return nc_reply_ok();
 }
 
-nc_reply * rpc_system_restart (xmlNodePtr UNUSED(input[]))
+nc_reply * rpc_system_restart (xmlNodePtr UNUSED(input))
 {
 	system("reboot -d 1");
 
 	return nc_reply_ok();
 }
 
-nc_reply * rpc_system_shutdown (xmlNodePtr UNUSED(input[]))
+nc_reply * rpc_system_shutdown (xmlNodePtr UNUSED(input))
 {
 	system("poweroff -d 1");
 
@@ -657,8 +658,18 @@ nc_reply * rpc_system_shutdown (xmlNodePtr UNUSED(input[]))
 struct transapi_rpc_callbacks rpc_clbks = {
 	.callbacks_count = 3,
 	.callbacks = {
+		{.name="set-current-datetime", .func=rpc_set_current_datetime},
+		{.name="system-restart", .func=rpc_system_restart},
+		{.name="system-shutdown", .func=rpc_system_shutdown}
+	}
+};
+
+
+/*struct transapi_rpc_callbacks rpc_clbks = {
+	.callbacks_count = 3,
+	.callbacks = {
 		{.name="set-current-datetime", .func=rpc_set_current_datetime, .arg_count=1, .arg_order={"current-datetime"}},
 		{.name="system-restart", .func=rpc_system_restart, .arg_count=0, .arg_order={}},
 		{.name="system-shutdown", .func=rpc_system_shutdown, .arg_count=0, .arg_order={}}
 	}
-};
+}; */
