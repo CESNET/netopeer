@@ -68,30 +68,25 @@ RPMDIR = RPMBUILD
 SERVER = netopeer-server
 SERVER_LIBS = @SERVER_LIBS@
 SERVER_SRCS =  src/server.c \
-	src/cfgnetopeer_transapi.c \
-	src/netconf_server_transapi.c \
-	@SERVER_TRANSPORT_SRCS@
+		src/cfgnetopeer_transapi.c \
+		src/netconf_server_transapi.c \
+		@SERVER_TRANSPORT_SRCS@
 SERVER_HDRS = src/server.h \
-	src/cfgnetopeer_transapi.h \
-	src/netconf_server_transapi.h \
-	@SERVER_TRANSPORT_HDRS@
+		src/cfgnetopeer_transapi.h \
+		src/netconf_server_transapi.h \
+		@SERVER_TRANSPORT_HDRS@
 SERVER_MODULES_CONF = config/Netopeer.xml \
-	config/NETCONF-server.xml
+		config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
-#<<<<<<< HEAD
 OPENWRT_MODULES = ietf-system
 
-COMMON_SRCS = src/common.c
-
-#=======
-#>>>>>>> origin/master
 MANAGER_SRCS = manager/netopeer-manager.in
 
 CONFIGURATOR_SRCS = configurator/setup.py \
-	configurator/netopeer-configurator \
-	configurator/netopeer/*.py \
-	configurator/netopeer/*.py.in
+		configurator/netopeer-configurator \
+		configurator/netopeer/*.py \
+		configurator/netopeer/*.py.in
 
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
@@ -101,50 +96,37 @@ OBJDIR= .obj
 TOOLS = manager/netopeer-manager
 PYTOOLS = configurator/netopeer-configurator
 
-CFGS =	config/netopeer-cfgnetopeer.yin \
-	config/netopeer-cfgnetopeer-config.rng \
-	config/netopeer-cfgnetopeer-gdefs-config.rng \
-	config/netopeer-cfgnetopeer-schematron.xsl \
-	config/ietf-netconf-server.yin \
-	config/ietf-x509-cert-to-name.yin \
-	config/ietf-netconf-acm.yin \
-	config/ietf-netconf-server-config.rng \
-	config/ietf-netconf-server-gdefs-config.rng \
-	config/ietf-netconf-server-schematron.xsl \
-	@SERVER_TLS_CFGS@
+CFGS =  config/netopeer-cfgnetopeer.yin \
+		config/netopeer-cfgnetopeer-config.rng \
+		config/netopeer-cfgnetopeer-gdefs-config.rng \
+		config/netopeer-cfgnetopeer-schematron.xsl \
+		config/ietf-netconf-server.yin \
+		config/ietf-x509-cert-to-name.yin \
+		config/ietf-netconf-acm.yin \
+		config/ietf-netconf-server-config.rng \
+		config/ietf-netconf-server-gdefs-config.rng \
+		config/ietf-netconf-server-schematron.xsl \
+		@SERVER_TLS_CFGS@
 
 CFGS_TAR = $(CFGS) \
-	config/netopeer-cfgnetopeer.yang \
-	config/ietf-netconf-server.yang \
-	config/Netopeer.xml.in \
-	config/NETCONF-server.xml.in \
-	config/Netopeer.xml.in \
-	src/config.h.in
-
-all: $(AGENT) $(SERVER) submakes
-
-.PHONY: submakes
-.PHONY: $(OPENWRT_MODULES)
-.PHONY: $(SUBDIRS)
-submakes:
-	for i in $(SUBDIRS); do \
-		$(MAKE) -C $$i; \
-	done
-	for i in $(OPENWRT_MODULES); do \
-		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
-	done
+		config/netopeer-cfgnetopeer.yang \
+		config/ietf-netconf-server.yang \
+		config/Netopeer.xml.in \
+		config/NETCONF-server.xml.in \
+		config/Netopeer.xml.in \
+		src/config.h.in
 
 MANPAGES = manager/netopeer-manager.1 \
-	netopeer-server.8 \
-	configurator/netopeer-configurator.1
+		netopeer-server.8 \
+		configurator/netopeer-configurator.1
 
 MANHTMLS = $(MANPAGES:%=%.html)
 
 MANPATH=$(DESTDIR)$(mandir)/man$(subst .,,$(suffix $(1)))
 define MANINSTALL
 [ -d $(call MANPATH,$(1)) ] || \
-	(mkdir -p $(call MANPATH,$(1)); \
-	chmod 755 $(call MANPATH,$(1))); \
+		(mkdir -p $(call MANPATH,$(1)); \
+		chmod 755 $(call MANPATH,$(1))); \
 $(INSTALL_DATA) $(1) $(call MANPATH,$(1))/;
 endef
 
@@ -159,52 +141,56 @@ define EXPAND
 sed -e 's|$${prefix}|$(prefix)|g' $(1) > $(2);
 endef
 
-all: $(SERVER) $(TOOLS)
+all: $(SERVER) $(TOOLS) submakes
+
+.PHONY: submakes
+.PHONY: $(OPENWRT_MODULES)
+.PHONY: $(SUBDIRS)
+submakes:
+	for i in $(SUBDIRS); do \
+		$(MAKE) -C $$i; \
+	done
+	for i in $(OPENWRT_MODULES); do \
+		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
+	done
 
 $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
 	$(call EXPAND,$(@:%=%.tmp),$@)
 
 %.1.html: %.1
-	@if [ "@ROFF2HTML@" = "no" ]; then \
-		echo "Missing roff2html"; \
-	else \
-		@ROFF2HTML@ $< > $@; \
-	fi
+		@if [ "@ROFF2HTML@" = "no" ]; then \
+				echo "Missing roff2html"; \
+		else \
+				@ROFF2HTML@ $< > $@; \
+		fi
 
 %.8.html: %.8
-	@if [ "@ROFF2HTML@" = "no" ]; then \
-		echo "Missing roff2html"; \
-	else \
-		@ROFF2HTML@ $< > $@; \
-	fi
+		@if [ "@ROFF2HTML@" = "no" ]; then \
+				echo "Missing roff2html"; \
+		else \
+				@ROFF2HTML@ $< > $@; \
+		fi
 
 $(SERVER): $(SERVER_OBJS) $(SERVER_MODULES_CONF)
-	@rm -f $@;
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(SERVER_OBJS) $(SERVER_LIBS) -o $@;
-
-#<<<<<<< HEAD
-$(AGENT): $(AGENT_OBJS)
-	@rm -f $@;
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(AGENT_OBJS) $(AGENT_LIBS) -o $@;
+		@rm -f $@;
+		$(CC) $(CFLAGS) $(CPPFLAGS) $(SERVER_OBJS) $(SERVER_LIBS) -o $@;
 
 src/openwrt/%.so: $(OBJDIR)/src/openwrt/%.o
-	@rm -f $@
-	$(CC) -shared $< $(LIBS) -Wl,-soname -Wl,$@ -o $@;
+		@rm -f $@
+		$(CC) -shared $< $(LIBS) -Wl,-soname -Wl,$@ -o $@;
 
-#=======
-#>>>>>>> origin/master
 manager/netopeer-manager: manager/netopeer-manager.tmp
-	$(call EXPAND,$<,$@)
-	chmod +x $@
+		$(call EXPAND,$<,$@)
+		chmod +x $@
 
 $(OBJDIR)/%.o: %.c
-	@[ -d $(dir $@) ] || \
-		(mkdir -p $(dir $@))
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
+		@[ -d $(dir $@) ] || \
+				(mkdir -p $(dir $@))
+		$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINE) -fPIC -c $< -o $@
 
 .PHONY: clean
 clean:
-	rm -rf $(SERVER) $(TOOLS) $(OBJDIR)
+		rm -rf $(SERVER) $(TOOLS) $(OBJDIR) $(OBJDIR)/src/openwrt/%.o $(OBJDIR)/src/openwrt/%.so
 
 .PHONY: doc
 doc: $(MANHTMLS)
@@ -214,63 +200,61 @@ dist: $(NAME).spec tarball rpm
 
 .PHONY: tarball
 tarball: $(SERVER_SRCS) $(SERVER_HDRS) $(MANHTMLS)
-	@rm -rf $(NAME)-$(VERSION);
-	@mkdir $(NAME)-$(VERSION);
-	@for i in $(SERVER_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) configure.in configure \
-	    Makefile.in VERSION $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) $(MANHTMLS) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
-	    [ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
-		cp $$i $(NAME)-$(VERSION)/$$i; \
-	done;
-	@rm -rf $(RPMDIR)/SOURCES/; \
-	mkdir -p $(RPMDIR)/SOURCES/; \
-	tar -c -z -f $(RPMDIR)/SOURCES/$(NAME)-$(VERSION)-$(RELEASE).tar.gz \
-	    $(NAME)-$(VERSION); \
-	rm -rf $(NAME)-$(VERSION);
+		@rm -rf $(NAME)-$(VERSION);
+		@mkdir $(NAME)-$(VERSION);
+		@for i in $(SERVER_SRCS) $(COMMON_SRCS) $(SERVER_HDRS) $(CFGS_TAR) $(SERVER_HDRS_TAR) configure.in configure \
+			Makefile.in VERSION $(NAME).spec.in netopeer.rc.in install-sh $(MANPAGES) $(MANHTMLS) config.sub config.guess $(MANAGER_SRCS) $(CONFIGURATOR_SRCS); do \
+			[ -d $(NAME)-$(VERSION)/$$(dirname $$i) ] || (mkdir -p $(NAME)-$(VERSION)/$$(dirname $$i)); \
+				cp $$i $(NAME)-$(VERSION)/$$i; \
+		done;
+		@rm -rf $(RPMDIR)/SOURCES/; \
+		mkdir -p $(RPMDIR)/SOURCES/; \
+		tar -c -z -f $(RPMDIR)/SOURCES/$(NAME)-$(VERSION)-$(RELEASE).tar.gz \
+			$(NAME)-$(VERSION); \
+		rm -rf $(NAME)-$(VERSION);
 
 .PHONY: rpm
 rpm: tarball
-	mkdir -p $(RPMDIR)/BUILD $(RPMDIR)/RPMS $(RPMDIR)/SRPMS
-	$(RPMBUILD) -ba $(NAME).spec \
-		--define "_topdir `pwd`/$(RPMDIR)";
+		mkdir -p $(RPMDIR)/BUILD $(RPMDIR)/RPMS $(RPMDIR)/SRPMS
+		$(RPMBUILD) -ba $(NAME).spec \
+				--define "_topdir `pwd`/$(RPMDIR)";
 
 .PHONY: cleanall
 cleanall: clean distclean
 
 .PHONY: distclean
 distclean:
-	rm -rf $(RPMDIR)
+		rm -rf $(RPMDIR)
 
 .PHONY: install
 install: $(SERVER) $(TOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
-	$(INSTALL) -d $(DESTDIR)/$(bindir);
-	$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
-	$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
-	if test "@NPCONF@" = "yes"; then \
-		$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix))) \
-	fi
-	$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
-	for i in $(SERVER_MODULES_CONF); do \
-		$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
-	done
-	$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
-	for i in $(CFGS); do \
-		$(INSTALL_DATA_PRIVATE) $$i $(CFGDIR)/cfgnetopeer/; \
-	done
-	touch $(CFGDIR)/cfgnetopeer/datastore.xml
-	touch $(CFGDIR)/cfgnetopeer/datastore-server.xml
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
-	$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
-	$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
-	if test -n "$(MANHTMLS)"; then \
-		[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
-			(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
-	fi
+		$(INSTALL) -d $(DESTDIR)/$(bindir);
+		$(INSTALL_PROGRAM) $(SERVER) $(DESTDIR)/$(bindir)/;
+		$(INSTALL_PROGRAM) $(TOOLS) $(DESTDIR)/$(bindir)/;
+		if test "@NPCONF@" = "yes"; then \
+				$(foreach tool,$(PYTOOLS),$(call PYINSTALL,$(tool),$(DESTDIR)$(prefix))) \
+		fi
+		$(INSTALL) -d $(DESTDIR)/$(modulesdir)/;
+		for i in $(SERVER_MODULES_CONF); do \
+				$(INSTALL_DATA_PRIVATE) $$i $(DESTDIR)/$(modulesdir)/; \
+		done
+		$(INSTALL) -d $(CFGDIR)/cfgnetopeer/
+		for i in $(CFGS); do \
+				$(INSTALL_DATA_PRIVATE) $$i $(CFGDIR)/cfgnetopeer/; \
+		done
+		$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/init.d/;
+		$(INSTALL_PROGRAM) -m 755 netopeer.rc $(DESTDIR)/$(sysconfdir)/init.d/
+		$(foreach man,$(MANPAGES),$(call MANINSTALL,$(man)))
+		if test -n "$(MANHTMLS)"; then \
+				[ -d $(DESTDIR)/$(datarootdir)/netopeer/ ] || \
+						(mkdir -p $(DESTDIR)/$(datarootdir)/netopeer/; chmod 755 $(DESTDIR)/$(datarootdir)/netopeer/); \
+		fi
 
-	for i in $(OPENWRT_MODULES); do \
-		$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
-		|| exit 1; \
-	done
+		for i in $(OPENWRT_MODULES); do \
+			$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
+			|| exit 1; \
+		done
 
-	$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
+		$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
 
 

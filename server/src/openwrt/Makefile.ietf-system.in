@@ -66,7 +66,7 @@ OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 CFGS =	ietf-system.yin \
 	ietf-system.xml
 
-all: $(NAME)
+all: clean $(NAME)
 
 $(NAME): $(OBJS)
 	@rm -f $@
