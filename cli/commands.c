@@ -87,6 +87,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 extern int done;
 extern struct cli_options* opts;
 volatile int verb_level = 0;
+volatile int time_commands = 0;
 
 void print_version();
 
@@ -121,6 +122,7 @@ COMMAND commands[] = {
 	{"cert", cmd_cert, "Manage trusted or your own certificates"},
 	{"crl", cmd_crl, "Manage Certificate Revocation List directory"},
 #endif
+	{"time", cmd_time, "Enable/disable measuring time of command execution"},
 	{"knownhosts", cmd_knownhosts, "Manage known hosts in the \"~/.ssh/known_hosts\" file"},
 	{"status", cmd_status, "Print information about the current NETCONF session"},
 	{"user-rpc", cmd_userrpc, "Send your own content in an RPC envelope (for DEBUG purposes)"},
@@ -498,15 +500,51 @@ static struct nc_filter* set_filter(const char* operation, const char* file, int
 	return filter;
 }
 
+static double timespec_subtract(struct timespec larger, struct timespec smaller) {
+	double ret;
+
+	if (larger.tv_sec < smaller.tv_sec) {
+		fprintf(stderr, "Wrong order of timespec_subtract() arguments.\n");
+		return 0;
+	}
+	if ((larger.tv_sec == smaller.tv_sec) && (larger.tv_nsec < smaller.tv_nsec)) {
+		fprintf(stderr, "Wrong order of timespec_subtract() arguments.\n");
+		return 0;
+	}
+
+	// convert one sec to nanosec
+	if (larger.tv_nsec < smaller.tv_nsec) {
+		larger.tv_sec--;
+		larger.tv_nsec += 1000000000L;
+	}
+
+	ret = larger.tv_sec - smaller.tv_sec;
+	ret += ((double) (larger.tv_nsec - smaller.tv_nsec)) / 1000000000.0;
+
+	return ret;
+}
+
 /* rpc parameter is freed after the function call */
 static int send_recv_process(const char* operation, nc_rpc* rpc, const char* output_file, FILE* output) {
 	nc_reply *reply = NULL;
 	char *data = NULL;
 	FILE* out_stream;
+	NC_MSG_TYPE msg_type;
+	struct timespec tsold, tsnew;
 	int ret = EXIT_SUCCESS;
 
+	if (time_commands) {
+		clock_gettime(CLOCK_MONOTONIC, &tsold);
+	}
+
 	/* send the request and get the reply */
-	switch (nc_session_send_recv(session, rpc, &reply)) {
+	msg_type = nc_session_send_recv(session, rpc, &reply);
+
+	if (time_commands) {
+		clock_gettime(CLOCK_MONOTONIC, &tsnew);
+	}
+
+	switch (msg_type) {
 	case NC_MSG_UNKNOWN:
 		if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
 			ERROR(operation, "receiving rpc-reply failed.");
@@ -560,6 +598,10 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 	}
 	nc_rpc_free(rpc);
 	nc_reply_free(reply);
+
+	if (time_commands) {
+		fprintf(output, "Timed: %.6fs\n", timespec_subtract(tsnew, tsold));
+	}
 
 	return ret;
 }
@@ -1481,6 +1523,16 @@ int cmd_capability(const char* arg, const char* UNUSED(old_input_file), FILE* ou
 	return EXIT_SUCCESS;
 }
 
+int cmd_time(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE* output, FILE* UNUSED(input)) {
+	time_commands = !time_commands;
+	if (time_commands) {
+		fprintf(output, "Timing on\n");
+	} else {
+		fprintf(output, "Timing off\n");
+	}
+	return EXIT_SUCCESS;
+}
+
 void cmd_getconfig_help(FILE* output) {
 	char *defaults;
 
@@ -1490,7 +1542,7 @@ void cmd_getconfig_help(FILE* output) {
 	} else {
 		defaults = "";
 	}
-	fprintf(stdout, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
+	fprintf(output, "get-config [--help] %s[--filter [file]] [--out file] running", defaults);
 	if (session == NULL || nc_cpblts_enabled(session, NC_CAP_STARTUP_ID)) {
 		fprintf(output, "|startup");
 	}
