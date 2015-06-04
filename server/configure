@@ -663,7 +663,7 @@ LDFLAGS
 CFLAGS
 CC
 RPMBUILD
-LNCTOOL
+LNCTOOL_EXISTS
 UNAME
 LIBNETCONF_LIBS
 LIBNETCONF_CFLAGS
@@ -3002,15 +3002,16 @@ if test -d "/usr/share/yang/modules/"; then
 fi
 
 # Check for lnctool
-# Extract the first word of "lnctool", so it can be a program name with args.
+if test "$LNCTOOL" = "lnctool"; then
+	# Extract the first word of "lnctool", so it can be a program name with args.
 set dummy lnctool; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_LNCTOOL+:} false; then :
+if ${ac_cv_prog_LNCTOOL_EXISTS+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if test -n "$LNCTOOL"; then
-  ac_cv_prog_LNCTOOL="$LNCTOOL" # Let the user override the test.
+  if test -n "$LNCTOOL_EXISTS"; then
+  ac_cv_prog_LNCTOOL_EXISTS="$LNCTOOL_EXISTS" # Let the user override the test.
 else
 as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
 for as_dir in $PATH
@@ -3019,7 +3020,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_LNCTOOL="yes"
+    ac_cv_prog_LNCTOOL_EXISTS="yes"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -3027,21 +3028,22 @@ done
   done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_prog_LNCTOOL" && ac_cv_prog_LNCTOOL="no"
+  test -z "$ac_cv_prog_LNCTOOL_EXISTS" && ac_cv_prog_LNCTOOL_EXISTS="no"
 fi
 fi
-LNCTOOL=$ac_cv_prog_LNCTOOL
-if test -n "$LNCTOOL"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LNCTOOL" >&5
-$as_echo "$LNCTOOL" >&6; }
+LNCTOOL_EXISTS=$ac_cv_prog_LNCTOOL_EXISTS
+if test -n "$LNCTOOL_EXISTS"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LNCTOOL_EXISTS" >&5
+$as_echo "$LNCTOOL_EXISTS" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
 
 
-if test "$LNCTOOL" = "no"; then
-	as_fn_error $? "\"lnctool not found!\"" "$LINENO" 5
+	if test "$LNCTOOL_EXISTS" = "no"; then
+		as_fn_error $? "\"lnctool not found!\"" "$LINENO" 5
+	fi
 fi
 
 # Check python for manager and configurator

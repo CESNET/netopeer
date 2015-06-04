@@ -232,9 +232,11 @@ if test -d "/usr/share/yang/modules/"; then
 fi
 
 # Check for lnctool
-AC_CHECK_PROG([LNCTOOL], [lnctool], [yes], [no])
-if test "$LNCTOOL" = "no"; then
-	AC_MSG_ERROR(["lnctool not found!"])
+if test "$LNCTOOL" = "lnctool"; then
+	AC_CHECK_PROG([LNCTOOL_EXISTS], [lnctool], [yes], [no])
+	if test "$LNCTOOL_EXISTS" = "no"; then
+		AC_MSG_ERROR(["lnctool not found!"])
+	fi
 fi
 
 # Check python for manager and configurator
