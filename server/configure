@@ -721,6 +721,7 @@ enable_debug
 enable_configurator
 enable_ssh
 enable_tls
+with_lnctool
 with_libnetconf
 with_modules_dir
 '
@@ -1361,6 +1362,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-distro=DISTRO    Compile for specific Linux distribution
+  --with-lnctool=PATH     Set path of lnctool, otherwise $PATH will be used
   --with-libnetconf=PATH  Set explicit installation prefix to the libnetconf
                           library
   --with-modules-dir=DIR  path to directory where netopeer modules
@@ -2663,6 +2665,16 @@ if test "${enable_tls+set}" = set; then :
 
 else
   TLS=no
+
+fi
+
+
+
+# Check whether --with-lnctool was given.
+if test "${with_lnctool+set}" = set; then :
+  withval=$with_lnctool; LNCTOOL=$with_lnctool
+else
+  LNCTOOL=lnctool
 
 fi
 
@@ -5252,12 +5264,12 @@ fi
 # Generate correct validation files
 { $as_echo "$as_me:${as_lineno-$LINENO}: generating validation files..." >&5
 $as_echo "$as_me: generating validation files..." >&6;}
-lnctool --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+$LNCTOOL --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
 	as_fn_error $? "Generating validation files for ietf-netconf-server failed." "$LINENO" 5
 fi
 
-lnctool --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+$LNCTOOL --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
 	as_fn_error $? "Generating validation files for netopeer-cfgnetopeer failed." "$LINENO" 5
 fi

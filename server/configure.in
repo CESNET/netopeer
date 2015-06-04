@@ -160,6 +160,12 @@ AC_ARG_ENABLE([tls],
 	TLS=no
 )
 
+AC_ARG_WITH([lnctool],
+	AC_HELP_STRING([--with-lnctool=PATH], [Set path of lnctool, otherwise $PATH will be used]),
+	LNCTOOL=$with_lnctool,
+	LNCTOOL=lnctool
+)
+
 AC_ARG_WITH([libnetconf],
 	AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
 	[CPPFLAGS="-I$withval/include/ $CPPFLAGS"
@@ -419,12 +425,12 @@ fi
 
 # Generate correct validation files
 AC_MSG_NOTICE([generating validation files...])
-lnctool --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+$LNCTOOL --model $PWD/config/ietf-netconf-server.yang $IETF_NETCONF_SERVER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
 	AC_MSG_ERROR([Generating validation files for ietf-netconf-server failed.])
 fi
 
-lnctool --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
+$LNCTOOL --model $PWD/config/netopeer-cfgnetopeer.yang $CFGNETOPEER_FEATURES --search-path $PWD/config/ --output-dir $PWD/config/ validation;
 if test "$?" != "0"; then
 	AC_MSG_ERROR([Generating validation files for netopeer-cfgnetopeer failed.])
 fi
