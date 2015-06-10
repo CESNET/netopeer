@@ -403,7 +403,7 @@ static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel chan
 
 int np_ssh_kill_session(const char* sid, struct client_struct_ssh* cur_client) {
 	struct client_struct_ssh* kill_client;
-	struct chan_struct* kill_chan;
+	struct chan_struct* kill_chan = NULL;
 
 	if (sid == NULL) {
 		return 1;
