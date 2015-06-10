@@ -185,6 +185,7 @@ void server_sessions_kill(struct session_info *session)
 	int agent_pid;
 
 	if (session) {
+		sid = nc_session_get_id(session->session);
 		server_sessions_stop(session);
 
 		if ((agent_pid = atoi(sid)) != 0) {
