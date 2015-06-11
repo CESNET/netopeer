@@ -79,3 +79,10 @@ All tools are built on top of the libnetconf library and allows you to use the f
 * NETCONF Access Control ([RFC 6536](http://tools.ietf.org/html/rfc6536))
 * NETCONF Call Home ([Reverse SSH draft](http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05), [RFC 5539bis](http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05))
 * NETCONF Server Configuration ([IETF Draft](http://tools.ietf.org/html/draft-kwatsen-netconf-server-01))
+
+
+## Other Resources
+
+* [libnetconf project](https://github.com/CESNET/libnetconf)
+* [Netopeer GUI](https://github.com/CESNET/Netopeer-GUI)
+* [CESNET TMC department](https://www.liberouter.org/)
