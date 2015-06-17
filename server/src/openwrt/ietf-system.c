@@ -238,11 +238,51 @@ static const char* get_node_content(const xmlNodePtr node) {
 	return ((char*)(node->children->content));
 }
 
+static int search_in_line(char *line, char *str) {   
+    if((strstr(line, str)) != NULL) {
+        return (EXIT_SUCCESS);
+    }
+    
+    return (EXIT_FAILURE);
+}
+
+static int replace_in_system_file(char *replacement, char *value) {
+	FILE *system_f;
+	FILE *replic_f;
+	char * line = NULL;
+    int searchResult = EXIT_FAILURE;
+    size_t len = 0;
+    size_t read;
+
+	system_f = fopen("/etc/config/system", "r");
+    replic_f = fopen("/etc/config/replic", "w");
+    
+    while ((read = getline(&line, &len, system_f)) != -1) {  
+        searchResult = search_in_line(line, replacement);
+
+        if (searchResult == EXIT_SUCCESS) {
+        	fprintf (replic_f, "	%s '%s'\n", replacement, value);
+        }
+
+        else {
+            fprintf (replic_f, "%s", line);
+        }
+        
+    }
+
+	fclose(system_f);
+    fclose(replic_f);
+    remove("/etc/config/system");
+    rename("/etc/config/replic", "/etc/config/system");
+
+    return (EXIT_SUCCESS);
+}
+
 static int set_hostname(const char* name)
 {
 	FILE* hostname_f;
 
-	if (name == NULL || strlen(name) == 0) {
+    if (name == NULL || strlen(name) == 0) {
 		return (EXIT_FAILURE);
 	}
 
@@ -256,8 +296,13 @@ static int set_hostname(const char* name)
 		return (EXIT_FAILURE);
 	}
 
-	fclose(hostname_f);
+	if ((replace_in_system_file("option hostname", name)) != (EXIT_SUCCESS)) {
+		nc_verb_error("Unable to write hostname to system config file");
+		fclose(hostname_f);
+		return (EXIT_FAILURE);
+	}
 
+	fclose(hostname_f);
 	return (EXIT_SUCCESS);
 }
 
@@ -283,23 +328,22 @@ static char* get_hostname(void)
 
 static char* get_timezone(void)
 {
-	FILE* zonename_uci;
+	FILE* zonename_f;
 	char *line = NULL;
 	size_t len = 0;
 
-	if ((zonename_uci = popen("uci get system.@system[0].zonename", "r")) == NULL &&
-		(zonename_uci = popen("uci get system.@system[0].timezone", "r")) == NULL) {
+	if ((zonename_f = fopen("/etc/TZ", "r")) == NULL) {
 		return (NULL);
 	}
 
-	if (getline(&line, &len, zonename_uci) == -1 || len == 0) {
+	if (getline(&line, &len, zonename_f) == -1 || len == 0) {
 		nc_verb_error("Unable to read zonename (%s)", strerror(errno));
 		free(line);
-		pclose(zonename_uci);
+		pclose(zonename_f);
 		return (NULL);
 	}
 
-	pclose(zonename_uci);
+	pclose(zonename_f);
 	return (line);
 }
 
@@ -307,14 +351,29 @@ static int set_timezone(const char* zone)
 {
 	char* command = NULL;
 	char* result = NULL;
+	FILE* timezone_f;
 
 	if (zone == NULL || strlen(zone) == 0) {
 		return (EXIT_FAILURE);
 	}
 
-	asprintf(&command, "uci set system.@system[0].zonename=%s; uci commit system;", zone);
-	system(command);
+	if ((timezone_f = fopen("/tmp/TZ", "w")) == NULL) {
+		return (EXIT_FAILURE);
+	}
 
+	if (fprintf(timezone_f, "%s", zone) <= 0) {
+		nc_verb_error("Unable to write timezone");
+		fclose(timezone_f);
+		return (EXIT_FAILURE);
+	}
+
+	if ((replace_in_system_file("option timezone", zone)) != (EXIT_SUCCESS)) {
+		nc_verb_error("Unable to write timezone to system config file");
+		fclose(timezone_f);
+		return (EXIT_FAILURE);
+	}
+
+	fclose(timezone_f);
 	result = get_timezone();
 	if (result == NULL) {
 		return (EXIT_FAILURE);
@@ -663,13 +722,3 @@ struct transapi_rpc_callbacks rpc_clbks = {
 		{.name="system-shutdown", .func=rpc_system_shutdown}
 	}
 };
-
-
-/*struct transapi_rpc_callbacks rpc_clbks = {
-	.callbacks_count = 3,
-	.callbacks = {
-		{.name="set-current-datetime", .func=rpc_set_current_datetime, .arg_count=1, .arg_order={"current-datetime"}},
-		{.name="system-restart", .func=rpc_system_restart, .arg_count=0, .arg_order={}},
-		{.name="system-shutdown", .func=rpc_system_shutdown, .arg_count=0, .arg_order={}}
-	}
-}; */
