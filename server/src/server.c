@@ -816,9 +816,14 @@ restart:
 	} else if (restart_hard) {
 		nc_verb_verbose("Server is going to hard restart.");
 		len = readlink("/proc/self/exe", path, PATH_MAX);
-		path[len] = 0;
+		if (len > 0) {
+			path[len] = 0;
+			xmlCleanupParser();
+			execv(path, argv);
+		}
+		nc_verb_error("Failed to get the path to self.");
 		xmlCleanupParser();
-		execv(path, argv);
+		return EXIT_FAILURE;
 	}
 
 	/*
