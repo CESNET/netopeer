@@ -557,9 +557,9 @@ void listen_loop(int do_init) {
 						break;
 #endif
 					default:
+						free(new_client);
 						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 					}
-					free(new_client);
 
 					/* sleep to prevent clients from immediate connection retry */
 					usleep(netopeer_options.response_time*1000);
