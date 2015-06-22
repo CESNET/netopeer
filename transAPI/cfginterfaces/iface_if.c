@@ -78,7 +78,7 @@ static int write_sysctl_proc_net(unsigned char ipv4, const char* if_name, const 
 
 	/* opening/creating sysctl.conf */
 	if (errno == ENOENT) {
-		if ((fd = open(SYSCTL_CONF_PATH, O_RDWR|O_CREAT|O_EXCL|00600)) == -1) {
+		if ((fd = open(SYSCTL_CONF_PATH, O_RDWR|O_CREAT|O_EXCL, 00600)) == -1) {
 			goto fail;
 		}
 	} else {
@@ -2190,7 +2190,7 @@ int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XM
 #endif
 		/* opening/creating the script */
 		if (errno == ENOENT) {
-			if ((fd = open(IFCFG_SCRIPTS_PATH, O_WRONLY|O_CREAT|O_EXCL|00700)) == -1) {
+			if ((fd = open(IFCFG_SCRIPTS_PATH, O_WRONLY|O_CREAT|O_EXCL, 00700)) == -1) {
 				asprintf(msg, "%s: failed to create \"%s\": %s", __func__, path, strerror(errno));
 				goto fail;
 			}
