@@ -543,6 +543,8 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		if (lookup == NULL) {
 			nc_verb_error("%s: failed to add lookup method", __func__);
 			X509_STORE_free(store);
+			/* CRL_DIR UNLOCK */
+			pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 			return 0;
 		}
 
