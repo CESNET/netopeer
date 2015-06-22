@@ -927,7 +927,7 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 			}
 			sshcb_channel_open(client, chan);
 			return 0;
-		} else if (type == SSH_REQUEST_CHANNEL && subtype == SSH_CHANNEL_REQUEST_SUBSYSTEM) {
+		} else if (type == SSH_REQUEST_CHANNEL && (enum ssh_channel_requests_e)subtype == SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
 			} else {
