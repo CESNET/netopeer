@@ -56,50 +56,51 @@ NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 struct tmz {
 	int minute_offset;
 	char* zonename;
+	char* TZString;
 };
 
 struct tmz timezones[] = {
 //	{-720, "Etc/GMT-12"},
-	{-660, "Pacific/Midway"},     /* -11:00 */
-	{-600, "Pacific/Honolulu"},   /* -10:00 */
-	{-570, "Pacific/Marquesas"},  /* -09:30 */
-	{-540, "Pacific/Gambier"},    /* -09:00 */
-	{-480, "Pacific/Pitcairn"},   /* -08:00 */
-	{-420, "America/Phoenix"},    /* -07:00 */
-	{-360, "America/Belize"},     /* -06:00 */
-	{-300, "America/Bogota"},     /* -05:00 */
-	{-270, "America/Caracas"},    /* -04:30 */
-	{-240, "America/Aruba"},      /* -04:00 */
-	{-210, "Canada/Newfoundland"},/* -03:30 */
-	{-180, "Atlantic/Stanley"},   /* -03:00 */
-	{-120, "America/Noronha"},    /* -02:00 */
-	{-60,  "Atlantic/Cape Verde"},/* -01:00 */
-	{0,    "UTC"},                /*  00:00 */
-	{60,  "Africa/Tunis"},        /* +01:00 */
-	{120, "Africa/Johannesburg"}, /* +02:00 */
-	{180, "Asia/Baghdad"},        /* +03:00 */
-	{210, "Asia/Tehran"},         /* +03:30 */
-	{240, "Asia/Dubai"},          /* +04:00 */
-	{270, "Asia/Kabul"},          /* +04:30 */
-	{300, "Asia/Karachi"},        /* +05:00 */
-	{330, "Asia/Colombo"},        /* +05:30 */
-	{345, "Asia/Kathmandu"},      /* +05:45 */
-	{360, "Asia/Dhaka"},          /* +06:00 */
-	{390, "Asia/Rangoon"},        /* +06:30 */
-	{420, "Asia/Bangkok"},        /* +07:00 */
-	{480, "Asia/Hong Kong"},      /* +08:00 */
-	{525, "Australia/Eucla"},     /* +08:45 */
-	{540, "Asia/Tokyo"},          /* +09:00 */
-	{570, "Australia/Darwin"},    /* +09:30 */
-	{600, "Australia/Brisbane"},  /* +10:00 */
-	{630, "Australia/Lord Howe"}, /* +10:30 */
-	{660, "Pacific/Noumea"},      /* +11:00 */
-	{690, "Pacific/Norfolk"},     /* +11:30 */
-	{720, "Asia/Kamchatka"},      /* +12:00 */
-	{765, "Pacific/Chatham"},     /* +12:45 */
-	{780, "Pacific/Enderbury"},   /* +13:00 */
-	{840, "Pacific/Kiritimati"},  /* +14:00 */
-	{0, NULL}
+	{-660, "Pacific/Midway", "SST11"},     	/* -11:00 */
+	{-600, "Pacific/Honolulu", "HST10"},   	/* -10:00 */
+	{-570, "Pacific/Marquesas", "MART9:30"},/* -09:30 */
+	{-540, "Pacific/Gambier", "GAMT9"},		/* -09:00 */
+	{-480, "Pacific/Pitcairn", "PST8"},		/* -08:00 */
+	{-420, "America/Phoenix", "MST7"},		/* -07:00 */
+	{-360, "America/Belize", "CST6"},		/* -06:00 */
+	{-300, "America/Bogota", "COT5"},		/* -05:00 */
+	{-270, "America/Caracas", "VET4:30"},	/* -04:30 */
+	{-240, "America/Aruba", "AST4"},		/* -04:00 */
+	{-210, "Canada/Newfoundland", "UTC"},			/* -03:30 */
+	{-180, "Atlantic/Stanley", "FKT4FKST,M9.1.0,M4.3.0"},/* -03:00 */
+	{-120, "America/Noronha", "FNT2"},		/* -02:00 */
+	{-60,  "Atlantic/Cape Verde", "CVT1"},			/* -01:00 */
+	{0,    "UTC", "UTC"},                	/*  00:00 */
+	{60,  "Africa/Tunis", "CET-1"},        			/* +01:00 */
+	{120, "Africa/Johannesburg", "SAST-2"}, 			/* +02:00 */
+	{180, "Asia/Baghdad", "AST-3"},        			/* +03:00 */
+	{210, "Asia/Tehran", "IRST-3:30IRDT,80/0,264/0"},         			/* +03:30 */
+	{240, "Asia/Dubai", "GST-4"},          			/* +04:00 */
+	{270, "Asia/Kabul", "AFT-4:30"},          			/* +04:30 */
+	{300, "Asia/Karachi", "PKT-5"},        			/* +05:00 */
+	{330, "Asia/Colombo", "IST-5:30"},        			/* +05:30 */
+	{345, "Asia/Kathmandu", "NPT-5:45"},      			/* +05:45 */
+	{360, "Asia/Dhaka", "BDT-6"},          			/* +06:00 */
+	{390, "Asia/Rangoon", "MMT-6:30"},        			/* +06:30 */
+	{420, "Asia/Bangkok", "ICT-7"},        			/* +07:00 */
+	{480, "Asia/Hong Kong", "HKT-8"},     			/* +08:00 */
+	{525, "Australia/Eucla", "CWST-8:45"},     			/* +08:45 */
+	{540, "Asia/Tokyo", "JST-9"},          			/* +09:00 */
+	{570, "Australia/Darwin", "CST-9:30"},    			/* +09:30 */
+	{600, "Australia/Brisbane", "EST-10"},  			/* +10:00 */
+	{630, "Australia/Lord Howe", "LHST-10:30LHST-11,M10.1.0,M4.1.0"}, 			/* +10:30 */
+	{660, "Pacific/Noumea", "NCT-11"},      			/* +11:00 */
+	{690, "Pacific/Norfolk", "NFT-11:30"},     			/* +11:30 */
+	{720, "Asia/Kamchatka", "PETT-11PETST,M3.5.0,M10.5.0/3"},      			/* +12:00 */
+	{765, "Pacific/Chatham", "CHAST-12:45CHADT,M9.5.0/2:45,M4.1.0/3:45"},    			/* +12:45 */
+	{780, "Pacific/Enderbury", "PHOT-13"},   			/* +13:00 */
+	{840, "Pacific/Kiritimati", "LINT-14"},  			/* +14:00 */
+	{0, NULL, NULL}
 };
 
 static int fail(struct nc_err** error, char* msg, int ret) {
@@ -583,11 +584,18 @@ int callback_systemns_system_systemns_clock_systemns_timezone_name(void ** UNUSE
 {
 	const char* zone;
 	char* msg;
+	int i;
 
 	if (op == XMLDIFF_ADD || op == XMLDIFF_MOD) {
 		zone = get_node_content(new_node);
 
-		if (set_timezone(zone) != EXIT_SUCCESS) {
+		for (i = 0; timezones[i].zonename != NULL; ++i) {
+			if (strcmp(timezones[i].zonename, zone) == 0) {
+				break;
+			}
+		}
+
+		if (set_timezone(timezones[i].TZString) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the timezone.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -624,7 +632,7 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void **
 			}
 		}
 
-		if (set_timezone(timezones[i].zonename) != EXIT_SUCCESS) {
+		if (set_timezone(timezones[i].TZString) != EXIT_SUCCESS) {
 			asprintf(&msg, "Failed to set the timezone.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
