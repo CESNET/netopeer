@@ -675,7 +675,7 @@ int main(int argc, char** argv) {
 	struct sigaction action;
 	sigset_t block_mask;
 
-	char *aux_string = NULL, path[PATH_MAX];
+	char *aux_string = NULL, path[PATH_MAX+1];
 	int next_option;
 	int daemonize = 0, len;
 	int listen_init = 1;
