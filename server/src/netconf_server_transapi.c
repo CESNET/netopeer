@@ -529,6 +529,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 	struct ch_server* srv, *del_srv;
 	xmlNodePtr auxnode, servernode, childnode;
 	xmlChar* auxstr;
+	int ret;
 
 	new = calloc(1, sizeof(struct ch_app));
 	new->transport = transport;
@@ -638,7 +639,11 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 		}
 	}
 
-	pthread_create(&(new->thread), NULL, app_loop, new);
+	ret = pthread_create(&(new->thread), NULL, app_loop, new);
+	if (ret) {
+		nc_verb_error("%s: pthread_create() error (%s)", __func__, strerror(ret));
+		goto fail;
+	}
 
 	/* insert the created app structure into the list */
 	if (!callhome_apps) {
