@@ -3620,6 +3620,11 @@ int cmd_knownhosts(const char* arg, const char* UNUSED(old_input_file), FILE* ou
 	} else {
 		fseek(file, 0, SEEK_END);
 		text_len = ftell(file);
+		if (text_len < 0) {
+			ERROR("knownhosts", "ftell on the known hosts file failed (%s)", strerror(errno));
+			fclose(file);
+			return EXIT_FAILURE;
+		}
 		fseek(file, 0, SEEK_SET);
 
 		text = malloc(text_len+1);
