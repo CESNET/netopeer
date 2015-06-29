@@ -430,6 +430,7 @@ userinput:
 		INSTRUCTION(output, "Select a with-defaults mode (report-all|report-all-tagged|trim|explicit): ");
 		if (fscanf(input, "%127s", mode_aux) == EOF) {
 			ERROR(operation, "Reading user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
+			free(mode_aux);
 			return NCWD_MODE_NOTSET;
 		}
 		mode = mode_aux;
@@ -3262,6 +3263,9 @@ static int cmd_connect_listen(const char* arg, int is_connect, FILE* output, FIL
 			INSTRUCTION(output, "Hostname to connect to: ");
 			if (fscanf(input, "%1023s", host) == EOF) {
 				ERROR(func_name, "Reading the user input failed (%s).", (errno != 0) ? strerror(errno) : "Unexpected input");
+				if (hostfree) {
+					free(host);
+				}
 				goto error_cleanup;
 			}
 		} else if ((optind + 1) == cmd.count) {
@@ -3714,6 +3718,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 			if (optarg[0] == '-' || optarg[0] == '+') {
 				if ((t = time(NULL)) == -1) {
 					ERROR("subscribe", "Getting the current time failed (%s)", strerror(errno));
+					if (out) {
+						fclose(out);
+					}
 					return EXIT_FAILURE;
 				}
 				t = t + strtol(optarg, NULL, 10);
@@ -3726,6 +3733,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 					/* begin time is in future */
 					ERROR("subscribe", "Begin time cannot be set to future.");
 					clear_arglist(&cmd);
+					if (out) {
+						fclose(out);
+					}
 					return EXIT_FAILURE;
 				}
 				start = t;
@@ -3741,6 +3751,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 			}
 			if (filter == NULL) {
 				clear_arglist(&cmd);
+				if (out) {
+					fclose(out);
+				}
 				return EXIT_FAILURE;
 			}
 			break;
@@ -3755,6 +3768,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 			if (out == NULL) {
 				ERROR("create-subscription", "opening the output file failed (%s).", strerror(errno));
 				clear_arglist(&cmd);
+				if (out) {
+					fclose(out);
+				}
 				return EXIT_FAILURE;
 			}
 			break;
@@ -3762,6 +3778,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 			ERROR("create-subscription", "unknown option -%c.", c);
 			cmd_subscribe_help(output);
 			clear_arglist(&cmd);
+			if (out) {
+				fclose(out);
+			}
 			return EXIT_FAILURE;
 		}
 	}
@@ -3769,6 +3788,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	if (session == NULL) {
 		ERROR("subscribe", "NETCONF session not established, use the \'connect\' command.");
 		clear_arglist(&cmd);
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -3776,6 +3798,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	if (nc_session_notif_allowed(session) == 0) {
 		ERROR("subscribe", "Notification subscription is not allowed on this session.");
 		clear_arglist(&cmd);
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 
@@ -3783,12 +3808,18 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	if (start != -1 && stop != -1 && start > stop) {
 		ERROR("subscribe", "Subscription start time must be lower than the end time.");
 		clear_arglist(&cmd);
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 
 	if ((optind + 1) < cmd.count) {
 		ERROR("create-subscription", "invalid parameters, see \'get --help\'.");
 		clear_arglist(&cmd);
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	} else if ((optind + 1) == cmd.count) {
 		/* stream specified */
@@ -3804,10 +3835,16 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	clear_arglist(&cmd);
 	if (rpc == NULL) {
 		ERROR("create-subscription", "creating an rpc request failed.");
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 
 	if (send_recv_process("subscribe", rpc, NULL, output) != 0) {
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 	rpc = NULL; /* just note that rpc is already freed by send_recv_process() */
@@ -3826,6 +3863,9 @@ int cmd_subscribe(const char* arg, const char* old_input_file, FILE* output, FIL
 	tconfig->output = (out == NULL) ? output : out;
 	if (pthread_create(&thread, NULL, notification_thread, tconfig) != 0) {
 		ERROR("create-subscription", "creating a thread for receiving notifications failed");
+		if (out) {
+			fclose(out);
+		}
 		return EXIT_FAILURE;
 	}
 	pthread_detach(thread);
