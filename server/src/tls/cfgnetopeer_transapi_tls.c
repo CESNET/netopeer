@@ -528,7 +528,7 @@ callback_restart:
 		}
 		if (xmlStrEqual(child->name, BAD_CAST "map-type")) {
 			map_type = get_node_content(child);
-			if (strchr(map_type, ':') != NULL) {
+			if (map_type && (strchr(map_type, ':') != NULL)) {
 				map_type = strchr(map_type, ':')+1;
 			}
 		}
