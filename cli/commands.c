@@ -472,7 +472,11 @@ static struct nc_filter* set_filter(const char* operation, const char* file, int
 		}
 
 		/* map content of the file into the memory */
-		fstat(filter_fd, &filter_stat);
+		if (fstat(filter_fd, &filter_stat) != 0) {
+			ERROR(operation, "fstat failed (%s).", strerror(errno));
+			close(filter_fd);
+			return NULL;
+		}
 		filter_s = (char*)mmap(NULL, filter_stat.st_size, PROT_READ, MAP_PRIVATE, filter_fd, 0);
 		if (filter_s == MAP_FAILED) {
 			ERROR(operation, "mmapping of the filter file failed (%s).", strerror(errno));
@@ -897,7 +901,12 @@ int cmd_validate(const char* arg, const char* old_input_file, FILE* output, FILE
 				}
 
 				/* map content of the file into the memory */
-				fstat(config_fd, &config_stat);
+				if (fstat(config_fd, &config_stat) != 0) {
+					ERROR("validate", "fstat failed (%s).", strerror(errno));
+					clear_arglist(&cmd);
+					close(config_fd);
+					return EXIT_FAILURE;
+				}
 				config_m = (char*)mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
 				if (config_m == MAP_FAILED) {
 					ERROR("validate", "mmapping of the local datastore file failed (%s).", strerror(errno));
@@ -1039,7 +1048,12 @@ int cmd_copyconfig(const char* arg, const char* old_input_file, FILE* output, FI
 			}
 
 			/* map content of the file into the memory */
-			fstat(config_fd, &config_stat);
+			if (fstat(config_fd, &config_stat) != 0) {
+				ERROR("copy-config", "fstat failed (%s).", strerror(errno));
+				clear_arglist(&cmd);
+				close(config_fd);
+				return EXIT_FAILURE;
+			}
 			config_m = (char*)mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
 			if (config_m == MAP_FAILED) {
 				ERROR("copy-config", "mmapping of the local datastore file failed (%s).", strerror(errno));
@@ -3891,7 +3905,12 @@ int cmd_userrpc(const char* arg, const char* old_input_file, FILE* output, FILE*
 			}
 
 			/* map content of the file into the memory */
-			fstat(config_fd, &config_stat);
+			if (fstat(config_fd, &config_stat) != 0) {
+				ERROR("user-rpc", "fstat failed (%s).", strerror(errno));
+				clear_arglist(&cmd);
+				close(config_fd);
+				return EXIT_FAILURE;
+			}
 			config_m = (char*) mmap(NULL, config_stat.st_size, PROT_READ, MAP_PRIVATE, config_fd, 0);
 			if (config_m == MAP_FAILED) {
 				ERROR("user-rpc", "mmapping of a local datastore file failed (%s).", strerror(errno));
