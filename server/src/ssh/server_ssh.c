@@ -786,7 +786,7 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		case SSH_CHANNEL_FORWARDED_TCPIP:
 			str_subtype = "forwarded-tcpip";
 			break;
-		case SSH_CHANNEL_X11:
+		case (int)SSH_CHANNEL_X11:
 			str_subtype = "channel-x11";
 			break;
 		case SSH_CHANNEL_UNKNOWN:
@@ -920,14 +920,14 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 			return 0;
 		}
 	} else if (client->authenticated) {
-		if (type == SSH_REQUEST_CHANNEL_OPEN && subtype == SSH_CHANNEL_SESSION) {
+		if (type == SSH_REQUEST_CHANNEL_OPEN && subtype == (int)SSH_CHANNEL_SESSION) {
 			ssh_channel chan;
 			if ((chan = ssh_message_channel_request_open_reply_accept(msg)) == NULL) {
 				ssh_message_reply_default(msg);
 			}
 			sshcb_channel_open(client, chan);
 			return 0;
-		} else if (type == SSH_REQUEST_CHANNEL && (enum ssh_channel_requests_e)subtype == SSH_CHANNEL_REQUEST_SUBSYSTEM) {
+		} else if (type == SSH_REQUEST_CHANNEL && subtype == (int)SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
 			} else {
