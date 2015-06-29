@@ -74,11 +74,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 extern struct np_options netopeer_options;
 extern int quit;
 
-#ifndef DISABLE_CALLHOME
-
 static struct ch_app* callhome_apps = NULL;
-
-#endif
 
 static void free_all_bind_addr(struct np_bind_addr** list) {
 	struct np_bind_addr* prev;
@@ -312,8 +308,6 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 
 	return EXIT_SUCCESS;
 }
-
-#ifndef DISABLE_CALLHOME
 
 static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name) {
 	xmlNodePtr child;
@@ -768,8 +762,6 @@ int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_
 	return EXIT_SUCCESS;
 }
 
-#endif
-
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
 
@@ -823,12 +815,10 @@ void server_transapi_close(void) {
 	free_all_bind_addr(&netopeer_options.binds);
 	pthread_mutex_unlock(&netopeer_options.binds_lock);
 
-#ifndef DISABLE_CALLHOME
 	nc_verb_verbose("NETCONF Call Home cleanup.");
 	while (callhome_apps != NULL) {
 		app_rm(callhome_apps->name, callhome_apps->transport);
 	}
-#endif
 }
 
 /*

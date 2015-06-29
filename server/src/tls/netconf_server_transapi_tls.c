@@ -128,20 +128,8 @@ int callback_srv_netconf_srv_tls_srv_listen_srv_interface(void** UNUSED(data), X
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
 int callback_srv_netconf_srv_tls_srv_call_home_srv_applications_srv_application(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-#ifndef DISABLE_CALLHOME
 	return callback_srv_netconf_srv_call_home_srv_applications_srv_application(op, old_node, new_node, error, NC_TRANSPORT_TLS);
-#else
-	(void)op;
-	(void)old_node;
-	(void)new_node;
-	(void)error;
-
-	nc_verb_warning("Callhome is not supported in libnetconf!");
-	return EXIT_SUCCESS;
-#endif
 }
-
-#ifndef DISABLE_CALLHOME
 
 int np_tls_chapp_linger_check(struct ch_app* app) {
 	struct timeval cur_time;
@@ -158,8 +146,6 @@ int np_tls_chapp_linger_check(struct ch_app* app) {
 
 	return 0;
 }
-
-#endif
 
 int server_transapi_init_tls(void) {
 	xmlDocPtr doc = NULL;

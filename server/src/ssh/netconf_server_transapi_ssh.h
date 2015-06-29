@@ -1,11 +1,7 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_SSH_H_
 #define _NETCONF_SERVER_TRANSAPI_SSH_H_
 
-#ifndef DISABLE_CALLHOME
-
 int np_ssh_chapp_linger_check(struct ch_app* app);
-
-#endif
 
 int server_transapi_init_ssh(void);
 

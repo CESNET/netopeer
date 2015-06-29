@@ -318,12 +318,9 @@ AC_ARG_WITH([libnetconf],
 )
 
 # libnetconf
-callhome=yes
 AC_SEARCH_LIBS([nc_callhome_listen], [netconf], [],
 	[
-		AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]);
-		CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME";
-		callhome=no;
+		AC_MSG_ERROR([libnetconf is compiled without libssh, netopeer cannot be compiled!]);
 		AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [],
 		[
 			AC_MSG_ERROR([libnetconf does not support notifications.]);
@@ -381,16 +378,11 @@ if test "$SSH" = "yes"; then
 
 	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_ssh)"
 
-	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
+	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature><feature>outbound-ssh</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>ssh</feature>"
 
-	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh"
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh,outbound-ssh"
 	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},ssh"
-
-	if test "$callhome" = "yes"; then
-		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
-		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-ssh"
-	fi
 fi
 if test "$TLS" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_TLS"
@@ -405,20 +397,15 @@ if test "$TLS" = "yes"; then
 		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls)"
 	fi
 
-	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
+	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
 
 	if test "$SSH" = "yes"; then
 		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
 	fi
 
-	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls"
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls,outbound-tls"
 	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},tls"
-
-	if test "$callhome" = "yes"; then
-		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
-		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-tls"
-	fi
 fi
 
 if (test "$SSH" = "no") && (test "$TLS" = "no"); then
