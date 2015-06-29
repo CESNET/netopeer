@@ -422,7 +422,9 @@ char* readinput(const char* instruction, const char* tmpfile, FILE* output) {
 	return input;
 
 fail:
-	close(tmpfd);
+	if (tmpfd > -1) {
+		close(tmpfd);
+	}
 	if (tmpname != NULL) {
 		unlink(tmpname);
 	}
