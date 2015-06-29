@@ -2909,7 +2909,6 @@ fi
 
 REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
-SERVER_LIBS=$LIBS
 
 
 ############################ Check for programs ################################
@@ -5066,6 +5065,8 @@ fi
 # remove backup files
 rm -f config/Netopeer.xml.orig
 rm -f config/NETCONF-server.xml.orig
+
+SERVER_LIBS=$LIBS
 
 ###################### Check for configure parameters ##########################
 
