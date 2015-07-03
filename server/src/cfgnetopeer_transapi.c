@@ -179,6 +179,9 @@ static int parse_model_cfg(struct np_module* module, xmlNodePtr node, NCDS_TYPE 
 	/* cut off the .yin suffix */
 	aux = strrchr(name, '.');
 	if (aux) { *aux = '\0';}
+	/* cut off @revision info */
+	aux = strrchr(name, '@');
+	if (aux) { *aux = '\0';}
 
 	free(model_path);
 	free(transapi_path);
@@ -188,9 +191,19 @@ static int parse_model_cfg(struct np_module* module, xmlNodePtr node, NCDS_TYPE 
 		if (xmlStrcmp(aux_node->name, BAD_CAST "feature") == 0) {
 			feature = (char*)xmlNodeGetContent(aux_node);
 			if (strcmp(feature, "*") == 0) {
-				ncds_features_enableall(name);
+				if (ncds_features_enableall(name)) {
+					nc_verb_error("Enabling all features in \"%s\" module failed.", name);
+					free(name);
+					return EXIT_FAILURE;
+				}
+				nc_verb_verbose("All features in \"%s\" module enabled.", name);
 			} else {
-				ncds_feature_enable(name, feature);
+				if (ncds_feature_enable(name, feature)) {
+					nc_verb_error("Enabling \"%s\" features in \"%s\" module failed.", feature, name);
+					free(name);
+					return EXIT_FAILURE;
+				}
+				nc_verb_verbose("\"%s\" features in \"%s\" module enabled.", feature, name);
 			}
 			free(feature);
 		}
