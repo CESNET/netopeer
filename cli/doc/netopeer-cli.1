@@ -372,7 +372,7 @@ This is the default value.
 .RS 4
 Specify path to a file containing edit configuration data. The content of the
 file is placed into the <config> element of the \fIedit-config\fR operation.
-Therefore, it don't have to be a well-formed XML document with only a single
+Therefore, it doesn't have to be a well-formed XML document with only a single
 root element. If neither \fI\-\-config\fR nor \fI\-\-url\fR is specified, user
 is prompted to write edit configuration data manually. For examples, see the
 .B EDIT-CONFIG
@@ -461,7 +461,7 @@ configuration datastore cannot be retrieved.
 .RE
 .SS get-schema
 Perform NETCONF <get-schema> operation that retrieves specified data model used
-by the server. This operation is available only if the server implements YANG
+by the server. This operation is available only if the server implements the YANG
 Module for NETCONF Monitoring. The list of available schemas can be retrieved from
 .I /netconf-state/schemas
 subtree via the <get> operation. For more details see \fIRFC 6022 sections 3.1 and 4\fR.
@@ -830,12 +830,155 @@ Only data that do not contain default values are retrieved.
 .PP
 .B explicit
 .RS 4
-Only data explicitly set by the client are retrieved despite they contain
-default values or not.
+Only data explicitly set by the client are retrieved with
+or without default values.
 .RE
 .RE
 .SH "EDIT-CONFIG"
-TBD
+The netopeer command line interface (CLI) is a NETCONF
+client (RFC 6241).  This client can format a NETCONF "edit-config" RPC
+message with information supplied by the CLI user.  When it follows
+a successful netopeer-cli "connect" operation,
+the client's edit-config RPC asks the connected
+server to initialize or replace values in a specific
+datastore.  This is shown in the example netopeer-cli session
+that follows:
+.br
+.br
+
+.br
+# sudo ./netopeer-cli
+.br
+netconf> connect --login username localhost
+.br
+username@localhost password:
+.br
+netconf> edit-config --defop replace --config edit-config.yin running
+.br
+
+.br
+  Result OK
+.br
+netconf> quit
+.br
+# cat edit-config.yin
+.br
+<interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"
+.br
+            xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type">
+.br
+ <interface>
+.br
+   <name>eth1</name>
+.br
+   <type>ianaift:ethernetCsmacd</type>
+.br
+   <enabled>false</enabled>
+.br
+ </interface>
+.br
+</interfaces>
+.br
+#
+.br
+
+.br
+As shown above, "--config edit-config.yin" is the
+file input to the edit-config request.  The file identifies
+the target objects by name and type, and it requests to set
+the "enabled" object to false on an RFC 7223-defined network interface.
+The object instance is under the control of the server and one of
+its datastores is
+the target of the request.  The NETCONF server runs
+on localhost in the above example.  In crafting an edit-config
+request, the --config file must use the prefixes and names from
+the target datastore's schema definition.  Thus, "ianaift" is the
+only prefix name for the particular ietf-interfaces instance.
+A <type> element is also required for the edit-config --config file.
+The CLI user can obtain these metadata and instance data
+as follows:
+.br
+
+.br
+# sudo ./netopeer-cli
+.br
+netconf> connect --login username localhost
+.br
+username@localhost password:
+.br
+netconf> get-config ietf-interfaces
+.br
+
+.br
+  Select target datastore (running|startup|candidate|url:<dsturl>): running
+.br
+
+.br
+  Result:
+.br
+<interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
+.br
+    <interface>
+.br
+      <name>eth1</name>
+.br
+      <type xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type">ianaift:ethernetCsmacd</type>
+.br
+      <enabled>true</enabled>
+.br
+      <ipv6 xmlns="urn:ietf:params:xml:ns:yang:ietf-ip">
+.br
+        <enabled>true</enabled>
+.br
+        <forwarding>false</forwarding>
+.br
+        <mtu>1500</mtu>
+.br
+        <dup-addr-detect-transmits>1</dup-addr-detect-transmits>
+.br
+        <autoconf>
+.br
+          <create-global-addresses>true</create-global-addresses>
+.br
+          <create-temporary-addresses>false</create-temporary-addresses>
+.br
+          <temporary-valid-lifetime>604800</temporary-valid-lifetime>
+.br
+          <temporary-preferred-lifetime>86400</temporary-preferred-lifetime>
+.br
+        </autoconf>
+.br
+      </ipv6>
+.br
+    </interface>
+.br
+
+.br
+  ...
+.br
+
+.br
+  </netopeer><nacm xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-acm">
+.br
+    <enable-nacm>false</enable-nacm>
+.br
+  </nacm>
+.br
+netconf>
+.br
+
+.br
+The elipses ("...") above indicate that the "get-config ietf-interfaces"
+command output is abbreviated.  The information that is used for crafting
+a --config file input to the edit-config command is shown above.
+As stated above, the type element needs to be included and the prefix must be exact:
+.br
+
+.br
+<type xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type">ianaift:ethernetCsmacd</type>
+.br
+
+.br
 .SH "SEE ALSO"
 .BR netopeer-agent(1),
 .BR netopeer-configurator(1),
