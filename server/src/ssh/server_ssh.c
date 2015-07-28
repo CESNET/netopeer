@@ -175,11 +175,25 @@ static void* netconf_session_thread(void* arg) {
 	return NULL;
 }
 
+static void start_netconf_session_thread(struct client_struct_ssh* client, struct chan_struct* channel) {
+	int ret;
+	struct ncsess_thread_config* nstc;
+
+	/* start a separate thread for NETCONF session accept */
+	nstc = malloc(sizeof(struct ncsess_thread_config));
+	nstc->chan = channel;
+	nstc->client = client;
+	if ((ret = pthread_create(&channel->new_sess_tid, NULL, netconf_session_thread, nstc)) != 0) {
+		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
+		free(nstc);
+		channel->to_free = 1;
+		return;
+	}
+	pthread_detach(channel->new_sess_tid);
+}
+
 /* return 0 - OK, -1 error */
 static int sshcb_channel_subsystem(struct client_struct_ssh* client, struct chan_struct* channel, const char* subsystem) {
-	struct ncsess_thread_config* nstc;
-	int ret;
-
 	if (strcmp(subsystem, "netconf") == 0) {
 		if (channel->netconf_subsystem) {
 			nc_verb_warning("Client '%s' requested subsystem 'netconf' for the second time", client->username);
@@ -189,18 +203,6 @@ static int sshcb_channel_subsystem(struct client_struct_ssh* client, struct chan
 			if (channel->new_sess_tid != 0) {
 				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 			}
-
-			/* start a separate thread for NETCONF session accept */
-			nstc = malloc(sizeof(struct ncsess_thread_config));
-			nstc->chan = channel;
-			nstc->client = client;
-			if ((ret = pthread_create(&channel->new_sess_tid, NULL, netconf_session_thread, nstc)) != 0) {
-				nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
-				free(nstc);
-				channel->to_free = 1;
-				return -1;
-			}
-			pthread_detach(channel->new_sess_tid);
 		}
 	} else {
 		nc_verb_warning("Client '%s' requested unknown subsystem '%s'", client->username, subsystem);
@@ -930,6 +932,7 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		} else if (type == SSH_REQUEST_CHANNEL && subtype == (int)SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
+				start_netconf_session_thread(client, channel);
 			} else {
 				ssh_message_reply_default(msg);
 			}
