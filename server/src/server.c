@@ -593,9 +593,18 @@ void listen_loop(int do_init) {
 				continue;
 			}
 
+			/* add the client into the global clients structure */
+			/* GLOBAL WRITE LOCK */
+			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			client_append(&netopeer_state.clients, new_client);
+			/* GLOBAL WRITE UNLOCK */
+			pthread_rwlock_unlock(&netopeer_state.global_lock);
+
 			/* start the client thread */
 			if ((ret = pthread_create((pthread_t*)&new_client->tid, NULL, client_main_thread, (void*)new_client)) != 0) {
 				nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+				np_client_detach(&netopeer_state.clients, new_client);
+
 				new_client->tid = 0;
 				new_client->to_free = 1;
 				switch (new_client->transport) {
@@ -615,13 +624,6 @@ void listen_loop(int do_init) {
 				}
 				continue;
 			}
-
-			/* add the client into the global clients structure */
-			/* GLOBAL WRITE LOCK */
-			pthread_rwlock_wrlock(&netopeer_state.global_lock);
-			client_append(&netopeer_state.clients, new_client);
-			/* GLOBAL WRITE UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
 		}
 
 	} while (!quit && !restart_soft);
