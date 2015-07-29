@@ -197,17 +197,20 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 	gettimeofday(&cur_time, NULL);
 
 	/* check the channel for hello timeout */
-	if (channel->nc_sess == NULL && timeval_diff(cur_time, channel->last_rpc_time) >= netopeer_options.hello_timeout) {
-		if (channel->new_sess_tid == 0) {
-			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		} else {
-			while (pthread_cancel(channel->new_sess_tid) != ESRCH) {
-				usleep(5);
+	while (channel->nc_sess == NULL) {
+		if (timeval_diff(cur_time, channel->last_rpc_time) >= netopeer_options.hello_timeout) {
+			if (channel->new_sess_tid == 0) {
+				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+			} else {
+				while (pthread_cancel(channel->new_sess_tid) != ESRCH) {
+					usleep(5);
+				}
+				channel->new_sess_tid = 0;
 			}
-			channel->new_sess_tid = 0;
+			nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
+			channel->to_free = 1;
 		}
-		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
-		channel->to_free = 1;
+		usleep(100000);
 	}
 }
 
