@@ -188,7 +188,6 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 		channel->to_free = 1;
 		return;
 	}
-	pthread_detach(channel->new_sess_tid);
 
 	gettimeofday(&cur_time, NULL);
 
@@ -202,13 +201,14 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 				while (pthread_cancel(channel->new_sess_tid) != ESRCH) {
 					usleep(5);
 				}
-				channel->new_sess_tid = 0;
 			}
 			nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
 			channel->to_free = 1;
+			break;
 		}
 		usleep(100000);
 	}
+	pthread_join(channel->new_sess_tid, NULL);
 
 	/* new session was created */
 	channel->new_sess_tid = 0;
@@ -481,6 +481,9 @@ int np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 				continue;
 			}
 			start_wait_netconf_session_thread(client, chan);
+			if (chan->nc_sess == NULL) {
+				continue;
+			}
 		}
 
 		/* receive a new RPC */
