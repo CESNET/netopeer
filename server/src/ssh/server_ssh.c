@@ -39,10 +39,6 @@ static inline void _chan_free(struct client_struct_ssh* client, struct chan_stru
 		nc_session_free(chan->nc_sess);
 	}
 
-	if (chan->new_sess_tid != 0) {
-		pthread_cancel(chan->new_sess_tid);
-	}
-
 	if (chan->ssh_chan != NULL && client->ssh_chans->next != NULL) {
 		ssh_channel_free(chan->ssh_chan);
 	}
@@ -143,73 +139,32 @@ static struct chan_struct* client_find_channel_by_sid(struct client_struct_ssh* 
 	return chan;
 }
 
-/* separate thread because nc_session_accept_inout is blocking */
-static void* netconf_session_thread(void* arg) {
-	struct ncsess_thread_config* nstc = (struct ncsess_thread_config*)arg;
+static int create_netconf_session(struct client_struct_ssh* client, struct chan_struct* channel) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	nstc->chan->nc_sess = nc_session_accept_libssh_channel(caps, nstc->client->username, nstc->chan->ssh_chan);
+	channel->nc_sess = nc_session_accept_libssh_channel(caps, client->username, channel->ssh_chan);
 	nc_cpblts_free(caps);
-	if (nstc->chan->to_free == 1) {
+	if (channel->to_free == 1) {
 		/* probably a signal received */
-		if (nstc->chan->nc_sess != NULL) {
+		if (channel->nc_sess != NULL) {
 			/* unlikely to happen */
-			nc_session_free(nstc->chan->nc_sess);
+			nc_session_free(channel->nc_sess);
+			channel->nc_sess = NULL;
 		}
-		return NULL;
+		return EXIT_FAILURE;
 	}
-	if (nstc->chan->nc_sess == NULL) {
+	if (channel->nc_sess == NULL) {
 		nc_verb_error("%s: failed to create a new NETCONF session", __func__);
-		nstc->chan->to_free = 1;
-		return NULL;
-	}
-
-	return NULL;
-}
-
-static void start_wait_netconf_session_thread(struct client_struct_ssh* client, struct chan_struct* channel) {
-	int ret;
-	struct ncsess_thread_config* nstc;
-	struct timeval cur_time;
-
-	/* start a separate thread for NETCONF session accept */
-	nstc = malloc(sizeof(struct ncsess_thread_config));
-	nstc->chan = channel;
-	nstc->client = client;
-	if ((ret = pthread_create(&channel->new_sess_tid, NULL, netconf_session_thread, nstc)) != 0) {
-		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
-		free(nstc);
 		channel->to_free = 1;
-		return;
+		return EXIT_FAILURE;
 	}
-
-	gettimeofday(&cur_time, NULL);
-
-	/* check the channel for hello timeout */
-	while (channel->nc_sess == NULL) {
-		gettimeofday(&cur_time, NULL);
-		if (timeval_diff(cur_time, channel->last_rpc_time) >= netopeer_options.hello_timeout) {
-			if (channel->new_sess_tid == 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			} else {
-				while (pthread_cancel(channel->new_sess_tid) != ESRCH) {
-					usleep(5);
-				}
-			}
-			nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
-			channel->to_free = 1;
-			break;
-		}
-		usleep(100000);
-	}
-	pthread_join(channel->new_sess_tid, NULL);
-	free(nstc);
 
 	/* new session was created */
-	channel->new_sess_tid = 0;
 	nc_verb_verbose("New server session for '%s' with ID %s", client->username, nc_session_get_id(channel->nc_sess));
 	gettimeofday((struct timeval*)&channel->last_rpc_time, NULL);
+
+	return EXIT_SUCCESS;
 }
 
 /* return 0 - OK, -1 error */
@@ -219,10 +174,6 @@ static int sshcb_channel_subsystem(struct client_struct_ssh* client, struct chan
 			nc_verb_warning("Client '%s' requested subsystem 'netconf' for the second time", client->username);
 		} else {
 			channel->netconf_subsystem = 1;
-
-			if (channel->new_sess_tid != 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			}
 		}
 	} else {
 		nc_verb_warning("Client '%s' requested unknown subsystem '%s'", client->username, subsystem);
@@ -476,8 +427,7 @@ int np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 			if (!chan->netconf_subsystem) {
 				continue;
 			}
-			start_wait_netconf_session_thread(client, chan);
-			if (chan->nc_sess == NULL) {
+			if (create_netconf_session(client, chan)) {
 				continue;
 			}
 		}
