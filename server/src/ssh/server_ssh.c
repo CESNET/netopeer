@@ -148,8 +148,6 @@ static void* netconf_session_thread(void* arg) {
 	struct ncsess_thread_config* nstc = (struct ncsess_thread_config*)arg;
 	struct nc_cpblts* caps = NULL;
 
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
 	caps = nc_session_get_cpblts_default();
 	nstc->chan->nc_sess = nc_session_accept_libssh_channel(caps, nstc->client->username, nstc->chan->ssh_chan);
 	nc_cpblts_free(caps);
