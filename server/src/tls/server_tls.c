@@ -680,6 +680,8 @@ void* netconf_session_thread(void* arg) {
 	struct client_struct_tls* client = (struct client_struct_tls*)arg;
 	struct nc_cpblts* caps = NULL;
 
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
 	caps = nc_session_get_cpblts_default();
 	client->nc_sess = nc_session_accept_tls(caps, client->username, client->tls);
 	nc_cpblts_free(caps);

@@ -148,6 +148,8 @@ static void* netconf_session_thread(void* arg) {
 	struct ncsess_thread_config* nstc = (struct ncsess_thread_config*)arg;
 	struct nc_cpblts* caps = NULL;
 
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
 	caps = nc_session_get_cpblts_default();
 	nstc->chan->nc_sess = nc_session_accept_libssh_channel(caps, nstc->client->username, nstc->chan->ssh_chan);
 	nc_cpblts_free(caps);
@@ -175,9 +177,10 @@ static void* netconf_session_thread(void* arg) {
 	return NULL;
 }
 
-static void start_netconf_session_thread(struct client_struct_ssh* client, struct chan_struct* channel) {
+static void start_wait_netconf_session_thread(struct client_struct_ssh* client, struct chan_struct* channel) {
 	int ret;
 	struct ncsess_thread_config* nstc;
+	struct timeval cur_time;
 
 	/* start a separate thread for NETCONF session accept */
 	nstc = malloc(sizeof(struct ncsess_thread_config));
@@ -190,6 +193,22 @@ static void start_netconf_session_thread(struct client_struct_ssh* client, struc
 		return;
 	}
 	pthread_detach(channel->new_sess_tid);
+
+	gettimeofday(&cur_time, NULL);
+
+	/* check the channel for hello timeout */
+	if (channel->nc_sess == NULL && timeval_diff(cur_time, channel->last_rpc_time) >= netopeer_options.hello_timeout) {
+		if (channel->new_sess_tid == 0) {
+			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
+		} else {
+			while (pthread_cancel(channel->new_sess_tid) != ESRCH) {
+				usleep(5);
+			}
+			channel->new_sess_tid = 0;
+		}
+		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
+		channel->to_free = 1;
+	}
 }
 
 /* return 0 - OK, -1 error */
@@ -717,18 +736,6 @@ int np_ssh_client_transport(struct client_struct_ssh* client) {
 			}
 		}
 
-		/* check the channel for hello timeout */
-		if (chan->nc_sess == NULL && timeval_diff(cur_time, chan->last_rpc_time) >= netopeer_options.hello_timeout) {
-			if (chan->new_sess_tid == 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			} else {
-				pthread_cancel(chan->new_sess_tid);
-				chan->new_sess_tid = 0;
-			}
-			nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
-			chan->to_free = 1;
-		}
-
 		/* check the channel for idle timeout */
 		if (timeval_diff(cur_time, chan->last_rpc_time) >= netopeer_options.idle_timeout) {
 			/* check for active event subscriptions, in that case we can never disconnect an idle session */
@@ -932,7 +939,7 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		} else if (type == SSH_REQUEST_CHANNEL && subtype == (int)SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
-				start_netconf_session_thread(client, channel);
+				start_wait_netconf_session_thread(client, channel);
 			} else {
 				ssh_message_reply_default(msg);
 			}
