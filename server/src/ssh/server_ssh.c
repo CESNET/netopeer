@@ -159,17 +159,14 @@ static void* netconf_session_thread(void* arg) {
 			/* unlikely to happen */
 			nc_session_free(nstc->chan->nc_sess);
 		}
-		free(nstc);
 		return NULL;
 	}
 	if (nstc->chan->nc_sess == NULL) {
 		nc_verb_error("%s: failed to create a new NETCONF session", __func__);
 		nstc->chan->to_free = 1;
-		free(nstc);
 		return NULL;
 	}
 
-	free(nstc);
 	return NULL;
 }
 
@@ -209,6 +206,7 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 		usleep(100000);
 	}
 	pthread_join(channel->new_sess_tid, NULL);
+	free(nstc);
 
 	/* new session was created */
 	channel->new_sess_tid = 0;
