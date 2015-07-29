@@ -169,10 +169,6 @@ static void* netconf_session_thread(void* arg) {
 		return NULL;
 	}
 
-	nstc->chan->new_sess_tid = 0;
-	nc_verb_verbose("New server session for '%s' with ID %s", nstc->client->username, nc_session_get_id(nstc->chan->nc_sess));
-	gettimeofday((struct timeval*)&nstc->chan->last_rpc_time, NULL);
-
 	free(nstc);
 	return NULL;
 }
@@ -198,6 +194,7 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 
 	/* check the channel for hello timeout */
 	while (channel->nc_sess == NULL) {
+		gettimeofday(&cur_time, NULL);
 		if (timeval_diff(cur_time, channel->last_rpc_time) >= netopeer_options.hello_timeout) {
 			if (channel->new_sess_tid == 0) {
 				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
@@ -212,6 +209,11 @@ static void start_wait_netconf_session_thread(struct client_struct_ssh* client, 
 		}
 		usleep(100000);
 	}
+
+	/* new session was created */
+	channel->new_sess_tid = 0;
+	nc_verb_verbose("New server session for '%s' with ID %s", client->username, nc_session_get_id(channel->nc_sess));
+	gettimeofday((struct timeval*)&channel->last_rpc_time, NULL);
 }
 
 /* return 0 - OK, -1 error */
@@ -468,11 +470,17 @@ int np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 	}
 
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->to_free || chan->nc_sess == NULL) {
-			if (chan->to_free) {
-				++skip_sleep;
-			}
+		if (chan->to_free) {
+			++skip_sleep;
 			continue;
+		}
+
+		/* block this client until the hello is received */
+		if (chan->nc_sess == NULL) {
+			if (!chan->netconf_subsystem) {
+				continue;
+			}
+			start_wait_netconf_session_thread(client, chan);
 		}
 
 		/* receive a new RPC */
@@ -942,7 +950,6 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		} else if (type == SSH_REQUEST_CHANNEL && subtype == (int)SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
-				start_wait_netconf_session_thread(client, channel);
 			} else {
 				ssh_message_reply_default(msg);
 			}
