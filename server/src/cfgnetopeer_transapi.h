@@ -5,7 +5,6 @@
 
 struct np_options {
 	uint8_t verbose;
-	uint32_t hello_timeout;
 	uint32_t idle_timeout;
 	uint16_t max_sessions;
 	uint16_t response_time;

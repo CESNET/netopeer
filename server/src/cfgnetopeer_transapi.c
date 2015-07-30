@@ -431,7 +431,8 @@ int callback_n_netopeer_n_hello_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlN
 	uint32_t num;
 
 	if (op & XMLDIFF_REM) {
-		netopeer_options.hello_timeout = 600;
+		/* set default value */
+		nc_hello_timeout(600 * 1000);
 		return EXIT_SUCCESS;
 	}
 
@@ -453,7 +454,7 @@ int callback_n_netopeer_n_hello_timeout(void** UNUSED(data), XMLDIFF_OP op, xmlN
 		return EXIT_FAILURE;
 	}
 
-	netopeer_options.hello_timeout = num;
+	nc_hello_timeout(num * 1000);
 	return EXIT_SUCCESS;
 }
 
