@@ -401,7 +401,7 @@ static void* app_loop(void* app_v) {
 
 	nc_verb_verbose("Starting Call Home thread (%s).", app->name);
 
-	nc_session_transport(NC_TRANSPORT_SSH);
+	nc_session_transport(app->transport);
 
 	for (;;) {
 		pthread_testcancel();
@@ -423,6 +423,7 @@ static void* app_loop(void* app_v) {
 		for (;;) {
 			for (i = 0; i < app->rec_count; ++i) {
 				if ((app->client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
+                    app->client->transport = app->transport;
 					break;
 				}
 				sleep(app->rec_interval);
@@ -438,7 +439,7 @@ static void* app_loop(void* app_v) {
 			}
 		}
 
-		/* publish the new client for the main application loop to create a new SSH session */
+		/* publish the new client for the main application loop to create a new session */
 		while (1) {
 			/* CALLHOME LOCK */
 			pthread_mutex_lock(&callhome_lock);
