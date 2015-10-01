@@ -16,8 +16,17 @@
 #include <ctype.h>
 #include <pwd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/utsname.h>
 #include <sys/sysinfo.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <arpa/inet.h> // Network
+
+#include "parse.h"
+
+#define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 
 #ifdef __GNUC__
 #	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
@@ -54,7 +63,7 @@ Feel free to use it to distinguish module behavior for different error-option va
 NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
 struct tmz {
-	int minute_offset;
+	int minute_offset; 
 	char* zonename;
 	char* TZString;
 };
@@ -239,49 +248,149 @@ static const char* get_node_content(const xmlNodePtr node) {
 	return ((char*)(node->children->content));
 }
 
-static int search_in_line(char *line, char *str) {   
-    if((strstr(line, str)) != NULL) {
-        return (EXIT_SUCCESS);
-    }
-    
-    return (EXIT_FAILURE);
+static int ntp_cmd(const char* cmd)
+{
+	int status;
+	pid_t pid;
+
+	if ((pid = vfork()) == -1) {
+		nc_verb_error("fork failed (%s).", strerror(errno));
+		return EXIT_FAILURE;
+	} else if (pid == 0) {
+		/* child */
+		int fd = open("/dev/null", O_RDONLY);
+		if (fd == -1) {
+			nc_verb_warning("Opening NULL dev failed (%s).", strerror(errno));
+		} else {
+			dup2(fd, STDIN_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			dup2(fd, STDERR_FILENO);
+			close(fd);
+		}
+		execl("/etc/init.d/sysntpd", "/etc/init.d/sysntpd", cmd, (char*)NULL);
+		nc_verb_error("exec failed (%s).", strerror(errno));
+		return EXIT_FAILURE;
+	}
+
+	if (waitpid(pid, &status, 0) == -1) {
+		nc_verb_error("Failed to wait for the service child (%s).", strerror(errno));
+		return EXIT_FAILURE;
+	}
+
+	if (WEXITSTATUS(status) != 0) {
+		if (strcmp(cmd, "status")) {
+			nc_verb_error("Unable to %s NTP service (command returned %d).", cmd, WEXITSTATUS(status));
+		}
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }
 
-static int replace_in_system_file(char *replacement, char *value) {
-	FILE *system_f;
-	FILE *replic_f;
-	char * line = NULL;
-    int searchResult = EXIT_FAILURE;
-    size_t len = 0;
-    size_t read;
+int ntp_start(void)
+{
+	return ntp_cmd("start");
+}
 
-	system_f = fopen("/etc/config/system", "r");
-    replic_f = fopen("/etc/config/replic", "w");
-    
-    while ((read = getline(&line, &len, system_f)) != -1) {  
-        searchResult = search_in_line(line, replacement);
+int ntp_stop(void)
+{
+	return ntp_cmd("stop");
+}
 
-        if (searchResult == EXIT_SUCCESS) {
-        	fprintf (replic_f, "	%s '%s'\n", replacement, value);
-        }
+int ntp_restart(void)
+{
+	return ntp_cmd("restart");
+}
 
-        else {
-            fprintf (replic_f, "%s", line);
-        }
-        
-    }
+static int set_ntp_enabled(const char *value)
+{
+	t_element_type type = OPTION;
+	char *path = "system.ntp.enabled";
 
-	fclose(system_f);
-    fclose(replic_f);
-    remove("/etc/config/system");
-    rename("/etc/config/replic", "/etc/config/system");
+	if (edit_config(path, value, type) != EXIT_SUCCESS) {
+		return (EXIT_FAILURE);
+	}
 
-    return (EXIT_SUCCESS);
+	return (EXIT_SUCCESS);
+}
+
+static int ntp_add_server(const char *value, const char* association_type, char** msg)
+{
+	if (strcmp(association_type, "server") == 0) {
+		t_element_type type = OPTION;
+		char *path = "system.ntp.enable_server";
+
+		if (edit_config(path, "1", type) != EXIT_SUCCESS) {
+			asprintf(msg, "Setting NTP %s failed", association_type);
+			return (EXIT_FAILURE);
+		}
+	}
+
+	t_element_type type = LIST;
+	char *path = "system.ntp.server";
+
+	if (edit_config(path, value, type) != EXIT_SUCCESS) {
+		asprintf(msg, "Setting NTP %s failed", association_type);
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
+}
+
+char** ntp_resolve_server(const char* server_name, char** msg)
+{
+	struct sockaddr_in* addr4;
+	struct sockaddr_in6* addr6;
+	char buffer[INET6_ADDRSTRLEN + 1];
+	struct addrinfo* current;
+	struct addrinfo* addrs;
+	struct addrinfo hints;
+	char** ret = NULL;
+	int r, i, count;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	if ((r = getaddrinfo(server_name, NULL, &hints, &addrs)) != 0) {
+		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(r));
+		return NULL;
+	}
+
+	/* count returned addresses */
+	for (current = addrs, count = 0; current != NULL; current = current->ai_next, count++);
+	if (count == 0) {
+		*msg = strdup("\"%s\" cannot be resolved.");
+		return NULL;
+	}
+
+	/* get array for returning */
+	ret = malloc(count * sizeof(char*));
+	for (i = 0, current = addrs; i < count; i++, current = current->ai_next) {
+		switch (current->ai_addr->sa_family) {
+		case AF_INET:
+			addr4 = (struct sockaddr_in*) current->ai_addr;
+			ret[i] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
+			break;
+
+		case AF_INET6:
+			addr6 = (struct sockaddr_in6*) current->ai_addr;
+			ret[i] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
+			break;
+		}
+	}
+	ret[i] = NULL; /* terminating NULL byte */
+	freeaddrinfo(addrs);
+
+	return ret;
 }
 
 static int set_hostname(const char* name)
 {
 	FILE* hostname_f;
+	char *path = "system.hostname";
+	t_element_type type = OPTION;
 
     if (name == NULL || strlen(name) == 0) {
 		return (EXIT_FAILURE);
@@ -297,7 +406,7 @@ static int set_hostname(const char* name)
 		return (EXIT_FAILURE);
 	}
 
-	if ((replace_in_system_file("option hostname", name)) != (EXIT_SUCCESS)) {
+	if (edit_config(path, name, type) != (EXIT_SUCCESS)) {
 		nc_verb_error("Unable to write hostname to system config file");
 		fclose(hostname_f);
 		return (EXIT_FAILURE);
@@ -350,9 +459,10 @@ static char* get_timezone(void)
 
 static int set_timezone(const char* zone)
 {
-	char* command = NULL;
 	char* result = NULL;
 	FILE* timezone_f;
+	char *path = "system.timezone";
+	t_element_type type = OPTION;
 
 	if (zone == NULL || strlen(zone) == 0) {
 		return (EXIT_FAILURE);
@@ -368,7 +478,7 @@ static int set_timezone(const char* zone)
 		return (EXIT_FAILURE);
 	}
 
-	if ((replace_in_system_file("option timezone", zone)) != (EXIT_SUCCESS)) {
+	if ((edit_config(path, zone, type)) != (EXIT_SUCCESS)) {
 		nc_verb_error("Unable to write timezone to system config file");
 		fclose(timezone_f);
 		return (EXIT_FAILURE);
@@ -642,18 +752,194 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void **
 	return EXIT_SUCCESS;
 }
 
+static bool ntp_restart_flag = false;
+
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:ntp/systemns:enabled changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_ntp_systemns_enabled(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
+{
+	char* msg = NULL;
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		if (strcmp(get_node_content(new_node), "true") == 0) {
+			if (set_ntp_enabled("1") == EXIT_SUCCESS) {
+				ntp_restart_flag = false;
+			} else {
+				asprintf(&msg, "Failed to start NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
+			if (ntp_start() == EXIT_SUCCESS) {
+				/* flag for parent callback */
+				ntp_restart_flag = false;
+			} else {
+				asprintf(&msg, "Failed to start NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else if (strcmp(get_node_content(new_node), "false") == 0) {
+			if (ntp_stop() != EXIT_SUCCESS) {
+				asprintf(&msg, "Failed to stop NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else {
+			asprintf(&msg, "Unkown value \"%s\" in the NTP enabled field.", get_node_content(new_node));
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		/* Nothing to do for us, should never happen since there is a default value */
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the ntp-enabled callback.", op);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:ntp/systemns:server changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	xmlNodePtr cur, child, node;
+	int i;
+	char* msg = NULL, **resolved = NULL;
+	const char* udp_address = NULL;
+	const char* association_type = NULL;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_REM | XMLDIFF_MOD)) {
+		for (child = node->children; child != NULL; child = child->next) {
+			if (child->type != XML_ELEMENT_NODE) {
+				continue;
+			}
+			/* udp */
+			if (xmlStrcmp(child->name, BAD_CAST "udp") == 0) {
+				for (cur = child->children; cur != NULL; cur = cur->next) {
+					if (cur->type != XML_ELEMENT_NODE) {
+						continue;
+					}
+					if (xmlStrcmp(cur->name, BAD_CAST "address") == 0) {
+						udp_address = (char*)get_node_content(cur);
+					}
+				}
+			}
+
+			/* association-type */
+			if (xmlStrcmp(child->name, BAD_CAST "association-type") == 0) {
+				association_type = get_node_content(child);
+			}
+		}
+
+		/* check that we have necessary info */
+		if (udp_address == NULL) {
+			msg = strdup("Missing address of the NTP server.");
+			return fail(error, msg, EXIT_FAILURE);
+		}
+
+		/* Manual address resolution if pool used */
+		if (strcmp(association_type, "pool") == 0) {
+			resolved = ntp_resolve_server(udp_address, &msg);
+			if (resolved == NULL) {
+				goto error;
+			}
+			udp_address = resolved[0];
+			association_type = "server";
+		} else if (association_type == NULL) {
+			/* set default value if needed (shouldn't be) */
+			association_type = NTP_SERVER_ASSOCTYPE_DEFAULT;
+		}
+
+		/* This loop may be executed more than once only with the association type pool */
+		i = 0;
+		while (udp_address) {
+			if (op & XMLDIFF_ADD) {
+				/* Write the new values into Augeas structure */
+				if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+					goto error;
+				}
+			} 
+			// else if (op & XMLDIFF_REM) {
+				/* Delete this item from the config */
+				// if (ntp_rm_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+				// 	goto error;
+				// }
+			// } 
+			// else { /* XMLDIFF_MOD */
+			// 	/* Update this item from the config */
+			// 	if (ntp_rm_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+			// 		goto error;
+			// 	}
+			// 	if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+			// 		goto error;
+			// 	}
+			// }
+
+			/* in case of pool, move on to another server address */
+			if (resolved != NULL) {
+				udp_address = resolved[++i];
+			} else {
+				udp_address = NULL;
+			}
+		}
+
+		if (resolved) {
+			free(resolved);
+		}
+
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the ntp-server callback.", op);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	/* saving augeas data is postponed to the parent callback ntp */
+
+	/* flag for parent callback */
+	ntp_restart_flag = true;
+
+	return EXIT_SUCCESS;
+
+error:
+	if (resolved) {
+		for (i = 0; resolved[i] != NULL; i++) {
+			free(resolved[i]);
+		}
+		free(resolved);
+	}
+
+	return fail(error, msg, EXIT_FAILURE);
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 3,
+	.callbacks_count = 5,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
 		{.path = "/systemns:system/systemns:clock/systemns:timezone-name", .func = callback_systemns_system_systemns_clock_systemns_timezone_name},
-		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset}
+		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset},
+		{.path = "/systemns:system/systemns:ntp/systemns:server", .func = callback_systemns_system_systemns_ntp_systemns_server},
+		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled}
 	}
 };
 
@@ -728,5 +1014,66 @@ struct transapi_rpc_callbacks rpc_clbks = {
 		{.name="set-current-datetime", .func=rpc_set_current_datetime},
 		{.name="system-restart", .func=rpc_system_restart},
 		{.name="system-shutdown", .func=rpc_system_shutdown}
+	}
+};
+
+xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
+{
+	xmlNodePtr ntp_node;
+
+	/* ntp */
+	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
+
+	/* ntp/enabled */
+	t_element_type type = OPTION;
+	char* path = "system.ntp.enabled";
+	char** ret = NULL;
+	int count = 0;
+
+	ret = get_config(path, type, &count);
+	if (ret == NULL || count == 0) {
+		asprintf(errmsg, "Match for \"%s\" failed", path);
+		return (NULL);
+	}
+	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret[0], "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
+
+	return (ntp_node);
+
+}
+
+int ietfsystem_file_change(const char* UNUSED(filepath), xmlDocPtr *edit_conf, int *exec)
+{
+	*edit_conf = NULL;
+    *exec = 0;
+
+    char* msg = NULL;
+	xmlNodePtr root, config = NULL;
+	xmlNsPtr ns;
+
+    *edit_conf = xmlNewDoc(BAD_CAST "1.0");
+	root = xmlNewNode(NULL, BAD_CAST "system");
+	xmlDocSetRootElement(*edit_conf, root);
+	ns = xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-system", NULL);
+	xmlSetNs(root, ns);
+	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", BAD_CAST "ncop");
+
+	config = ntp_getconfig(ns, &msg);
+
+	if (config == NULL) {
+		xmlFreeDoc(*edit_conf);
+		*edit_conf = NULL;
+		return fail(NULL, msg, EXIT_FAILURE);
+	}
+
+	xmlSetProp(config, BAD_CAST "ncop:operation", BAD_CAST "replace");
+	xmlAddChild(root, config);
+
+	return EXIT_SUCCESS;
+}
+
+struct transapi_file_callbacks file_clbks = {
+	.callbacks_count = 1,
+	.callbacks = {
+		{.path = "/etc/config/system", .func = ietfsystem_file_change}
 	}
 };
