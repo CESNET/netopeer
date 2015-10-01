@@ -378,7 +378,7 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 			}
 
 			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
-				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				nc_verb_error("%s: could not bind \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 				continue;
 			}
 
@@ -394,13 +394,13 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 			}
 
 			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
-				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				nc_verb_error("%s: could not bind \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 				continue;
 			}
 		}
 
 		if (listen(npsock->pollsock[npsock->count-1].fd, 5) == -1) {
-			nc_verb_error("%s: unable to start listening on \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+			nc_verb_error("%s: unable to start listening on \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 			continue;
 		}
 
