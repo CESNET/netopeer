@@ -387,7 +387,8 @@ fail:
 }
 
 pthread_mutex_t callhome_lock = PTHREAD_MUTEX_INITIALIZER;
-volatile struct client_struct* callhome_client = NULL;
+pthread_cond_t callhome_cond = PTHREAD_COND_INITIALIZER;
+volatile struct ch_app* callhome_app = NULL;
 
 /* each app has its own thread */
 __attribute__((noreturn))
@@ -440,33 +441,26 @@ static void* app_loop(void* app_v) {
 		}
 
 		/* publish the new client for the main application loop to create a new session */
-		while (1) {
-			/* CALLHOME LOCK */
-			pthread_mutex_lock(&callhome_lock);
-			if (callhome_client == NULL) {
-				callhome_client = app->client;
-				/* CALLHOME UNLOCK */
-				pthread_mutex_unlock(&callhome_lock);
-				break;
-			}
-			/* CALLHOME UNLOCK */
-			pthread_mutex_unlock(&callhome_lock);
-		}
+        /* CALLHOME LOCK */
+        pthread_mutex_lock(&callhome_lock);
+        while (callhome_app) {
+            /* someone else is waiting already, let's wait with them */
+            pthread_cond_wait(&callhome_cond, &callhome_lock);
+        }
+        callhome_app = app;
 
-		/* wait for the listen loop to create the client thread (a bit shady) */
-		i = 0;
-		while (app->client->tid == 0) {
-			usleep(1000*netopeer_options.response_time);
-			++i;
-			if (i == 10) {
-				nc_verb_error("Call Home (app %s) client thread creation timeout, retrying.", app->name);
-				app->client->to_free = 1;
-				break;
-			}
-		}
-		if (i == 10) {
-			continue;
-		}
+        while (callhome_app) {
+            /* wait for client thread creation */
+            pthread_cond_wait(&callhome_cond, &callhome_lock);
+        }
+
+        /* CALLHOME UNLOCK */
+        pthread_mutex_unlock(&callhome_lock);
+
+        if (!app->client) {
+            nc_verb_error("Call Home (app %s) client creation failed.", app->name);
+            continue;
+        }
 
 		cur_server->active = 1;
 

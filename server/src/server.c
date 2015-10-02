@@ -68,7 +68,8 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 extern struct np_options netopeer_options;
 
 extern pthread_mutex_t callhome_lock;
-extern struct client_struct* callhome_client;
+extern pthread_cond_t callhome_cond;
+extern struct ch_app* callhome_app;
 
 /* one global structure holding all the client information */
 struct np_state netopeer_state = {
@@ -460,6 +461,20 @@ static struct client_struct* sock_accept(const struct np_sock* npsock) {
 	return ret;
 }
 
+static void clear_broadcast_callhome_client(int fail) {
+    /* CALLHOME LOCK */
+    pthread_mutex_lock(&callhome_lock);
+    if (callhome_app) {
+        if (fail) {
+            callhome_app->client = NULL;
+        }
+        callhome_app = NULL;
+        pthread_cond_broadcast(&callhome_cond);
+    }
+    /* CALLHOME UNLOCK */
+    pthread_mutex_unlock(&callhome_lock);
+}
+
 void listen_loop(int do_init) {
 	struct client_struct* new_client;
 	struct np_sock npsock = {.count = 0};
@@ -511,14 +526,13 @@ void listen_loop(int do_init) {
 #endif
 
 		/* Callhome client check */
-		if (callhome_client != NULL) {
-			/* CALLHOME LOCK */
-			pthread_mutex_lock(&callhome_lock);
-			new_client = callhome_client;
-			callhome_client = NULL;
-			/* CALLHOME UNLOCK */
-			pthread_mutex_unlock(&callhome_lock);
+        /* CALLHOME LOCK */
+        pthread_mutex_lock(&callhome_lock);
+		if (callhome_app) {
+			new_client = callhome_app->client;
 		}
+		/* CALLHOME UNLOCK */
+        pthread_mutex_unlock(&callhome_lock);
 
 		/* Listen client check */
 		if (new_client == NULL) {
@@ -557,6 +571,8 @@ void listen_loop(int do_init) {
 						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 					}
 
+					clear_broadcast_callhome_client(1);
+
 					/* sleep to prevent clients from immediate connection retry */
 					usleep(netopeer_options.response_time*1000);
 					continue;
@@ -590,6 +606,7 @@ void listen_loop(int do_init) {
 
 			/* client is not valid, some error occured */
 			if (ret != 0) {
+                clear_broadcast_callhome_client(1);
 				continue;
 			}
 
@@ -622,8 +639,13 @@ void listen_loop(int do_init) {
 					free(new_client);
 					break;
 				}
+
+				clear_broadcast_callhome_client(1);
 				continue;
 			}
+
+			/* Signal app loops if needed */
+			clear_broadcast_callhome_client(0);
 		}
 
 	} while (!quit && !restart_soft);
