@@ -677,8 +677,13 @@ void listen_loop(int do_init) {
 			pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 			ret = pthread_join(client_tid, NULL);
-			if (ret != 0 && errno != EINTR) {
-				nc_verb_error("Failed to join client thread (%s).", strerror(errno));
+            if (ret == EINVAL) {
+                /* Call Home app is already waiting for it, let it handle it */
+                usleep(10000);
+                continue;
+            }
+			if (ret != 0) {
+				nc_verb_error("Failed to join client thread (%s).", strerror(ret));
 			}
 		}
 
