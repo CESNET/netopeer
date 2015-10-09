@@ -631,8 +631,8 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 
 	if ((op & XMLDIFF_REM) || ((op & XMLDIFF_MOD) && strcmp(module_enabled, "false") == 0)) {
 		if (module == NULL) {
-			nc_verb_error("%s: internal error: module to disable not found", __func__);
-			return EXIT_FAILURE;
+			/* it does not exist, so it is disabled */
+			return EXIT_SUCCESS;
 		}
 
 		if (module_disable(module, 1)) {
