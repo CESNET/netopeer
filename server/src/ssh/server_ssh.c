@@ -108,9 +108,9 @@ static struct chan_struct* client_free_channel(struct client_struct_ssh* client,
 
 	if (prev_chan == NULL) {
 		_chan_free(client, cur_chan);
-		free(client->ssh_chans);
-		client->ssh_chans = NULL;
-		return NULL;
+		client->ssh_chans = cur_chan->next;
+		free(cur_chan);
+		return client->ssh_chans;
 	}
 
 	prev_chan->next = cur_chan->next;
