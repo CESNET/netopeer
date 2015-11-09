@@ -113,7 +113,14 @@ class nc_sshauth(ncmodule.ncmodule):
 		ssh_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:ssh')
 		if len(ssh_node) == 0:
 			netopeer_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer')
-			ssh_node = netopeer_node[0].newChild(netopeer_node[0].ns(), 'ssh', None)
+			if len(netopeer_node) == 0:
+				startup_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup')
+				netopeer_node = libxml2.newNode('netopeer')
+				netopeer_node.newNs('urn:cesnet:tmc:netopeer:1.0', None)
+				startup_node[0].addChild(netopeer_node)
+			else:
+				netopeer_node = netopeer_node[0]
+			ssh_node = netopeer_node.newChild(netopeer_node.ns(), 'ssh', None)
 		else:
 			ssh_node = ssh_node[0]
 
