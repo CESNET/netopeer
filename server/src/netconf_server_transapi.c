@@ -382,6 +382,9 @@ static struct client_struct* sock_connect(const char* address, uint16_t port) {
 	return ret;
 
 fail:
+	if (ret->sock != -1) {
+		close(ret->sock);
+	}
 	free(ret);
 	return NULL;
 }
