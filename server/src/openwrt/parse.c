@@ -66,7 +66,8 @@ typedef enum
 	S_START,
 	S_CONFIG,
 	S_SECTION,
-	S_ITEM
+	S_ITEM,
+	S_VALUE
 } t_fsm_state;
 
 void arg_clear(path_data *arguments)
@@ -171,18 +172,112 @@ int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
 
-		if (state == S_CONFIG)
+		if (state == S_CONFIG) {
 			state = S_START;
-		if (line_replic != NULL)
+		}
+		if (line_replic != NULL) {
     		free(line_replic);
-    	if (!rm)
+		}
+    	if (!rm) {
     		fprintf(new_file, "%s", line);
-    	else
+    	}
+    	else {
     		rm = false;
+    	}
 
     }
 
 	return EXIT_SUCCESS;
+}
+
+int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, const char *value)
+{
+	char *line = NULL;
+		size_t len = 0;
+		ssize_t read;
+
+		bool found = false;
+		bool in_progress = false;
+		t_fsm_state state = S_START;
+
+	while ((read = getline(&line, &len, original_file)) != -1) {
+
+		if (found) {
+			fprintf(new_file, "%s", line);
+			continue;
+		}
+
+		char *line_replic = malloc(len * sizeof(char));
+		strcpy(line_replic, line);
+		char *word;
+
+		word = strtok (line_replic ," \t\v\f\r\"\'\n");
+		while (word != NULL){
+
+			switch(state) {
+
+				case S_START:
+					if (strcmp(word, "config") == 0) {
+						state = S_CONFIG;
+						fprintf(new_file, "\n");
+					}
+					break;
+
+				case S_CONFIG:
+					if (arguments->section != NULL) {
+						if((strcmp(word, arguments->section)) == 0) {
+									state = S_SECTION;
+									in_progress = true;
+								}
+					}
+					else {
+						if((strcmp(word, arguments->file)) == 0) {
+									state = S_SECTION;
+									in_progress = true;
+								}
+							}
+							break;
+
+						case S_SECTION:
+							if ((strcmp(word, "list")) == 0) {
+							state = S_ITEM;
+						}
+						break;
+
+					case S_ITEM:
+						if ((strcmp(word, arguments->item)) == 0) {
+							state = S_VALUE;
+						}
+						else
+							state = S_SECTION;
+						break;
+
+					case S_VALUE:
+						if ((strcmp(word, value)) == 0) {
+							/* no printing to file - deleting list item */
+							found = true;
+							in_progress = false;
+							state = S_START;
+						}
+			}
+			word = strtok (NULL, " \t\v\f\r\"\'\n");
+		}
+
+		if (state == S_CONFIG) {
+			state = S_START;
+		}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
+		if (!in_progress) {
+			state = S_START;
+		}
+		if (!found && (strcmp(line, "\n") != 0)) {
+			fprintf(new_file, "%s", line);
+		}
+	}
+
+		return EXIT_SUCCESS;
 }
 
 int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const char *value)
@@ -234,10 +329,12 @@ int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const ch
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
 
-		if (state == S_CONFIG)
+		if (state == S_CONFIG) {
 			state = S_START;
-		if (line_replic != NULL)
+		}
+		if (line_replic != NULL) {
     		free(line_replic);
+		}
     	fprintf(new_file, "%s", line);
 	}
 
@@ -320,14 +417,18 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
 
-		if (state == S_CONFIG)
+		if (state == S_CONFIG) {
 			state = S_START;
-    	if (line_replic != NULL)
+		}
+    	if (line_replic != NULL) {
     		free(line_replic);
-		if (!in_progress)
+    	}
+		if (!in_progress) {
 			state = S_START;
-    	if (!found && (strcmp(line, "\n") != 0))
+		}
+    	if (!found && (strcmp(line, "\n") != 0)) {
     		fprintf(new_file, "%s", line);
+    	}
     }
 
     if (!found && in_progress)
@@ -406,12 +507,15 @@ char* get_option_config(path_data *arguments, FILE *original_file)
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
 
-		if (state == S_CONFIG)
+		if (state == S_CONFIG) {
 			state = S_START;
-    	if (line_replic != NULL)
+		}
+    	if (line_replic != NULL) {
     		free(line_replic);
-		if (!in_progress)
+    	}
+		if (!in_progress) {
 			state = S_START;
+		}
     }
 
     return NULL;
@@ -522,12 +626,14 @@ char** get_config(char *path, t_element_type type, int *count)
 
     if (type == OPTION) {
     	ret = malloc( sizeof(char*));
-		if ((ret[0] = get_option_config(&arguments, fileptr)) == NULL)
+		if ((ret[0] = get_option_config(&arguments, fileptr)) == NULL) {
 			return NULL;
+		}
 		*count = 1;
 	} else if (type == LIST) {
-		if ((ret = get_list_config(&arguments, fileptr, count)) == NULL)
+		if ((ret = get_list_config(&arguments, fileptr, count)) == NULL) {
 			return NULL;
+		}
 	}
 
     arg_clear(&arguments);
@@ -558,8 +664,44 @@ int edit_config(char *path, const char *value, t_element_type type)
 			return EXIT_FAILURE;
 	}
 	else if (type == LIST) {
-		if (add_list(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS)
+		if (add_list(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS){
 			return EXIT_FAILURE;
+		}
+	}
+
+	arg_clear(&arguments);
+	fclose(fileptr1);
+	fclose(fileptr2);
+	remove(filename);
+	rename("/etc/config/config.tmp", filename);
+
+    return EXIT_SUCCESS;
+}
+
+int rm_config(char *path, const char *value, t_element_type type)
+{
+	FILE *fileptr1, *fileptr2;
+    path_data arguments;
+
+    arguments.section = NULL;
+
+    if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return EXIT_FAILURE;
+    }
+
+    char filename[80] = "/etc/config/";
+    strcat(filename, arguments.file);
+
+    fileptr1 = fopen(filename, "r");
+    fileptr2 = fopen("/etc/config/config.tmp", "w");
+
+	if (type == OPTION) {
+		return EXIT_SUCCESS;
+	}
+	else if (type == LIST) {
+		if (rm_list_item(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS) {
+			return EXIT_FAILURE;
+		}
 	}
 
 	arg_clear(&arguments);

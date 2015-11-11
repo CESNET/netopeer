@@ -64,6 +64,15 @@ typedef enum
 int edit_config(char *path, const char *value, t_element_type type);
 
 /**
+ * @brief removes openWRT configuration from files stored in /etc/config
+ * @param path path to the configuration element to be edited
+ * @param value configuration elemement value to be set
+ * @param type configuration element type - OPTION or LIST
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int rm_config(char *path, const char *value, t_element_type type);
+
+/**
  * @brief gets value from openWRT configuration files stored
  * in /etc/config
  * @param path path to the configuration element

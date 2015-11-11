@@ -743,7 +743,6 @@ static int set_ntp_enabled(const char *value)
 
 static int ntp_add_server(const char *value, const char* association_type, char** msg)
 {
-	printf("ADDING NETOPEER SERVER\n");
 	t_element_type type = OPTION;
 	if (strcmp(association_type, "server") == 0) {
 		char *path = "system.ntp.enable_server";
@@ -765,54 +764,67 @@ static int ntp_add_server(const char *value, const char* association_type, char*
 	return (EXIT_SUCCESS);
 }
 
-char** ntp_resolve_server(const char* server_name, char** msg)
+static int ntp_rm_server(const char *value, const char* association_type, char** msg)
 {
-	struct sockaddr_in* addr4;
-	struct sockaddr_in6* addr6;
-	char buffer[INET6_ADDRSTRLEN + 1];
-	struct addrinfo* current;
-	struct addrinfo* addrs;
-	struct addrinfo hints;
-	char** ret = NULL;
-	int r, i, count;
+	t_element_type type = LIST;
+	char *path = "system.ntp.server";
 
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
-
-	if ((r = getaddrinfo(server_name, NULL, &hints, &addrs)) != 0) {
-		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(r));
-		return NULL;
+	if (rm_config(path, value, type) != EXIT_SUCCESS) {
+		asprintf(msg, "Setting NTP %s failed", association_type);
+		return (EXIT_FAILURE);
 	}
 
-	/* count returned addresses */
-	for (current = addrs, count = 0; current != NULL; current = current->ai_next, count++);
-	if (count == 0) {
-		*msg = strdup("\"%s\" cannot be resolved.");
-		return NULL;
-	}
-
-	/* get array for returning */
-	ret = malloc(count * sizeof(char*));
-	for (i = 0, current = addrs; i < count; i++, current = current->ai_next) {
-		switch (current->ai_addr->sa_family) {
-		case AF_INET:
-			addr4 = (struct sockaddr_in*) current->ai_addr;
-			ret[i] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
-			break;
-
-		case AF_INET6:
-			addr6 = (struct sockaddr_in6*) current->ai_addr;
-			ret[i] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
-			break;
-		}
-	}
-	ret[i] = NULL; /* terminating NULL byte */
-	freeaddrinfo(addrs);
-
-	return ret;
+	return (EXIT_SUCCESS);
 }
+
+// char** ntp_resolve_server(const char* server_name, char** msg)
+// {
+// 	struct sockaddr_in* addr4;
+// 	struct sockaddr_in6* addr6;
+// 	char buffer[INET6_ADDRSTRLEN + 1];
+// 	struct addrinfo* current;
+// 	struct addrinfo* addrs;
+// 	struct addrinfo hints;
+// 	char** ret = NULL;
+// 	int r, i, count;
+
+// 	memset(&hints, 0, sizeof(struct addrinfo));
+// 	hints.ai_family = AF_UNSPEC;
+// 	hints.ai_socktype = SOCK_DGRAM;
+// 	hints.ai_protocol = IPPROTO_UDP;
+
+// 	if ((r = getaddrinfo(server_name, NULL, &hints, &addrs)) != 0) {
+// 		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(r));
+// 		return NULL;
+// 	}
+
+// 	/* count returned addresses */
+// 	for (current = addrs, count = 0; current != NULL; current = current->ai_next, count++);
+// 	if (count == 0) {
+// 		*msg = strdup("\"%s\" cannot be resolved.");
+// 		return NULL;
+// 	}
+
+// 	/* get array for returning */
+// 	ret = malloc(count * sizeof(char*));
+// 	for (i = 0, current = addrs; i < count; i++, current = current->ai_next) {
+// 		switch (current->ai_addr->sa_family) {
+// 		case AF_INET:
+// 			addr4 = (struct sockaddr_in*) current->ai_addr;
+// 			ret[i] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
+// 			break;
+
+// 		case AF_INET6:
+// 			addr6 = (struct sockaddr_in6*) current->ai_addr;
+// 			ret[i] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
+// 			break;
+// 		}
+// 	}
+// 	ret[i] = NULL; /* terminating NULL byte */
+// 	freeaddrinfo(addrs);
+
+// 	return ret;
+// }
 
 static int set_hostname(const char* name)
 {
@@ -1019,6 +1031,8 @@ int transapi_init(xmlDocPtr * running)
 		xmlNewChild(clock, NULL, BAD_CAST "timezone-location", BAD_CAST zonename);
 		free(zonename);
 	}
+
+	/* clear default ntp servers */
 
 	return EXIT_SUCCESS;
 }
@@ -1245,9 +1259,9 @@ int callback_systemns_system_systemns_ntp_systemns_enabled(void** UNUSED(data), 
 int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr cur, child, node;
-	int i;
-	char* msg = NULL, **resolved = NULL;
+	char* msg = NULL;
 	const char* udp_address = NULL;
+	const char* old_udp_address = NULL;
 	const char* association_type = NULL;
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
@@ -1275,61 +1289,65 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), X
 			}
 		}
 
+		/* XMLDIFF_MOD - get old node content to remove from config file */
+		if (op & XMLDIFF_MOD) {
+			node = old_node;
+
+			for (child = node->children; child != NULL; child = child->next) {
+				if (child->type != XML_ELEMENT_NODE) {
+					continue;
+				}
+				/* udp */
+				if (xmlStrcmp(child->name, BAD_CAST "udp") == 0) {
+					for (cur = child->children; cur != NULL; cur = cur->next) {
+						if (cur->type != XML_ELEMENT_NODE) {
+							continue;
+						}
+						if (xmlStrcmp(cur->name, BAD_CAST "address") == 0) {
+							old_udp_address = (char*)get_node_content(cur);
+						}
+					}
+				}
+			}
+		}
+		
 		/* check that we have necessary info */
 		if (udp_address == NULL) {
 			msg = strdup("Missing address of the NTP server.");
 			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		/* Manual address resolution if pool used */
-		if (strcmp(association_type, "pool") == 0) {
-			resolved = ntp_resolve_server(udp_address, &msg);
-			if (resolved == NULL) {
-				goto error;
-			}
-			udp_address = resolved[0];
-			association_type = "server";
-		} else if (association_type == NULL) {
-			/* set default value if needed (shouldn't be) */
-			association_type = NTP_SERVER_ASSOCTYPE_DEFAULT;
-		}
+		printf("UDP ADDRESS: %s\n", udp_address);
+
+		association_type = "server";
 
 		/* This loop may be executed more than once only with the association type pool */
-		i = 0;
-		while (udp_address) {
-			if (op & XMLDIFF_ADD) {
-				printf("NTP ADDRESS: %s\n", udp_address);
-				if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
-					goto error;
-				}
-			} 
-			// else if (op & XMLDIFF_REM) {
-			// 	/* Delete this item from the config */
-			// 	if (ntp_rm_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
-			// 		goto error;
-			// 	}
-			// } 
-			// else { /* XMLDIFF_MOD */
-			// /* Update this item from the config */
-			// 	if (ntp_rm_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
-			// 		goto error;
-			// 	}
-			// 	if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
-			// 		goto error;
-			// 	}
-			// }
-
-			/* in case of pool, move on to another server address */
-			if (resolved != NULL) {
-				udp_address = resolved[++i];
-			} else {
-				udp_address = NULL;
+		if (op & XMLDIFF_ADD) {
+			printf("OP XMLDIFF_ADD\n");
+			if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+				goto error;
+			}
+		} 
+		else if (op & XMLDIFF_REM) {
+			/* Delete this item from the config */
+			printf("OP XMLDIFF_REM\n");
+			if (ntp_rm_server(old_udp_address, association_type, &msg) != EXIT_SUCCESS) {
+				goto error;
+			}
+		} 
+		else { /* XMLDIFF_MOD */
+			printf("OP XMLDIFF_MOD\n");
+		/* Update this item from the config */
+			if (ntp_rm_server(old_udp_address, association_type, &msg) != EXIT_SUCCESS) {
+				goto error;
+			}
+			if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
+				goto error;
 			}
 		}
 
-		if (resolved) {
-			free(resolved);
-		}
+		udp_address = NULL;
+		old_udp_address = NULL;
 
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the ntp-server callback.", op);
@@ -1344,12 +1362,6 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), X
 	return EXIT_SUCCESS;
 
 error:
-	if (resolved) {
-		for (i = 0; resolved[i] != NULL; i++) {
-			free(resolved[i]);
-		}
-		free(resolved);
-	}
 
 	return fail(error, msg, EXIT_FAILURE);
 }
