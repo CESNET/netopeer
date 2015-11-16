@@ -1,9 +1,10 @@
 /**
- * \file cfgnetopeer_transapi.c
- * \author David Kupka <xkupka01@stud.fit.vutbr.cz>
+ * @file cfgnetopeer_transapi.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @author David Kupka <xkupka01@stud.fit.vutbr.cz>
  * @brief NETCONF device module to configure netconf server
  *
- * Copyright (C) 2011 CESNET, z.s.p.o.
+ * Copyright (C) 2011-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

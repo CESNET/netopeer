@@ -1,10 +1,11 @@
 /**
- * \file netconf-server-transapi.c
- * \author Radek Krejci <rkrejci@cesnet.cz>
+ * @file netconf_server_transapi.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @author Radek Krejci <rkrejci@cesnet.cz>
  * @brief NETCONF device module to configure netconf server following
  * ietf-netconf-server data model
  *
- * Copyright (C) 2014 CESNET, z.s.p.o.
+ * Copyright (C) 2014-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

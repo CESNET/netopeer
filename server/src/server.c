@@ -1,12 +1,10 @@
 /**
  * @file server.c
  * @author David Kupka <xkupka01@stud.fit.vutbr.cz>
- *         Radek Krejci <rkrejci@cesnet.cz
- * @brief Netopeer server.
+ * @author Radek Krejci <rkrejci@cesnet.cz>
+ * @brief Netopeer server
  *
- * Copyright (c) 2011, CESNET, z.s.p.o.
- * All rights reserved.
- *
+ * Copyright (C) 2011-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -17,22 +15,26 @@
  *    notice, this list of conditions and the following disclaimer in
  *    the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of the CESNET, z.s.p.o. nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is, and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
  */
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
