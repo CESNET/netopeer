@@ -80,9 +80,12 @@ All tools are built on top of the libnetconf library and allows you to use the f
 * NETCONF Call Home ([Reverse SSH draft](http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05), [RFC 5539bis](http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05))
 * NETCONF Server Configuration ([IETF Draft](http://tools.ietf.org/html/draft-kwatsen-netconf-server-01))
 
-
 ## Other Resources
 
 * [libnetconf project](https://github.com/CESNET/libnetconf)
 * [Netopeer GUI](https://github.com/CESNET/Netopeer-GUI)
 * [CESNET TMC department](https://www.liberouter.org/)
+
+## Solving Issues
+
+Please, do not contact authors directly. Instead, use the project [issue tracker](https://github.com/CESNET/netopeer/issues). This way, we can share the solutions to your problems with all users and avoid repeating the same answers over and over again.
