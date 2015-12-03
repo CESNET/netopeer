@@ -3344,10 +3344,7 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 		origin = read_ifcfg_var(if_name, "BOOTPROTO", NULL);
 #endif
 #ifdef DEBIAN
-		if ((origin = read_iface_method(1, if_name)) == NULL) {
-			asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
-			return EXIT_FAILURE;
-		}
+		origin = read_iface_method(1, if_name);
 #endif
 
 		/* static is learned from the static_ips struct,
@@ -3654,10 +3651,7 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 #endif
 
 #ifdef DEBIAN
-		if ((origin = read_iface_method(0, if_name)) == NULL) {
-			asprintf(msg, "%s: failed to read the method of %s from \"%s\".", __func__, if_name, IFCFG_FILES_PATH);
-			return EXIT_FAILURE;
-		}
+		origin = read_iface_method(0, if_name);
 #endif
 
 		/* static learned from static_ips */
