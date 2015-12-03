@@ -28,6 +28,7 @@
 #include <arpa/inet.h> // Network
 
 #include "parse.h"
+#include "dns_resolver.h"
 
 #define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 
@@ -64,6 +65,9 @@ Feel free to use it to distinguish module behavior for different error-option va
                          executed again with previous configuration data to roll it back.
  */
 NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
+
+/* reorder done flag for DNS search domains */
+static bool dns_search_reorder_done = false;
 
 struct tmz {
 	// int minute_offset; 
@@ -777,55 +781,6 @@ static int ntp_rm_server(const char *value, const char* association_type, char**
 	return (EXIT_SUCCESS);
 }
 
-// char** ntp_resolve_server(const char* server_name, char** msg)
-// {
-// 	struct sockaddr_in* addr4;
-// 	struct sockaddr_in6* addr6;
-// 	char buffer[INET6_ADDRSTRLEN + 1];
-// 	struct addrinfo* current;
-// 	struct addrinfo* addrs;
-// 	struct addrinfo hints;
-// 	char** ret = NULL;
-// 	int r, i, count;
-
-// 	memset(&hints, 0, sizeof(struct addrinfo));
-// 	hints.ai_family = AF_UNSPEC;
-// 	hints.ai_socktype = SOCK_DGRAM;
-// 	hints.ai_protocol = IPPROTO_UDP;
-
-// 	if ((r = getaddrinfo(server_name, NULL, &hints, &addrs)) != 0) {
-// 		asprintf(msg, "getaddrinfo call failed: %s\n", gai_strerror(r));
-// 		return NULL;
-// 	}
-
-// 	/* count returned addresses */
-// 	for (current = addrs, count = 0; current != NULL; current = current->ai_next, count++);
-// 	if (count == 0) {
-// 		*msg = strdup("\"%s\" cannot be resolved.");
-// 		return NULL;
-// 	}
-
-// 	/* get array for returning */
-// 	ret = malloc(count * sizeof(char*));
-// 	for (i = 0, current = addrs; i < count; i++, current = current->ai_next) {
-// 		switch (current->ai_addr->sa_family) {
-// 		case AF_INET:
-// 			addr4 = (struct sockaddr_in*) current->ai_addr;
-// 			ret[i] = strdup(inet_ntop(AF_INET, &addr4->sin_addr.s_addr, buffer, INET6_ADDRSTRLEN));
-// 			break;
-
-// 		case AF_INET6:
-// 			addr6 = (struct sockaddr_in6*) current->ai_addr;
-// 			ret[i] = strdup(inet_ntop(AF_INET6, &addr6->sin6_addr.s6_addr, buffer, INET6_ADDRSTRLEN));
-// 			break;
-// 		}
-// 	}
-// 	ret[i] = NULL; /* terminating NULL byte */
-// 	freeaddrinfo(addrs);
-
-// 	return ret;
-// }
-
 static int set_hostname(const char* name)
 {
 	FILE* hostname_f;
@@ -1033,6 +988,9 @@ int transapi_init(xmlDocPtr * running)
 	}
 
 	/* clear default ntp servers */
+
+	/* Clear default dns search domains */
+	dns_rm_search_domain_all();
 
 	return EXIT_SUCCESS;
 }
@@ -1354,8 +1312,6 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), X
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
-	/* saving augeas data is postponed to the parent callback ntp */
-
 	/* flag for parent callback */
 	ntp_restart_flag = true;
 
@@ -1366,20 +1322,75 @@ error:
 	return fail(error, msg, EXIT_FAILURE);
 }
 
+int callback_systemns_system_systemns_dns_resolver_systemns_search(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	xmlNodePtr cur;
+	int i;
+	char* msg = NULL;
+
+	/* Already processed, skip */
+	if (dns_search_reorder_done) {
+		return EXIT_SUCCESS;
+	}
+
+	if (op & XMLDIFF_SIBLING) {
+		/* remove them all */
+		dns_rm_search_domain_all();
+
+		/* and then add them all in current order */
+		for (i = 1, cur = new_node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type == XML_ELEMENT_NODE && xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				if (dns_add_search_domain(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+					return fail(error, msg, EXIT_FAILURE);
+				}
+				i++;
+			}
+		}
+
+		/* Remember that REORDER was processed for every sibling */
+		dns_search_reorder_done = true;
+	} else if (op & XMLDIFF_ADD) {
+		/* Get the index of this node */
+		/* search<-dns-resolver->first children */
+		for (i = 1, cur = new_node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
+			} else if (cur == new_node) {
+				break;
+			} else if (xmlStrcmp(cur->name, BAD_CAST "search") == 0) {
+				i++;
+			}
+		}
+		if (dns_add_search_domain(get_node_content(new_node), i, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		if (dns_rm_search_domain(get_node_content(old_node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-search callback.", op);
+		return fail(error, msg,  EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 5,
+	.callbacks_count = 6,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
 		{.path = "/systemns:system/systemns:clock/systemns:timezone-name", .func = callback_systemns_system_systemns_clock_systemns_timezone_name},
 		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset},
 		{.path = "/systemns:system/systemns:ntp/systemns:server", .func = callback_systemns_system_systemns_ntp_systemns_server},
-		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled}
+		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:search", .func = callback_systemns_system_systemns_dns_resolver_systemns_search}
 	}
 };
 

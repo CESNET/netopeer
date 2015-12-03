@@ -61,7 +61,8 @@ MANAGER = $(TOPDIR)/manager/netopeer-manager
 OBJDIR= .obj
 
 SRCS =	ietf-system.c \
-		parse.c
+		parse.c \
+		dns_resolver.c
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 

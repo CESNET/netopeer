@@ -6,6 +6,7 @@
 			<transapi>@sysconfdir@/netopeer/ietf-system/ietf-system.so</transapi>
 			<feature>timezone-name</feature>
 			<feature>ntp</feature>
+			<feature>dns-resolver</feature>
 		</model-main>
 	</data-models>
 	<repo>
