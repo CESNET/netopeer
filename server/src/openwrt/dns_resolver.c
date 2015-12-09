@@ -137,7 +137,7 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
             }
             else {
                 /* Configuration domain can't be added - print error and continue */
-                asprintf(msg, "Add \"%s\" failed", domain);
+                asprintf(msg, "Add search domain \"%s\" failed", domain);
                 fprintf (fileptr2, "%s\n", line);
             }
         }
@@ -208,7 +208,7 @@ int dns_rm_search_domain(const char* domain, char** msg)
 
     if (!found) {
     	/* Configuration domain not found - print error and continue */
-        asprintf(msg, "Match for \"%s\" failed", domain);
+        asprintf(msg, "Match for search \"%s\" failed", domain);
     	return EXIT_FAILURE;
     }
 
@@ -220,6 +220,7 @@ void dns_rm_search_domain_all(void)
 	FILE *fileptr1, *fileptr2;
     char * line = NULL;
     int searchResult = EXIT_FAILURE;
+    bool found = false;
     size_t len = 0;
     size_t read;
  
@@ -228,6 +229,204 @@ void dns_rm_search_domain_all(void)
     
     while ((read = getline(&line, &len, fileptr1)) != -1) {  
         searchResult = search_in_line(line, "search");
+        format_line(line);
+
+        if (searchResult == EXIT_SUCCESS) {
+            continue;
+        }
+        else {
+            fprintf (fileptr2, "%s", line);
+        }
+    }
+
+    fclose(fileptr1);
+    fclose(fileptr2);
+    remove("/etc/resolv.conf");
+    rename("/etc/resolv.tmp", "/etc/resolv.conf");
+}
+
+int dns_mod_nameserver(const char* address, int index, char** msg)
+{
+    FILE *fileptr1, *fileptr2;
+    char * line = NULL;
+    char * new_line = NULL;
+    int searchResult = EXIT_FAILURE;
+    bool found = false;
+    size_t len = 0;
+    size_t read;
+    int i = 1;
+
+    if (address == NULL || index < 1) {
+        /* NULL values */
+        return EXIT_FAILURE;
+    }
+
+    fileptr1 = fopen("/etc/resolv.conf", "r");
+    fileptr2 = fopen("/etc/resolv.tmp", "w");
+
+    while ((read = getline(&line, &len, fileptr1)) != -1) {  
+        searchResult = search_in_line(line, "nameserver");
+
+        if (searchResult == EXIT_SUCCESS) {
+            
+            if (i == index) {
+                fprintf (fileptr2, "nameserver %s\n", address);
+                found = true;
+            }
+            else {
+                fprintf (fileptr2, "%s", line);
+            }
+            i++;
+        }
+        else {
+            format_line(line);
+            fprintf (fileptr2, "%s\n", line);
+        }
+    }
+
+    if (!found) {
+        /* Nameserver with index not found */
+        asprintf(msg, "Nameserver with index \"%d\" not found", index);
+        return EXIT_FAILURE;
+    }
+
+    fclose(fileptr1);
+    fclose(fileptr2);
+    remove("/etc/resolv.conf");
+    rename("/etc/resolv.tmp", "/etc/resolv.conf");
+
+    return EXIT_SUCCESS;
+}
+
+int dns_add_nameserver(const char* address, int index, char** msg)
+{
+    FILE *fileptr1, *fileptr2;
+    char * line = NULL;
+    char * new_line = NULL;
+    int searchResult = EXIT_FAILURE;
+    bool found = false;
+    bool written = false;
+    size_t len = 0;
+    size_t read;
+    int i = 1;
+
+    if (address == NULL || index < 1) {
+        /* NULL values */
+        return EXIT_FAILURE;
+    }
+
+    fileptr1 = fopen("/etc/resolv.conf", "r");
+    fileptr2 = fopen("/etc/resolv.tmp", "w");
+
+    while ((read = getline(&line, &len, fileptr1)) != -1) {  
+        searchResult = search_in_line(line, "nameserver");
+
+        if (searchResult == EXIT_SUCCESS) {
+            found = true;
+            
+            if (i == index && !written) {
+                fprintf (fileptr2, "nameserver %s\n", address);
+                written = true;
+            }
+            i++;
+
+            fprintf (fileptr2, "%s", line);
+        }
+        else {
+            format_line(line);
+            if (found && !written) {
+                /* Do not write - Can be found more nameservers after comment section */
+                if (line[0] != 35) {
+                    fprintf (fileptr2, "nameserver %s\n", address);
+                    written = true;
+                }
+            }
+
+            fprintf (fileptr2, "%s\n", line);
+        }
+    }
+
+    if (!found) {
+        /* Add new nameserver line */
+        fprintf (fileptr2, "nameserver %s\n", address);
+    }
+
+    fclose(fileptr1);
+    fclose(fileptr2);
+    remove("/etc/resolv.conf");
+    rename("/etc/resolv.tmp", "/etc/resolv.conf");
+
+    return EXIT_SUCCESS;
+}
+
+int dns_rm_nameserver(const char* address, char** msg)
+{
+    FILE *fileptr1, *fileptr2;
+    char * line = NULL;
+    int searchResult = EXIT_FAILURE;
+    bool found = false;
+    size_t len = 0;
+    size_t read;
+ 
+    fileptr1 = fopen("/etc/resolv.conf", "r");
+    fileptr2 = fopen("/etc/resolv.tmp", "w");
+    
+    while ((read = getline(&line, &len, fileptr1)) != -1) {  
+        searchResult = search_in_line(line, "nameserver");
+
+        if (searchResult == EXIT_SUCCESS) {
+
+            searchResult = remove_substring(line, address);
+            format_line(line);
+
+            if (searchResult == EXIT_SUCCESS) {
+            	found = true;
+
+                if (strcmp(line, "nameserver") == 0) {
+                    continue;
+                }
+                else {
+                    fprintf (fileptr2, "%s\n", line);
+                }
+            }
+            else {
+                fprintf (fileptr2, "%s\n", line);
+            }
+        }
+        else {
+            format_line(line);
+            fprintf (fileptr2, "%s\n", line);
+        }
+    }
+
+
+    fclose(fileptr1);
+    fclose(fileptr2);
+    remove("/etc/resolv.conf");
+    rename("/etc/resolv.tmp", "/etc/resolv.conf");
+
+    if (!found) {
+    	/* Configuration address not found - print error and continue */
+        asprintf(msg, "Match for nameserver \"%s\" failed", address);
+    	return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+void dns_rm_nameserver_all(void)
+{
+	FILE *fileptr1, *fileptr2;
+    char * line = NULL;
+    int searchResult = EXIT_FAILURE;
+    size_t len = 0;
+    size_t read;
+ 
+    fileptr1 = fopen("/etc/resolv.conf", "r");
+    fileptr2 = fopen("/etc/resolv.tmp", "w");
+    
+    while ((read = getline(&line, &len, fileptr1)) != -1) {  
+        searchResult = search_in_line(line, "nameserver");
         format_line(line);
 
         if (searchResult == EXIT_SUCCESS) {

@@ -68,6 +68,7 @@ NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 
 /* reorder done flag for DNS search domains */
 static bool dns_search_reorder_done = false;
+static bool dns_server_reorder_done = false;
 
 struct tmz {
 	// int minute_offset; 
@@ -1376,13 +1377,131 @@ int callback_systemns_system_systemns_dns_resolver_systemns_search(void** UNUSED
 	return EXIT_SUCCESS;
 }
 
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver/systemns:server changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_dns_resolver_systemns_server(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	xmlNodePtr cur, addr, node;
+	char* msg = NULL;
+	int i;
+
+	if ((op & XMLDIFF_SIBLING) && !dns_server_reorder_done) {
+
+		/* remove all */
+		dns_rm_nameserver_all();
+
+		/* and add them again in current order */
+		for (i = 1, cur = new_node->parent->children; cur != NULL; i++, cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "server")) {
+				continue;
+			}
+			/* get node with added/changed address */
+			for (addr = cur->children; addr != NULL; addr = addr->next) {
+				if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "udp-and-tcp")) {
+					continue;
+				}
+				for (addr = addr->children; addr != NULL; addr = addr->next) {
+					if (addr->type != XML_ELEMENT_NODE || xmlStrcmp(addr->name, BAD_CAST "address")) {
+						continue;
+					}
+					break;
+				}
+				break;
+			}
+
+			if (addr == NULL || dns_add_nameserver(get_node_content(addr), i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		}
+
+		dns_server_reorder_done = true;
+	} else {
+		node = (op & XMLDIFF_REM ? old_node : new_node);
+
+		/* Get the index of this nameserver
+		 *
+		 * We care about it on ADD and MOD, otherwise
+		 * we just need the address.
+		 */
+		for (i = 1, cur = node->parent->children; cur != NULL; cur = cur->next) {
+			if (cur->type != XML_ELEMENT_NODE) {
+				continue;
+			} else if (cur == node) {
+				/* get node with added/changed address */
+				for (cur = node->children; cur != NULL; cur = cur->next) {
+					if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "udp-and-tcp")) {
+						continue;
+					}
+					for (cur = cur->children; cur != NULL; cur = cur->next) {
+						if (cur->type != XML_ELEMENT_NODE || xmlStrcmp(cur->name, BAD_CAST "address")) {
+							continue;
+						}
+						break;
+					}
+					break;
+				}
+				break;
+			} else if (xmlStrcmp(cur->name, node->name) == 0) {
+				i++;
+			}
+		}
+
+		if (op & XMLDIFF_REM) {
+			if (cur == NULL || dns_rm_nameserver(get_node_content(cur), &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else if (op & XMLDIFF_ADD) {
+			if (cur == NULL || dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else if (op & XMLDIFF_MOD) {
+			if (cur == NULL || dns_mod_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error))
+{
+	char* msg = NULL;
+
+	/* Reset REORDER flags in order to process these changes in the next configuration change */
+	dns_search_reorder_done = false;
+	dns_server_reorder_done = false;
+
+	return EXIT_SUCCESS;
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 6,
+	.callbacks_count = 8,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
@@ -1390,7 +1509,9 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:clock/systemns:timezone-utc-offset", .func = callback_systemns_system_systemns_clock_systemns_timezone_utc_offset},
 		{.path = "/systemns:system/systemns:ntp/systemns:server", .func = callback_systemns_system_systemns_ntp_systemns_server},
 		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled},
-		{.path = "/systemns:system/systemns:dns-resolver/systemns:search", .func = callback_systemns_system_systemns_dns_resolver_systemns_search}
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:search", .func = callback_systemns_system_systemns_dns_resolver_systemns_search},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:server", .func = callback_systemns_system_systemns_dns_resolver_systemns_server},
+		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
 	}
 };
 
