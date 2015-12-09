@@ -1474,6 +1474,84 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server(void** UNUSED
 }
 
 /**
+ * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	char* msg, *ptr;
+	xmlNodePtr node;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	/* Check the timeout value */
+	strtol(get_node_content(node), &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Timeout \"%s\" is not a number.", get_node_content(node));
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		if (dns_set_opt_timeout(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		dns_rm_opt_timeout();
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-timeout callback.", op);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	char* msg, *ptr;
+	xmlNodePtr node;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	/* Check the attempts value */
+	strtol(get_node_content(node), &ptr, 10);
+	if (*ptr != '\0') {
+		asprintf(&msg, "Attempts \"%s\" is not a number.", get_node_content(node));
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		if (dns_set_opt_attempts(get_node_content(node), &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	} else if (op & XMLDIFF_REM) {
+		dns_rm_opt_attempts();
+	} else {
+		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-attempts callback.", op);
+		return fail(error, msg, EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+/**
  * @brief This callback will be run when node in path /systemns:system/systemns:dns-resolver changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -1501,7 +1579,7 @@ int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 8,
+	.callbacks_count = 10,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
@@ -1511,6 +1589,8 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:ntp/systemns:enabled", .func = callback_systemns_system_systemns_ntp_systemns_enabled},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:search", .func = callback_systemns_system_systemns_dns_resolver_systemns_search},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:server", .func = callback_systemns_system_systemns_dns_resolver_systemns_server},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
+		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
 		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
 	}
 };
