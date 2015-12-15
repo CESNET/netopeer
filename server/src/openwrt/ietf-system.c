@@ -1394,10 +1394,14 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server(void** UNUSED
 	char* msg = NULL;
 	int i;
 
+	printf("1\n");
+
 	if ((op & XMLDIFF_SIBLING) && !dns_server_reorder_done) {
 
 		/* remove all */
 		dns_rm_nameserver_all();
+
+		printf("2\n");
 
 		/* and add them again in current order */
 		for (i = 1, cur = new_node->parent->children; cur != NULL; i++, cur = cur->next) {
@@ -1425,6 +1429,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server(void** UNUSED
 
 		dns_server_reorder_done = true;
 	} else {
+		printf("3\n");
 		node = (op & XMLDIFF_REM ? old_node : new_node);
 
 		/* Get the index of this nameserver
@@ -1460,9 +1465,15 @@ int callback_systemns_system_systemns_dns_resolver_systemns_server(void** UNUSED
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		} else if (op & XMLDIFF_ADD) {
+			printf("4\n");
+			if (cur == NULL)
+			{
+				printf("CURR is null\n");
+			}
 			if (cur == NULL || dns_add_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
 			}
+			printf("5\n");
 		} else if (op & XMLDIFF_MOD) {
 			if (cur == NULL || dns_mod_nameserver(get_node_content(cur), i, &msg) != EXIT_SUCCESS) {
 				return fail(error, msg, EXIT_FAILURE);
