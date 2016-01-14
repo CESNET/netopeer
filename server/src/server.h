@@ -64,11 +64,8 @@ struct client_struct {
 
 /* one global structure */
 struct np_state {
-	/*
-	 * READ - when accessing clients
-	 * WRITE - when adding/removing clients
-	 */
-	pthread_rwlock_t global_lock;
+	/* locked when adding/removing clients */
+	pthread_mutex_t global_lock;
 	struct client_struct* clients;
 	struct np_state_tls* tls_state;
 };

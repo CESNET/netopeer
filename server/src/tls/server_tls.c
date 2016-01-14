@@ -1105,16 +1105,12 @@ int np_tls_session_count(void) {
 	struct client_struct_tls* client;
 	int count = 0;
 
-	/* GLOBAL READ LOCK */
-	pthread_rwlock_rdlock(&netopeer_state.global_lock);
 	for (client = (struct client_struct_tls*)netopeer_state.clients; client != NULL; client = (struct client_struct_tls*)client->next) {
 		if (client->transport != NC_TRANSPORT_TLS) {
 			continue;
 		}
 		++count;
 	}
-	/* GLOBAL READ UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 	return count;
 }

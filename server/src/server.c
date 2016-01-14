@@ -75,7 +75,7 @@ extern struct ch_app* callhome_app;
 
 /* one global structure holding all the client information */
 struct np_state netopeer_state = {
-	.global_lock = PTHREAD_RWLOCK_INITIALIZER
+	.global_lock = PTHREAD_MUTEX_INITIALIZER
 };
 
 /* flags of main server loop, they are turned when a signal comes */
@@ -236,9 +236,6 @@ void* client_main_thread(void* arg) {
 	do {
 		skip_sleep = 0;
 
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-
 		switch (client->transport) {
 #ifdef NP_SSH
 		case NC_TRANSPORT_SSH:
@@ -256,22 +253,19 @@ void* client_main_thread(void* arg) {
 			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		}
 
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-
 		if (!skip_sleep) {
 			/* we did not do anything productive, so let the thread sleep */
 			usleep(netopeer_options.response_time*1000);
 		}
 	} while (!client->to_free);
 
-	/* GLOBAL WRITE LOCK */
-	pthread_rwlock_wrlock(&netopeer_state.global_lock);
+	/* GLOBAL LOCK */
+	pthread_mutex_lock(&netopeer_state.global_lock);
 
 	np_client_detach(&netopeer_state.clients, client);
 
-	/* GLOBAL WRITE UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
+	/* GLOBAL UNLOCK */
+	pthread_mutex_unlock(&netopeer_state.global_lock);
 
 	switch (client->transport) {
 #ifdef NP_SSH
@@ -547,12 +541,16 @@ void listen_loop(int do_init) {
 			/* Maximum number of sessions check */
 			if (netopeer_options.max_sessions > 0) {
 				ret = 0;
+				/* GLOBAL LOCK */
+				pthread_mutex_lock(&netopeer_state.global_lock);
 #ifdef NP_SSH
 				ret += np_ssh_session_count();
 #endif
 #ifdef NP_TLS
 				ret += np_tls_session_count();
 #endif
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				if (ret >= netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
@@ -613,16 +611,21 @@ void listen_loop(int do_init) {
 			}
 
 			/* add the client into the global clients structure */
-			/* GLOBAL WRITE LOCK */
-			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			/* GLOBAL LOCK */
+			pthread_mutex_lock(&netopeer_state.global_lock);
 			client_append(&netopeer_state.clients, new_client);
-			/* GLOBAL WRITE UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
+			/* GLOBAL UNLOCK */
+			pthread_mutex_unlock(&netopeer_state.global_lock);
 
 			/* start the client thread */
 			if ((ret = pthread_create((pthread_t*)&new_client->tid, NULL, client_main_thread, (void*)new_client)) != 0) {
 				nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+
+				/* GLOBAL LOCK */
+				pthread_mutex_lock(&netopeer_state.global_lock);
 				np_client_detach(&netopeer_state.clients, new_client);
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				new_client->tid = 0;
 				new_client->to_free = 1;
@@ -663,27 +666,27 @@ void listen_loop(int do_init) {
 	if (!restart_soft) {
 		/* wait for all the clients to exit nicely themselves */
 		while (1) {
-			/* GLOBAL READ LOCK */
-			pthread_rwlock_rdlock(&netopeer_state.global_lock);
+			/* GLOBAL LOCK */
+			pthread_mutex_lock(&netopeer_state.global_lock);
 
 			if (netopeer_state.clients == NULL) {
-				/* GLOBAL READ UNLOCK */
-				pthread_rwlock_unlock(&netopeer_state.global_lock);
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				break;
 			}
 
 			client_tid = netopeer_state.clients->tid;
 
-			/* GLOBAL READ UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
+			/* GLOBAL UNLOCK */
+			pthread_mutex_unlock(&netopeer_state.global_lock);
 
 			ret = pthread_join(client_tid, NULL);
-            if (ret == EINVAL) {
-                /* Call Home app is already waiting for it, let it handle it */
-                usleep(10000);
-                continue;
-            }
+			if (ret == EINVAL) {
+				/* Call Home app is already waiting for it, let it handle it */
+				usleep(10000);
+				continue;
+			}
 			if (ret != 0) {
 				nc_verb_error("Failed to join client thread (%s).", strerror(ret));
 			}

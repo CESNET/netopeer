@@ -397,6 +397,9 @@ static void sshcb_auth_pubkey(struct client_struct_ssh* client, ssh_message msg)
 static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel channel) {
 	struct chan_struct* cur_chan;
 
+	/* GLOBAL LOCK */
+	pthread_mutex_lock(&netopeer_state.global_lock);
+
 	if (client->ssh_chans == NULL) {
 		client->ssh_chans = calloc(1, sizeof(struct chan_struct));
 		cur_chan = client->ssh_chans;
@@ -406,6 +409,9 @@ static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel chan
 		cur_chan = cur_chan->next;
 	}
 	cur_chan->ssh_chan = channel;
+
+	/* GLOBAL UNLOCK */
+	pthread_mutex_unlock(&netopeer_state.global_lock);
 
 	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
 
@@ -1004,8 +1010,6 @@ int np_ssh_session_count(void) {
 	struct chan_struct* chan;
 	int count = 0;
 
-	/* GLOBAL READ LOCK */
-	pthread_rwlock_rdlock(&netopeer_state.global_lock);
 	for (client = (struct client_struct_ssh*)netopeer_state.clients; client != NULL; client = (struct client_struct_ssh*)client->next) {
 		if (client->transport != NC_TRANSPORT_SSH) {
 			continue;
@@ -1023,8 +1027,6 @@ int np_ssh_session_count(void) {
 			++count;
 		}
 	}
-	/* GLOBAL READ UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 	return count;
 }
