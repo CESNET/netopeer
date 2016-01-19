@@ -735,7 +735,7 @@ added to this list.</text>
             <text>The password for this entry.</text>
           </description>
         </leaf>
-        <list name="ssh-key">
+        <list name="authorized-key">
           <key value="name"/>
           <description>
             <text>A list of public SSH keys for this user.</text>
