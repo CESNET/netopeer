@@ -4,6 +4,8 @@
 		<model-main>
 			<path>@sysconfdir@/netopeer/ietf-system/ietf-system.yin</path>
 			<transapi>@sysconfdir@/netopeer/ietf-system/ietf-system.so</transapi>
+			<feature>authentication</feature>
+			<feature>local-users</feature>
 			<feature>timezone-name</feature>
 			<feature>ntp</feature>
 			<feature>dns-resolver</feature>

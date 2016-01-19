@@ -29,6 +29,7 @@
 
 #include "parse.h"
 #include "dns_resolver.h"
+#include "local_users.h"
 
 #define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 
@@ -1534,7 +1535,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_tim
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg, *ptr;
 	xmlNodePtr node;
@@ -1584,13 +1585,95 @@ int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_
 	return EXIT_SUCCESS;
 }
 
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_authentication_systemns_user(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	xmlNodePtr node_aux, node;
+	const char *name = NULL, *passwd = NULL, *new_passwd;
+	char *msg;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	/* get name */
+	for(node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
+		if (node_aux->type != XML_ELEMENT_NODE || xmlStrcmp(node_aux->name, BAD_CAST "name") != 0) {
+			continue;
+		}
+		name = get_node_content(node_aux);
+		break;
+	}
+
+	if (name == NULL) {
+		return fail(error, strdup("Missing name element for the user."), EXIT_FAILURE);
+	}
+
+	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
+		/* create new user */
+
+		/* get password if any */
+		for(node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
+			if (node_aux->type != XML_ELEMENT_NODE || xmlStrcmp(node_aux->name, BAD_CAST "password") != 0) {
+				continue;
+			}
+			passwd = get_node_content(node_aux);
+			break;
+		}
+		if (passwd == NULL) {
+			passwd = "";
+		}
+
+		if (op & XMLDIFF_ADD) {
+			if ((new_passwd = users_add(name, passwd, &msg)) == NULL) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		} else { /* (op & XMLDIFF_MOD) */
+			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
+		}
+		if (new_passwd != passwd && node_aux != NULL) {
+			/* update password in configuration data */
+			/* securely rewrite/erase the plain text password from memory */
+			memset((char*)(node_aux->children->content), '\0', strlen((char*)(node_aux->children->content)));
+
+			/* and now replace content of the xml node */
+			xmlNodeSetContent(node_aux, BAD_CAST new_passwd);
+			config_modified = 1;
+		}
+
+		/* process authorized keys */
+	} else if (op & XMLDIFF_REM) {
+		/* remove existing user */
+		msg = NULL;
+		if (users_rm(name, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+		if (msg != NULL) {
+			nc_verb_warning(msg);
+			free(msg);
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 10,
+	.callbacks_count = 11,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
@@ -1603,6 +1686,9 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
 		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
+		// {.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
+		{.path = "/systemns:system/systemns:authentication/systemns:user", .func = callback_systemns_system_systemns_authentication_systemns_user}
+		// {.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order", .func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}
 };
 

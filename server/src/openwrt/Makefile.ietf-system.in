@@ -62,7 +62,10 @@ OBJDIR= .obj
 
 SRCS =	ietf-system.c \
 		parse.c \
-		dns_resolver.c
+		dns_resolver.c \
+		local_users.c \
+		encrypt.c \
+		salt.c
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
@@ -95,5 +98,5 @@ install: $(NAME).so $(CFGS)
 		--model $(CFGDIR)/$(NAME)/ietf-system.yin \
 		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
 		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
-		--features timezone-name ntp
+		--features authentication local-users ntp timezone-name
 
