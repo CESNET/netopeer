@@ -1667,13 +1667,98 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** data, 
 	return EXIT_SUCCESS;
 }
 
+/**
+ * @brief This callback will be run when node in path /systemns:system/systemns:authentication/systemns:user/systemns:authorized-key changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key(void** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	char *msg;
+	xmlNodePtr aux_node, node;
+	const char* username = NULL, *id = NULL, *alg = NULL, *pem = NULL;
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	/* get username for this key */
+	for (aux_node = node->parent->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "name") != 0) {
+			continue;
+		}
+		username = get_node_content(aux_node);
+		break;
+	}
+	if (username == NULL) {
+		return fail(error, strdup("Missing name element for the user."), EXIT_FAILURE);
+	}
+
+	/* get id of this key */
+	for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+		if (aux_node->type != XML_ELEMENT_NODE || xmlStrcmp(aux_node->name, BAD_CAST "name") != 0) {
+			continue;
+		}
+		id = get_node_content(aux_node);
+		break;
+	}
+	if (id == NULL) {
+		return fail(error, strdup("Missing name element for the authorized-key."), EXIT_FAILURE);
+	}
+
+	if (op & XMLDIFF_MOD) {
+		/* implement as removing the key and then adding it as a new one */
+		op = XMLDIFF_REM | XMLDIFF_ADD;
+	}
+
+	if (op & XMLDIFF_REM) {
+		/* remove the existing key */
+		if (authkey_rm(username, id, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
+	if (op & XMLDIFF_ADD) {
+		/* get pem data of this key */
+		for (aux_node = node->children; aux_node != NULL; aux_node = aux_node->next) {
+			if (aux_node->type != XML_ELEMENT_NODE) {
+				continue;
+			}
+			if  (xmlStrcmp(aux_node->name, BAD_CAST "key-data") != 0) {
+				pem = get_node_content(aux_node);
+			} else if  (xmlStrcmp(aux_node->name, BAD_CAST "algorithm") != 0) {
+				alg = get_node_content(aux_node);
+			}
+
+			if (pem && alg) {
+				break;
+			}
+		}
+		if (pem == NULL || alg == NULL) {
+			asprintf(&msg, "Missing %s element for the authorized-key.", (pem == NULL) ? "key-data" : "algorithm");
+			return fail(error, msg, EXIT_FAILURE);
+		}
+
+		/* add new key */
+		if (authkey_add(username, id, alg, pem, &msg) != EXIT_SUCCESS) {
+			return fail(error, msg, EXIT_FAILURE);
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 11,
+	.callbacks_count = 12,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/systemns:system/systemns:hostname", .func = callback_systemns_system_systemns_hostname},
@@ -1686,7 +1771,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:timeout", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_timeout},
 		{.path = "/systemns:system/systemns:dns-resolver/systemns:options/systemns:attempts", .func = callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_attempts},
 		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
-		// {.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
+		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key},
 		{.path = "/systemns:system/systemns:authentication/systemns:user", .func = callback_systemns_system_systemns_authentication_systemns_user}
 		// {.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order", .func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}

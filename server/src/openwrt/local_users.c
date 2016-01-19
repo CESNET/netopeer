@@ -55,6 +55,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <ctype.h>
 
 #include "local_users.h"
 #include "encrypt.h"
@@ -89,7 +90,6 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 
 	if (passwd[1] == '0') {
 		/* encrypt the password */
-		// get_login_defs();
 		en_passwd = pw_encrypt(&(passwd[3]), crypt_make_salt(NULL, NULL));
 	} else {
 		en_passwd = passwd;
@@ -146,6 +146,148 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	ulckpwdf();
 
 	return (en_passwd);
+}
+
+void format(char *s)
+{
+	char* formated_s = calloc(strlen(s), sizeof(char));
+	int i = 0;
+	int formated_s_index = 0;
+	int whitespace_found = 0;
+	int line_begin = 1;
+
+	/* Delete if there is more than one whitespace - replace with one space */
+	/* Delete whitespaces on line begin */
+	for (i = 0; i < strlen(s); ++i) {
+
+		if (isspace(s[i])) {
+			if (whitespace_found || line_begin) {
+				continue;
+			}
+			if (s[i] == '\n') {
+				continue;
+			}
+			/* Add one space between */
+			formated_s[formated_s_index] = ' ';
+			formated_s_index++;
+
+			whitespace_found = 1;
+		}
+		else {
+			line_begin = 0;
+			whitespace_found = 0;
+
+			formated_s[formated_s_index] = s[i];
+			formated_s_index++;
+		}
+	}
+
+	/* Delete whitespaces on line end */
+	for (i = strlen(formated_s)-1; i > 0; --i) {
+		if (isspace(formated_s[i])) {
+			formated_s[i] = '\0';
+		}
+		else {
+			break;
+		}
+	}
+
+	strcpy(s, formated_s);
+	free(formated_s);
+}
+
+static const char* get_authfile_path()
+{
+	FILE *file;
+	char *line = NULL;
+	size_t n = 0;
+	ssize_t len;
+	char delimiter[] = " \t";
+	char *context, *path;
+
+	if ((file = fopen("/etc/ssh/sshd_config", "r")) == NULL) {
+		return (NULL);
+	}
+
+	while((len = getline(&line, &n, file)) != -1) {
+
+		format(line);
+		if (line[0] == '#') {
+			continue;
+		}
+
+		if (strcmp(strtok_r(line, delimiter, &context), "AuthorizedKeysFile") != 0 ) {
+			continue;
+		}
+
+		path = strtok_r(NULL, delimiter, &context);
+		break;
+	}
+
+	free(line);
+	free(context);
+	fclose(file);
+	return path;
+}
+
+static FILE* open_authfile(const char *username, const char *opentype, char **path, char **msg)
+{
+	struct passwd *pwd;
+	char *filepath = NULL;
+	FILE *file;
+	mode_t mask;
+	int flag;
+	const char *akf = NULL;
+
+	/* get AuthorizedKeysFile value from sshd_config */
+
+	/* user root - keys always located in /etc/dropbear/ */
+	if (strcmp(username, "root") == 0) {
+		asprintf(&akf, "/etc/dropbear/authorized_keys");
+	}
+	else {
+		asprintf(&akf, get_authfile_path());
+	}
+
+	if (akf == NULL) {
+		*msg = strdup("SSH server doesn't support Authorized Keys files.");
+		return(NULL);
+	}
+
+	/* get user home */
+	pwd = getpwnam(username);
+	if (pwd == NULL) {
+		asprintf(msg, "Unable to get user record (%s)", strerror(errno));
+		return (NULL);
+	}
+	if (pwd->pw_dir == NULL) {
+		asprintf(msg, "Home directory of user \"%s\" not set, unable to set authorized keys.", username);
+		return(NULL);
+	}
+	asprintf(&filepath, "%s/%s", pwd->pw_dir, akf);
+
+	/* open authorized_keys file in the user's ssh home directory */
+	flag = access(filepath, F_OK);
+	mask = umask(0600);
+	if ((file = fopen(filepath, opentype)) == NULL) {
+		umask(mask);
+		asprintf(msg, "Opening authorized keys file \"%s\" failed (%s).", filepath, strerror(errno));
+		free(filepath);
+		return (NULL);
+	}
+	umask(mask);
+	if (flag != 0) {
+		/* change owner of the created file */
+		chown(filepath, pwd->pw_uid, pwd->pw_gid);
+	}
+
+	if (path != NULL) {
+		*path = filepath;
+	} else {
+		free(filepath);
+	}
+
+	return (file);
 }
 
 int users_rm(const char *name, char **msg)
@@ -248,4 +390,93 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	}
 
 	return (NULL);
+}
+
+int authkey_add(const char *username, const char *id, const char *algorithm, const char *pem, char **msg)
+{
+	FILE *authkeys_file;
+
+	assert(username);
+	assert(id);
+	assert(pem);
+	assert(algorithm);
+
+	/* get authorized_keys file */
+	if ((authkeys_file = open_authfile(username, "a", NULL, msg)) == NULL) {
+		return (EXIT_FAILURE);
+	}
+
+	/* add the key to the file */
+	fprintf(authkeys_file, "%s %s %s\n", algorithm, pem, id);
+	fclose(authkeys_file);
+
+	return (EXIT_SUCCESS);
+}
+
+int authkey_rm(const char *username, const char*id, char **msg)
+{
+	FILE *file, *copy;
+	char *copy_path = NULL, *file_path;
+	char *line = NULL, *aux_id;
+	size_t n = 0;
+	ssize_t len;
+	struct stat st;
+
+	assert(username);
+	assert(id);
+
+	/* get authorized_keys file */
+	if ((file = open_authfile(username, "r", &file_path, msg)) == NULL) {
+		return (EXIT_FAILURE);
+	}
+	/* get file stat of the original file to make a nice copy of it */
+	fstat(fileno(file), &st);
+
+	/* prepare copy of the file */
+	asprintf(&copy_path, "%s.cfgsystem", file_path);
+	if ((copy = fopen(copy_path, "w")) == NULL) {
+		asprintf(msg, "Unable to prepare working authorized keys file \"%s\" (%s).", copy_path, strerror(errno));
+		free(copy_path);
+		free(file_path);
+		fclose(file);
+		return (EXIT_FAILURE);
+	}
+	fchmod(fileno(copy), st.st_mode);
+	fchown(fileno(copy), st.st_uid, st.st_gid);
+
+	while((len = getline(&line, &n, file)) != -1) {
+		/* get the second space to locate comment/id */
+		aux_id = strchr(strchr(line, ' ') + 1, ' ') + 1;
+		if (aux_id == NULL) {
+			/* invalid format of the key */
+			continue;
+		}
+
+		/* remove the newline if any */
+		if (line[len - 1] == '\n') {
+			line[len - 1] = '\0';
+		}
+
+		/* check if it is matching */
+		if (aux_id == NULL || strcmp(id, aux_id) != 0) {
+			/* they do not match so write the key into the new authorized_keys file */
+			fprintf(copy, "%s\n", line);
+		}
+	}
+	free(line);
+	fclose(file);
+	fclose(copy);
+
+	if (rename(copy_path, file_path) == -1) {
+		asprintf(msg, "Unable to rewrite authorized_keys file \"%s\" (%s).", file_path, strerror(errno));
+		unlink(copy_path);
+		free(copy_path);
+		free(file_path);
+		return (EXIT_FAILURE);
+	}
+
+	free(copy_path);
+	free(file_path);
+
+	return (EXIT_SUCCESS);
 }
