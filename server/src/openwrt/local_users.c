@@ -203,31 +203,29 @@ static const char* get_authfile_path()
 	size_t n = 0;
 	ssize_t len;
 	char delimiter[] = " \t";
-	char *context, *path;
+	char *token;
 
 	if ((file = fopen("/etc/ssh/sshd_config", "r")) == NULL) {
 		return (NULL);
 	}
 
 	while((len = getline(&line, &n, file)) != -1) {
-
 		format(line);
-		if (line[0] == '#') {
+		if (line[0] == '#' || strlen(line) == 0) {
 			continue;
 		}
 
-		if (strcmp(strtok_r(line, delimiter, &context), "AuthorizedKeysFile") != 0 ) {
+		token = strtok(line, delimiter);
+		if (strcmp(token , "AuthorizedKeysFile") != 0 ) {
 			continue;
 		}
 
-		path = strtok_r(NULL, delimiter, &context);
+		token = strtok(NULL, delimiter);
 		break;
 	}
 
-	free(line);
-	free(context);
 	fclose(file);
-	return path;
+	return token;
 }
 
 static FILE* open_authfile(const char *username, const char *opentype, char **path, char **msg)
@@ -238,6 +236,7 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 	mode_t mask;
 	int flag;
 	const char *akf = NULL;
+	char *path_key = NULL;
 
 	/* get AuthorizedKeysFile value from sshd_config */
 
@@ -246,7 +245,13 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 		asprintf(&akf, "/etc/dropbear/authorized_keys");
 	}
 	else {
-		asprintf(&akf, get_authfile_path());
+		path_key = get_authfile_path();
+		if (path_key == NULL) {
+			asprintf(&akf, ".ssh/authorized_keys");
+		}
+		else {
+			asprintf(&akf, path_key);
+		}
 	}
 
 	if (akf == NULL) {
@@ -254,17 +259,22 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 		return(NULL);
 	}
 
-	/* get user home */
-	pwd = getpwnam(username);
-	if (pwd == NULL) {
-		asprintf(msg, "Unable to get user record (%s)", strerror(errno));
-		return (NULL);
+	/* get user home - if not root */
+	if (strcmp(username, "root") != 0) {
+		pwd = getpwnam(username);
+		if (pwd == NULL) {
+			asprintf(msg, "Unable to get user record (%s)", strerror(errno));
+			return (NULL);
+		}
+		if (pwd->pw_dir == NULL) {
+			asprintf(msg, "Home directory of user \"%s\" not set, unable to set authorized keys.", username);
+			return(NULL);
+		}
+		asprintf(&filepath, "%s/%s", pwd->pw_dir, akf);
 	}
-	if (pwd->pw_dir == NULL) {
-		asprintf(msg, "Home directory of user \"%s\" not set, unable to set authorized keys.", username);
-		return(NULL);
+	else {
+		asprintf(&filepath, akf);
 	}
-	asprintf(&filepath, "%s/%s", pwd->pw_dir, akf);
 
 	/* open authorized_keys file in the user's ssh home directory */
 	flag = access(filepath, F_OK);
@@ -365,6 +375,26 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 		return (NULL);
 	}
 
+	/* create users .ssh directory */
+	asprintf(&cmdline, "mkdir /home/%s/.ssh", name);
+	ret = WEXITSTATUS(system(cmdline));
+	free(cmdline);
+
+	if (ret != 0) {
+		*msg = strdup(errmsg[ret]);
+		return (NULL);
+	}
+
+	/* Change file ownership */
+	asprintf(&cmdline, "chown -R %s:%s /home/%s/.ssh", name, name, name);
+	ret = WEXITSTATUS(system(cmdline));
+	free(cmdline);
+
+	if (ret != 0) {
+		*msg = strdup(errmsg[ret]);
+		return (NULL);
+	}
+
 	/* set password */
 	if (strlen(passwd) != 0) {
 		retstr = set_passwd(name, passwd, msg);
@@ -395,6 +425,8 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 int authkey_add(const char *username, const char *id, const char *algorithm, const char *pem, char **msg)
 {
 	FILE *authkeys_file;
+	int ret;
+	char *cmdline = NULL;
 
 	assert(username);
 	assert(id);
@@ -409,6 +441,15 @@ int authkey_add(const char *username, const char *id, const char *algorithm, con
 	/* add the key to the file */
 	fprintf(authkeys_file, "%s %s %s\n", algorithm, pem, id);
 	fclose(authkeys_file);
+
+	/* Add permissions to owner */
+	asprintf(&cmdline, "chmod 700 /home/%s/.ssh/authorized_keys", username);
+	ret = WEXITSTATUS(system(cmdline));
+	free(cmdline);
+
+	if (ret != 0) {
+		return (EXIT_FAILURE);
+	}
 
 	return (EXIT_SUCCESS);
 }
