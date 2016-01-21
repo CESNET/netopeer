@@ -1,11 +1,7 @@
 #ifndef _NETCONF_SERVER_TRANSAPI_TLS_H_
 #define _NETCONF_SERVER_TRANSAPI_TLS_H_
 
-#ifndef DISABLE_CALLHOME
-
 int np_tls_chapp_linger_check(struct ch_app* app);
-
-#endif
 
 int server_transapi_init_tls(void);
 

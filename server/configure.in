@@ -181,7 +181,6 @@ AC_ARG_WITH([libnetconf],
 )
 REQS="$REQS libnetconf"
 BUILDREQS="$BUILDREQS libnetconf-devel"
-SERVER_LIBS=$LIBS
 
 
 ############################ Check for programs ################################
@@ -232,9 +231,11 @@ if test -d "/usr/share/yang/modules/"; then
 fi
 
 # Check for lnctool
-AC_CHECK_PROG([LNCTOOL], [lnctool], [yes], [no])
-if test "$LNCTOOL" = "no"; then
-	AC_MSG_ERROR(["lnctool not found!"])
+if test "$LNCTOOL" = "lnctool"; then
+	AC_CHECK_PROG([LNCTOOL_EXISTS], [lnctool], [yes], [no])
+	if test "$LNCTOOL_EXISTS" = "no"; then
+		AC_MSG_ERROR(["lnctool not found!"])
+	fi
 fi
 
 # Check python for manager and configurator
@@ -281,12 +282,27 @@ LDFLAGS="$LDFLAGS $LDFLAGS_LIB_XML"
 BUILDREQS="$BUILDREQS libxml2-devel"
 REQS="$REQS libxml2"
 
+# libnetconf
+AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [], AC_MSG_ERROR([libnetconf not found or not supporting notifications!]))
+
+if test "$SSH" = "yes"; then
+	AC_CHECK_LIB([netconf], [nc_session_accept_libssh_channel], [], [
+		AC_MSG_NOTICE(); AC_MSG_WARN([libnetconf does not support SSH, disabling it!]); AC_MSG_NOTICE(); SSH=no
+	])
+fi
+
 if test "$SSH" = "yes"; then
 	# libssh
 	AC_SEARCH_LIBS([ssh_pki_key_ecdsa_name], [ssh], [], [AC_MSG_ERROR([Missing the libssh library (>= 0.6.4).])])
 
 	# libcrypt
 	AC_SEARCH_LIBS([crypt], [crypt], [], [AC_MSG_ERROR([Missing the libcrypt library.])])
+fi
+
+if test "$TLS" = "yes"; then
+	AC_CHECK_LIB([netconf], [nc_session_accept_tls], [], [
+		AC_MSG_NOTICE(); AC_MSG_WARN([libnetconf does not support TLS, disabling it!]); AC_MSG_NOTICE(); TLS=no
+	])
 fi
 
 if test "$TLS" = "yes"; then
@@ -299,41 +315,6 @@ if test "$TLS" = "yes"; then
 	# M2Crypto python module
 	AX_PYTHON_MODULE(M2Crypto, fatal)
 fi
-
-AC_ARG_WITH([libnetconf],
-        AC_HELP_STRING([--with-libnetconf=PATH],[Set explicit installation prefix to the libnetconf library]),
-        [CPPFLAGS="-I$withval/include/ $CPPFLAGS"
-        LIBS="-L$withval/lib/ -Wl,-rpath,$withval/lib $LIBS"
-        LIBS="-L$withval/lib64/ -Wl,-rpath,$withval/lib64 $LIBS"
-        CONFIGURE_PARAMS="$CONFIGURE_PARAMS --with-libnetconf=$withval"
-        LIBNETCONF_DATADIR="$withval/share/"
-        ],[
-        # get info from pkg-config about installed package
-        PKG_CHECK_MODULES(LIBNETCONF, libnetconf)
-        CPPFLAGS="$LIBNETCONF_CFLAGS $CPPFLAGS"
-        LIBS="$LIBNETCONF_LIBS $LIBS"
-        LIBNETCONF_DATADIR="`$PKG_CONFIG --variable=datadir libnetconf`"]
-)
-
-# libnetconf
-callhome=yes
-AC_SEARCH_LIBS([nc_callhome_listen], [netconf], [],
-	[
-		AC_MSG_WARN([libnetconf is compiled without libssh2, disabling callhome.]);
-		CPPFLAGS="$CPPFLAGS -DDISABLE_CALLHOME";
-		callhome=no;
-		AC_SEARCH_LIBS([ncntf_dispatch_receive], [netconf], [],
-		[
-			AC_MSG_ERROR([libnetconf does not support notifications.]);
-			AC_SEARCH_LIBS([nc_init], [netconf], [], AC_MSG_ERROR([libnetconf not found!]))
-		])
-	]
-)
-
-REQS="$REQS libnetconf"
-BUILDREQS="$BUILDREQS libnetconf-devel"
-
-SERVER_LIBS=$LIBS
 
 # pthread
 AX_PTHREAD([
@@ -357,6 +338,8 @@ AC_ARG_WITH([modules-dir],
 rm -f config/Netopeer.xml.orig
 rm -f config/NETCONF-server.xml.orig
 
+SERVER_LIBS=$LIBS
+
 ###################### Check for configure parameters ##########################
 
 SERVER_TRANSPORT_SRCS=""
@@ -379,16 +362,11 @@ if test "$SSH" = "yes"; then
 
 	CLIENT_STRUCT_SIZE="sizeof(struct client_struct_ssh)"
 
-	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature>"
+	NCSERVER_FEATURES="<feature>ssh</feature><feature>inbound-ssh</feature><feature>outbound-ssh</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>ssh</feature>"
 
-	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh"
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}ssh,inbound-ssh,outbound-ssh"
 	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},ssh"
-
-	if test "$callhome" = "yes"; then
-		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-ssh</feature>"
-		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-ssh"
-	fi
 fi
 if test "$TLS" = "yes"; then
 	CFLAGS="$CFLAGS -DNP_TLS"
@@ -403,20 +381,15 @@ if test "$TLS" = "yes"; then
 		CLIENT_STRUCT_SIZE="sizeof(struct client_struct_tls)"
 	fi
 
-	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature>"
+	NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>tls</feature><feature>inbound-tls</feature><feature>outbound-tls</feature>"
 	NETOPEER_FEATURES="${NETOPEER_FEATURES}<feature>tls</feature>"
 
 	if test "$SSH" = "yes"; then
 		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},"
 	fi
 
-	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls"
+	IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES}tls,inbound-tls,outbound-tls"
 	CFGNETOPEER_FEATURES="${CFGNETOPEER_FEATURES},tls"
-
-	if test "$callhome" = "yes"; then
-		NCSERVER_FEATURES="${NCSERVER_FEATURES}<feature>outbound-tls</feature>"
-		IETF_NETCONF_SERVER_FEATURES="${IETF_NETCONF_SERVER_FEATURES},outbound-tls"
-	fi
 fi
 
 if (test "$SSH" = "no") && (test "$TLS" = "no"); then

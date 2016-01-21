@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.22.2 -->
-<!-- CreationDate: Thu Apr  9 11:05:00 2015 -->
+<!-- CreationDate: Tue Jul 14 08:58:15 2015 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -704,9 +704,9 @@ is the default value.</p>
 <p style="margin-left:23%;">Specify path to a file
 containing edit configuration data. The content of the file
 is placed into the &lt;config&gt; element of the
-<i>edit-config</i> operation. Therefore, it don&rsquo;t have
-to be a well-formed XML document with only a single root
-element. If neither <i>&minus;&minus;config</i> nor
+<i>edit-config</i> operation. Therefore, it doesn&rsquo;t
+have to be a well-formed XML document with only a single
+root element. If neither <i>&minus;&minus;config</i> nor
 <i>&minus;&minus;url</i> is specified, user is prompted to
 write edit configuration data manually. For examples, see
 the <b>EDIT-CONFIG</b> section of this document.</p>
@@ -806,7 +806,7 @@ For description of possible values, see the
 <br>
 Perform NETCONF &lt;get-schema&gt; operation that retrieves
 specified data model used by the server. This operation is
-available only if the server implements YANG Module for
+available only if the server implements the YANG Module for
 NETCONF Monitoring. The list of available schemas can be
 retrieved from <i>/netconf-state/schemas</i> subtree via the
 &lt;get&gt; operation. For more details see <i>RFC 6022
@@ -1306,15 +1306,132 @@ default values are retrieved.</p>
 <p style="margin-left:17%; margin-top: 1em"><b>explicit</b></p>
 
 <p style="margin-left:23%;">Only data explicitly set by the
-client are retrieved despite they contain default values or
-not.</p>
+client are retrieved with or without default values.</p>
 
 <h2>EDIT-CONFIG
 <a name="EDIT-CONFIG"></a>
 </h2>
 
 
-<p style="margin-left:11%; margin-top: 1em">TBD</p>
+<p style="margin-left:11%; margin-top: 1em">The netopeer
+command line interface (CLI) is a NETCONF client (RFC 6241).
+This client can format a NETCONF &quot;edit-config&quot; RPC
+message with information supplied by the user. Following a
+successful netopeer-cli &quot;connect&quot; operation, the
+client&rsquo;s edit-config RPC asks the connected server to
+initialize or replace values in a specific datastore. This
+is shown in the example netopeer-cli session that
+follows:</p>
+
+<p style="margin-left:11%; margin-top: 1em">$
+./netopeer-cli <br>
+netconf&gt; connect --login username localhost <br>
+username@localhost password: <br>
+netconf&gt; edit-config --defop replace --config
+edit-config.xml running</p>
+
+<p style="margin-left:11%; margin-top: 1em">Result OK <br>
+netconf&gt; quit <br>
+$ cat edit-config.xml <br>
+&lt;interfaces
+xmlns=&quot;urn:ietf:params:xml:ns:yang:ietf-interfaces&quot;
+<br>
+
+xmlns:ianaift=&quot;urn:ietf:params:xml:ns:yang:iana-if-type&quot;&gt;
+<br>
+&lt;interface&gt; <br>
+&lt;name&gt;eth1&lt;/name&gt; <br>
+&lt;type&gt;ianaift:ethernetCsmacd&lt;/type&gt; <br>
+&lt;enabled&gt;false&lt;/enabled&gt; <br>
+&lt;/interface&gt; <br>
+&lt;/interfaces&gt; <br>
+#</p>
+
+<p style="margin-left:11%; margin-top: 1em">As shown above,
+&quot;--config edit-config.xml&quot; is the input file for
+the edit-config request. The file identifies the target
+objects by name and type and it requests to set the
+&quot;enabled&quot; object to false on an RFC 7223-defined
+network interface. The object instance is controlled by the
+server and one of its datastores is the target of the
+request. The NETCONF server runs on localhost in the above
+example. In crafting an edit-config request, the --config
+file must use the namespaces from the target
+datastore&rsquo;s schema definition. Thus,
+&quot;ianaift&quot; is used as the prefix for the namespace
+for the particular ietf-interfaces instance. A &lt;type&gt;
+element is also required for the edit-config --config file.
+The CLI user can obtain these metadata and instance data as
+follows:</p>
+
+<p style="margin-left:11%; margin-top: 1em">$
+./netopeer-cli <br>
+netconf&gt; connect --login username localhost <br>
+username@localhost password: <br>
+netconf&gt; get-config ietf-interfaces</p>
+
+<p style="margin-left:11%; margin-top: 1em">Select target
+datastore (running|startup|candidate|url:&lt;dsturl&gt;):
+running</p>
+
+<p style="margin-left:11%; margin-top: 1em">Result: <br>
+&lt;interfaces
+xmlns=&quot;urn:ietf:params:xml:ns:yang:ietf-interfaces&quot;
+xmlns:ianaift=&quot;urn:ietf:params:xml:ns:yang:iana-if-type&quot;&gt;
+<br>
+&lt;interface&gt; <br>
+&lt;name&gt;eth1&lt;/name&gt; <br>
+&lt;type&gt;ianaift:ethernetCsmacd&lt;/type&gt; <br>
+&lt;enabled&gt;true&lt;/enabled&gt; <br>
+&lt;ipv6
+xmlns=&quot;urn:ietf:params:xml:ns:yang:ietf-ip&quot;&gt;
+<br>
+&lt;enabled&gt;true&lt;/enabled&gt; <br>
+&lt;forwarding&gt;false&lt;/forwarding&gt; <br>
+&lt;mtu&gt;1500&lt;/mtu&gt; <br>
+
+&lt;dup-addr-detect-transmits&gt;1&lt;/dup-addr-detect-transmits&gt;
+<br>
+&lt;autoconf&gt; <br>
+
+&lt;create-global-addresses&gt;true&lt;/create-global-addresses&gt;
+<br>
+
+&lt;create-temporary-addresses&gt;false&lt;/create-temporary-addresses&gt;
+<br>
+
+&lt;temporary-valid-lifetime&gt;604800&lt;/temporary-valid-lifetime&gt;
+<br>
+
+&lt;temporary-preferred-lifetime&gt;86400&lt;/temporary-preferred-lifetime&gt;
+<br>
+&lt;/autoconf&gt; <br>
+&lt;/ipv6&gt; <br>
+&lt;/interface&gt;</p>
+
+<p style="margin-left:11%; margin-top: 1em">...</p>
+
+
+<p style="margin-left:11%; margin-top: 1em">&lt;/netopeer&gt;
+<br>
+&lt;nacm
+xmlns=&quot;urn:ietf:params:xml:ns:yang:ietf-netconf-acm&quot;&gt;
+<br>
+&lt;enable-nacm&gt;false&lt;/enable-nacm&gt; <br>
+&lt;/nacm&gt; <br>
+netconf&gt;</p>
+
+<p style="margin-left:11%; margin-top: 1em">The elipses
+(&quot;...&quot;) above indicate that the &quot;get-config
+ietf-interfaces&quot; command output is abbreviated. The
+information that is used for crafting a --config file input
+to the edit-config command is shown above. As alredy
+mentioned, the type element needs to be included and the
+prefix must be exact:</p>
+
+<p style="margin-left:11%; margin-top: 1em">&lt;type
+xmlns:ianaift=&quot;urn:ietf:params:xml:ns:yang:iana-if-type&quot;&gt;
+ianaift:ethernetCsmacd&lt;/type&gt;</p>
 
 <h2>SEE ALSO
 <a name="SEE ALSO"></a>
@@ -1322,9 +1439,8 @@ not.</p>
 
 
 
-<p style="margin-left:11%; margin-top: 1em"><b>netopeer-agent(1),
-netopeer-configurator(1), netopeer-manager(1),
-netopeer-server(1),</b> <br>
+<p style="margin-left:11%; margin-top: 1em"><b>netopeer-configurator(1),
+netopeer-manager(1), netopeer-server(8),</b> <br>
 RFC 5277 (Event Notifications) <br>
 RFC 6241 (NETCONF v1.1) <br>
 RFC 6242 (NETCONF over SSH) <br>
@@ -1335,7 +1451,7 @@ http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05
 
 http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05
 (Call Home) <br>
-https://netopeer.googlecode.com (Netopeer homepage)</p>
+https://github.com/CESNET/netopeer (Netopeer homepage)</p>
 
 <h2>MAILING LIST
 <a name="MAILING LIST"></a>
@@ -1343,9 +1459,9 @@ https://netopeer.googlecode.com (Netopeer homepage)</p>
 
 
 <p style="margin-left:11%; margin-top: 1em">To discuss
-various topics about <b>netopeer-cli,</b> join the Netopeer
-mailing list at
-&lt;https://groups.google.com/group/netopeer&gt;.</p>
+various topics about <b>netopeer-cli,</b> look at Netopeer
+issue tracker at
+&lt;https://github.com/cesnet/netopeer/issues&gt;.</p>
 
 <h2>REPORTING BUGS
 <a name="REPORTING BUGS"></a>
@@ -1353,8 +1469,7 @@ mailing list at
 
 
 <p style="margin-left:11%; margin-top: 1em">Report bugs to
-the issue tracker at
-&lt;https://code.google.com/p/netopeer/issues/list&gt;.</p>
+the issue tracker at the same URL.</p>
 
 <h2>AUTHORS
 <a name="AUTHORS"></a>
@@ -1370,7 +1485,7 @@ the issue tracker at
 
 
 <p style="margin-left:11%; margin-top: 1em">Copyright
-&copy; 2012-2014 CESNET, z.s.p.o.</p>
+&copy; 2012-2015 CESNET, z.s.p.o.</p>
 <hr>
 </body>
 </html>

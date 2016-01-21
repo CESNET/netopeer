@@ -12,7 +12,6 @@ struct chan_struct {
 	int chan_out[2];			// pipe - libssh channel write, libnetconf read
 	int netconf_subsystem;
 	struct nc_session* nc_sess;
-	pthread_t new_sess_tid;
 	volatile struct timeval last_rpc_time;	// timestamp of the last RPC either in or out
 	volatile int to_free;		// is this channel valid?
 	volatile int last_send;

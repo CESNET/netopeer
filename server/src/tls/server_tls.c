@@ -42,9 +42,6 @@ void client_free_tls(struct client_struct_tls* client) {
 		nc_session_free(client->nc_sess);
 	}
 
-	if (client->new_sess_tid != 0) {
-		pthread_cancel(client->new_sess_tid);
-	}
 	if (client->tls != NULL) {
 		SSL_shutdown(client->tls);
 		SSL_free(client->tls);
@@ -543,6 +540,8 @@ static int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
 		if (lookup == NULL) {
 			nc_verb_error("%s: failed to add lookup method", __func__);
 			X509_STORE_free(store);
+			/* CRL_DIR UNLOCK */
+			pthread_mutex_unlock(&netopeer_options.tls_opts->crl_dir_lock);
 			return 0;
 		}
 
@@ -673,9 +672,7 @@ fail:
 	return 0;
 }
 
-/* separate thread because nc_session_accept_inout is blocking */
-void* netconf_session_thread(void* arg) {
-	struct client_struct_tls* client = (struct client_struct_tls*)arg;
+static int create_netconf_session(struct client_struct_tls* client) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
@@ -687,19 +684,18 @@ void* netconf_session_thread(void* arg) {
 			/* unlikely to happen */
 			nc_session_free(client->nc_sess);
 		}
-		return NULL;
+		return EXIT_FAILURE;
 	}
 	if (client->nc_sess == NULL) {
 		nc_verb_error("%s: failed to create a new NETCONF session", __func__);
 		client->to_free = 1;
-		return NULL;
+		return EXIT_FAILURE;
 	}
 
-	client->new_sess_tid = 0;
 	nc_verb_verbose("New server session for '%s' with ID %s", client->username, nc_session_get_id(client->nc_sess));
 	gettimeofday((struct timeval*)&client->last_rpc_time, NULL);
 
-	return NULL;
+	return EXIT_SUCCESS;
 }
 
 int np_tls_kill_session(const char* sid, struct client_struct_tls* cur_client) {
@@ -737,11 +733,12 @@ int np_tls_client_netconf_rpc(struct client_struct_tls* client) {
 	int closing = 0, skip_sleep = 0;
 	struct nc_err* err;
 
-	if (client->to_free || client->nc_sess == NULL) {
-		if (client->to_free) {
-			++skip_sleep;
-		}
-		return skip_sleep;
+	if (client->to_free) {
+		return 1;
+	}
+
+	if (client->nc_sess == NULL && create_netconf_session(client)) {
+		return 1;
 	}
 
 	/* receive a new RPC */
@@ -929,24 +926,11 @@ int np_tls_client_transport(struct client_struct_tls* client) {
 		client->to_free = 1;
 	}
 
-	if (client->to_free) {
+	if (client->to_free || client->nc_sess == NULL) {
 		return 1;
 	}
 
 	gettimeofday(&cur_time, NULL);
-
-	/* check the ncsession for hello timeout */
-	if (client->nc_sess == NULL && timeval_diff(cur_time, client->last_rpc_time) >= netopeer_options.hello_timeout) {
-		if (client->new_sess_tid == 0) {
-			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-		} else {
-			pthread_cancel(client->new_sess_tid);
-			client->new_sess_tid = 0;
-		}
-		nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
-		client->to_free = 1;
-		++skip_sleep;
-	}
 
 	/* check the session for idle timeout */
 	if (timeval_diff(cur_time, client->last_rpc_time) >= netopeer_options.idle_timeout) {
@@ -1098,8 +1082,6 @@ int np_tls_session_count(void) {
 }
 
 int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) {
-	int ret;
-
 	new_client->tls = SSL_new(tlsctx);
 	if (new_client->tls == NULL) {
 		nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1124,13 +1106,6 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 	}
 
 	gettimeofday((struct timeval*)&new_client->last_rpc_time, NULL);
-
-	/* start a separate thread for NETCONF session accept */
-	if ((ret = pthread_create(&new_client->new_sess_tid, NULL, netconf_session_thread, new_client)) != 0) {
-		nc_verb_error("%s: failed to start the NETCONF session thread (%s)", __func__, strerror(ret));
-		return 1;
-	}
-	pthread_detach(new_client->new_sess_tid);
 
 	return 0;
 }

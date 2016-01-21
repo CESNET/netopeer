@@ -39,10 +39,6 @@ static inline void _chan_free(struct client_struct_ssh* client, struct chan_stru
 		nc_session_free(chan->nc_sess);
 	}
 
-	if (chan->new_sess_tid != 0) {
-		pthread_cancel(chan->new_sess_tid);
-	}
-
 	if (chan->ssh_chan != NULL && client->ssh_chans->next != NULL) {
 		ssh_channel_free(chan->ssh_chan);
 	}
@@ -143,64 +139,41 @@ static struct chan_struct* client_find_channel_by_sid(struct client_struct_ssh* 
 	return chan;
 }
 
-/* separate thread because nc_session_accept_inout is blocking */
-static void* netconf_session_thread(void* arg) {
-	struct ncsess_thread_config* nstc = (struct ncsess_thread_config*)arg;
+static int create_netconf_session(struct client_struct_ssh* client, struct chan_struct* channel) {
 	struct nc_cpblts* caps = NULL;
 
 	caps = nc_session_get_cpblts_default();
-	nstc->chan->nc_sess = nc_session_accept_libssh_channel(caps, nstc->client->username, nstc->chan->ssh_chan);
+	channel->nc_sess = nc_session_accept_libssh_channel(caps, client->username, channel->ssh_chan);
 	nc_cpblts_free(caps);
-	if (nstc->chan->to_free == 1) {
+	if (channel->to_free == 1) {
 		/* probably a signal received */
-		if (nstc->chan->nc_sess != NULL) {
+		if (channel->nc_sess != NULL) {
 			/* unlikely to happen */
-			nc_session_free(nstc->chan->nc_sess);
+			nc_session_free(channel->nc_sess);
+			channel->nc_sess = NULL;
 		}
-		free(nstc);
-		return NULL;
+		return EXIT_FAILURE;
 	}
-	if (nstc->chan->nc_sess == NULL) {
+	if (channel->nc_sess == NULL) {
 		nc_verb_error("%s: failed to create a new NETCONF session", __func__);
-		nstc->chan->to_free = 1;
-		free(nstc);
-		return NULL;
+		channel->to_free = 1;
+		return EXIT_FAILURE;
 	}
 
-	nstc->chan->new_sess_tid = 0;
-	nc_verb_verbose("New server session for '%s' with ID %s", nstc->client->username, nc_session_get_id(nstc->chan->nc_sess));
-	gettimeofday((struct timeval*)&nstc->chan->last_rpc_time, NULL);
+	/* new session was created */
+	nc_verb_verbose("New server session for '%s' with ID %s", client->username, nc_session_get_id(channel->nc_sess));
+	gettimeofday((struct timeval*)&channel->last_rpc_time, NULL);
 
-	free(nstc);
-	return NULL;
+	return EXIT_SUCCESS;
 }
 
 /* return 0 - OK, -1 error */
 static int sshcb_channel_subsystem(struct client_struct_ssh* client, struct chan_struct* channel, const char* subsystem) {
-	struct ncsess_thread_config* nstc;
-	int ret;
-
 	if (strcmp(subsystem, "netconf") == 0) {
 		if (channel->netconf_subsystem) {
 			nc_verb_warning("Client '%s' requested subsystem 'netconf' for the second time", client->username);
 		} else {
 			channel->netconf_subsystem = 1;
-
-			if (channel->new_sess_tid != 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			}
-
-			/* start a separate thread for NETCONF session accept */
-			nstc = malloc(sizeof(struct ncsess_thread_config));
-			nstc->chan = channel;
-			nstc->client = client;
-			if ((ret = pthread_create(&channel->new_sess_tid, NULL, netconf_session_thread, nstc)) != 0) {
-				nc_verb_error("%s: failed to start the NETCONF session thread (%s)", strerror(ret));
-				free(nstc);
-				channel->to_free = 1;
-				return -1;
-			}
-			pthread_detach(channel->new_sess_tid);
 		}
 	} else {
 		nc_verb_warning("Client '%s' requested unknown subsystem '%s'", client->username, subsystem);
@@ -403,7 +376,7 @@ static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel chan
 
 int np_ssh_kill_session(const char* sid, struct client_struct_ssh* cur_client) {
 	struct client_struct_ssh* kill_client;
-	struct chan_struct* kill_chan;
+	struct chan_struct* kill_chan = NULL;
 
 	if (sid == NULL) {
 		return 1;
@@ -444,11 +417,19 @@ int np_ssh_client_netconf_rpc(struct client_struct_ssh* client) {
 	}
 
 	for (chan = client->ssh_chans; chan != NULL; chan = chan->next) {
-		if (chan->to_free || chan->nc_sess == NULL) {
-			if (chan->to_free) {
-				++skip_sleep;
-			}
+		if (chan->to_free) {
+			++skip_sleep;
 			continue;
+		}
+
+		/* block this client until the hello is received */
+		if (chan->nc_sess == NULL) {
+			if (!chan->netconf_subsystem) {
+				continue;
+			}
+			if (create_netconf_session(client, chan)) {
+				continue;
+			}
 		}
 
 		/* receive a new RPC */
@@ -715,18 +696,6 @@ int np_ssh_client_transport(struct client_struct_ssh* client) {
 			}
 		}
 
-		/* check the channel for hello timeout */
-		if (chan->nc_sess == NULL && timeval_diff(cur_time, chan->last_rpc_time) >= netopeer_options.hello_timeout) {
-			if (chan->new_sess_tid == 0) {
-				nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
-			} else {
-				pthread_cancel(chan->new_sess_tid);
-				chan->new_sess_tid = 0;
-			}
-			nc_verb_warning("Session of client '%s' did not send hello RPC for too long, disconnecting.", client->username);
-			chan->to_free = 1;
-		}
-
 		/* check the channel for idle timeout */
 		if (timeval_diff(cur_time, chan->last_rpc_time) >= netopeer_options.idle_timeout) {
 			/* check for active event subscriptions, in that case we can never disconnect an idle session */
@@ -786,7 +755,7 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		case SSH_CHANNEL_FORWARDED_TCPIP:
 			str_subtype = "forwarded-tcpip";
 			break;
-		case SSH_CHANNEL_X11:
+		case (int)SSH_CHANNEL_X11:
 			str_subtype = "channel-x11";
 			break;
 		case SSH_CHANNEL_UNKNOWN:
@@ -920,14 +889,14 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 			return 0;
 		}
 	} else if (client->authenticated) {
-		if (type == SSH_REQUEST_CHANNEL_OPEN && subtype == SSH_CHANNEL_SESSION) {
+		if (type == SSH_REQUEST_CHANNEL_OPEN && subtype == (int)SSH_CHANNEL_SESSION) {
 			ssh_channel chan;
 			if ((chan = ssh_message_channel_request_open_reply_accept(msg)) == NULL) {
 				ssh_message_reply_default(msg);
 			}
 			sshcb_channel_open(client, chan);
 			return 0;
-		} else if (type == SSH_REQUEST_CHANNEL && subtype == SSH_CHANNEL_REQUEST_SUBSYSTEM) {
+		} else if (type == SSH_REQUEST_CHANNEL && subtype == (int)SSH_CHANNEL_REQUEST_SUBSYSTEM) {
 			if (sshcb_channel_subsystem(client, channel, ssh_message_channel_request_subsystem(msg)) == 0) {
 				ssh_message_channel_request_reply_success(msg);
 			} else {

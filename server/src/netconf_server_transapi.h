@@ -10,8 +10,6 @@ struct np_bind_addr {
 	struct np_bind_addr* next;
 };
 
-#ifndef DISABLE_CALLHOME
-
 struct ch_app {
 	NC_TRANSPORT transport;
 	char* name;
@@ -35,8 +33,6 @@ struct ch_app {
 };
 
 int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
-
-#endif
 
 int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error, NC_TRANSPORT transport);
 

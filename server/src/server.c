@@ -67,10 +67,8 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 
 extern struct np_options netopeer_options;
 
-#ifndef DISABLE_CALLHOME
 extern pthread_mutex_t callhome_lock;
 extern struct client_struct* callhome_client;
-#endif
 
 /* one global structure holding all the client information */
 struct np_state netopeer_state = {
@@ -380,7 +378,7 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 			}
 
 			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr4, sizeof(struct sockaddr_in)) == -1) {
-				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				nc_verb_error("%s: could not bind \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 				continue;
 			}
 
@@ -396,13 +394,13 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 			}
 
 			if (bind(npsock->pollsock[npsock->count-1].fd, (struct sockaddr*)saddr6, sizeof(struct sockaddr_in6)) == -1) {
-				nc_verb_error("%s: could not bind \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+				nc_verb_error("%s: could not bind \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 				continue;
 			}
 		}
 
 		if (listen(npsock->pollsock[npsock->count-1].fd, 5) == -1) {
-			nc_verb_error("%s: unable to start listening on \"%s\" (%s)", __func__, addrs->addr, strerror(errno));
+			nc_verb_error("%s: unable to start listening on \"%s\" port %d (%s)", __func__, addrs->addr, addrs->port, strerror(errno));
 			continue;
 		}
 
@@ -512,7 +510,6 @@ void listen_loop(int do_init) {
 		tlsctx = np_tls_server_id_check(tlsctx);
 #endif
 
-#ifndef DISABLE_CALLHOME
 		/* Callhome client check */
 		if (callhome_client != NULL) {
 			/* CALLHOME LOCK */
@@ -522,7 +519,6 @@ void listen_loop(int do_init) {
 			/* CALLHOME UNLOCK */
 			pthread_mutex_unlock(&callhome_lock);
 		}
-#endif
 
 		/* Listen client check */
 		if (new_client == NULL) {
@@ -557,9 +553,9 @@ void listen_loop(int do_init) {
 						break;
 #endif
 					default:
+						free(new_client);
 						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 					}
-					free(new_client);
 
 					/* sleep to prevent clients from immediate connection retry */
 					usleep(netopeer_options.response_time*1000);
@@ -597,9 +593,18 @@ void listen_loop(int do_init) {
 				continue;
 			}
 
+			/* add the client into the global clients structure */
+			/* GLOBAL WRITE LOCK */
+			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			client_append(&netopeer_state.clients, new_client);
+			/* GLOBAL WRITE UNLOCK */
+			pthread_rwlock_unlock(&netopeer_state.global_lock);
+
 			/* start the client thread */
 			if ((ret = pthread_create((pthread_t*)&new_client->tid, NULL, client_main_thread, (void*)new_client)) != 0) {
 				nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+				np_client_detach(&netopeer_state.clients, new_client);
+
 				new_client->tid = 0;
 				new_client->to_free = 1;
 				switch (new_client->transport) {
@@ -619,13 +624,6 @@ void listen_loop(int do_init) {
 				}
 				continue;
 			}
-
-			/* add the client into the global clients structure */
-			/* GLOBAL WRITE LOCK */
-			pthread_rwlock_wrlock(&netopeer_state.global_lock);
-			client_append(&netopeer_state.clients, new_client);
-			/* GLOBAL WRITE UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
 		}
 
 	} while (!quit && !restart_soft);
@@ -675,7 +673,7 @@ int main(int argc, char** argv) {
 	struct sigaction action;
 	sigset_t block_mask;
 
-	char *aux_string = NULL, path[PATH_MAX];
+	char *aux_string = NULL, path[PATH_MAX+1];
 	int next_option;
 	int daemonize = 0, len;
 	int listen_init = 1;
@@ -816,9 +814,14 @@ restart:
 	} else if (restart_hard) {
 		nc_verb_verbose("Server is going to hard restart.");
 		len = readlink("/proc/self/exe", path, PATH_MAX);
-		path[len] = 0;
+		if (len > 0) {
+			path[len] = 0;
+			xmlCleanupParser();
+			execv(path, argv);
+		}
+		nc_verb_error("Failed to get the path to self.");
 		xmlCleanupParser();
-		execv(path, argv);
+		return EXIT_FAILURE;
 	}
 
 	/*

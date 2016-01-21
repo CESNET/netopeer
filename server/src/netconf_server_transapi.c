@@ -74,11 +74,7 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 extern struct np_options netopeer_options;
 extern int quit;
 
-#ifndef DISABLE_CALLHOME
-
 static struct ch_app* callhome_apps = NULL;
-
-#endif
 
 static void free_all_bind_addr(struct np_bind_addr** list) {
 	struct np_bind_addr* prev;
@@ -313,8 +309,6 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 	return EXIT_SUCCESS;
 }
 
-#ifndef DISABLE_CALLHOME
-
 static xmlNodePtr find_node(xmlNodePtr parent, xmlChar* name) {
 	xmlNodePtr child;
 
@@ -407,7 +401,7 @@ static void* app_loop(void* app_v) {
 
 	nc_verb_verbose("Starting Call Home thread (%s).", app->name);
 
-	nc_session_transport(NC_TRANSPORT_SSH);
+	nc_session_transport(app->transport);
 
 	for (;;) {
 		pthread_testcancel();
@@ -429,6 +423,7 @@ static void* app_loop(void* app_v) {
 		for (;;) {
 			for (i = 0; i < app->rec_count; ++i) {
 				if ((app->client = sock_connect(cur_server->address, cur_server->port)) != NULL) {
+                    app->client->transport = app->transport;
 					break;
 				}
 				sleep(app->rec_interval);
@@ -444,7 +439,7 @@ static void* app_loop(void* app_v) {
 			}
 		}
 
-		/* publish the new client for the main application loop to create a new SSH session */
+		/* publish the new client for the main application loop to create a new session */
 		while (1) {
 			/* CALLHOME LOCK */
 			pthread_mutex_lock(&callhome_lock);
@@ -529,6 +524,7 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 	struct ch_server* srv, *del_srv;
 	xmlNodePtr auxnode, servernode, childnode;
 	xmlChar* auxstr;
+	int ret;
 
 	new = calloc(1, sizeof(struct ch_app));
 	new->transport = transport;
@@ -638,7 +634,11 @@ static int app_create(xmlNodePtr node, struct nc_err** error, NC_TRANSPORT trans
 		}
 	}
 
-	pthread_create(&(new->thread), NULL, app_loop, new);
+	ret = pthread_create(&(new->thread), NULL, app_loop, new);
+	if (ret) {
+		nc_verb_error("%s: pthread_create() error (%s)", __func__, strerror(ret));
+		goto fail;
+	}
 
 	/* insert the created app structure into the list */
 	if (!callhome_apps) {
@@ -763,8 +763,6 @@ int callback_srv_netconf_srv_call_home_srv_applications_srv_application(XMLDIFF_
 	return EXIT_SUCCESS;
 }
 
-#endif
-
 /**
  * @brief Initialize plugin after loaded and before any other functions are called.
 
@@ -818,12 +816,10 @@ void server_transapi_close(void) {
 	free_all_bind_addr(&netopeer_options.binds);
 	pthread_mutex_unlock(&netopeer_options.binds_lock);
 
-#ifndef DISABLE_CALLHOME
 	nc_verb_verbose("NETCONF Call Home cleanup.");
 	while (callhome_apps != NULL) {
 		app_rm(callhome_apps->name, callhome_apps->transport);
 	}
-#endif
 }
 
 /*

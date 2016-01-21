@@ -393,9 +393,12 @@ char* readinput(const char* instruction, const char* tmpfile, FILE* output) {
 		/* Remove the instruction comment */
 		if (old_content == NULL && instruction != NULL) {
 			ptr = strstr(input, "\n<!--#\n");
-			ptr2 = strstr(input, "\n-->\n");
+			if (!ptr) {
+				goto cleanup;
+			}
+			ptr2 = strstr(ptr, "\n-->\n");
 			/* The user could have deleted or modified the comment, ignore it then */
-			if (ptr != NULL && ptr2 != NULL) {
+			if (ptr2 != NULL) {
 				ptr2 += 5;
 				memmove(ptr, ptr2, strlen(ptr2)+1);
 
@@ -414,6 +417,8 @@ char* readinput(const char* instruction, const char* tmpfile, FILE* output) {
 		}
 	}
 
+cleanup:
+
 	close(tmpfd);
 	free(old_content);
 	free((char*)last_tmpfile);
@@ -422,7 +427,9 @@ char* readinput(const char* instruction, const char* tmpfile, FILE* output) {
 	return input;
 
 fail:
-	close(tmpfd);
+	if (tmpfd > -1) {
+		close(tmpfd);
+	}
 	if (tmpname != NULL) {
 		unlink(tmpname);
 	}
