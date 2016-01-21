@@ -62,6 +62,7 @@ OBJDIR= .obj
 
 SRCS =	ietf-system.c \
 		parse.c \
+		date_time.c \
 		dns_resolver.c \
 		local_users.c \
 		encrypt.c \
