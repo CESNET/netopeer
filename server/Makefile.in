@@ -151,7 +151,7 @@ submakes:
 		$(MAKE) -C $$i; \
 	done
 	for i in $(OPENWRT_MODULES); do \
-		$(MAKE) -C src/openwrt/ -f Makefile.$$i; \
+		$(MAKE) -C src/openwrt/$$i -f Makefile.$$i; \
 	done
 
 $(SERVER_MODULES_CONF): $(SERVER_MODULES_CONF:%=%.tmp)
@@ -190,7 +190,10 @@ $(OBJDIR)/%.o: %.c
 
 .PHONY: clean
 clean:
-		rm -rf $(SERVER) $(TOOLS) $(OBJDIR) $(OBJDIR)/src/openwrt/%.o $(OBJDIR)/src/openwrt/%.so
+	rm -rf $(SERVER) $(TOOLS) $(OBJDIR)
+	for i in $(OPENWRT_MODULES); do \
+		rm -rf $(OBJDIR)/src/openwrt/$$i/%.o $(OBJDIR)/src/openwrt/$$i/%.so; \
+	done
 
 .PHONY: doc
 doc: $(MANHTMLS)
@@ -251,10 +254,8 @@ install: $(SERVER) $(TOOLS) $(CFGS) $(MANPAGES) $(MANHTMLS)
 		fi
 
 		for i in $(OPENWRT_MODULES); do \
-			$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/ -f Makefile.$$i install \
+			$(MAKE) DESTDIR=$(patsubst .%,$(TOPDIR)/.%,$(DESTDIR)) -C src/openwrt/$$i -f Makefile.$$i install \
 			|| exit 1; \
 		done
 
 		$(foreach man,$(MANHTMLS),$(INSTALL_DATA) $(man) $(DESTDIR)/$(datarootdir)/netopeer/;)
-
-

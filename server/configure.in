@@ -455,7 +455,7 @@ if test "$NPCONF" = "yes"; then
 	AC_CONFIG_FILES(configurator/netopeer/config.py)
 fi
 
-AC_CONFIG_FILES(src/openwrt/ietf-system.xml)
-AC_CONFIG_FILES(src/openwrt/Makefile.ietf-system)
+AC_CONFIG_FILES(src/openwrt/ietf-system/ietf-system.xml)
+AC_CONFIG_FILES(src/openwrt/ietf-system/Makefile.ietf-system)
 
 AC_OUTPUT
