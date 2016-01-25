@@ -8,7 +8,6 @@
 			<feature>local-users</feature>
 			<feature>timezone-name</feature>
 			<feature>ntp</feature>
-			<feature>dns-resolver</feature>
 		</model-main>
 	</data-models>
 	<repo>

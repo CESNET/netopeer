@@ -50,6 +50,9 @@ int transapi_version = 6;
  */
 int config_modified = 0;
 
+/* Signal to not change config via callback and file callback at same time */
+int modified_by_callback = 0;
+
 /*
  * Determines the callbacks order.
  * Set this variable before compilation and DO NOT modify it in runtime.
@@ -381,6 +384,7 @@ int transapi_init(xmlDocPtr * running)
 	}
 
 	/* clear default ntp servers */
+	dns_rm_nameserver_all();
 
 	/* Clear default dns search domains */
 	dns_rm_search_domain_all();
@@ -880,7 +884,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_tim
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		dns_rm_opt_timeout();
+		dns_rm_opt_timeout(&msg);
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-timeout callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
@@ -919,7 +923,7 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_att
 			return fail(error, msg, EXIT_FAILURE);
 		}
 	} else if (op & XMLDIFF_REM) {
-		dns_rm_opt_attempts();
+		dns_rm_opt_attempts(&msg);
 	} else {
 		asprintf(&msg, "Unsupported XMLDIFF_OP \"%d\" used in the dns-resolver-options-attempts callback.", op);
 		return fail(error, msg, EXIT_FAILURE);
@@ -1327,7 +1331,7 @@ struct transapi_rpc_callbacks rpc_clbks = {
 	}
 };
 
-int ietfsystem_file_change(const char* UNUSED(filepath), xmlDocPtr *edit_conf, int *exec)
+int ietfsystem_file_change(const char* filepath, xmlDocPtr *edit_conf, int *exec)
 {
 	*edit_conf = NULL;
     *exec = 0;
@@ -1343,7 +1347,12 @@ int ietfsystem_file_change(const char* UNUSED(filepath), xmlDocPtr *edit_conf, i
 	xmlSetNs(root, ns);
 	xmlNewNs(root, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0", BAD_CAST "ncop");
 
-	config = ntp_getconfig(ns, &msg);
+	if (strcmp(filepath, "/etc/config/system") == 0) {
+		config = ntp_getconfig(ns, &msg);
+	} else if (strcmp(filepath, "/etc/resolv.conf") == 0) {
+		config = dns_getconfig(ns, &msg);
+	}
+	
 
 	if (config == NULL) {
 		xmlFreeDoc(*edit_conf);
@@ -1358,8 +1367,11 @@ int ietfsystem_file_change(const char* UNUSED(filepath), xmlDocPtr *edit_conf, i
 }
 
 struct transapi_file_callbacks file_clbks = {
-	.callbacks_count = 1,
+	.callbacks_count = 4,
 	.callbacks = {
-		{.path = "/etc/config/system", .func = ietfsystem_file_change}
+		{.path = "/etc/config/system", .func = ietfsystem_file_change},
+		{.path = "/etc/resolv.conf", .func = ietfsystem_file_change},
+		{.path = "/etc/passwd", .func = ietfsystem_file_change},
+		{.path = "/etc/shadow", .func = ietfsystem_file_change}
 	}
 };

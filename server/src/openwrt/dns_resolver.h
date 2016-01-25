@@ -121,7 +121,7 @@ int dns_set_opt_timeout(const char* number, char** msg);
  * @param msg[out] error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int dns_rm_opt_timeout(void);
+int dns_rm_opt_timeout(char** msg);
 
 /**
  * @brief set the attempts option to the /etc/resolv.conf configuration file
@@ -137,6 +137,6 @@ int dns_set_opt_attempts(const char* number, char** msg);
  * @param msg[out] error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int dns_rm_opt_attempts(void);
+int dns_rm_opt_attempts(char** msg);
 
 #endif /* DNS_RESOLVER_H_ */
