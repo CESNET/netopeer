@@ -67,6 +67,7 @@ SRCS =	ietf-interfaces.c \
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 CFGS =	model/ietf-interfaces.yin \
+		model/ietf-ip.yin \
 		ietf-interfaces.xml \
 		model/iana-if-type.yin \
 		model/ietf-interfaces-config.rng \
