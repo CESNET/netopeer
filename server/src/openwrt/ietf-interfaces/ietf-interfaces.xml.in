@@ -1,10 +1,18 @@
 <device>
 	<name>ietf-interfaces</name>
 	<data-models>
+		<model>
+			<path>@sysconfdir@/netopeer/ietf-interfaces/iana-if-type.yin</path>
+		</model>
 		<model-main>
 			<path>@sysconfdir@/netopeer/ietf-interfaces/ietf-interfaces.yin</path>
 			<transapi>@sysconfdir@/netopeer/ietf-interfaces/ietf-interfaces.so</transapi>
 		</model-main>
+		<model>
+			<path>@sysconfdir@/netopeer/ietf-interfaces/ietf-ip.yin</path>
+			<features>ipv4-non-contiguous-netmasks</features>
+			<features>ipv6-privacy-autoconf</features>
+		</model>
 	</data-models>
 	<repo>
 		<type>file</type>
