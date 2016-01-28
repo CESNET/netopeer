@@ -57,7 +57,7 @@
 #include <arpa/inet.h>
 
 #include "date_time.h"
-#include "parse.h"
+#include "../config-parser/parse.h"
 
 struct tmz {
 	char* zonename;
@@ -72,7 +72,7 @@ struct tmz_offset {
 struct tmz_offset timezones_offset[] = {
 	//	{-720, "Etc/GMT-12"},
 	{-660, "SST11"},
-	{-600, "HST10"},   	
+	{-600, "HST10"},
 	{-570, "MART9:30"},
 	{-540, "GAMT9"},
 	{-480, "PST8"},
@@ -91,7 +91,7 @@ struct tmz_offset timezones_offset[] = {
 	{180,  "AST-3"},
 	{210,  "IRST-3:30IRDT,80/0,264/0"},
 	{240,  "GST-4"},
-	{270,  "AFT-4:30"}, 
+	{270,  "AFT-4:30"},
 	{300,  "PKT-5"},
 	{330,  "IST-5:30"},
 	{345,  "NPT-5:45"},

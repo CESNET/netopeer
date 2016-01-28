@@ -458,4 +458,7 @@ fi
 AC_CONFIG_FILES(src/openwrt/ietf-system/ietf-system.xml)
 AC_CONFIG_FILES(src/openwrt/ietf-system/Makefile.ietf-system)
 
+AC_CONFIG_FILES(src/openwrt/ietf-interfaces/ietf-interfaces.xml)
+AC_CONFIG_FILES(src/openwrt/ietf-interfaces/Makefile.ietf-interfaces)
+
 AC_OUTPUT

@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include "parse.h"
+#include "../config-parser/parse.h"
 #include "dns_resolver.h"
 #include "local_users.h"
 #include "date_time.h"

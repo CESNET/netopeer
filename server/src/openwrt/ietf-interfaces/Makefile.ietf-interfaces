@@ -33,45 +33,43 @@
 # if advised of the possibility of such damage.
 #
 
-NAME = ietf-system
+NAME = ietf-interfaces
 
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
-prefix = @prefix@
-exec_prefix = @exec_prefix@
-datarootdir = @datarootdir@
-datadir = @datadir@
-bindir = @bindir@
-includedir = @includedir@
-libdir =  @libdir@
-mandir = @mandir@
-sysconfdir = @sysconfdir@
+prefix = /usr/local
+exec_prefix = ${prefix}
+datarootdir = ${prefix}/share
+datadir = ${datarootdir}
+bindir = ${exec_prefix}/bin
+includedir = ${prefix}/include
+libdir =  ${prefix}/lib64
+mandir = ${datarootdir}/man
+sysconfdir = ${prefix}/etc
 
-TOPDIR = @CONFIGURE_PWD@
+TOPDIR = /home/nagy/netopeer/server
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer/
-CC = @CC@
-INSTALL = @INSTALL@
-INSTALL_PROGRAM = @INSTALL_PROGRAM@
-INSTALL_DATA = @INSTALL@ -m 600
+CC = gcc
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL}
+INSTALL_DATA = /usr/bin/install -c -m 600
 
-CFLAGS = @CFLAGS@
-CPPFLAGS = @CPPFLAGS@
+CFLAGS = -Wall -Wextra -O3 -pthread -DNP_SSH
+CPPFLAGS = -I/usr/local/include   -DRCSID=\"$(IDGIT)\" -I/usr/include/libxml2
 
 MANAGER = $(TOPDIR)/manager/netopeer-manager
 
 OBJDIR= .obj
 
-SRCS =	ietf-system.c \
-		$(TOPDIR)/src/openwrt/config-parser/parse.c \
-		date_time.c \
-		dns_resolver.c \
-		local_users.c \
-		encrypt.c \
-		salt.c
+SRCS =	ietf-interfaces.c
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
-CFGS =	ietf-system.yin \
-	ietf-system.xml
+CFGS =	model/ietf-interfaces.yin \
+		model/ietf-interfaces.xml \
+		model/iana-if-type.yin \
+		model/ietf-interfaces-config.rng \
+		model/ietf-interfaces-gdefs-config.rng \
+		model/ietf-interfaces-schematron.xsl
 
 all: clean $(NAME)
 
@@ -96,8 +94,11 @@ install: $(NAME).so $(CFGS)
 		$(INSTALL_DATA) $$i $(CFGDIR)/$(NAME)/; \
 	done
 	$(MANAGER) add --name $(NAME) \
-		--model $(CFGDIR)/$(NAME)/ietf-system.yin \
-		--transapi $(CFGDIR)/$(NAME)/ietf-system.so \
-		--datastore $(CFGDIR)/$(NAME)/datastore.xml \
-		--features authentication local-users ntp timezone-name
-
+		--model $(CFGDIR)/$(NAME)/ietf-interfaces.yin \
+		--transapi $(CFGDIR)/$(NAME)/ietf-interfaces.so \
+		--datastore $(CFGDIR)/$(NAME)/datastore.xml; \
+	$(MANAGER) add --name $(NAME) \
+		--augment $(CFGDIR)/$(NAME)/ietf-ip.yin \
+		--features ipv4-non-contiguous-netmasks ipv6-privacy-autoconf; \
+	$(MANAGER) add --name $(NAME) \
+		--import $(CFGDIR)/$(NAME)/iana-if-type.yin;

@@ -79,7 +79,8 @@ SERVER_MODULES_CONF = config/Netopeer.xml \
 		config/NETCONF-server.xml
 SERVER_OBJS = $(SERVER_SRCS:%.c=$(OBJDIR)/%.o)
 
-OPENWRT_MODULES = ietf-system
+OPENWRT_MODULES = ietf-system \
+				ietf-interfaces
 
 MANAGER_SRCS = manager/netopeer-manager.in
 

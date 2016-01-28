@@ -1,0 +1,13 @@
+<device>
+	<name>ietf-interfaces</name>
+	<data-models>
+		<model-main>
+			<path>@sysconfdir@/netopeer/ietf-interfaces/ietf-interfaces.yin</path>
+			<transapi>@sysconfdir@/netopeer/ietf-interfaces/ietf-interfaces.so</transapi>
+		</model-main>
+	</data-models>
+	<repo>
+		<type>file</type>
+		<path>@sysconfdir@/netopeer/ietf-interfaces/datastore.xml</path>
+	</repo>
+</device>

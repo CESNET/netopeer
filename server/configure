@@ -5719,6 +5719,11 @@ ac_config_files="$ac_config_files src/openwrt/ietf-system/ietf-system.xml"
 ac_config_files="$ac_config_files src/openwrt/ietf-system/Makefile.ietf-system"
 
 
+ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/ietf-interfaces.xml"
+
+ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/Makefile.ietf-interfaces"
+
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -6435,6 +6440,8 @@ do
     "configurator/netopeer/config.py") CONFIG_FILES="$CONFIG_FILES configurator/netopeer/config.py" ;;
     "src/openwrt/ietf-system/ietf-system.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system/ietf-system.xml" ;;
     "src/openwrt/ietf-system/Makefile.ietf-system") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system/Makefile.ietf-system" ;;
+    "src/openwrt/ietf-interfaces/ietf-interfaces.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/ietf-interfaces.xml" ;;
+    "src/openwrt/ietf-interfaces/Makefile.ietf-interfaces") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/Makefile.ietf-interfaces" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
