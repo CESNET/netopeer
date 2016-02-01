@@ -666,59 +666,59 @@ int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	xmlNodePtr cur;
-// 	char* msg = NULL, *ptr;
-// 	unsigned char loopback = 0;
+int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	xmlNodePtr cur;
+	char* msg = NULL, *ptr;
+	unsigned char loopback = 0;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	iface_ipv4addr_ignore = 0;
-// 	iface_ipv4enabled_ignore = 0;
+	iface_ipv4addr_ignore = 0;
+	iface_ipv4enabled_ignore = 0;
 
-// 	/* learn the interface type */
-// 	for (cur = ((op & XMLDIFF_REM) ? old_node->parent->children : new_node->parent->children); cur != NULL; cur=cur->next) {
-// 		if (cur->children == NULL || cur->children->content == NULL) {
-// 			continue;
-// 		}
+	/* learn the interface type */
+	for (cur = ((op & XMLDIFF_REM) ? old_node->parent->children : new_node->parent->children); cur != NULL; cur=cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
 
-// 		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
-// 			ptr = (char*)cur->children->content;
-// 			if (strchr(ptr, ':') != NULL) {
-// 				ptr = strchr(ptr, ':')+1;
-// 			}
-// 			if (strcmp(ptr, "softwareLoopback") == 0) {
-// 				loopback = 1;
-// 			}
-// 			break;
-// 		}
-// 	}
+		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
+			ptr = (char*)cur->children->content;
+			if (strchr(ptr, ':') != NULL) {
+				ptr = strchr(ptr, ':')+1;
+			}
+			if (strcmp(ptr, "softwareLoopback") == 0) {
+				loopback = 1;
+			}
+			break;
+		}
+	}
 
-// 	if (op & XMLDIFF_ADD) {
-// 		/* set default values of the leaf children (enabled, forwarding)
-// 		 * since these nodes may not be present, but must be set
-// 		 */
-// 		if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 		/* enable static IPv4 */
-// 		if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 	} else if (op & XMLDIFF_REM) {
-// 		/* "disable" */
-// 		if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 		/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
-// 		iface_ipv4enabled_ignore = 1;
-// 	}
+	// if (op & XMLDIFF_ADD) {
+	// 	/* set default values of the leaf children (enabled, forwarding)
+	// 	 * since these nodes may not be present, but must be set
+	// 	 */
+	// 	if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
+	// 		return finish(msg, EXIT_FAILURE, error);
+	// 	}
+	// 	/* enable static IPv4 */
+	// 	if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
+	// 		return finish(msg, EXIT_FAILURE, error);
+	// 	}
+	// } else if (op & XMLDIFF_REM) {
+	// 	/* "disable" */
+	// 	if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
+	// 		return finish(msg, EXIT_FAILURE, error);
+	// 	}
+	// 	/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
+	// 	iface_ipv4enabled_ignore = 1;
+	// }
 
-// 	return EXIT_SUCCESS;
-// }
+	return EXIT_SUCCESS;
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/ip:enabled changes
@@ -731,63 +731,63 @@ int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	xmlNodePtr cur, node;
-// 	char* msg = NULL, *ptr;
-// 	unsigned char enabled = 3, loopback = 0;
+int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	xmlNodePtr cur, node;
+	char* msg = NULL, *ptr;
+	unsigned char enabled = 3, loopback = 0;
 
-// 	if (iface_ignore || iface_ipv4enabled_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore || iface_ipv4enabled_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	/* learn the interface type */
-// 	for (cur = node->parent->parent->children; cur != NULL; cur=cur->next) {
-// 		if (cur->children == NULL || cur->children->content == NULL) {
-// 			continue;
-// 		}
+	/* learn the interface type */
+	for (cur = node->parent->parent->children; cur != NULL; cur=cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
 
-// 		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
-// 			ptr = (char*)cur->children->content;
-// 			if (strchr(ptr, ':') != NULL) {
-// 				ptr = strchr(ptr, ':')+1;
-// 			}
-// 			if (strcmp(ptr, "softwareLoopback") == 0) {
-// 				loopback = 1;
-// 			}
-// 			break;
-// 		}
-// 	}
+		if (xmlStrEqual(cur->name, BAD_CAST "type")) {
+			ptr = (char*)cur->children->content;
+			if (strchr(ptr, ':') != NULL) {
+				ptr = strchr(ptr, ':')+1;
+			}
+			if (strcmp(ptr, "softwareLoopback") == 0) {
+				loopback = 1;
+			}
+			break;
+		}
+	}
 
-// 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 		enabled = 2;
-// 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 		enabled = 1;
-// 	} else if (op & XMLDIFF_MOD) {
-// 		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 			enabled = 1;
-// 		} else {
-// 			enabled = 2;
-// 		}
-// 	}
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 2;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 1;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
+			enabled = 1;
+		} else {
+			enabled = 2;
+		}
+	}
 
-// 	if (enabled == 3) {
-// 		/* no real interface change */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (enabled == 3) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
 
-// 	ret = iface_ipv4_enabled(iface_name, enabled, node, loopback, &msg);
-// 	iface_ipv4addr_ignore = 1;
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv4_enabled(iface_name, enabled, node, loopback, &msg);
+	iface_ipv4addr_ignore = 1;
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/ip:forwarding changes
@@ -800,44 +800,44 @@ int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	xmlNodePtr node;
-// 	char* msg = NULL;
-// 	unsigned char forwarding = 2;
+int callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	xmlNodePtr node;
+	char* msg = NULL;
+	unsigned char forwarding = 2;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		forwarding = 0;
-// 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		forwarding = 1;
-// 	} else if (op & XMLDIFF_MOD) {
-// 		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 			forwarding = 1;
-// 		} else {
-// 			forwarding = 0;
-// 		}
-// 	}
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		forwarding = 0;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		forwarding = 1;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
+			forwarding = 1;
+		} else {
+			forwarding = 0;
+		}
+	}
 
-// 	if (forwarding == 2) {
-// 		/* no real interface change */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (forwarding == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
 
-// 	ret = iface_ipv4_forwarding(iface_name, forwarding, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv4_forwarding(iface_name, forwarding, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/ip:mtu changes
@@ -888,70 +888,76 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_mtu (void ** data, XMLDIFF_OP
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret, i;
-// 	char* msg = NULL, *netmask = NULL, *ip = NULL;
-// 	unsigned char prefix_len = 0, octet, mask;
-// 	xmlNodePtr cur, node;
+int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret, i;
+	char* msg = NULL, *netmask = NULL, *ip = NULL;
+	const char* netmask_conf;	/* not changing netmask for config file usage */
+	unsigned char prefix_len = 0, octet, mask;
+	xmlNodePtr cur, node;
 
-// 	if (iface_ignore || iface_ipv4addr_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore || iface_ipv4addr_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? new_node : old_node);
+	node = (op & XMLDIFF_ADD ? new_node : old_node);
 
-// 	for (cur = node->children; cur != NULL; cur = cur->next) {
-// 		if (cur->children == NULL || cur->children->content == NULL) {
-// 			continue;
-// 		}
+	for (cur = node->children; cur != NULL; cur = cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
 
-// 		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
-// 			ip = strdup((char*)cur->children->content);
-// 		}
-// 		if (xmlStrEqual(cur->name, BAD_CAST "prefix-length")) {
-// 			prefix_len = atoi((char*)cur->children->content);
-// 		}
-// 		if (xmlStrEqual(cur->name, BAD_CAST "netmask")) {
-// 			netmask = strdup((char*)cur->children->content);
-// 		}
-// 	}
+		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
+			ip = strdup((char*)cur->children->content);
+		}
+		if (xmlStrEqual(cur->name, BAD_CAST "prefix-length")) {
+			prefix_len = atoi((char*)cur->children->content);
+		}
+		if (xmlStrEqual(cur->name, BAD_CAST "netmask")) {
+			netmask = strdup((char*)cur->children->content);
+			netmask_conf = strdup(netmask);
+		}
+	}
 
-// 	if (ip == NULL) {
-// 		msg = strdup("Missing ip address in an IPv4 address.");
-// 		free(netmask);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
-// 	if ((prefix_len == 0 && netmask == NULL) || (prefix_len != 0 && netmask != NULL)) {
-// 		asprintf(&msg, "Cannot get subnet for the IP \"%s\".", ip);
-// 		free(ip);
-// 		free(netmask);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (ip == NULL) {
+		msg = strdup("Missing ip address in an IPv4 address.");
+		free(netmask);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+	if ((prefix_len == 0 && netmask == NULL) || (prefix_len != 0 && netmask != NULL)) {
+		asprintf(&msg, "Cannot get subnet for the IP \"%s\".", ip);
+		free(ip);
+		free(netmask);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (netmask != NULL) {
-// 		prefix_len = 0;
-// 		mask = 0x80;
-// 		octet = (unsigned)atoi(strtok(netmask, "."));
-// 		i = 0;
-// 		while (mask & octet) {
-// 			++prefix_len;
-// 			mask >>= 1;
-// 			++i;
-// 			if (i == 32) {
-// 				break;
-// 			}
-// 			if (i % 8 == 0) {
-// 				octet = (unsigned)atoi(strtok(NULL, "."));
-// 				mask = 0x80;
-// 			}
-// 		}
-// 		free(netmask);
-// 	}
+	if (netmask != NULL) {
+		prefix_len = 0;
+		mask = 0x80;
+		octet = (unsigned)atoi(strtok(netmask, "."));
+		i = 0;
+		while (mask & octet) {
+			++prefix_len;
+			mask >>= 1;
+			++i;
+			if (i == 32) {
+				break;
+			}
+			if (i % 8 == 0) {
+				octet = (unsigned)atoi(strtok(NULL, "."));
+				mask = 0x80;
+			}
+		}
+		free(netmask);
+	} else {
+		unsigned long ip_mask = (0xFFFFFFFF << (32 - (int)prefix_len)) & 0xFFFFFFFF;
+		asprintf(&netmask_conf, "%lu.%lu.%lu.%lu\n", ip_mask >> 24, (ip_mask >> 16) & 0xFF, (ip_mask >> 8) & 0xFF, ip_mask & 0xFF);
+	}
 
-// 	ret = iface_ipv4_ip(iface_name, ip, prefix_len, op, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv4_ip(iface_name, ip, prefix_len, op, netmask_conf, &msg);
+	free(netmask_conf);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/ip:neighbor changes
@@ -1587,15 +1593,15 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 4,
+	.callbacks_count = 7,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
-		// {.path = "/if:interfaces/if:interface/ip:ipv4", .func = callback_if_interfaces_if_interface_ip_ipv4},
-		// {.path = "/if:interfaces/if:interface/ip:ipv4/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_enabled},
-		// {.path = "/if:interfaces/if:interface/ip:ipv4/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding},
+		{.path = "/if:interfaces/if:interface/ip:ipv4", .func = callback_if_interfaces_if_interface_ip_ipv4},
+		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_enabled},
+		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_mtu},
-		// {.path = "/if:interfaces/if:interface/ip:ipv4/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_address},
+		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_address},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6", .func = callback_if_interfaces_if_interface_ip_ipv6},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_enabled},

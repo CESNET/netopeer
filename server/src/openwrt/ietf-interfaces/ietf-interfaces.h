@@ -34,11 +34,11 @@ void iface_cleanup(void);
 /* config */
 int iface_enabled(const char* if_name, unsigned char boolean, char** msg);
 
-// int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg);
+int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg);
 int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg);
-// int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg);
+int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, const char* netmask, char** msg);
 int iface_ipv4_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg);
-// int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg);
+int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg);
 
 // int iface_ipv6_forwarding(const char* if_name, unsigned char boolean, char** msg);
 // int iface_ipv6_mtu(const char* if_name, unsigned int mtu, char** msg);
