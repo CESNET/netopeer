@@ -82,4 +82,12 @@ int rm_config(char *path, const char *value, t_element_type type);
  */
 char** get_config(char *path, t_element_type type, int *count);
 
+/**
+ * @brief gets section name where interface is configured
+ * in /etc/config/network
+ * @param ifname path to the configuration element
+ * @return NULL if element not found, name of section in conf file
+ */
+char* get_interface_section(const char* ifname);
+
 #endif /* PARSE_H_ */

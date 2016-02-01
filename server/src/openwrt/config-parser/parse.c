@@ -608,6 +608,112 @@ char** get_list_config(path_data *arguments, FILE *file, int *found_counter)
 	return ret;
 }
 
+char* get_interface_section(const char* ifname)
+{
+	FILE *net_config = fopen("/etc/config/network", "r");
+
+	path_data arguments;
+	char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    bool found = false;
+    bool in_progress = false;
+    bool interface = false;
+    t_fsm_state state = S_START;
+
+    /* Init arguments */
+    arguments.file = NULL;
+    asprintf(&(arguments.file), "network");
+    arguments.section = NULL;
+    asprintf(&(arguments.item), "ifname");
+
+	while ((read = getline(&line, &len, net_config)) != -1) {
+
+		char *line_replic = malloc(len * sizeof(char));
+		strcpy(line_replic, line);
+		char *word;
+
+		word = strtok (line_replic ," \t\v\f\r\"\'\n");
+		while (word != NULL){
+
+			switch(state) {
+
+				case S_START:
+					if (strcmp(word, "config") == 0) {
+						state = S_CONFIG;
+					}
+					break;
+
+				case S_CONFIG:
+					if (strcmp(word, "interface") == 0) {
+						interface = true;
+						break;
+					}
+					if (interface) {
+						free(arguments.section);
+						asprintf(&(arguments.section), "%s", word);
+						state = S_SECTION;
+		        		in_progress = true;
+					}
+		        	break;
+
+		        case S_SECTION:
+		        	if ((strcmp(word, "option")) == 0) {
+			    		state = S_ITEM;
+    				}
+    				else if (strcmp(word, "config") == 0) {
+		    			found = true;
+		    			in_progress = false;
+		    		}
+    				break;
+
+    			case S_ITEM:
+		    		if ((strcmp(word, arguments.item)) == 0) {
+		    			found = true;
+		    			in_progress = false;
+		    			break;
+		    		}
+		    		else {
+		    			state = S_SECTION;
+		    		}
+		    		if (found) {
+		    			if((strcmp(ifname, word)) == 0) {
+	    					
+	    					free(line_replic);
+	    					free(arguments.file);
+	    					free(arguments.item);
+	    					free(line);
+	    					fclose(net_config);
+			    			return arguments.section;
+		    			}
+		    			else {
+		    				found = false;
+		    				state = S_SECTION;
+		    			}
+		    		}
+		    		break;
+			}
+			word = strtok (NULL, " \t\v\f\r\"\'\n");
+		}
+
+		if (state == S_CONFIG) {
+			state = S_START;
+		}
+    	if (line_replic != NULL) {
+    		free(line_replic);
+    	}
+		if (!in_progress) {
+			state = S_START;
+		}
+    }
+
+    free(line);
+    arg_clear(&arguments);
+    fclose(net_config);
+    return NULL;
+}
+
 char** get_config(char *path, t_element_type type, int *count)
 {
 	FILE *fileptr;

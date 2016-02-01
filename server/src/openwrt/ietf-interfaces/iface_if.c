@@ -131,22 +131,25 @@ fail:
 
 int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg) {
 	char *path = NULL;
+	char* section = NULL;
 	t_element_type type = OPTION;
 	const char* value = strdup(mtu);
 
-	/* this adjusts the IPv6 MTU as well, that is why we save it first and set it afterwards */
 	if (write_to_sys_net(if_name, "mtu", mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/sys/class/net/...\"", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
-	asprintf(&path, "network.%s.mtu", if_name);
+	section = get_interface_section(if_name);
+	asprintf(&path, "network.%s.mtu", section);
 	if ((edit_config(path, value, type)) != (EXIT_SUCCESS)) {
 		asprintf(msg, "Configuring interface %s mtu failed.", if_name);
 		free(path);
+		free(section);
 		return EXIT_FAILURE;
 	}
 
+	free(section);
 	free(path);
 	return EXIT_SUCCESS;
 }
