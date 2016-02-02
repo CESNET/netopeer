@@ -1162,7 +1162,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP
 {
 	int ret;
 	char* msg = NULL;
-	unsigned short mtu;
+	char* mtu;
 
 	if (iface_ignore) {
 		return EXIT_SUCCESS;
@@ -1178,8 +1178,10 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP
 		return finish(msg, EXIT_FAILURE, error);
 	}
 
-	mtu = atoi((char*)new_node->children->content);
+	asprintf(&mtu, (char*)new_node->children->content);
 	ret = iface_ipv6_mtu(iface_name, mtu, &msg);
+
+	free(mtu);
 	return finish(msg, ret, error);
 }
 

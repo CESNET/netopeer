@@ -296,11 +296,13 @@ int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg)
 		asprintf(msg, "Configuring interface %s mtu failed.", if_name);
 		free(path);
 		free(section);
+		free(value);
 		return EXIT_FAILURE;
 	}
 
 	free(section);
 	free(path);
+	free(value);
 	return EXIT_SUCCESS;
 }
 
@@ -423,17 +425,31 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 
 /* IPv6 */
 
-int iface_ipv6_mtu(const char* if_name, unsigned int mtu, char** msg) {
-	char str_mtu[10];
+int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg) {
 
-	sprintf(str_mtu, "%d", mtu);
-	if (write_to_proc_net(0, if_name, "mtu", str_mtu) != EXIT_SUCCESS) {
+	if (write_to_proc_net(0, if_name, "mtu", mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
 		return EXIT_FAILURE;
 	}
 
 	/* permanent */
-	
+	char *path = NULL;
+	char* section = NULL;
+	t_element_type type = OPTION;
+	const char* value = strdup(mtu);
 
+	section = get_interface_section(if_name);
+	asprintf(&path, "network.%s.mtu", section);
+	if ((edit_config(path, value, type)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring interface %s mtu failed.", if_name);
+		free(path);
+		free(section);
+		free(value);
+		return EXIT_FAILURE;
+	}
+
+	free(section);
+	free(path);
+	free(value);
 	return EXIT_SUCCESS;
 }
