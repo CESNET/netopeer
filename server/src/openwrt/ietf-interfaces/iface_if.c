@@ -537,3 +537,16 @@ int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XM
 {
 	return iface_ipv4_neighbor(if_name, ip, mac, op, msg);
 }
+
+int iface_ipv6_dup_addr_det(const char* if_name, unsigned int dup_addr_det, char** msg)
+{
+	char str_dad[15];
+
+	sprintf(str_dad, "%d", dup_addr_det);
+	if (write_to_proc_net(0, if_name, "dad_transmits", str_dad) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
