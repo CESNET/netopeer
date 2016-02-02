@@ -1021,31 +1021,31 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** data, XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	char* msg = NULL;
+int callback_if_interfaces_if_interface_ip_ipv6 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	char* msg = NULL;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	if (op & XMLDIFF_ADD) {
-// 		 set default values of the leaf children (enabled, forwarding, create-global-addresses)
-// 		 * since these nodes may not be present, but must be set
+	if (op & XMLDIFF_ADD) {
+		 /* set default values of the leaf children (enabled, forwarding, create-global-addresses) */
+		 /* since these nodes may not be present, but must be set */
 		 
-// 		if (iface_ipv6_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 		if (iface_ipv6_creat_glob_addr(iface_name, 1, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 		if (iface_ipv6_enabled(iface_name, 1, &msg) != EXIT_SUCCESS) {
-// 			return finish(msg, EXIT_FAILURE, error);
-// 		}
-// 	}
+		if (iface_ipv6_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		if (iface_ipv6_creat_glob_addr(iface_name, 1, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		if (iface_ipv6_enabled(iface_name, 1, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+	}
 
-// 	return EXIT_SUCCESS;
-// }
+	return EXIT_SUCCESS;
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:enabled changes
@@ -1595,7 +1595,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 18,
+	.callbacks_count = 19,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1605,7 +1605,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_mtu},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_address},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6", .func = callback_if_interfaces_if_interface_ip_ipv6},
+		{.path = "/if:interfaces/if:interface/ip:ipv6", .func = callback_if_interfaces_if_interface_ip_ipv6},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_enabled},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
