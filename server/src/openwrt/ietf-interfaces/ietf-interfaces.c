@@ -1337,44 +1337,44 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (vo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned char creat_glob_addr = 2;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned char creat_glob_addr = 2;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 		creat_glob_addr = 1;
-// 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 		creat_glob_addr = 0;
-// 	} else if (op & XMLDIFF_MOD) {
-// 		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
-// 			creat_glob_addr = 0;
-// 		} else {
-// 			creat_glob_addr = 1;
-// 		}
-// 	}
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		creat_glob_addr = 1;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		creat_glob_addr = 0;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
+			creat_glob_addr = 0;
+		} else {
+			creat_glob_addr = 1;
+		}
+	}
 
-// 	if (creat_glob_addr == 2) {
-// 		/* no real interface change */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (creat_glob_addr == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
 
-// 	ret = iface_ipv6_creat_glob_addr(iface_name, creat_glob_addr, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_creat_glob_addr(iface_name, creat_glob_addr, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-temporary-addresses changes
@@ -1387,44 +1387,44 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (vo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned char creat_temp_addr = 2;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned char creat_temp_addr = 2;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		creat_temp_addr = 0;
-// 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		creat_temp_addr = 1;
-// 	} else if (op & XMLDIFF_MOD) {
-// 		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 			creat_temp_addr = 1;
-// 		} else {
-// 			creat_temp_addr = 0;
-// 		}
-// 	}
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		creat_temp_addr = 0;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		creat_temp_addr = 1;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
+			creat_temp_addr = 1;
+		} else {
+			creat_temp_addr = 0;
+		}
+	}
 
-// 	if (creat_temp_addr == 2) {
-// 		/* no real interface change */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (creat_temp_addr == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
 
-// 	ret = iface_ipv6_creat_temp_addr(iface_name, creat_temp_addr, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_creat_temp_addr(iface_name, creat_temp_addr, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-valid-lifetime changes
@@ -1437,33 +1437,33 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (vo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned int temp_val_lft;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned int temp_val_lft;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM) {
-// 		temp_val_lft = 604800;
-// 	} else {
-// 		temp_val_lft = atoi((char*)node->children->content);
-// 	}
+	if (op & XMLDIFF_REM) {
+		temp_val_lft = 604800;
+	} else {
+		temp_val_lft = atoi((char*)node->children->content);
+	}
 
-// 	ret = iface_ipv6_temp_val_lft(iface_name, temp_val_lft, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_temp_val_lft(iface_name, temp_val_lft, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime changes
@@ -1476,33 +1476,33 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (vo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned int temp_pref_lft;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned int temp_pref_lft;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM) {
-// 		temp_pref_lft = 86400;
-// 	} else {
-// 		temp_pref_lft = atoi((char*)node->children->content);
-// 	}
+	if (op & XMLDIFF_REM) {
+		temp_pref_lft = 86400;
+	} else {
+		temp_pref_lft = atoi((char*)node->children->content);
+	}
 
-// 	ret = iface_ipv6_temp_pref_lft(iface_name, temp_pref_lft, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_temp_pref_lft(iface_name, temp_pref_lft, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/if:name changes
@@ -1595,7 +1595,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 14,
+	.callbacks_count = 18,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1612,10 +1612,10 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-global-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-temporary-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-valid-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-global-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-temporary-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-valid-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
 		// {.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled}
 	}

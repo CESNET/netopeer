@@ -550,3 +550,95 @@ int iface_ipv6_dup_addr_det(const char* if_name, unsigned int dup_addr_det, char
 
 	return EXIT_SUCCESS;
 }
+
+int iface_ipv6_creat_glob_addr(const char* if_name, unsigned char boolean, char** msg)
+{
+	char* cmd, *line = NULL;
+	FILE* output;
+	size_t len = 0;
+
+	if (write_to_proc_net(0, if_name, "autoconf", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	if (!boolean) {
+		asprintf(&cmd, "ip -6 addr flush dev %s scope link 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return EXIT_FAILURE;
+		}
+
+		if (getline(&line, &len, output) != -1) {
+			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+			free(line);
+			pclose(output);
+			return EXIT_FAILURE;
+		}
+
+		free(line);
+		pclose(output);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+int iface_ipv6_creat_temp_addr(const char* if_name, unsigned char boolean, char** msg) {
+	int ret = EXIT_SUCCESS;
+	char* cmd, *line = NULL;
+	FILE* output;
+	size_t len = 0;
+
+	if (write_to_proc_net(0, if_name, "use_tempaddr", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	if (!boolean) {
+		asprintf(&cmd, "ip -6 addr flush dev %s temporary 2>&1", if_name);
+		output = popen(cmd, "r");
+		free(cmd);
+
+		if (output == NULL) {
+			asprintf(msg, "%s: failed to execute a command.", __func__);
+			return EXIT_FAILURE;
+		}
+
+		if (getline(&line, &len, output) != -1) {
+			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+			ret = EXIT_FAILURE;
+		}
+
+		free(line);
+		pclose(output);
+	}
+
+	return ret;
+}
+
+int iface_ipv6_temp_val_lft(const char* if_name, unsigned int temp_val_lft, char** msg) {
+	char str_tvl[15];
+
+	sprintf(str_tvl, "%d", temp_val_lft);
+	if (write_to_proc_net(0, if_name, "temp_valid_lft", str_tvl) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+int iface_ipv6_temp_pref_lft(const char* if_name, unsigned int temp_pref_lft, char** msg) {
+	char str_tpl[15];
+
+	sprintf(str_tpl, "%d", temp_pref_lft);
+	if (write_to_proc_net(0, if_name, "temp_prefered_lft", str_tpl) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
