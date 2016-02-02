@@ -1196,45 +1196,45 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL, *ip = NULL;
-// 	unsigned char prefix_len = 0;
-// 	xmlNodePtr cur, node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL, *ip = NULL;
+	unsigned char prefix_len = 0;
+	xmlNodePtr cur, node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	for (cur = node->children; cur != NULL; cur = cur->next) {
-// 		if (cur->children == NULL || cur->children->content == NULL) {
-// 			continue;
-// 		}
+	for (cur = node->children; cur != NULL; cur = cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
 
-// 		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
-// 			ip = strdup((char*)cur->children->content);
-// 		}
-// 		if (xmlStrEqual(cur->name, BAD_CAST "prefix-length")) {
-// 			prefix_len = atoi((char*)cur->children->content);
-// 		}
-// 	}
+		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
+			ip = strdup((char*)cur->children->content);
+		}
+		if (xmlStrEqual(cur->name, BAD_CAST "prefix-length")) {
+			prefix_len = atoi((char*)cur->children->content);
+		}
+	}
 
-// 	if (ip == NULL) {
-// 		msg = strdup("Missing ip address in an IPv6 address.");
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
-// 	if (prefix_len == 0) {
-// 		asprintf(&msg, "Cannot get subnet for the IP \"%s\".", ip);
-// 		free(ip);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (ip == NULL) {
+		msg = strdup("Missing ip address in an IPv6 address.");
+		return finish(msg, EXIT_FAILURE, error);
+	}
+	if (prefix_len == 0) {
+		asprintf(&msg, "Cannot get subnet for the IP \"%s\".", ip);
+		free(ip);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	ret = iface_ipv6_ip(iface_name, ip, prefix_len, op, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_ip(iface_name, ip, prefix_len, op, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:neighbor changes
@@ -1595,7 +1595,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 10,
+	.callbacks_count = 11,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1609,7 +1609,7 @@ struct transapi_data_callbacks clbks =  {
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_enabled},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-global-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses},

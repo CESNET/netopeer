@@ -120,60 +120,97 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	char* section = NULL;
 	t_element_type type = OPTION;
 	section = get_interface_section(if_name);
+	sprintf(str_prefix, "%d", prefix);
 
-	if (op & XMLDIFF_ADD) {
-		asprintf(&path, "network.%s.proto", section);
-		if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
-			asprintf(msg, "Configuring interface %s option proto failed.", if_name);
+	if (ipv4) { /* IPv4 */
+		if (op & XMLDIFF_ADD) {
+			asprintf(&path, "network.%s.proto", section);
+			if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option proto failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+
 			free(path);
-			free(section);
-			return EXIT_FAILURE;
+			path = NULL;
+			asprintf(&path, "network.%s.ipaddr", section);
+			if ((edit_config(path, ip, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+
+			free(path);
+			path = NULL;
+			asprintf(&path, "network.%s.netmask", section);
+			if ((edit_config(path, netmask, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
 		}
 
-		free(path);
-		path = NULL;
-		asprintf(&path, "network.%s.ipaddr", section);
-		if ((edit_config(path, ip, type)) != (EXIT_SUCCESS)) {
-			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+		if (op & XMLDIFF_REM) {
 			free(path);
-			free(section);
-			return EXIT_FAILURE;
+			path = NULL;
+			asprintf(&path, "network.%s.ipaddr", section);
+			if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+
+			free(path);
+			path = NULL;
+			asprintf(&path, "network.%s.netmask", section);
+			if ((rm_config(path, netmask, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+		}
+	} else { /* IPv6 */
+		if (op & XMLDIFF_ADD) {
+			const char* ip_prefix;
+			asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
+
+			asprintf(&path, "network.%s.proto", section);
+			if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option proto failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+
+			free(path);
+			path = NULL;
+			asprintf(&path, "network.%s.ip6addr", section);
+			if ((edit_config(path, ip_prefix, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
 		}
 
-		free(path);
-		path = NULL;
-		asprintf(&path, "network.%s.netmask", section);
-		if ((edit_config(path, netmask, type)) != (EXIT_SUCCESS)) {
-			asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
+		if (op & XMLDIFF_REM) {
 			free(path);
-			free(section);
-			return EXIT_FAILURE;
+			path = NULL;
+			asprintf(&path, "network.%s.ip6addr", section);
+			if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
 		}
-	}
+	}	
 
-	if (op & XMLDIFF_REM) {
-		free(path);
-		path = NULL;
-		asprintf(&path, "network.%s.ipaddr", section);
-		if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
-			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-			free(path);
-			free(section);
-			return EXIT_FAILURE;
-		}
-
-		free(path);
-		path = NULL;
-		asprintf(&path, "network.%s.netmask", section);
-		if ((rm_config(path, netmask, type)) != (EXIT_SUCCESS)) {
-			asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
-			free(path);
-			free(section);
-			return EXIT_FAILURE;
-		}
-	}
-
-	printf("1\n");
 	free(path);
 	free(section);
 	return EXIT_SUCCESS;
@@ -463,4 +500,12 @@ int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg)
 	free(path);
 	free(value);
 	return EXIT_SUCCESS;
+}
+
+int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg)
+{	
+	/* not using netmask for ipv6 */
+	const char* netmask = NULL;
+	
+	return iface_ip(0, if_name, ip, prefix, op, netmask, msg);
 }
