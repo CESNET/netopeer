@@ -246,7 +246,7 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 	char *path = NULL;
 	char *section = NULL;
 	t_element_type type = OPTION;
-	const char* value = (boolean ? "1" : "0");
+	char* value = (boolean ? "1" : "0");
 
 	section = get_interface_section(if_name);
 	asprintf(&path, "network.%s.enabled", section);
@@ -320,7 +320,6 @@ int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg)
 	char *path = NULL;
 	char* section = NULL;
 	t_element_type type = OPTION;
-	const char* value = strdup(mtu);
 
 	if (write_to_sys_net(if_name, "mtu", mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/sys/class/net/...\"", __func__, if_name);
@@ -329,17 +328,15 @@ int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg)
 
 	section = get_interface_section(if_name);
 	asprintf(&path, "network.%s.mtu", section);
-	if ((edit_config(path, value, type)) != (EXIT_SUCCESS)) {
+	if ((edit_config(path, mtu, type)) != (EXIT_SUCCESS)) {
 		asprintf(msg, "Configuring interface %s mtu failed.", if_name);
 		free(path);
 		free(section);
-		free(value);
 		return EXIT_FAILURE;
 	}
 
 	free(section);
 	free(path);
-	free(value);
 	return EXIT_SUCCESS;
 }
 
@@ -379,7 +376,6 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 			if (getline(&line, &len, dhcp_pid) != -1) {
 				pid = strdup(line);
 			}
-			free(line);
 			fclose(dhcp_pid);
 			/* dhcp lease release */
 			asprintf(&cmd, "kill -s SIGUSR2 %s 2>&1", pid);
@@ -462,6 +458,33 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 
 /* IPv6 */
 
+int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg)
+{
+	if (write_to_proc_net(0, if_name, "disable_ipv6", (boolean ? "0" : "1")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	/* permanent */
+	char *path = NULL;
+	char* section = NULL;
+	t_element_type type = OPTION;
+	char* value = (boolean ? "1" : "0");
+
+	section = get_interface_section(if_name);
+	asprintf(&path, "network.%s.ipv6", section);
+	if ((edit_config(path, value, type)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring interface %s ipv6 enabled failed.", if_name);
+		free(path);
+		free(section);
+		return EXIT_FAILURE;
+	}
+
+	free(section);
+	free(path);
+	return EXIT_SUCCESS;
+}
+
 int iface_ipv6_forwarding(const char* if_name, unsigned char boolean, char** msg)
 {
 	if (write_to_proc_net(0, if_name, "forwarding", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
@@ -484,7 +507,7 @@ int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg)
 	char *path = NULL;
 	char* section = NULL;
 	t_element_type type = OPTION;
-	const char* value = strdup(mtu);
+	char* value = strdup(mtu);
 
 	section = get_interface_section(if_name);
 	asprintf(&path, "network.%s.mtu", section);
@@ -505,7 +528,7 @@ int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg)
 int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, char** msg)
 {	
 	/* not using netmask for ipv6 */
-	const char* netmask = NULL;
+	char* netmask = NULL;
 	
 	return iface_ip(0, if_name, ip, prefix, op, netmask, msg);
 }

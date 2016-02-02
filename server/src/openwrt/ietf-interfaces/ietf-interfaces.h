@@ -49,7 +49,7 @@ int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XM
 // int iface_ipv6_creat_temp_addr(const char* if_name, unsigned char boolean, char** msg);
 // int iface_ipv6_temp_val_lft(const char* if_name, unsigned int temp_val_lft, char** msg);
 // int iface_ipv6_temp_pref_lft(const char* if_name, unsigned int temp_pref_lft, char** msg);
-// int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg);
+int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg);
 
 /* state */
 // char** iface_get_ifcs(unsigned char config, unsigned int* dev_count, char** msg);
