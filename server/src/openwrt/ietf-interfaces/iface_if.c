@@ -509,3 +509,8 @@ int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 	
 	return iface_ip(0, if_name, ip, prefix, op, netmask, msg);
 }
+
+int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg)
+{
+	return iface_ipv4_neighbor(if_name, ip, mac, op, msg);
+}

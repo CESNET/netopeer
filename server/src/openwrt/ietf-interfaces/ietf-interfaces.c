@@ -1247,45 +1247,45 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL, *ip = NULL, *mac = NULL;
-// 	xmlNodePtr cur, node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL, *ip = NULL, *mac = NULL;
+	xmlNodePtr cur, node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	for (cur = node->children; cur != NULL; cur = cur->next) {
-// 		if (cur->children == NULL || cur->children->content == NULL) {
-// 			continue;
-// 		}
+	for (cur = node->children; cur != NULL; cur = cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
 
-// 		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
-// 			ip = strdup((char*)cur->children->content);
-// 		}
-// 		if (xmlStrEqual(cur->name, BAD_CAST "link-layer-address")) {
-// 			mac = strdup((char*)cur->children->content);
-// 		}
-// 	}
+		if (xmlStrEqual(cur->name, BAD_CAST "ip")) {
+			ip = strdup((char*)cur->children->content);
+		}
+		if (xmlStrEqual(cur->name, BAD_CAST "link-layer-address")) {
+			mac = strdup((char*)cur->children->content);
+		}
+	}
 
-// 	if (ip == NULL) {
-// 		msg = strdup("Missing ip address in an IPv6 neighbor.");
-// 		free(mac);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
-// 	if (mac == NULL) {
-// 		asprintf(&msg, "Cannot get MAC for the neighbor \"%s\".", ip);
-// 		free(ip);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (ip == NULL) {
+		msg = strdup("Missing ip address in an IPv6 neighbor.");
+		free(mac);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+	if (mac == NULL) {
+		asprintf(&msg, "Cannot get MAC for the neighbor \"%s\".", ip);
+		free(ip);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	ret = iface_ipv6_neighbor(iface_name, ip, mac, op, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_neighbor(iface_name, ip, mac, op, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits changes
@@ -1610,7 +1610,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-global-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-temporary-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses},
