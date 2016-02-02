@@ -697,25 +697,25 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 		}
 	}
 
-	// if (op & XMLDIFF_ADD) {
-	// 	/* set default values of the leaf children (enabled, forwarding)
-	// 	 * since these nodes may not be present, but must be set
-	// 	 */
-	// 	if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// 	/* enable static IPv4 */
-	// 	if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// } else if (op & XMLDIFF_REM) {
-	// 	/* "disable" */
-	// 	if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// 	/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
-	// 	iface_ipv4enabled_ignore = 1;
-	// }
+	if (op & XMLDIFF_ADD) {
+		/* set default values of the leaf children (enabled, forwarding)
+		 * since these nodes may not be present, but must be set
+		 */
+		if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		/* enable static IPv4 */
+		if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+	} else if (op & XMLDIFF_REM) {
+		/* "disable" */
+		if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
+		iface_ipv4enabled_ignore = 1;
+	}
 
 	return EXIT_SUCCESS;
 }

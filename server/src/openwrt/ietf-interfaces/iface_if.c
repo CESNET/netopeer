@@ -369,23 +369,31 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 	/* kill DHCP daemon and flush IPv4 addresses */
 	if (enabled == 0 || enabled == 2) {
 		if (!is_loopback) {
-
 			/* get dhcp process id */
 			asprintf(&dhcp_pid_path, "/var/run/udhcpc-%s.pid", if_name);
-			dhcp_pid = fopen(dhcp_pid_path, "r");
+			if ((dhcp_pid = fopen(dhcp_pid_path, "r")) == NULL) {
+				asprintf(msg, "dhcp client on interface %s not running", if_name);
+				free(dhcp_pid_path);
+				goto flush_ip;
+			}
 			if (getline(&line, &len, dhcp_pid) != -1) {
 				pid = strdup(line);
 			}
+			free(line);
+			free(dhcp_pid_path);
 			fclose(dhcp_pid);
+
 			/* dhcp lease release */
 			asprintf(&cmd, "kill -s SIGUSR2 %s 2>&1", pid);
 			output = popen(cmd, "r");
 			free(cmd);
 			free(pid);
+
 			if (output == NULL) {
 				asprintf(msg, "%s: failed to execute a command.", __func__);
 				return EXIT_FAILURE;
 			}
+
 			if (getline(&line, &len, output) != -1 && strstr(line, "dhcpcd not running") == NULL) {
 				asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
 				free(line);
@@ -395,21 +403,22 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 			pclose(output);
 		}
 
-		asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", if_name);
-		output = popen(cmd, "r");
-		free(cmd);
-		if (output == NULL) {
-			asprintf(msg, "%s: failed to execute a command.", __func__);
-			return EXIT_FAILURE;
-		}
-		if (getline(&line, &len, output) != -1) {
-			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
-			free(line);
-			pclose(output);
-			return EXIT_FAILURE;
-		}
+		flush_ip:
+			asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", if_name);
+			output = popen(cmd, "r");
+			free(cmd);
+			if (output == NULL) {
+				asprintf(msg, "%s: failed to execute a command.", __func__);
+				return EXIT_FAILURE;
+			}
+			if (getline(&line, &len, output) != -1) {
+				asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
+				free(line);
+				pclose(output);
+				return EXIT_FAILURE;
+			}
 
-		pclose(output);
+			pclose(output);
 	/* flush IPv4 addresses and enable DHCP daemon */
 	} else if (enabled == 1) {
 		asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", pid);
