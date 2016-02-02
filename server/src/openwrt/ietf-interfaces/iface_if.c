@@ -425,7 +425,18 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 
 /* IPv6 */
 
-int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg) {
+int iface_ipv6_forwarding(const char* if_name, unsigned char boolean, char** msg)
+{
+	if (write_to_proc_net(0, if_name, "forwarding", (boolean ? "1" : "0")) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg)
+{
 
 	if (write_to_proc_net(0, if_name, "mtu", mtu) != EXIT_SUCCESS) {
 		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);

@@ -1108,44 +1108,44 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** data, XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned char forwarding = 2;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned char forwarding = 2;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		forwarding = 0;
-// 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 		forwarding = 1;
-// 	} else if (op & XMLDIFF_MOD) {
-// 		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
-// 			forwarding = 1;
-// 		} else {
-// 			forwarding = 0;
-// 		}
-// 	}
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		forwarding = 0;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "true")) {
+		forwarding = 1;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "true")) {
+			forwarding = 1;
+		} else {
+			forwarding = 0;
+		}
+	}
 
-// 	if (forwarding == 2) {
-// 		/* no real interface change */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (forwarding == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
 
-// 	ret = iface_ipv6_forwarding(iface_name, forwarding, &msg);
-// 	return finish(msg, ret, error);
-// }
+	ret = iface_ipv6_forwarding(iface_name, forwarding, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:mtu changes
@@ -1595,7 +1595,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 9,
+	.callbacks_count = 10,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1607,7 +1607,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6", .func = callback_if_interfaces_if_interface_ip_ipv6},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_enabled},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
