@@ -10,8 +10,8 @@
 		</model-main>
 		<model>
 			<path>@sysconfdir@/netopeer/ietf-interfaces/ietf-ip.yin</path>
-			<features>ipv4-non-contiguous-netmasks</features>
-			<features>ipv6-privacy-autoconf</features>
+			<feature>ipv4-non-contiguous-netmasks</feature>
+			<feature>ipv6-privacy-autoconf</feature>
 		</model>
 	</data-models>
 	<repo>
