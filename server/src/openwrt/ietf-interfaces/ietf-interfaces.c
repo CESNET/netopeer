@@ -697,25 +697,25 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
 		}
 	}
 
-	// if (op & XMLDIFF_ADD) {
-	// 	/* set default values of the leaf children (enabled, forwarding)
-	// 	 * since these nodes may not be present, but must be set
-	// 	 */
-	// 	if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// 	/* enable static IPv4 */
-	// 	if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// } else if (op & XMLDIFF_REM) {
-	// 	/* "disable" */
-	// 	if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
-	// 		return finish(msg, EXIT_FAILURE, error);
-	// 	}
-	// 	/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
-	// 	iface_ipv4enabled_ignore = 1;
-	// }
+	if (op & XMLDIFF_ADD) {
+		/* set default values of the leaf children (enabled, forwarding)
+		 * since these nodes may not be present, but must be set
+		 */
+		if (iface_ipv4_forwarding(iface_name, 0, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		/* enable static IPv4 */
+		if (iface_ipv4_enabled(iface_name, 2, NULL, loopback, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+	} else if (op & XMLDIFF_REM) {
+		/* "disable" */
+		if (iface_ipv4_enabled(iface_name, 0, NULL, loopback, &msg) != EXIT_SUCCESS) {
+			return finish(msg, EXIT_FAILURE, error);
+		}
+		/* if "enabled" is "false", it would normally change the interface to static addressing - wrong */
+		iface_ipv4enabled_ignore = 1;
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -1158,30 +1158,30 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** data, XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
-// {
-// 	int ret;
-// 	char* msg = NULL;
-// 	unsigned short mtu;
+int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned short mtu;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	if (op & XMLDIFF_REM) {
-// 		/* leave it be */
-// 		return EXIT_SUCCESS;
-// 	}
+	if (op & XMLDIFF_REM) {
+		/* leave it be */
+		return EXIT_SUCCESS;
+	}
 
-// 	if (new_node->children == NULL || new_node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (new_node->children == NULL || new_node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	mtu = atoi((char*)new_node->children->content);
-// 	ret = iface_ipv6_mtu(iface_name, mtu, &msg);
-// 	return finish(msg, ret, error);
-// }
+	mtu = atoi((char*)new_node->children->content);
+	ret = iface_ipv6_mtu(iface_name, mtu, &msg);
+	return finish(msg, ret, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv6/ip:address changes
@@ -1593,7 +1593,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 7,
+	.callbacks_count = 9,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1606,7 +1606,7 @@ struct transapi_data_callbacks clbks =  {
 		// {.path = "/if:interfaces/if:interface/ip:ipv6", .func = callback_if_interfaces_if_interface_ip_ipv6},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:enabled", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_enabled},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:forwarding", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding},
-		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
+		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:mtu", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_mtu},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:address", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_address},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:neighbor", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor},
 		// {.path = "/if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits},

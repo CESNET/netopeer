@@ -342,39 +342,31 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 			}
 			free(line);
 			fclose(dhcp_pid);
-
 			/* dhcp lease release */
 			asprintf(&cmd, "kill -s SIGUSR2 %s 2>&1", pid);
 			output = popen(cmd, "r");
 			free(cmd);
 			free(pid);
-
 			if (output == NULL) {
 				asprintf(msg, "%s: failed to execute a command.", __func__);
 				return EXIT_FAILURE;
 			}
-
 			if (getline(&line, &len, output) != -1 && strstr(line, "dhcpcd not running") == NULL) {
 				asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
 				free(line);
 				pclose(output);
 				return EXIT_FAILURE;
 			}
-
-			free(line);
-			line = NULL;
 			pclose(output);
 		}
 
 		asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", if_name);
 		output = popen(cmd, "r");
 		free(cmd);
-
 		if (output == NULL) {
 			asprintf(msg, "%s: failed to execute a command.", __func__);
 			return EXIT_FAILURE;
 		}
-
 		if (getline(&line, &len, output) != -1) {
 			asprintf(msg, "%s: interface %s fail: %s", __func__, if_name, line);
 			free(line);
@@ -382,9 +374,7 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 			return EXIT_FAILURE;
 		}
 
-		free(line);
 		pclose(output);
-
 	/* flush IPv4 addresses and enable DHCP daemon */
 	} else if (enabled == 1) {
 		asprintf(&cmd, "ip -4 addr flush dev %s 2>&1", pid);
@@ -403,7 +393,6 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 			return EXIT_FAILURE;
 		}
 
-		free(line);
 		line = NULL;
 		pclose(output);
 
@@ -425,7 +414,6 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 				return EXIT_FAILURE;
 			}
 
-			free(line);
 			pclose(output);
 		}
 	}
@@ -433,4 +421,19 @@ int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr no
 	return EXIT_SUCCESS;
 }
 
+/* IPv6 */
 
+int iface_ipv6_mtu(const char* if_name, unsigned int mtu, char** msg) {
+	char str_mtu[10];
+
+	sprintf(str_mtu, "%d", mtu);
+	if (write_to_proc_net(0, if_name, "mtu", str_mtu) != EXIT_SUCCESS) {
+		asprintf(msg, "%s: interface %s fail: Unable to open/write to \"/proc/sys/net/...\"", __func__, if_name);
+		return EXIT_FAILURE;
+	}
+
+	/* permanent */
+	
+
+	return EXIT_SUCCESS;
+}
