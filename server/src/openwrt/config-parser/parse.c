@@ -122,14 +122,14 @@ static int get_items_from_path(char *path, path_data *arguments)
 int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 {
 	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    bool rm = false;
-    t_fsm_state state = S_START;
+	size_t len = 0;
+	ssize_t read;
+	bool rm = false;
+	t_fsm_state state = S_START;
 
-    while ((read = getline(&line, &len, original_file)) != -1) {
+	while ((read = getline(&line, &len, original_file)) != -1) {
 
-    	char *line_replic = malloc(len * sizeof(char));
+		char *line_replic = malloc(len * sizeof(char));
 		strcpy(line_replic, line);
 		char *word;
 
@@ -147,26 +147,30 @@ int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 				case S_CONFIG:
 					if (arguments->section != NULL) {
 						if((strcmp(word, arguments->section)) == 0)
-		        			state = S_SECTION;
+							state = S_SECTION;
 					}
 					else {
 						if((strcmp(word, arguments->file)) == 0)
-		        			state = S_SECTION;
-		        	}
-		        	break;
+							state = S_SECTION;
+					}
+					break;
 
-		        case S_SECTION:
-		        	if ((strcmp(word, "list")) == 0)
-			    		state = S_ITEM;
-    				else if (strcmp(word, "config") == 0)
-    					state = S_CONFIG;
-    				break;
+				case S_SECTION:
+					if ((strcmp(word, "list")) == 0)
+						state = S_ITEM;
+					else if (strcmp(word, "config") == 0)
+						state = S_CONFIG;
+					break;
 
-    			case S_ITEM:
-    				if ((strcmp(word, arguments->item)) == 0) {
-    					rm = true;
-    					state = S_SECTION;
-    				}
+				case S_ITEM:
+					if ((strcmp(word, arguments->item)) == 0) {
+						rm = true;
+						state = S_SECTION;
+					}
+
+				/* not used */
+				case S_VALUE:
+					break;
 
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
@@ -176,16 +180,16 @@ int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 			state = S_START;
 		}
 		if (line_replic != NULL) {
-    		free(line_replic);
+			free(line_replic);
 		}
-    	if (!rm) {
-    		fprintf(new_file, "%s", line);
-    	}
-    	else {
-    		rm = false;
-    	}
+		if (!rm) {
+			fprintf(new_file, "%s", line);
+		}
+		else {
+			rm = false;
+		}
 
-    }
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -283,14 +287,14 @@ int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, cons
 int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const char *value)
 {
 	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    bool succ = false;
-    t_fsm_state state = S_START;
+	size_t len = 0;
+	ssize_t read;
+	bool succ = false;
+	t_fsm_state state = S_START;
 
-    while ((read = getline(&line, &len, original_file)) != -1) {
+	while ((read = getline(&line, &len, original_file)) != -1) {
 
-    	char *line_replic = malloc(len * sizeof(char));
+		char *line_replic = malloc(len * sizeof(char));
 		strcpy(line_replic, line);
 		char *word;
 
@@ -308,22 +312,27 @@ int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const ch
 				case S_CONFIG:
 					if (arguments->section != NULL) {
 						if((strcmp(word, arguments->section)) == 0)
-		        			state = S_SECTION;
+							state = S_SECTION;
 					}
 					else {
 						if((strcmp(word, arguments->file)) == 0)
-		        			state = S_SECTION;
-		        	}
-		        	break;
+							state = S_SECTION;
+					}
+					break;
 
-		        case S_SECTION:
-		        	if (!succ)
-		        		fprintf(new_file, "\tlist %s %s\n", arguments->item, value);
-		        	succ = true;
-		        	break;
-		        
-		        case S_ITEM:
-		        	break;
+				case S_SECTION:
+					if (!succ)
+						fprintf(new_file, "\tlist %s %s\n", arguments->item, value);
+					succ = true;
+					break;
+				
+				/* not used */
+				case S_ITEM:
+					break;
+
+				/* not used */
+				case S_VALUE:
+					break;
 
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
@@ -333,9 +342,9 @@ int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const ch
 			state = S_START;
 		}
 		if (line_replic != NULL) {
-    		free(line_replic);
+			free(line_replic);
 		}
-    	fprintf(new_file, "%s", line);
+		fprintf(new_file, "%s", line);
 	}
 
 	return EXIT_SUCCESS;
@@ -345,12 +354,12 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 {
 
 	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
+	size_t len = 0;
+	ssize_t read;
 
-    bool found = false;
-    bool in_progress = false;
-    t_fsm_state state = S_START;
+	bool found = false;
+	bool in_progress = false;
+	t_fsm_state state = S_START;
 
 	while ((read = getline(&line, &len, original_file)) != -1) {
 
@@ -378,41 +387,45 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 				case S_CONFIG:
 					if (arguments->section != NULL) {
 						if((strcmp(word, arguments->section)) == 0) {
-		        			state = S_SECTION;
-		        			in_progress = true;
-		        		}
+							state = S_SECTION;
+							in_progress = true;
+						}
 					}
 					else {
 						if((strcmp(word, arguments->file)) == 0) {
-		        			state = S_SECTION;
-		        			in_progress = true;
-		        		}
-		        	}
-		        	break;
+							state = S_SECTION;
+							in_progress = true;
+						}
+					}
+					break;
 
-		        case S_SECTION:
-		        	if ((strcmp(word, "option")) == 0) {
-			    		state = S_ITEM;
-    				}
-    				else if (strcmp(word, "config") == 0) {
-		    			fprintf(new_file, "\toption %s %s\n", arguments->item, value);
-		    			fprintf(new_file, "\n");
-		    			fprintf(new_file, "%s", line);
-		    			found = true;
-		    			in_progress = false;
-		    		}
-    				break;
+				case S_SECTION:
+					if ((strcmp(word, "option")) == 0) {
+						state = S_ITEM;
+					}
+					else if (strcmp(word, "config") == 0) {
+						fprintf(new_file, "\toption %s %s\n", arguments->item, value);
+						fprintf(new_file, "\n");
+						fprintf(new_file, "%s", line);
+						found = true;
+						in_progress = false;
+					}
+					break;
 
-    			case S_ITEM:
-		    		if ((strcmp(word, arguments->item)) == 0) {
-		    			fprintf(new_file, "\toption %s %s\n", arguments->item, value);
-		    			found = true;
-		    			in_progress = false;
-		    			state = S_START;
-		    		}
-		    		else
-		    			state = S_SECTION;
-		    		break;
+				case S_ITEM:
+					if ((strcmp(word, arguments->item)) == 0) {
+						fprintf(new_file, "\toption %s %s\n", arguments->item, value);
+						found = true;
+						in_progress = false;
+						state = S_START;
+					}
+					else
+						state = S_SECTION;
+					break;
+
+				/* not used */
+				case S_VALUE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -420,34 +433,47 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 		if (state == S_CONFIG) {
 			state = S_START;
 		}
-    	if (line_replic != NULL) {
-    		free(line_replic);
-    	}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
 		if (!in_progress) {
 			state = S_START;
 		}
-    	if (!found && (strcmp(line, "\n") != 0)) {
-    		fprintf(new_file, "%s", line);
-    	}
-    }
+		if (!found && (strcmp(line, "\n") != 0)) {
+			fprintf(new_file, "%s", line);
+		}
+	}
 
-    if (!found && in_progress)
-    	fprintf(new_file, "\toption %s %s\n", arguments->item, value);
+	if (!found && in_progress)
+		fprintf(new_file, "\toption %s %s\n", arguments->item, value);
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
-char* get_option_config(path_data *arguments, FILE *original_file)
+char* get_option_config(char *path)
 {
-	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
+	FILE *fileptr;
+	path_data arguments;
+	char* filename;
+	char* line = NULL;
+	char* ret = NULL;
+	size_t len = 0;
+	ssize_t read;
+	bool found = false;
+	bool in_progress = false;
+	t_fsm_state state = S_START;
 
-    bool found = false;
-    bool in_progress = false;
-    t_fsm_state state = S_START;
+	arguments.section = NULL;
 
-	while ((read = getline(&line, &len, original_file)) != -1) {
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return NULL;
+	}
+
+	asprintf(&filename, "/etc/config/%s", arguments.file);
+	fileptr = fopen(filename, "r");
+	free(filename);
+
+	while ((read = getline(&line, &len, fileptr)) != -1) {
 
 		char *line_replic = malloc(len * sizeof(char));
 		strcpy(line_replic, line);
@@ -465,44 +491,53 @@ char* get_option_config(path_data *arguments, FILE *original_file)
 					break;
 
 				case S_CONFIG:
-					if (arguments->section != NULL) {
-						if((strcmp(word, arguments->section)) == 0) {
-		        			state = S_SECTION;
-		        			in_progress = true;
-		        		}
+					if (arguments.section != NULL) {
+						if((strcmp(word, arguments.section)) == 0) {
+							state = S_SECTION;
+							in_progress = true;
+						}
 					}
 					else {
-						if((strcmp(word, arguments->file)) == 0) {
-		        			state = S_SECTION;
-		        			in_progress = true;
-		        		}
-		        	}
-		        	break;
+						if((strcmp(word, arguments.file)) == 0) {
+							state = S_SECTION;
+							in_progress = true;
+						}
+					}
+					break;
 
-		        case S_SECTION:
-		        	if ((strcmp(word, "option")) == 0) {
-			    		state = S_ITEM;
-    				}
-    				else if (strcmp(word, "config") == 0) {
-		    			found = true;
-		    			in_progress = false;
-		    		}
-    				break;
+				case S_SECTION:
+					if ((strcmp(word, "option")) == 0) {
+						state = S_ITEM;
+					}
+					else if (strcmp(word, "config") == 0) {
+						found = true;
+						in_progress = false;
+					}
+					break;
 
-    			case S_ITEM:
-		    		if ((strcmp(word, arguments->item)) == 0) {
-		    			found = true;
-		    			in_progress = false;
-		    			break;
-		    		}
-		    		else
-		    			state = S_SECTION;
-		    		if (found) {
-		    			if (line_replic != NULL)
-    						free(line_replic);
-		    			return word;
-		    		}
-		    		break;
+				case S_ITEM:
+					if ((strcmp(word, arguments.item)) == 0) {
+						found = true;
+						in_progress = false;
+						break;
+					}
+					else
+						state = S_SECTION;
+					if (found) {
+						if (line_replic != NULL) {
+							free(line_replic);
+						}
+						arg_clear(&arguments);
+						fclose(fileptr);
+						ret = strdup(word);
+						free(line);
+						return ret;
+					}
+					break;
+
+				/* not used */
+				case S_VALUE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -510,30 +545,45 @@ char* get_option_config(path_data *arguments, FILE *original_file)
 		if (state == S_CONFIG) {
 			state = S_START;
 		}
-    	if (line_replic != NULL) {
-    		free(line_replic);
-    	}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
 		if (!in_progress) {
 			state = S_START;
 		}
-    }
+	}
 
-    return NULL;
+	arg_clear(&arguments);
+	fclose(fileptr);
+	return NULL;
 }
 
-char** get_list_config(path_data *arguments, FILE *file, int *found_counter)
+char** get_list_config(char* path, int* count)
 {
+	FILE *fileptr;
+	path_data arguments;
+	char* filename;
 	char** ret = NULL;
 	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    bool found = false;
-    t_fsm_state state = S_START;
-    int mem_list = 5;
-    *found_counter = 0;
-    ret = calloc(mem_list, sizeof(char*));
+	size_t len = 0;
+	ssize_t read;
+	bool found = false;
+	t_fsm_state state = S_START;
+	int mem_list = 5;
+	*count = 0;
+	ret = calloc(mem_list, sizeof(char*));
 
-	while ((read = getline(&line, &len, file)) != -1) {
+	arguments.section = NULL;
+
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return NULL;
+	}
+
+	asprintf(&filename, "/etc/config/%s", arguments.file);
+	fileptr = fopen(filename, "r");
+	free(filename);
+
+	while ((read = getline(&line, &len, fileptr)) != -1) {
 
 		char *line_replic = malloc(len * sizeof(char));
 		strcpy(line_replic, line);
@@ -545,88 +595,100 @@ char** get_list_config(path_data *arguments, FILE *file, int *found_counter)
 			switch(state) {
 
 				case S_START:
-					if (strcmp(word, "config") == 0) {
-						state = S_CONFIG;
-					}
-					break;
+				if (strcmp(word, "config") == 0) {
+					state = S_CONFIG;
+				}
+				break;
 
 				case S_CONFIG:
-					if (arguments->section != NULL) {
-						if((strcmp(word, arguments->section)) == 0) {
-		        			state = S_SECTION;
-		        		}
+				if (arguments.section != NULL) {
+					if ((strcmp(word, arguments.section)) == 0) {
+						state = S_SECTION;
 					}
-					else {
-						if((strcmp(word, arguments->file)) == 0) {
-		        			state = S_SECTION;
-		        		}
-		        	}
-		        	break;
+				}
+				else {
+					if ((strcmp(word, arguments.file)) == 0) {
+						state = S_SECTION;
+					}
+				}
+				break;
 
-		        case S_SECTION:
-		        	if ((strcmp(word, "list")) == 0) {
-			    		state = S_ITEM;
-    				}
-    				else if (strcmp(word, "config") == 0) {
-		    			state = S_CONFIG;
-		    		}
-    				break;
+				case S_SECTION:
+				if ((strcmp(word, "list")) == 0) {
+					state = S_ITEM;
+				}
+				else if (strcmp(word, "config") == 0) {
+					state = S_CONFIG;
+				}
+				break;
 
-    			case S_ITEM:
-		    		if ((strcmp(word, arguments->item)) == 0) {
-		    			found = true;
-		    			break;
-		    		}
-		    		else
-		    			state = S_SECTION;
-		    		if (found) {
-    					found = false;
-    					state = S_SECTION;
-		    			
-		    			if (*found_counter >= mem_list) {
-		    				mem_list = mem_list * 2;
-		    				if ((ret = realloc(ret, sizeof(char*)*2)) == NULL ) {
-		    					return NULL;
-		    				}
-		    			}
-		    			if ( (ret[*found_counter] = malloc(strlen(word) * sizeof(char))) ) {
-		    				strcpy(ret[*found_counter], word);
-		    			}
-		    			(*found_counter)++;
-		    		}
-		    		break;
+				case S_ITEM:
+				if ((strcmp(word, arguments.item)) == 0) {
+					found = true;
+					break;
+				}
+				else
+					state = S_SECTION;
+				if (found) {
+					found = false;
+					state = S_SECTION;
+
+					if (*count >= mem_list) {
+						mem_list = mem_list * 2;
+						if ((ret = realloc(ret, sizeof(char*)*2)) == NULL ) {
+							fclose(fileptr);
+							free(line);
+							return NULL;
+						}
+					}
+					if ( (ret[*count] = malloc(strlen(word) * sizeof(char))) ) {
+						strcpy(ret[*count], word);
+					}
+					(*count)++;
+				}
+				break;
+
+				/* not used */
+    			case S_VALUE:
+    			break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
 
 		if (state == S_CONFIG)
 			state = S_START;
-    	if (line_replic != NULL)
-    		free(line_replic);
-    }
+		if (line_replic != NULL)
+			free(line_replic);
+	}
 
+	fclose(fileptr);
+	free(line);
 	return ret;
 }
 
-char* get_interface_section(const char* ifname)
+char** get_interface_section(const char* ifname, int* count)
 {
-	FILE *net_config = fopen("/etc/config/network", "r");
+	char** ret = NULL;
+	FILE *net_config;
+	if ((net_config = fopen("/etc/config/network", "r")) == NULL) {
+		return NULL;
+	}
 
 	path_data arguments;
 	char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
+	size_t len = 0;
+	ssize_t read;
 
-    bool found = false;
-    bool in_progress = false;
-    bool interface = false;
-    t_fsm_state state = S_START;
+	bool found = false;
+	bool in_progress = false;
+	bool interface = false;
+	t_fsm_state state = S_START;
 
-    /* Init arguments */
-    arguments.file = NULL;
-    asprintf(&(arguments.file), "network");
-    arguments.section = NULL;
-    asprintf(&(arguments.item), "ifname");
+	/* Init arguments */
+	arguments.file = NULL;
+	asprintf(&(arguments.file), "network");
+	arguments.section = NULL;
+	asprintf(&(arguments.item), "ifname");
 
 	while ((read = getline(&line, &len, net_config)) != -1) {
 
@@ -640,59 +702,66 @@ char* get_interface_section(const char* ifname)
 			switch(state) {
 
 				case S_START:
-					if (strcmp(word, "config") == 0) {
-						state = S_CONFIG;
-					}
-					break;
+				if (strcmp(word, "config") == 0) {
+					state = S_CONFIG;
+				}
+				break;
 
 				case S_CONFIG:
-					if (strcmp(word, "interface") == 0) {
-						interface = true;
-						break;
-					}
-					if (interface) {
-						free(arguments.section);
-						asprintf(&(arguments.section), "%s", word);
+				if (strcmp(word, "interface") == 0) {
+					interface = true;
+					break;
+				}
+				if (interface) {
+					free(arguments.section);
+					asprintf(&(arguments.section), "%s", word);
+					state = S_SECTION;
+					in_progress = true;
+				}
+				break;
+
+				case S_SECTION:
+				if ((strcmp(word, "option")) == 0) {
+					state = S_ITEM;
+				}
+				else if (strcmp(word, "config") == 0) {
+					found = true;
+					in_progress = false;
+				}
+				break;
+
+				case S_ITEM:
+				if ((strcmp(word, arguments.item)) == 0) {
+					found = true;
+					in_progress = false;
+					break;
+				}
+				else {
+					state = S_SECTION;
+				}
+				if (found) {
+					if ((strcmp(ifname, word)) == 0) {
+						if (ret == NULL) {
+							*count = 1;
+							ret = malloc(sizeof(char*));
+						} else {
+							++(*count);
+							ret = realloc(ret, (*count)*sizeof(char*));
+						}
+						ret[*count-1] = strdup(arguments.section);
+						found = false;
 						state = S_SECTION;
-		        		in_progress = true;
 					}
-		        	break;
+					else {
+						found = false;
+						state = S_SECTION;
+					}
+				}
+				break;
 
-		        case S_SECTION:
-		        	if ((strcmp(word, "option")) == 0) {
-			    		state = S_ITEM;
-    				}
-    				else if (strcmp(word, "config") == 0) {
-		    			found = true;
-		    			in_progress = false;
-		    		}
-    				break;
-
-    			case S_ITEM:
-		    		if ((strcmp(word, arguments.item)) == 0) {
-		    			found = true;
-		    			in_progress = false;
-		    			break;
-		    		}
-		    		else {
-		    			state = S_SECTION;
-		    		}
-		    		if (found) {
-		    			if((strcmp(ifname, word)) == 0) {
-	    					
-	    					free(line_replic);
-	    					free(arguments.file);
-	    					free(arguments.item);
-	    					free(line);
-	    					fclose(net_config);
-			    			return arguments.section;
-		    			}
-		    			else {
-		    				found = false;
-		    				state = S_SECTION;
-		    			}
-		    		}
-		    		break;
+				/* not used */
+    			case S_VALUE:
+    			break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -700,70 +769,36 @@ char* get_interface_section(const char* ifname)
 		if (state == S_CONFIG) {
 			state = S_START;
 		}
-    	if (line_replic != NULL) {
-    		free(line_replic);
-    	}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
 		if (!in_progress) {
 			state = S_START;
 		}
-    }
-
-    free(line);
-    arg_clear(&arguments);
-    fclose(net_config);
-    return NULL;
-}
-
-char** get_config(char *path, t_element_type type, int *count)
-{
-	FILE *fileptr;
-    path_data arguments;
-    char** ret = NULL;
-
-    arguments.section = NULL;
-
-    if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
-    	return NULL;
-    }
-
-    char filename[80] = "/etc/config/";
-    strcat(filename, arguments.file);
-	fileptr = fopen(filename, "r");
-
-    if (type == OPTION) {
-    	ret = malloc( sizeof(char*));
-		if ((ret[0] = get_option_config(&arguments, fileptr)) == NULL) {
-			return NULL;
-		}
-		*count = 1;
-	} else if (type == LIST) {
-		if ((ret = get_list_config(&arguments, fileptr, count)) == NULL) {
-			return NULL;
-		}
 	}
 
-    arg_clear(&arguments);
-	fclose(fileptr);
-
+	free(line);
+	arg_clear(&arguments);
+	fclose(net_config);
 	return ret;
 }
 
 int edit_config(char *path, const char *value, t_element_type type)
 {
 	FILE *fileptr1, *fileptr2;
-    path_data arguments;
+	path_data arguments;
 
-    arguments.section = NULL;
+	arguments.section = NULL;
 
-    if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
-    	return EXIT_FAILURE;
-    }
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return EXIT_FAILURE;
+	}
 
-    char filename[80] = "/etc/config/";
-    strcat(filename, arguments.file);
+	char filename[80] = "/etc/config/";
+	strcat(filename, arguments.file);
 
-    fileptr1 = fopen(filename, "r");
-    fileptr2 = fopen("/etc/config/config.tmp", "w");
+	fileptr1 = fopen(filename, "r");
+	fileptr2 = fopen("/etc/config/config.tmp", "w");
 
 	if (type == OPTION) {
 		if (change_option_value(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS)
@@ -781,31 +816,35 @@ int edit_config(char *path, const char *value, t_element_type type)
 	remove(filename);
 	rename("/etc/config/config.tmp", filename);
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 int rm_config(char *path, const char *value, t_element_type type)
 {
 	FILE *fileptr1, *fileptr2;
-    path_data arguments;
+	path_data arguments;
 
-    arguments.section = NULL;
+	arguments.section = NULL;
 
-    if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
 		return EXIT_FAILURE;
-    }
+	}
 
-    char filename[80] = "/etc/config/";
-    strcat(filename, arguments.file);
+	char filename[80] = "/etc/config/";
+	strcat(filename, arguments.file);
 
-    fileptr1 = fopen(filename, "r");
-    fileptr2 = fopen("/etc/config/config.tmp", "w");
+	fileptr1 = fopen(filename, "r");
+	fileptr2 = fopen("/etc/config/config.tmp", "w");
 
 	if (type == OPTION) {
+		fclose(fileptr1);
+		fclose(fileptr2);
 		return EXIT_SUCCESS;
 	}
 	else if (type == LIST) {
 		if (rm_list_item(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS) {
+			fclose(fileptr1);
+			fclose(fileptr2);
 			return EXIT_FAILURE;
 		}
 	}
@@ -816,5 +855,5 @@ int rm_config(char *path, const char *value, t_element_type type)
 	remove(filename);
 	rename("/etc/config/config.tmp", filename);
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

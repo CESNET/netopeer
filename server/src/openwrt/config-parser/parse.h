@@ -73,14 +73,21 @@ int edit_config(char *path, const char *value, t_element_type type);
 int rm_config(char *path, const char *value, t_element_type type);
 
 /**
- * @brief gets value from openWRT configuration files stored
+ * @brief gets list value from openWRT configuration files stored
  * in /etc/config
  * @param path path to the configuration element
- * @param type configuration element type - OPTION or LIST
  * @param count number of matches
  * @return NULL if element not found, list of found elements
  */
-char** get_config(char *path, t_element_type type, int *count);
+char** get_list_config(char *path, int *count);
+
+/**
+ * @brief gets option value from openWRT configuration files stored
+ * in /etc/config
+ * @param path path to the configuration element
+ * @return NULL if element not found, list of found elements
+ */
+char* get_option_config(char *path);
 
 /**
  * @brief gets section name where interface is configured
@@ -88,6 +95,16 @@ char** get_config(char *path, t_element_type type, int *count);
  * @param ifname path to the configuration element
  * @return NULL if element not found, name of section in conf file
  */
-char* get_interface_section(const char* ifname);
+char** get_interface_section(const char* ifname, int* count);
+
+/**
+ * @brief edits openWRT configuration files stored in /etc/config/network
+ * adds configuration section
+ * @param path path to the configuration element to be edited
+ * @param value configuration elemement value to be set
+ * @param type configuration element type - OPTION or LIST
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int add_interface_config(char *path, const char *value, t_element_type type);
 
 #endif /* PARSE_H_ */
