@@ -1152,20 +1152,16 @@ xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
 
 	/* ntp/enabled */
-	t_element_type type = OPTION;
 	char* path = "system.ntp.enabled";
-	char** ret = NULL;
-	int count = 0;
+	char* ret = NULL;
 
-	ret = get_config(path, type, &count);
-	if (ret == NULL || count == 0) {
+	if ((ret = get_option_config(path)) == NULL) {
 		asprintf(errmsg, "Match for \"%s\" failed", path);
 		return (NULL);
 	}
-	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret[0], "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
+	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret, "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
 
 	return (ntp_node);
-
 }
 
 /**
@@ -1205,10 +1201,8 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input)
 	char *msg = NULL, *ptr;
 	const char *rollback_timezone;
 	int offset;
-	t_element_type type = OPTION;
 	char* path = "system.ntp.enabled";
-	char** ret = NULL;
-	int count = 0;
+	char* ret = NULL;
 
 	if (current_datetime == NULL) {
 		err = nc_err_new(NC_ERR_MISSING_ELEM);
@@ -1217,11 +1211,9 @@ nc_reply* rpc_set_current_datetime(xmlNodePtr input)
 		return nc_reply_error(err);
 	}
 
-	ret = get_config(path, type, &count);
-	if (ret == NULL || count == 0) {
+	if ((ret = get_option_config(path)) == NULL) {
 		nc_verb_warning("Failed to check NTP status.");
-	}
-	else if (strcmp(ret[0], "1") == 0) {
+	} else if (strcmp(ret, "1") == 0) {
 		err = nc_err_new(NC_ERR_OP_FAILED);
 		nc_err_set(err, NC_ERR_PARAM_APPTAG, "ntp-active");
 		nc_verb_verbose("RPC set-current-datetime requested with NTP running.");
