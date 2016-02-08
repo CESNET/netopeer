@@ -97,14 +97,12 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 	xmlNewNs(type, BAD_CAST "urn:ietf:params:xml:ns:yang:iana-if-type", BAD_CAST "ianaift");
 	free(tmp);
 
-	printf("2\n");
 	if ((tmp = iface_get_enabled(1, if_name, msg)) == NULL) {
 		goto fail;
 	}
 	xmlNewTextChild(interface, interface->ns, BAD_CAST "enabled", BAD_CAST tmp);
 	free(tmp);
 
-	printf("3: IPV4 START\n");
 	/* IPv4 */
 	if ((j = iface_get_ipv4_presence(if_name, msg)) == -1) {
 		goto fail;
@@ -114,28 +112,19 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 		ipns = xmlNewNs(ip, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-ip", NULL);
 		xmlSetNs(ip, ipns);
 
-		printf("4\n");
+		ipv4_enabled = 1;
+		xmlNewTextChild(ip, ip->ns, BAD_CAST "enabled", BAD_CAST "true");
 
-		if (1) {
-			ipv4_enabled = 1;
-		} else {
-			ipv4_enabled = 0;
-		}
-		xmlNewTextChild(ip, ip->ns, BAD_CAST "enabled", BAD_CAST tmp);
-		// free(tmp);
-
-		printf("5\n");
 		if ((tmp = iface_get_ipv4_forwarding(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
 		free(tmp);
 
-		printf("6\n");
 		if ((tmp = iface_get_ipv4_mtu(1, if_name, msg)) == NULL) {
 			goto fail;
 		}
-		printf("7\n");
+
 		if (65535 < atoi(tmp)) {
 			/* ietf-ip cannot handle higher MTU, set it to this max */
 			free(iface_name);
@@ -150,7 +139,6 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 		}
 		free(tmp);
 
-		printf("8\n");
 		/* with DHCP enabled, these addresses are not a part of the configuration */
 		if (ipv4_enabled) {
 			if (iface_get_ipv4_ipaddrs(1, if_name, &ips, msg) != 0) {
@@ -170,12 +158,11 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 				ips.count = 0;
 			}
 		}
-		printf("9\n");
 
 		if (iface_get_ipv4_neighs(1, if_name, &ips, msg) != 0) {
 			goto fail;
 		}
-		printf("10\n");
+
 		for (j = 0; j < ips.count; ++j) {
 			addr = xmlNewChild(ip, ip->ns, BAD_CAST "neighbor", NULL);
 			xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
@@ -184,7 +171,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 			free(ips.ip[j]);
 			free(ips.prefix_or_mac[j]);
 		}
-		printf("11\n");
+
 		if (ips.count != 0) {
 			free(ips.ip);
 			free(ips.prefix_or_mac);
@@ -192,7 +179,6 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 		}
 	}
 
-	printf("20: IPV6 START\n");
 	/* IPv6 */
 	if ((j = iface_get_ipv6_presence(1, if_name, msg)) == -1) {
 		goto fail;
@@ -328,8 +314,6 @@ int transapi_init(xmlDocPtr * running)
 	xmlNsPtr ns;
 	char** devices, *msg = NULL;
 
-	printf("1\n");
-
 	devices = iface_get_ifcs(1, &dev_count, &msg);
 	if (devices == NULL) {
 		return finish(msg, EXIT_FAILURE, NULL);
@@ -347,7 +331,6 @@ int transapi_init(xmlDocPtr * running)
 		interface = parse_iface_config(devices[i], ns, &msg);
 		free(devices[i]);
 
-		printf("100\n");
 		if (interface == NULL) {
 			if (msg != NULL) {
 				nc_verb_error(msg);
@@ -358,7 +341,6 @@ int transapi_init(xmlDocPtr * running)
 
 		xmlAddChild(root, interface);
 	}
-	printf("1000\n");
 
 	free(devices);
 
@@ -371,7 +353,7 @@ int transapi_init(xmlDocPtr * running)
 void transapi_close(void)
 {
 	free(iface_name);
-	// iface_cleanup();
+	iface_cleanup();
 	return;
 }
 
@@ -1582,7 +1564,6 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 		return EXIT_SUCCESS;
 	}
 
-	printf("CALL 0\n");
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	if (node->children == NULL || node->children->content == NULL) {
@@ -1590,10 +1571,8 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 		return finish(msg, EXIT_FAILURE, error);
 	}
 
-	printf("CALL 1\n");
 	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
 		enabled = 1;
-		printf("CALL 2\n");
 	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
 		enabled = 0;
 	} else if (op & XMLDIFF_MOD) {
@@ -1604,7 +1583,6 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 		}
 	}
 
-	printf("CALL 3\n");
 	if (enabled == 2) {
 		/* no real interface change */
 		return EXIT_SUCCESS;

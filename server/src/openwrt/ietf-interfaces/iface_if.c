@@ -154,7 +154,6 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	size_t len = 0;
 
 	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
-	printf("IP ADDR removal: %s\n", cmd);
 	output = popen(cmd, "r");
 	free(cmd);
 
@@ -179,106 +178,150 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	pclose(output);
 
 	/* pernament */
-	// char *path = NULL;
-	// char* section = NULL;
-	// t_element_type type = OPTION;
-	// section = get_interface_section(if_name);
-	// sprintf(str_prefix, "%d", prefix);
+	char *ret = NULL;
+	char *path = NULL;
+	char* section = NULL;
+	t_element_type type = OPTION;
+	struct interface_section if_section;
+	sprintf(str_prefix, "%d", prefix);
 
-	// if (ipv4) { /* IPv4 */
-	// 	if (op & XMLDIFF_ADD) {
-	// 		asprintf(&path, "network.%s.proto", section);
-	// 		if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option proto failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
+	if (ipv4) { /* IPv4 */
+		if (op & XMLDIFF_ADD) {
+			asprintf(&(if_section.section), "netconf_%s", if_name);
+			if_section.ifname = strdup(if_name);
+			if_section.ipv4_addr = strdup(ip);
+			if_section.ipv4_netmask = strdup(netmask);
+			if_section.ipv6_addr = NULL;
+			if_section.proto = 0;
 
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.ipaddr", section);
-	// 		if ((edit_config(path, ip, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
+			if (add_interface_section(&if_section) != EXIT_SUCCESS) {
+				asprintf(msg, "Configuring interface %s failed.", if_name);
+				free(if_section.section);
+				free(if_section.ifname);
+				free(if_section.ipv4_addr);
+				free(if_section.ipv4_netmask);
+				return EXIT_FAILURE;
+			}
 
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.netmask", section);
-	// 		if ((edit_config(path, netmask, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
-	// 	}
+			// asprintf(&path, "network.%s.proto", section);
+			// if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
+			// 	asprintf(msg, "Configuring interface %s option proto failed.", if_name);
+			// 	free(path);
+			// 	free(section);
+			// 	return EXIT_FAILURE;
+			// }
 
-	// 	if (op & XMLDIFF_REM) {
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.ipaddr", section);
-	// 		if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
+			// free(path);
+			// asprintf(&path, "network.%s.ipaddr", section);
+			// if ((edit_config(path, ip, type)) != (EXIT_SUCCESS)) {
+			// 	asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+			// 	free(path);
+			// 	free(section);
+			// 	return EXIT_FAILURE;
+			// }
 
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.netmask", section);
-	// 		if ((rm_config(path, netmask, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
+			// free(path);
+			// asprintf(&path, "network.%s.netmask", section);
+			// if ((edit_config(path, netmask, type)) != (EXIT_SUCCESS)) {
+			// 	asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
+			// 	free(path);
+			// 	free(section);
+			// 	return EXIT_FAILURE;
+			// }
+			return EXIT_SUCCESS;
+		}
 
-	// 		/* if static and no ipaddr or ip6addr - remove whole section */
+		if (op & XMLDIFF_REM) {
+			/* get section where ip address is located */
+			if ((section = get_config_section("network.null.ipaddr", "interface", ip)) == NULL) {
+				return EXIT_SUCCESS;
+			}
 
-	// 	}
-	// } else { /* IPv6 */
-	// 	if (op & XMLDIFF_ADD) {
-	// 		const char* ip_prefix;
-	// 		asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
+			/* check for ipv6 address - if not present remove whole section */
+			free(path);
+			asprintf(&path, "network.%s.ip6addr", section);
+			if ((ret = get_option_config(path)) == NULL) {
+				free(path);
+				asprintf(&path, "network.%s.ipaddr", section);
+				if ((rm_config_section(path)) != (EXIT_SUCCESS)) {
+					asprintf(msg, "Configuring interface %s option ipaddr remove failed.", if_name);
+					free(path);
+					free(section);
+					return EXIT_FAILURE;
+				}
+			} else {
+				free(ret);
+				free(path);
+				asprintf(&path, "network.%s.ipaddr", section);
+				if ((rm_config(path, netmask, type)) != (EXIT_SUCCESS)) {
+					asprintf(msg, "Configuring interface %s option ipaddr remove failed.", if_name);
+					free(path);
+					free(section);
+					return EXIT_FAILURE;
+				}
 
-	// 		asprintf(&path, "network.%s.proto", section);
-	// 		if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option proto failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
+				free(path);
+				asprintf(&path, "network.%s.netmask", section);
+				if ((rm_config(path, netmask, type)) != (EXIT_SUCCESS)) {
+					asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
+					free(path);
+					free(section);
+					return EXIT_FAILURE;
+				}
+			}
+		}
+	} else { /* IPv6 */
+		if (op & XMLDIFF_ADD) {
+			const char* ip_prefix;
+			asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
 
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.ip6addr", section);
-	// 		if ((edit_config(path, ip_prefix, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
-	// 	}
+			asprintf(&(if_section.section), "netconf6_%s", if_name);
+			if_section.ifname = strdup(if_name);
+			if_section.ipv6_addr = strdup(ip);
+			if_section.proto = 0;
+			if_section.ipv4_addr = NULL;
+			if_section.ipv4_netmask = NULL;
 
-	// 	if (op & XMLDIFF_REM) {
-	// 		free(path);
-	// 		path = NULL;
-	// 		asprintf(&path, "network.%s.ip6addr", section);
-	// 		if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
-	// 			asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-	// 			free(path);
-	// 			free(section);
-	// 			return EXIT_FAILURE;
-	// 		}
-	// 	}
-	// }	
+			if (add_interface_section(&if_section) != EXIT_SUCCESS) {
+				asprintf(msg, "Configuring interface %s failed.", if_name);
+				free(if_section.section);
+				free(if_section.ifname);
+				free(if_section.ipv6_addr);
+				return EXIT_FAILURE;
+			}
 
-	// free(path);
-	// free(section);
+			// asprintf(&path, "network.%s.proto", section);
+			// if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
+			// 	asprintf(msg, "Configuring interface %s option proto failed.", if_name);
+			// 	free(path);
+			// 	free(section);
+			// 	return EXIT_FAILURE;
+			// }
+
+			// free(path);
+			// asprintf(&path, "network.%s.ip6addr", section);
+			// if ((edit_config(path, ip_prefix, type)) != (EXIT_SUCCESS)) {
+			// 	asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+			// 	free(path);
+			// 	free(section);
+			// 	return EXIT_FAILURE;
+			// }
+		}
+
+		if (op & XMLDIFF_REM) {
+			free(path);
+			asprintf(&path, "network.%s.ip6addr", section);
+			if ((rm_config(path, ip, type)) != (EXIT_SUCCESS)) {
+				asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
+				free(path);
+				free(section);
+				return EXIT_FAILURE;
+			}
+		}
+	}	
+
+	free(path);
+	free(section);
 	return EXIT_SUCCESS;
 }
 
@@ -289,7 +332,6 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 	FILE* output;
 	size_t len = 0;
 
-	printf("EN 1\n");
 	asprintf(&cmd, "ip link set dev %s %s 2>&1", if_name, (boolean ? "up" : "down"));
 	output = popen(cmd, "r");
 	free(cmd);
@@ -299,7 +341,6 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	printf("EN 2\n");
 	if (getline(&line, &len, output) == -1) {
 		ret = EXIT_SUCCESS;
 	} else {
@@ -310,7 +351,6 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 	free(line);
 	pclose(output);
 
-	printf("EN 3\n");
 	/* pernament */
 	int i;
 	char *path = NULL;
@@ -319,11 +359,8 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 	t_element_type type = OPTION;
 	char* value = (boolean ? "1" : "0");
 
-	printf("EN 4\n");
 	if ((section = get_interface_section(if_name, &section_count)) != NULL) {
-		printf("EN 5\n");
 		for (i = 0; i < section_count; ++i) {
-			printf("EN 6\n");
 			asprintf(&path, "network.%s.enable", section[i]);
 			if ((edit_config(path, value, type)) != (EXIT_SUCCESS)) {
 				asprintf(msg, "Configuring interface %s enabled failed.", if_name);
@@ -335,7 +372,6 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 			free(section[i]);
 			free(path);
 		}
-		printf("EN 7\n");
 		free(section);
 	}
 

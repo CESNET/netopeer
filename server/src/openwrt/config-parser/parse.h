@@ -53,6 +53,15 @@ typedef enum
 	LIST
 }t_element_type;
 
+struct interface_section {
+	char* section;
+	char* ifname;
+	char* ipv4_addr;
+	char* ipv4_netmask;
+	char* ipv6_addr;
+	int proto; /* 0 - static, 1 - dhcp */
+};
+
 /**
  * @brief edits openWRT configuration files stored in /etc/config
  * if configuration element is not set, it will be added
@@ -73,6 +82,13 @@ int edit_config(char *path, const char *value, t_element_type type);
 int rm_config(char *path, const char *value, t_element_type type);
 
 /**
+ * @brief removes openWRT configuration section from files stored in /etc/config
+ * @param path path to the configuration element to be edited
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int rm_config_section(char *path);
+
+/**
  * @brief gets list value from openWRT configuration files stored
  * in /etc/config
  * @param path path to the configuration element
@@ -90,12 +106,21 @@ char** get_list_config(char *path, int *count);
 char* get_option_config(char *path);
 
 /**
- * @brief gets section name where interface is configured
+ * @brief gets sections name where interface is configured
  * in /etc/config/network
  * @param ifname path to the configuration element
  * @return NULL if element not found, name of section in conf file
  */
 char** get_interface_section(const char* ifname, int* count);
+
+/**
+ * @brief gets openWRT configuration section from files stored in /etc/config
+ * @param path path to the configuration element - section part can be set to e.g. null
+ * @param section_type type of config section e.g. "interface"
+ * @param value configuration elemement value to be set
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+char* get_config_section(char* path, const char* section_type, const char* value);
 
 /**
  * @brief edits openWRT configuration files stored in /etc/config/network
@@ -105,6 +130,6 @@ char** get_interface_section(const char* ifname, int* count);
  * @param type configuration element type - OPTION or LIST
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int add_interface_config(char *path, const char *value, t_element_type type);
+int add_interface_section(struct interface_section* if_section);
 
 #endif /* PARSE_H_ */

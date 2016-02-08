@@ -197,12 +197,12 @@ int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, const char *value)
 {
 	char *line = NULL;
-		size_t len = 0;
-		ssize_t read;
+	size_t len = 0;
+	ssize_t read;
 
-		bool found = false;
-		bool in_progress = false;
-		t_fsm_state state = S_START;
+	bool found = false;
+	bool in_progress = false;
+	t_fsm_state state = S_START;
 
 	while ((read = getline(&line, &len, original_file)) != -1) {
 
@@ -444,8 +444,9 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 		}
 	}
 
-	if (!found && in_progress)
+	if (!found && in_progress) {
 		fprintf(new_file, "\toption %s %s\n", arguments->item, value);
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -855,5 +856,219 @@ int rm_config(char *path, const char *value, t_element_type type)
 	remove(filename);
 	rename("/etc/config/config.tmp", filename);
 
+	return EXIT_SUCCESS;
+}
+
+char* get_config_section(char* path, const char* section_type, const char* value)
+{
+	char* ret = NULL;
+	FILE *config_file;
+	char* filename;
+	path_data arguments;
+
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return NULL;
+	}
+
+	asprintf(&filename, "/etc/config/%s", arguments.file);
+	if ((config_file = fopen(filename, "r")) == NULL) {
+		return NULL;
+	}
+	free(filename);
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+
+	bool interface = false;
+	t_fsm_state state = S_START;
+
+	while ((read = getline(&line, &len, config_file)) != -1) {
+		char *line_replic = strdup(line);
+		char *word;
+
+		word = strtok (line_replic ," \t\v\f\r\"\'\n");
+		while (word != NULL){
+			switch(state) {
+				case S_START:
+				if (strcmp(word, "config") == 0) {
+					state = S_CONFIG;
+				}
+				break;
+
+				case S_CONFIG:
+				if (strcmp(word, section_type) == 0) {
+					interface = true;
+					break;
+				}
+				if (interface) {
+					free(arguments.section);
+					arguments.section = strdup(word);
+					state = S_SECTION;
+					interface = false;
+				}
+				break;
+
+				case S_SECTION:
+				if (strcmp(word, "option") == 0) {
+					state = S_ITEM;
+				} else if (strcmp(word, "config") == 0) {
+					state = S_CONFIG;
+				}
+				break;
+
+				case S_ITEM:
+				if (strcmp(word, arguments.item) == 0) {
+					state = S_VALUE;
+				} else {
+					state = S_SECTION;
+				}
+				break;
+
+				case S_VALUE:
+				if (strcmp(word, value) == 0) {
+					free(line_replic);
+					free(line);
+					fclose(config_file);
+					ret = strdup(arguments.section);
+					arg_clear(&arguments);
+					return ret;
+				} else {
+					state = S_SECTION;
+				}
+				break;
+			}
+			word = strtok (NULL, " \t\v\f\r\"\'\n");
+		}
+
+		if (state == S_CONFIG) {
+			state = S_START;
+		}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
+	}
+
+	free(line);
+	fclose(config_file);
+	return NULL;
+}
+
+int rm_config_section(char *path)
+{
+	FILE *fileptr1, *fileptr2;
+	path_data arguments;
+	char* filename;
+	arguments.section = NULL;
+
+	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
+		return EXIT_FAILURE;
+	}
+	
+	asprintf(&filename, "/etc/config/%s", arguments.file);
+	if (((fileptr1 = fopen(filename, "r")) == NULL) || ((fileptr2 = fopen("/etc/config/config.tmp", "w")) == NULL)) {
+		return EXIT_FAILURE;
+	}
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+
+	bool found = false;
+	bool in_progress = false;
+	t_fsm_state state = S_START;
+
+	while ((read = getline(&line, &len, fileptr1)) != -1) {
+
+		char *line_replic = malloc(len * sizeof(char));
+		strcpy(line_replic, line);
+		char *word;
+
+		word = strtok (line_replic ," \t\v\f\r\"\'\n");
+		while (word != NULL){
+
+			switch(state) {
+
+				case S_START:
+					if (strcmp(word, "config") == 0) {
+						state = S_CONFIG;
+						fprintf(fileptr2, "\n");
+					}
+					break;
+
+				case S_CONFIG:
+					if (arguments.section != NULL) {
+						if((strcmp(word, arguments.section)) == 0) {
+							state = S_SECTION;
+							in_progress = true;
+							found = true;
+						}
+					}
+					break;
+
+				case S_SECTION:
+					if (strcmp(word, "config") == 0) {
+						found = false;
+						in_progress = false;
+					}
+					break;
+
+				/* not used */
+				case S_ITEM:
+					break;
+
+				/* not used */
+				case S_VALUE:
+					break;
+			}
+			word = strtok (NULL, " \t\v\f\r\"\'\n");
+		}
+
+		if (state == S_CONFIG) {
+			state = S_START;
+		}
+		if (line_replic != NULL) {
+			free(line_replic);
+		}
+		if (!in_progress) {
+			state = S_START;
+		}
+		if (!found && (strcmp(line, "\n") != 0)) {
+			fprintf(fileptr2, "%s", line);
+		}
+	}
+	free(line);
+
+	arg_clear(&arguments);
+	fclose(fileptr1);
+	fclose(fileptr2);
+	rename("/etc/config/config.tmp", filename);
+	free(filename);
+
+	return EXIT_SUCCESS;
+}
+
+int add_interface_section(struct interface_section* if_section) {
+	FILE *fileptr;
+
+	if ((fileptr = fopen("/etc/config/network", "a")) == NULL) {
+		return EXIT_FAILURE;
+	}
+
+	fprintf(fileptr, "\nconfig interface \'%s\'", if_section->section);
+	fprintf(fileptr, "\n\toption ifname \'%s\'", if_section->ifname);
+	fprintf(fileptr, "\n\toption proto \'%s\'", (if_section->proto ? "static" : "dhcp"));
+
+	if ((if_section->ipv4_addr != NULL) && (if_section->ipv4_netmask != NULL) && (if_section->proto == 0)) {
+		fprintf(fileptr, "\n\toption ipaddr \'%s\'", if_section->ipv4_addr);
+		fprintf(fileptr, "\n\toption netmask \'%s\'", if_section->ipv4_netmask);
+	}
+
+	if ((if_section->ipv6_addr != NULL) && (if_section->proto == 0)) {
+		fprintf(fileptr, "\n\toption ip6addr \'%s\'", if_section->ipv6_addr);
+	}
+
+	fprintf(fileptr, "\n");
+	fclose(fileptr);
 	return EXIT_SUCCESS;
 }
