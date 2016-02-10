@@ -132,13 +132,13 @@ int main(int argc, char** argv)
 	}
 
 	/* register the datastore */
-	if ((ds = ncds_new(NCDS_TYPE_FILE, "./ietf-system.yin", NULL)) == NULL) {
+	if ((ds = ncds_new(NCDS_TYPE_FILE, "/etc/netopeer/ietf-system/ietf-system.yin", NULL)) == NULL) {
 		nc_close();
 		return 1;
 	}
 
 	/* add imports and augments */
-	if (ncds_add_model("./ietf-yang-types.yin") != 0 || ncds_add_model("./ietf-netconf-acm.yin") != 0) {
+	if (ncds_add_model("/etc/netopeer/ietf-system/ietf-yang-types.yin") != 0 || ncds_add_model("/etc/netopeer/ietf-system/ietf-netconf-acm.yin") != 0) {
 		nc_verb_error("Could not add import and augment models.");
 		nc_close();
 		return 1;
