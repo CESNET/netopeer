@@ -18,6 +18,8 @@
 
 #define DEV_STATS_PATH "/proc/net/dev"
 
+static int if_sec_id = 0;
+
 /* /proc/sys/net/(ipv4,ipv6)/conf/(if_name)/(variable) = (value) */
 static int write_to_proc_net(unsigned char ipv4, const char* if_name, const char* variable, const char* value)
 {
@@ -147,14 +149,13 @@ char** iface_get_ifcs(unsigned char config, unsigned int* dev_count, char** msg)
 	return ret;
 }
 
-static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, const char* netmask, char** msg)
+static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, const char* netmask, unsigned char prefix, XMLDIFF_OP op, char** msg)
 {
 	char* cmd, *line = NULL, str_prefix[4];
 	FILE* output;
 	size_t len = 0;
 
 	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
-	printf("\n\nIP COMMAND: %s\n\n", cmd);
 	output = popen(cmd, "r");
 	free(cmd);
 
@@ -188,7 +189,8 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 
 	if (ipv4) { /* IPv4 */
 		if (op & XMLDIFF_ADD) {
-			asprintf(&(if_section.section), "netconf_%s", if_name);
+			if_sec_id++;
+			asprintf(&(if_section.section), "%s%s", if_name, if_sec_id);
 			if_section.ifname = strdup(if_name);
 			if_section.ipv4_addr = strdup(ip);
 			if_section.ipv4_netmask = strdup(netmask);
@@ -204,31 +206,10 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 				return EXIT_FAILURE;
 			}
 
-			// asprintf(&path, "network.%s.proto", section);
-			// if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
-			// 	asprintf(msg, "Configuring interface %s option proto failed.", if_name);
-			// 	free(path);
-			// 	free(section);
-			// 	return EXIT_FAILURE;
-			// }
-
-			// free(path);
-			// asprintf(&path, "network.%s.ipaddr", section);
-			// if ((edit_config(path, ip, type)) != (EXIT_SUCCESS)) {
-			// 	asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-			// 	free(path);
-			// 	free(section);
-			// 	return EXIT_FAILURE;
-			// }
-
-			// free(path);
-			// asprintf(&path, "network.%s.netmask", section);
-			// if ((edit_config(path, netmask, type)) != (EXIT_SUCCESS)) {
-			// 	asprintf(msg, "Configuring interface %s option netmask failed.", if_name);
-			// 	free(path);
-			// 	free(section);
-			// 	return EXIT_FAILURE;
-			// }
+			free(if_section.section);
+			free(if_section.ifname);
+			free(if_section.ipv4_addr);
+			free(if_section.ipv4_netmask);
 			return EXIT_SUCCESS;
 		}
 
@@ -244,12 +225,10 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 			if ((ret = get_option_config(path)) == NULL) {
 				free(path);
 				asprintf(&path, "network.%s.ipaddr", section);
-				printf("1 PATH: %s\n", path);
 				if ((rm_config_section(path)) != (EXIT_SUCCESS)) {
 					asprintf(msg, "Configuring interface %s option ipaddr remove failed.", if_name);
 					free(path);
 					free(section);
-					printf("99: ERR\n");
 					return EXIT_FAILURE;
 				}
 			} else {
@@ -277,8 +256,9 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 		if (op & XMLDIFF_ADD) {
 			const char* ip_prefix;
 			asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
+			if_sec_id++;
 
-			asprintf(&(if_section.section), "netconf6_%s", if_name);
+			asprintf(&(if_section.section), "%s%s", if_name, if_sec_id);
 			if_section.ifname = strdup(if_name);
 			if_section.ipv6_addr = strdup(ip);
 			if_section.proto = 0;
@@ -293,22 +273,9 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 				return EXIT_FAILURE;
 			}
 
-			// asprintf(&path, "network.%s.proto", section);
-			// if ((edit_config(path, "static", type)) != (EXIT_SUCCESS)) {
-			// 	asprintf(msg, "Configuring interface %s option proto failed.", if_name);
-			// 	free(path);
-			// 	free(section);
-			// 	return EXIT_FAILURE;
-			// }
-
-			// free(path);
-			// asprintf(&path, "network.%s.ip6addr", section);
-			// if ((edit_config(path, ip_prefix, type)) != (EXIT_SUCCESS)) {
-			// 	asprintf(msg, "Configuring interface %s option ipaddr failed.", if_name);
-			// 	free(path);
-			// 	free(section);
-			// 	return EXIT_FAILURE;
-			// }
+			free(if_section.section);
+			free(if_section.ifname);
+			free(if_section.ipv6_addr);
 		}
 
 		if (op & XMLDIFF_REM) {
@@ -478,9 +445,9 @@ int iface_ipv4_forwarding(const char* if_name, unsigned char boolean, char** msg
 	return EXIT_SUCCESS;
 }
 
-int iface_ipv4_ip(const char* if_name, const char* ip, unsigned char prefix, XMLDIFF_OP op, const char* netmask, char** msg)
+int iface_ipv4_ip(const char* if_name, const char* ip, const char* netmask, unsigned char prefix, XMLDIFF_OP op, char** msg)
 {
-	return iface_ip(1, if_name, ip, prefix, op, netmask, msg);
+	return iface_ip(1, if_name, ip, netmask, prefix, op, msg);
 }
 
 /* enabled - 0 (disable), 1 (enable DHCP), 2 (enable static) */
@@ -677,7 +644,7 @@ int iface_ipv6_ip(const char* if_name, const char* ip, unsigned char prefix, XML
 	/* not using netmask for ipv6 */
 	char* netmask = NULL;
 	
-	return iface_ip(0, if_name, ip, prefix, op, netmask, msg);
+	return iface_ip(0, if_name, ip, netmask, prefix, op, msg);
 }
 
 int iface_ipv6_neighbor(const char* if_name, const char* ip, const char* mac, XMLDIFF_OP op, char** msg)

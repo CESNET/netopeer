@@ -956,7 +956,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIF
 		asprintf(&netmask, "%lu.%lu.%lu.%lu", ip_mask >> 24, (ip_mask >> 16) & 0xFF, (ip_mask >> 8) & 0xFF, ip_mask & 0xFF);
 	}
 
-	ret = iface_ipv4_ip(iface_name, ip, prefix_len, op, netmask, &msg);
+	ret = iface_ipv4_ip(iface_name, ip, netmask, prefix_len, op, &msg);
 	free(netmask);
 	return finish(msg, ret, error);
 }
