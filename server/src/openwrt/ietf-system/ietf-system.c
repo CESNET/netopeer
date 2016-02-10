@@ -258,6 +258,11 @@ static char* get_hostname(void)
 		return (NULL);
 	}
 
+	/* remove last character if newline */
+	if (line[strlen(line) - 1] == '\n') {
+		line[strlen(line) - 1] = '\0';
+	}
+
 	fclose(hostname_f);
 	return (line);
 }
