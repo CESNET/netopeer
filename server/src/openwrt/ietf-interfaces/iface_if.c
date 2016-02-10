@@ -154,6 +154,7 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 	size_t len = 0;
 
 	asprintf(&cmd, "ip addr %s %s/%d dev %s 2>&1", (op & XMLDIFF_ADD ? "add" : "del"), ip, prefix, if_name);
+	printf("\n\nIP COMMAND: %s\n\n", cmd);
 	output = popen(cmd, "r");
 	free(cmd);
 
@@ -243,10 +244,12 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, uns
 			if ((ret = get_option_config(path)) == NULL) {
 				free(path);
 				asprintf(&path, "network.%s.ipaddr", section);
+				printf("1 PATH: %s\n", path);
 				if ((rm_config_section(path)) != (EXIT_SUCCESS)) {
 					asprintf(msg, "Configuring interface %s option ipaddr remove failed.", if_name);
 					free(path);
 					free(section);
+					printf("99: ERR\n");
 					return EXIT_FAILURE;
 				}
 			} else {
@@ -1384,7 +1387,8 @@ char* iface_get_enabled(unsigned char config, const char* if_name, char** msg)
 			ptr = strdup("true");
 		} else if (strcmp(ptr, "DOWN") == 0) {
 			ptr = strdup("false");
-		} else if (strcmp(ptr, "UNKNOWN") == 0 && strncmp(if_name, "lo", 2) == 0) {
+		} else if (strcmp(ptr, "UNKNOWN") == 0 /*&& strncmp(if_name, "lo", 2) == 0*/) {
+			/* UNKNOWN state is OK in OpenWrt */
 			ptr = strdup("true");
 		} else {
 			asprintf(msg, "%s: unknown interface %s state \"%s\".", __func__, if_name, ptr);

@@ -49,6 +49,7 @@ sysconfdir = @sysconfdir@
 TOPDIR = @CONFIGURE_PWD@
 CFGDIR = $(DESTDIR)/$(sysconfdir)/netopeer/
 CC = @CC@
+LIBS = @LIBS@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL@ -m 600
@@ -62,7 +63,7 @@ OBJDIR= .obj
 
 SRCS =	ietf-interfaces.c \
 		iface_if.c \
-		$(TOPDIR)/src/openwrt/config-parser/parse.c
+		$(TOPDIR)/src/openwrt/config-parser/parse.c \
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
@@ -70,11 +71,16 @@ CFGS =	model/ietf-interfaces.yin \
 		model/ietf-ip.yin \
 		ietf-interfaces.xml \
 		model/iana-if-type.yin \
+		model/ietf-yang-types.yin \
+		model/ietf-inet-types.yin \
 		model/ietf-interfaces-config.rng \
 		model/ietf-interfaces-gdefs-config.rng \
 		model/ietf-interfaces-schematron.xsl
 
-all: clean $(NAME)
+all: clean $(NAME) $(NAME)-init
+
+$(NAME)-init: $(SRCS) $(NAME)-init.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ $(LIBS)
 
 $(NAME): $(OBJS)
 	@rm -f $@
@@ -90,12 +96,13 @@ clean:
 	rm -rf $(NAME).so $(OBJDIR)
 
 .PHONY: install
-install: $(NAME).so $(CFGS)
+install: $(NAME).so $(CFGS) $(NAME)-init
 	$(INSTALL) -d $(CFGDIR)/$(NAME);
 	$(INSTALL_PROGRAM) $(NAME).so $(CFGDIR)/$(NAME)/;
 	for i in $(CFGS); do \
 		$(INSTALL_DATA) $$i $(CFGDIR)/$(NAME)/; \
 	done
+	$(INSTALL_PROGRAM) $(NAME)-init $(CFGDIR)/$(NAME)/;
 	$(MANAGER) add --name $(NAME) \
 		--model $(CFGDIR)/$(NAME)/ietf-interfaces.yin \
 		--transapi $(CFGDIR)/$(NAME)/ietf-interfaces.so \

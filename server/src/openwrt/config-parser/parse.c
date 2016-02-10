@@ -990,7 +990,7 @@ int rm_config_section(char *path)
 			switch(state) {
 
 				case S_START:
-					if (strcmp(word, "config") == 0) {
+					if (strncmp(word, "config", 6) == 0) {
 						state = S_CONFIG;
 						fprintf(fileptr2, "\n");
 					}
@@ -998,7 +998,7 @@ int rm_config_section(char *path)
 
 				case S_CONFIG:
 					if (arguments.section != NULL) {
-						if((strcmp(word, arguments.section)) == 0) {
+						if((strncmp(word, arguments.section, strlen(word))) == 0) {
 							state = S_SECTION;
 							in_progress = true;
 							found = true;
@@ -1007,7 +1007,7 @@ int rm_config_section(char *path)
 					break;
 
 				case S_SECTION:
-					if (strcmp(word, "config") == 0) {
+					if (strncmp(word, "config", 6) == 0) {
 						found = false;
 						in_progress = false;
 					}
@@ -1033,7 +1033,7 @@ int rm_config_section(char *path)
 		if (!in_progress) {
 			state = S_START;
 		}
-		if (!found && (strcmp(line, "\n") != 0)) {
+		if ((!found) && (strcmp(line, "\n") != 0)) {
 			fprintf(fileptr2, "%s", line);
 		}
 	}
@@ -1042,13 +1042,17 @@ int rm_config_section(char *path)
 	arg_clear(&arguments);
 	fclose(fileptr1);
 	fclose(fileptr2);
-	rename("/etc/config/config.tmp", filename);
+	if (rename("/etc/config/config.tmp", filename) == -1) {
+		free(filename);
+		return EXIT_FAILURE;
+	}
 	free(filename);
 
 	return EXIT_SUCCESS;
 }
 
-int add_interface_section(struct interface_section* if_section) {
+int add_interface_section(struct interface_section* if_section)
+{
 	FILE *fileptr;
 
 	if ((fileptr = fopen("/etc/config/network", "a")) == NULL) {
@@ -1057,7 +1061,7 @@ int add_interface_section(struct interface_section* if_section) {
 
 	fprintf(fileptr, "\nconfig interface \'%s\'", if_section->section);
 	fprintf(fileptr, "\n\toption ifname \'%s\'", if_section->ifname);
-	fprintf(fileptr, "\n\toption proto \'%s\'", (if_section->proto ? "static" : "dhcp"));
+	fprintf(fileptr, "\n\toption proto \'%s\'", (if_section->proto ? "dhcp" : "static"));
 
 	if ((if_section->ipv4_addr != NULL) && (if_section->ipv4_netmask != NULL) && (if_section->proto == 0)) {
 		fprintf(fileptr, "\n\toption ipaddr \'%s\'", if_section->ipv4_addr);

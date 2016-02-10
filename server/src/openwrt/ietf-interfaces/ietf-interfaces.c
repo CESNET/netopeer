@@ -339,7 +339,10 @@ int transapi_init(xmlDocPtr * running)
 			}
 		}
 
-		xmlAddChild(root, interface);
+		if (xmlAddChild(root, interface) == NULL) {
+			free(devices);
+			return EXIT_FAILURE;
+		}
 	}
 
 	free(devices);
@@ -894,7 +897,6 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIF
 {
 	int ret, i;
 	char* msg = NULL, *netmask = NULL, *ip = NULL;
-	const char* netmask_conf;	/* not changing netmask for config file usage */
 	unsigned char prefix_len = 0, octet, mask;
 	xmlNodePtr cur, node;
 
@@ -917,7 +919,6 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIF
 		}
 		if (xmlStrEqual(cur->name, BAD_CAST "netmask")) {
 			netmask = strdup((char*)cur->children->content);
-			netmask_conf = strdup(netmask);
 		}
 	}
 
@@ -950,14 +951,13 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIF
 				mask = 0x80;
 			}
 		}
-		free(netmask);
 	} else {
 		unsigned long ip_mask = (0xFFFFFFFF << (32 - (int)prefix_len)) & 0xFFFFFFFF;
-		asprintf(&netmask_conf, "%lu.%lu.%lu.%lu\n", ip_mask >> 24, (ip_mask >> 16) & 0xFF, (ip_mask >> 8) & 0xFF, ip_mask & 0xFF);
+		asprintf(&netmask, "%lu.%lu.%lu.%lu", ip_mask >> 24, (ip_mask >> 16) & 0xFF, (ip_mask >> 8) & 0xFF, ip_mask & 0xFF);
 	}
 
-	ret = iface_ipv4_ip(iface_name, ip, prefix_len, op, netmask_conf, &msg);
-	free(netmask_conf);
+	ret = iface_ipv4_ip(iface_name, ip, prefix_len, op, netmask, &msg);
+	free(netmask);
 	return finish(msg, ret, error);
 }
 
