@@ -298,7 +298,7 @@ static int get_platform(xmlNodePtr parent)
  */
 int transapi_init(xmlDocPtr * running)
 {
-	xmlNodePtr running_root, clock, auth_root, ntp_root;
+	xmlNodePtr running_root, clock, auth_root, ntp_root, dns_root;
 	xmlNsPtr ns;
 	char *hostname, *zonename;
 	char *line = NULL;
@@ -398,6 +398,14 @@ int transapi_init(xmlDocPtr * running)
 			xmlFreeDoc(*running); *running = NULL;
 			return fail(NULL, msg, EXIT_FAILURE);
 		}
+	}
+
+	/* dns-resolver */
+	if ((dns_root =  dns_getconfig(running_root->ns, &msg)) != NULL) {
+		xmlAddChild(running_root, dns_root);
+	} else if (msg != NULL) {
+		xmlFreeDoc(*running); *running = NULL;
+		return fail(NULL, msg, EXIT_FAILURE);
 	}
 
 	/* authentication */
@@ -1187,26 +1195,6 @@ struct transapi_data_callbacks clbks =  {
 		// {.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order", .func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}
 };
-
-// xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
-// {
-// 	xmlNodePtr ntp_node;
-
-// 	/* ntp */
-// 	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
-
-// 	/* ntp/enabled */
-// 	char* path = "system.ntp.enabled";
-// 	char* ret = NULL;
-
-// 	if ((ret = get_option_config(path)) == NULL) {
-// 		asprintf(errmsg, "Match for \"%s\" failed", path);
-// 		return (NULL);
-// 	}
-// 	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret, "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
-
-// 	return (ntp_node);
-// }
 
 /**
  * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
