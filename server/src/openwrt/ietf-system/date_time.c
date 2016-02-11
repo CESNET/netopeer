@@ -732,3 +732,61 @@ int ntp_rm_server(const char *value, const char* association_type, char** msg)
 
 	return (EXIT_SUCCESS);
 }
+
+xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
+{
+	int i;
+	xmlNodePtr ntp_node, server, aux_node;
+	char* result = NULL, *content = NULL;
+	char** servers = NULL;
+	int count = 0;
+
+	/* ntp */
+	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
+
+	/* ntp/enabled */
+	if ((result = get_option_config("system.ntp.enabled")) == NULL) {
+		xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", BAD_CAST "true");
+	} else if (strcmp(result, "0") == 0) {
+		xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", BAD_CAST "false");
+	} else {
+		xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", BAD_CAST "true");
+	}
+	free(result);
+	
+	/* ntp/server[] */
+	if ((servers = get_list_config("system.ntp.server", &count)) == NULL) {
+		asprintf(errmsg, "NTP failed to get configuration from config file");
+		return NULL;
+	}
+	for (i = 0; i < count; ++i) {
+		/* ntp/server/ */
+		server = xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "server", NULL);
+
+		/* ntp/server/name */
+		asprintf(&content, "Server-%d", i);
+		xmlNewChild(server, server->ns, BAD_CAST "name", BAD_CAST content);
+		free(content);
+
+		/* ntp/server/udp/address */
+		aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp", NULL);
+		xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST servers[i]);
+		/* port specification is not supported by OpenWrt basic ntp implementation */
+
+		/* ntp/server/association-type */
+		if ((result = get_option_config("system.ntp.enable_server")) == NULL) {
+			xmlNewChild(server, server->ns, BAD_CAST "association-type", BAD_CAST "server");
+		} else if (strcmp(result, "0") == 0) {
+			xmlNewChild(server, server->ns, BAD_CAST "association-type", BAD_CAST "peer");
+		} else {
+			xmlNewChild(server, server->ns, BAD_CAST "association-type", BAD_CAST "server");
+		}
+		free(result);
+		
+		/* iburst is not supported by OpenWrt basic ntp implementation */
+
+		/* prefer is not supported by OpenWrt basic ntp implementation */
+	}
+
+	return ntp_node;
+}

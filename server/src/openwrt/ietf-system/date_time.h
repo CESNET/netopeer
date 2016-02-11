@@ -116,5 +116,13 @@ int ntp_add_server(const char *value, const char* association_type, char** msg);
  */
 int ntp_rm_server(const char *value, const char* association_type, char** msg);
 
+/**
+ * @brief Get current (real) configuration of the ntp part in XML format.
+ * @param ns[in] XML namespace for the XML subtree being created.
+ * @param errmsg[out] error message in case of error.
+ * @return Created XML subtree or NULL on failure.
+ */
+xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg);
+
 #endif /* DATE_TIME_H_ */
 

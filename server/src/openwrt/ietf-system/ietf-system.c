@@ -298,7 +298,7 @@ static int get_platform(xmlNodePtr parent)
  */
 int transapi_init(xmlDocPtr * running)
 {
-	xmlNodePtr running_root, clock, auth_root;
+	xmlNodePtr running_root, clock, auth_root, ntp_root;
 	xmlNsPtr ns;
 	char *hostname, *zonename;
 	char *line = NULL;
@@ -388,6 +388,16 @@ int transapi_init(xmlDocPtr * running)
 		clock = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
 		xmlNewChild(clock, NULL, BAD_CAST "timezone-location", BAD_CAST zonename);
 		free(zonename);
+	}
+
+	/* ntp */
+	if (ncds_feature_isenabled("ietf-system", "ntp")) {
+		if ((ntp_root =  ntp_getconfig(running_root->ns, &msg)) != NULL) {
+			xmlAddChild(running_root, ntp_root);
+		} else if (msg != NULL) {
+			xmlFreeDoc(*running); *running = NULL;
+			return fail(NULL, msg, EXIT_FAILURE);
+		}
 	}
 
 	/* authentication */
@@ -1178,25 +1188,25 @@ struct transapi_data_callbacks clbks =  {
 	}
 };
 
-xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
-{
-	xmlNodePtr ntp_node;
+// xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
+// {
+// 	xmlNodePtr ntp_node;
 
-	/* ntp */
-	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
+// 	/* ntp */
+// 	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");
 
-	/* ntp/enabled */
-	char* path = "system.ntp.enabled";
-	char* ret = NULL;
+// 	/* ntp/enabled */
+// 	char* path = "system.ntp.enabled";
+// 	char* ret = NULL;
 
-	if ((ret = get_option_config(path)) == NULL) {
-		asprintf(errmsg, "Match for \"%s\" failed", path);
-		return (NULL);
-	}
-	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret, "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
+// 	if ((ret = get_option_config(path)) == NULL) {
+// 		asprintf(errmsg, "Match for \"%s\" failed", path);
+// 		return (NULL);
+// 	}
+// 	xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "enabled", (strcmp(ret, "1") == 0) ? BAD_CAST "true" : BAD_CAST "false");
 
-	return (ntp_node);
-}
+// 	return (ntp_node);
+// }
 
 /**
  * @brief Get a node from the RPC input. The first found node is returned, so if traversing lists,
