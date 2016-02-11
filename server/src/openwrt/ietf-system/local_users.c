@@ -1,8 +1,10 @@
 /**
  * \file local_users.c
  * \brief Functions for manipulation with local users
+ * \author Michal Vasko <mvasko@cesnet.cz>
  * \author Peter Nagy <xnagyp01@stud.fit.vutbr.cz>
- * \date 2016
+ * \date 2013
+ * \date 2015
  *
  * Copyright (C) 2016 CESNET
  *
@@ -63,6 +65,7 @@
 #define SHADOW_ORIG "/etc/shadow"
 #define SHADOW_COPY "/etc/shadow.cfgsystem"
 #define DEFAULT_SHELL "/bin/ash"
+#define BUFLEN 4096
 
 /* for salt.c */
 long sha_crypt_min_rounds = -1;
@@ -151,7 +154,7 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 void format(char *s)
 {
 	char* formated_s = calloc(strlen(s), sizeof(char));
-	int i = 0;
+	unsigned int i = 0;
 	int formated_s_index = 0;
 	int whitespace_found = 0;
 	int line_begin = 1;
@@ -196,7 +199,7 @@ void format(char *s)
 	free(formated_s);
 }
 
-static const char* get_authfile_path()
+static char* get_authfile_path()
 {
 	FILE *file;
 	char *line = NULL;
@@ -230,12 +233,15 @@ static const char* get_authfile_path()
 
 static FILE* open_authfile(const char *username, const char *opentype, char **path, char **msg)
 {
-	struct passwd *pwd;
+	struct passwd pwd;
+	struct passwd *result;
+	char *buf;
+	size_t bufsize;
 	char *filepath = NULL;
 	FILE *file;
 	mode_t mask;
 	int flag;
-	const char *akf = NULL;
+	char *akf = NULL;
 	char *path_key = NULL;
 
 	/* get AuthorizedKeysFile value from sshd_config */
@@ -261,20 +267,32 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 
 	/* get user home - if not root */
 	if (strcmp(username, "root") != 0) {
-		pwd = getpwnam(username);
-		if (pwd == NULL) {
-			asprintf(msg, "Unable to get user record (%s)", strerror(errno));
-			return (NULL);
+
+		bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+		if (bufsize == -1) {
+			bufsize = 16384;
 		}
-		if (pwd->pw_dir == NULL) {
+		buf = malloc(bufsize);
+		if (buf == NULL) {
+			asprintf(msg, "Unable to allocate space to get /etc/passwd info.");
+			return NULL;
+		}
+
+		getpwnam_r(username, &pwd, buf, bufsize, &result);
+		if (result == NULL) {
+			asprintf(msg, "Not found.");
+			return NULL;
+		}
+		if (pwd.pw_dir == NULL) {
 			asprintf(msg, "Home directory of user \"%s\" not set, unable to set authorized keys.", username);
 			return(NULL);
 		}
-		asprintf(&filepath, "%s/%s", pwd->pw_dir, akf);
+		asprintf(&filepath, "%s/%s", pwd.pw_dir, akf);
 	}
 	else {
 		asprintf(&filepath, akf);
 	}
+	// free(akf);
 
 	/* open authorized_keys file in the user's ssh home directory */
 	flag = access(filepath, F_OK);
@@ -288,7 +306,7 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 	umask(mask);
 	if (flag != 0) {
 		/* change owner of the created file */
-		chown(filepath, pwd->pw_uid, pwd->pw_gid);
+		chown(filepath, pwd.pw_uid, pwd.pw_gid);
 	}
 
 	if (path != NULL) {
@@ -420,6 +438,177 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	}
 
 	return (NULL);
+}
+
+static xmlNodePtr authkey_getxml(const char* username, const char* home_dir, uid_t uid, gid_t gid, xmlNsPtr ns, char** msg)
+{
+	char *filepath = NULL;
+	FILE *authfile;
+	mode_t mask;
+	int flag;
+	char *akf = NULL;
+	char *path_key = NULL;
+	char *line = NULL, *id, *data;
+	xmlNodePtr firstnode = NULL, newnode;
+	ssize_t len = 0;
+	size_t n = 0;
+
+	/* get authorized_keys file */
+	
+	/* user root - keys always located in /etc/dropbear/ */
+	if (strcmp(username, "root") == 0) {
+		asprintf(&akf, "/etc/dropbear/authorized_keys");
+	}
+	else {
+		path_key = get_authfile_path();
+		if (path_key == NULL) {
+			asprintf(&akf, ".ssh/authorized_keys");
+		}
+		else {
+			asprintf(&akf, path_key);
+		}
+	}
+
+	if (akf == NULL) {
+		*msg = strdup("SSH server doesn't support Authorized Keys files.");
+		return(NULL);
+	}
+
+	/* get user home - if not root */
+	if (strcmp(username, "root") != 0) {
+		asprintf(&filepath, "%s/%s", home_dir, akf);
+	}
+	else {
+		asprintf(&filepath, akf);
+	}
+	free(akf);
+
+	/* open authorized_keys file in the user's ssh home directory */
+	flag = access(filepath, F_OK);
+	mask = umask(0600);
+	if ((authfile = fopen(filepath, "r")) == NULL) {
+		umask(mask);
+		asprintf(msg, "Opening authorized keys file \"%s\" failed (%s).", filepath, strerror(errno));
+		free(filepath);
+		return (NULL);
+	}
+	umask(mask);
+	if (flag != 0) {
+		/* change owner of the created file */
+		chown(filepath, uid, gid);
+	}
+	free(filepath);
+
+	while((len = getline(&line, &n, authfile)) != -1) {
+		/* get the second space to locate comment/id */
+		id = strchr((data = strchr(line, ' ')) + 1, ' ');
+
+		if (id == NULL) {
+			free(line);
+			xmlFreeNodeList(firstnode);
+			*msg = strdup("Invalid authorized key format.");
+			return (NULL);
+		}
+
+		/* divide comment/id from data... */
+		id[0] = '\0';
+		id++;
+		/* ... and data from algorithm */
+		data[0] = '\0';
+		data++;
+		/* remove the newline in the end if any */
+		if (line[len - 1] == '\n') {
+			line[len - 1] = '\0';
+		}
+
+		/* create xml data */
+		newnode = xmlNewNode(ns, BAD_CAST "authorized-key");
+		xmlNewChild(newnode, ns, BAD_CAST "name", BAD_CAST id);
+		xmlNewChild(newnode, ns, BAD_CAST "key-data", BAD_CAST data);
+		xmlNewChild(newnode, ns, BAD_CAST "algorithm", BAD_CAST line);
+
+		/* prepare returning node list */
+		if (firstnode == NULL) {
+			firstnode = newnode;
+		} else {
+			xmlAddSibling(firstnode, newnode);
+		}
+	}
+	free(line);
+
+	return(firstnode);
+}
+
+xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
+{
+	xmlNodePtr auth_node, user, aux_node;
+	struct passwd pw, *pwd;
+	struct spwd *spwd;
+	char buf[BUFLEN];
+	int i;
+
+	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
+		return (NULL);
+	}
+
+	/* authentication */
+	auth_node = xmlNewNode(ns, BAD_CAST "authentication");
+
+	/* authentication/user-authentication-order - implement sshd config file lookup */
+	xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user-authentication-order", BAD_CAST "local-users");
+
+	/* authentication/user[] */
+	if (lckpwdf() != 0) {
+		*msg = strdup("Failed to acquire shadow file lock.");
+		xmlFreeNode(auth_node);
+		return (NULL);
+	}
+
+	setpwent();
+
+	while (1) {
+		i = getpwent_r(&pw, buf, BUFLEN, &pwd);
+		/* no more records - end loop */
+		if(i) {
+			break;
+		}
+		/* authentication/user */
+		user = xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user", NULL);
+
+		/* authentication/user/name */
+		xmlNewChild(user, user->ns, BAD_CAST "name", BAD_CAST pwd->pw_name);
+
+		/* authentication/user/passwd */
+		if (pwd->pw_passwd[0] == 'x') {
+			/* get data from /etc/shadow */
+			setspent();
+			spwd = getspnam(pwd->pw_name);
+			if (spwd != NULL && /* no record, wtf?!? */
+					spwd->sp_pwdp[0] != '!' && /* account not initiated or locked */
+					spwd->sp_pwdp[0] != '*') { /* login disabled */
+				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
+			}
+		} else if (pwd->pw_passwd[0] != '*') {
+			/* password is stored in /etc/passwd or refers to something else (e.g., NIS server) */
+			xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
+		} /* else password is disabled */
+
+		/* authentication/user/authorized-key[] */
+		if ((aux_node = authkey_getxml(pwd->pw_name, pwd->pw_dir, pwd->pw_uid, pwd->pw_gid, user->ns, msg)) != NULL) {
+			xmlAddChildList(user, aux_node);
+		} else {
+			/* ignore failures in this case */
+			free(*msg);
+			*msg = NULL;
+			printf("ERROR - not returned authkeys\n");
+		}
+	}
+
+	endspent();
+	endpwent();
+	ulckpwdf();
+
+	return (auth_node);
 }
 
 int authkey_add(const char *username, const char *id, const char *algorithm, const char *pem, char **msg)

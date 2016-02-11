@@ -75,6 +75,7 @@ NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 /* reorder done flag for DNS search domains */
 static bool dns_search_reorder_done = false;
 static bool dns_server_reorder_done = false;
+static bool auth_user_rm = false;
 
 static int fail(struct nc_err** error, char* msg, int ret) {
 	if (error != NULL) {
@@ -259,8 +260,8 @@ static char* get_hostname(void)
 	}
 
 	/* remove last character if newline */
-	if (line[strlen(line) - 1] == '\n') {
-		line[strlen(line) - 1] = '\0';
+	if (line[strlen(line)-1] == '\n') {
+		line[strlen(line)-1] = '\0';
 	}
 
 	fclose(hostname_f);
@@ -297,7 +298,7 @@ static int get_platform(xmlNodePtr parent)
  */
 int transapi_init(xmlDocPtr * running)
 {
-	xmlNodePtr running_root, clock;
+	xmlNodePtr running_root, clock, auth_root;
 	xmlNsPtr ns;
 	char *hostname, *zonename;
 	char *line = NULL;
@@ -306,6 +307,7 @@ int transapi_init(xmlDocPtr * running)
 	struct sysinfo s_info;
 	time_t cur_time;
 	size_t len = 0;
+	char* msg = NULL;
 
 	/* fill uname structure */
 	uname(&uname_s);
@@ -388,11 +390,25 @@ int transapi_init(xmlDocPtr * running)
 		free(zonename);
 	}
 
+	/* authentication */
+	if (ncds_feature_isenabled("ietf-system", "authentication")) {
+		/* user */
+		if ((auth_root =  users_getxml(running_root->ns, &msg)) != NULL) {
+			xmlAddChild(running_root, auth_root);
+		} else if (msg != NULL) {
+			xmlFreeDoc(*running); *running = NULL;
+			return fail(NULL, msg, EXIT_FAILURE);
+		}
+	}
+
 	/* clear default ntp servers */
 	dns_rm_nameserver_all();
 
 	/* Clear default dns search domains */
 	dns_rm_search_domain_all();
+
+	/* Reset REORDER flags */
+	dns_search_reorder_done = false;
 
 	return EXIT_SUCCESS;
 }
@@ -974,6 +990,9 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 	const char *name = NULL, *passwd = NULL, *new_passwd;
 	char *msg;
 
+	/* True only if user is removed */
+	auth_user_rm = false;
+
 	node = (op & XMLDIFF_REM ? old_node : new_node);
 
 	/* get name */
@@ -1005,8 +1024,10 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 		}
 
 		if (op & XMLDIFF_ADD) {
-			if ((new_passwd = users_add(name, passwd, &msg)) == NULL) {
-				return fail(error, msg, EXIT_FAILURE);
+			if (strcmp(name, "root") != 0) {
+				if ((new_passwd = users_add(name, passwd, &msg)) == NULL) {
+					return fail(error, msg, EXIT_FAILURE);
+				}
 			}
 		} else { /* (op & XMLDIFF_MOD) */
 			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
@@ -1026,7 +1047,13 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 		/* process authorized keys */
 	} else if (op & XMLDIFF_REM) {
 		/* remove existing user */
+		auth_user_rm = true;
 		msg = NULL;
+		if (strcmp(name, "root") == 0) {
+			/* user root cannot be removed */
+			nc_verb_warning("User root cannot be removed");
+			return EXIT_SUCCESS;
+		}
 		if (users_rm(name, &msg) != EXIT_SUCCESS) {
 			return fail(error, msg, EXIT_FAILURE);
 		}
@@ -1088,9 +1115,11 @@ int callback_systemns_system_systemns_authentication_systemns_user_systemns_auth
 	}
 
 	if (op & XMLDIFF_REM) {
-		/* remove the existing key */
-		if (authkey_rm(username, id, &msg) != EXIT_SUCCESS) {
-			return fail(error, msg, EXIT_FAILURE);
+		if (!auth_user_rm) {
+			/* remove the existing key */
+			if (authkey_rm(username, id, &msg) != EXIT_SUCCESS) {
+				return fail(error, msg, EXIT_FAILURE);
+			}
 		}
 	}
 

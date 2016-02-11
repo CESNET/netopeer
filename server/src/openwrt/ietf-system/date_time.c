@@ -549,6 +549,11 @@ char* get_timezone(void)
 		return (NULL);
 	}
 
+	/* remove last character if newline */
+	if (line[strlen(line) - 1] == '\n') {
+		line[strlen(line) - 1] = '\0';
+	}
+
 	pclose(zonename_f);
 	return (line);
 }
