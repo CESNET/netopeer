@@ -982,11 +982,18 @@ int callback_systemns_system_systemns_dns_resolver_systemns_options_systemns_att
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** UNUSED(error))
+int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_OP UNUSED(op), xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** error)
 {
+	char* msg;
+
 	/* Reset REORDER flags in order to process these changes in the next configuration change */
 	dns_search_reorder_done = false;
 	dns_server_reorder_done = false;
+
+	/* Remove auto-generated dns resolver by dhcp */
+	if (dns_rm_auto_resolv(&msg) != EXIT_SUCCESS) {
+		return fail(error, msg, EXIT_FAILURE);
+	}
 
 	return EXIT_SUCCESS;
 }

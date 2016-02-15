@@ -9,6 +9,8 @@
 #include <libxml/tree.h>
 #include <errno.h>
 
+#include "../config-parser/parse.h"
+
 #define MAX_SEARCH_DOMAINS 6
 #define MAX_NAMESERVERS 3
 
@@ -791,5 +793,17 @@ int dns_rm_opt_attempts(char** msg)
 		return EXIT_FAILURE;
 	}
 
+	return EXIT_SUCCESS;
+}
+
+int dns_rm_auto_resolv(char** msg)
+{
+	char* ret;
+	if ((ret = get_option_config("dhcp.dnsmasq.resolvfile")) == NULL) {
+		asprintf(msg, "Unable to get dnsmasq resolvfile.");
+		return EXIT_FAILURE;
+	}
+
+	remove(ret);
 	return EXIT_SUCCESS;
 }
