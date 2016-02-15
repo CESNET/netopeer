@@ -814,8 +814,9 @@ int edit_config(char *path, const char *value, t_element_type type)
 	arg_clear(&arguments);
 	fclose(fileptr1);
 	fclose(fileptr2);
-	remove(filename);
-	rename("/etc/config/config.tmp", filename);
+	if (rename("/etc/config/config.tmp", filename) == -1) {
+		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -853,8 +854,9 @@ int rm_config(char *path, const char *value, t_element_type type)
 	arg_clear(&arguments);
 	fclose(fileptr1);
 	fclose(fileptr2);
-	remove(filename);
-	rename("/etc/config/config.tmp", filename);
+	if (rename("/etc/config/config.tmp", filename) == -1) {
+		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }

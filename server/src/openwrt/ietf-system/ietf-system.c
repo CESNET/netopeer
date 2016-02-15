@@ -1192,7 +1192,6 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/systemns:system/systemns:dns-resolver", .func = callback_systemns_system_systemns_dns_resolver},
 		{.path = "/systemns:system/systemns:authentication/systemns:user", .func = callback_systemns_system_systemns_authentication_systemns_user},
 		{.path = "/systemns:system/systemns:authentication/systemns:user/systemns:authorized-key", .func = callback_systemns_system_systemns_authentication_systemns_user_systemns_authorized_key}
-		// {.path = "/systemns:system/systemns:authentication/systemns:user-authentication-order", .func = callback_systemns_system_systemns_authentication_systemns_auth_order }
 	}
 };
 

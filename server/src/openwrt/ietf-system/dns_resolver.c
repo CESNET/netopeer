@@ -68,7 +68,7 @@ void format_line(char *s)
 	free(formated_s);
 }
 
-int remove_substring(char *s,const char *toremove)
+int remove_substring(char *s, const char *toremove)
 {
 	if ((s = strstr(s,toremove)) ) {
 		memmove(s,s+strlen(toremove),1+strlen(s+strlen(toremove)));
@@ -78,7 +78,7 @@ int remove_substring(char *s,const char *toremove)
 	return EXIT_FAILURE;
 }
 
-char* add_substring(char *s,const char *to_add, int index)
+char* add_substring(char *s, const char *to_add, int index)
 {
 	format_line(s);
 	char* word;
@@ -156,7 +156,6 @@ char** dns_get_nameserver()
 {
 	FILE *fileptr1;
 	char* line = NULL;
-	char* search_line = NULL;
 	char** search = NULL;
 	size_t len = 0;
 	size_t read;
@@ -423,7 +422,6 @@ void dns_rm_search_domain_all(void)
 	FILE *fileptr1, *fileptr2;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
-	bool found = false;
 	size_t len = 0;
 	size_t read;
  
@@ -452,7 +450,6 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 {
 	FILE *fileptr1, *fileptr2;
 	char * line = NULL;
-	char * new_line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
@@ -703,19 +700,14 @@ int dns_rm_opt_timeout(char** msg)
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	size_t read;
-	bool found = false;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
-		searchResult = search_in_line(line, "options timeout");
-
-		if (searchResult == EXIT_SUCCESS) {
-			found = true;
-		}
-		else {
+		
+		if ((searchResult = search_in_line(line, "options timeout")) != EXIT_SUCCESS) {
 			fprintf (fileptr2, "%s\n", line);
 		}
 	}
@@ -779,19 +771,14 @@ int dns_rm_opt_attempts(char** msg)
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	size_t read;
-	bool found = false;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
-		searchResult = search_in_line(line, "options attempts");
-
-		if (searchResult == EXIT_SUCCESS) {
-			found = true;
-		}
-		else {
+		
+		if ((searchResult = search_in_line(line, "options attempts")) != EXIT_SUCCESS) {
 			fprintf (fileptr2, "%s\n", line);
 		}
 	}
