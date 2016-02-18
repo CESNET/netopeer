@@ -8,6 +8,9 @@
 			<feature>local-users</feature>
 			<feature>timezone-name</feature>
 			<feature>ntp</feature>
+			<feature>crypt-hash-md5</feature>
+			<feature>crypt-hash-sha-256</feature>
+			<feature>crypt-hash-sha-512</feature>
 		</model-main>
 	</data-models>
 	<repo>

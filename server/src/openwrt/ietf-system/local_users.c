@@ -542,7 +542,7 @@ static xmlNodePtr authkey_getxml(const char* username, const char* home_dir, uid
 xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 {
 	xmlNodePtr auth_node, user, aux_node;
-	struct passwd pw, *pwd;
+	struct passwd *pwd;
 	struct spwd *spwd;
 	char buf[BUFLEN];
 	int i;
@@ -566,12 +566,8 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 
 	setpwent();
 
-	while (1) {
-		i = getpwent_r(&pw, buf, BUFLEN, &pwd);
-		/* no more records - end loop */
-		if(i) {
-			break;
-		}
+	while ((pwd = getpwent()) != NULL) {
+
 		/* authentication/user */
 		user = xmlNewChild(auth_node, auth_node->ns, BAD_CAST "user", NULL);
 
