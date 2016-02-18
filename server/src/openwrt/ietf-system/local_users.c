@@ -544,8 +544,6 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 	xmlNodePtr auth_node, user, aux_node;
 	struct passwd *pwd;
 	struct spwd *spwd;
-	char buf[BUFLEN];
-	int i;
 
 	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
 		return (NULL);

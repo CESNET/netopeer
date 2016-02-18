@@ -90,11 +90,11 @@ static int get_items_from_path(char *path, path_data *arguments)
 			tmp_char[tmp_char_ptr] = path[i];
 			tmp_char_ptr++;
 		} else {
-			if (element_num == 0){
-				arguments->file = calloc(tmp_char_ptr, sizeof(char));
+			if (element_num == 0) {
+				arguments->file = calloc(tmp_char_ptr+1, sizeof(char));
 				memcpy(arguments->file, tmp_char, tmp_char_ptr);
 			} else if (element_num == 1) {
-				arguments->section = calloc(tmp_char_ptr, sizeof(char));
+				arguments->section = calloc(tmp_char_ptr+1, sizeof(char));
 				memcpy(arguments->section, tmp_char, tmp_char_ptr);
 			}
 
@@ -105,13 +105,13 @@ static int get_items_from_path(char *path, path_data *arguments)
 	}
 
 	if (element_num == 1) {
-		arguments->item = calloc(strlen(tmp_char), sizeof(char));
+		arguments->item = calloc(strlen(tmp_char)+1, sizeof(char));
 		strcpy(arguments->item, tmp_char);
 
 		free(arguments->section);
 		arguments->section = NULL;
 	} else if (element_num == 2) {
-		arguments->item = calloc(tmp_char_ptr, sizeof(char));
+		arguments->item = calloc(tmp_char_ptr+1, sizeof(char));
 		memcpy(arguments->item, tmp_char, tmp_char_ptr);
 	}
 
