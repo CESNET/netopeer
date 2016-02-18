@@ -190,7 +190,7 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, con
 	if (ipv4) { /* IPv4 */
 		if (op & XMLDIFF_ADD) {
 			if_sec_id++;
-			asprintf(&(if_section.section), "%s%s", if_name, if_sec_id);
+			asprintf(&(if_section.section), "%s%d", if_name, if_sec_id);
 			if_section.ifname = strdup(if_name);
 			if_section.ipv4_addr = strdup(ip);
 			if_section.ipv4_netmask = strdup(netmask);
@@ -1477,6 +1477,7 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 				free(ip);
 				continue;
 			}
+			convert_netmask_to_prefix(prefix);
 			free(path);
 
 			asprintf(&path, "network.%s.proto", config_sections[i]);
