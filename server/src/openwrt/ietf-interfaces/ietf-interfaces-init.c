@@ -114,6 +114,8 @@ int main(int argc, char** argv)
 	char* new_startup_config;
 	xmlDocPtr startup_doc = NULL;
 	int ret = 0, i, j;
+	char* cmd;
+	FILE* output;
 
 	if (argc < 2 || argv[1][0] == '-') {
 		help(argv[0]);
@@ -179,6 +181,17 @@ int main(int argc, char** argv)
 		nc_close();
 		return 1;
 	}
+
+	/* reset wireless configuration */
+	asprintf(&cmd, "wifi detect > /etc/config/wireless");
+	output = popen(cmd, "r");
+	free(cmd);
+	if (output == NULL) {
+		nc_verb_error("Failed to reset wireless configuration.");
+		nc_close();
+		return 1;
+	}
+	pclose(output);
 
 	if (startup_doc == NULL || startup_doc->children == NULL) {
 		/* nothing to do */

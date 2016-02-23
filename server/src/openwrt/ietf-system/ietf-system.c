@@ -1056,6 +1056,7 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 			}
 		} else { /* (op & XMLDIFF_MOD) */
 			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
+				printf("FAILED to mod user %s\n", name);
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}

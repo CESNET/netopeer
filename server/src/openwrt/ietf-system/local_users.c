@@ -594,7 +594,6 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 			/* ignore failures in this case */
 			free(*msg);
 			*msg = NULL;
-			printf("ERROR - not returned authkeys\n");
 		}
 	}
 
