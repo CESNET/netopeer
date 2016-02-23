@@ -1,0 +1,15 @@
+language: python # support for pip, used to install ncclient
+sudo: required
+services:
+  - docker
+before_install:
+  - pip install ncclient
+  - ssh-keygen -N '' -f $HOME/.ssh/id_rsa
+script:
+  - docker build -t netopeer .
+  - docker run -d -p 8300:830 --name netopeer netopeer
+  - while ! docker logs netopeer 2>&1 | grep 'Netopeer server successfully initialized'; do echo '***** init string not found'; sleep 1; done
+  - sleep 5
+  - python -c "from ncclient import manager; m = manager.connect(host='127.0.0.1', port=8300, hostkey_verify=False); print(m.get())"
+  - docker logs netopeer
+  - docker stop netopeer

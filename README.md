@@ -40,6 +40,27 @@ As part of the Netopeer server, there is a set of the following tools:
  * [netopeer-manager(1)](http://netopeer.googlecode.com/git/server/manager/netopeer-manager.1.html)
  * [netopeer-configurator(1)](http://netopeer.googlecode.com/git/server/configurator/netopeer-configurator.1.html)
 
+#### Running the server in docker
+
+This repository has a `Dockerfile` that can be used to create a container that
+builds netopeer-server and starts the service. You need a linux with
+working [docker](https://www.docker.com/) installation to use it.
+
+To build the container:
+~~~
+docker build -t netopeer .
+~~~
+
+To start it:
+~~~
+docker run -it --rm -p 8300:830 --name netopeer netopeer
+~~~
+
+The line above maps netopeer's netconf port to 8300 on the host. You can
+connect to that port with [ncclient](https://github.com/ncclient/ncclient)
+without any user or password (as long as you have a valid private key on the
+host).
+
 ### [TransAPI modules](./transAPI)
 
 Netopeer projects provides several basic transAPI modules that, besides their
