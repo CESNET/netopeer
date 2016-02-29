@@ -83,10 +83,11 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	assert(name);
 	assert(passwd);
 
-	/* check password format */
-	if ((passwd[0] != '$') ||
+	/* check password format - empty password can be set */
+	if (((passwd[0] != '$') ||
 			(passwd[1] != '0' && passwd[1] != '1' && passwd[1] != '5' && passwd[1] != '6') ||
-			(passwd[2] != '$')) {
+			(passwd[2] != '$')) && (strlen(passwd) != 1)) {
+		printf("PASS: %s\n", passwd);
 		asprintf(msg, "Wrong password format (user %s).", name);
 		return (NULL);
 	}

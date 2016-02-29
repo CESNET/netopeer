@@ -1014,6 +1014,7 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 	xmlNodePtr node_aux, node;
 	const char *name = NULL, *passwd = NULL, *new_passwd;
 	char *msg;
+	int free_passwd = 0;
 
 	/* True only if user is removed */
 	auth_user_rm = false;
@@ -1044,8 +1045,10 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 			passwd = get_node_content(node_aux);
 			break;
 		}
+
 		if (passwd == NULL) {
-			passwd = "";
+			passwd = calloc(1, sizeof(char));
+			free_passwd = 1;
 		}
 
 		if (op & XMLDIFF_ADD) {
@@ -1056,7 +1059,7 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 			}
 		} else { /* (op & XMLDIFF_MOD) */
 			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
-				printf("FAILED to mod user %s\n", name);
+				printf("Failed to mod user %s\n", name);
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
@@ -1087,6 +1090,10 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 			nc_verb_warning(msg);
 			free(msg);
 		}
+	}
+
+	if (free_passwd) {
+		free(passwd);
 	}
 
 	return EXIT_SUCCESS;
