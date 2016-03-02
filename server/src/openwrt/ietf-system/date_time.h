@@ -91,6 +91,12 @@ int ntp_stop(void);
 int ntp_restart(void);
 
 /**
+ * @brief reload ntp service on your system
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int ntp_reload(void);
+
+/**
  * @brief enable or disable NTP server
  * @param value to enable or disable NTP server
  * @return EXIT_SUCCESS or EXIT_FAILURE

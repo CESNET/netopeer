@@ -649,8 +649,30 @@ int ntp_restart(void)
 	return ntp_cmd("restart");
 }
 
+int ntp_reload(void)
+{
+	return ntp_cmd("reload");
+}
+
 int set_ntp_enabled(const char *value)
 {
+	char* cmd;
+	FILE* output;
+
+	if (strcmp(value, "0") == 0) {
+		asprintf(&cmd, "/etc/init.d/sysntpd stop");
+	} else {
+		asprintf(&cmd, "/etc/init.d/sysntpd start");
+	}
+	output = popen(cmd, "r");
+	free(cmd);
+
+	if (output == NULL) {
+		return EXIT_FAILURE;
+	}
+	pclose(output);
+
+	/* pernament */
 	t_element_type type = OPTION;
 	char *path = "system.ntp.enabled";
 

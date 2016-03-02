@@ -573,8 +573,6 @@ int callback_systemns_system_systemns_clock_systemns_timezone_utc_offset(void **
 	return EXIT_SUCCESS;
 }
 
-static bool ntp_restart_flag = false;
-
 /**
  * @brief This callback will be run when node in path /systemns:system/systemns:ntp/systemns:enabled changes
  *
@@ -592,20 +590,19 @@ int callback_systemns_system_systemns_ntp_systemns_enabled(void** UNUSED(data), 
 
 	if (op & (XMLDIFF_ADD | XMLDIFF_MOD)) {
 		if (strcmp(get_node_content(new_node), "true") == 0) {
-			if (set_ntp_enabled("1") == EXIT_SUCCESS) {
-				ntp_restart_flag = false;
-			} else {
+			if (set_ntp_enabled("1") != EXIT_SUCCESS) {
 				asprintf(&msg, "Failed to start NTP.");
 				return fail(error, msg, EXIT_FAILURE);
 			}
-			if (ntp_start() == EXIT_SUCCESS) {
-				/* flag for parent callback */
-				ntp_restart_flag = false;
-			} else {
+			if (ntp_start() != EXIT_SUCCESS) {
 				asprintf(&msg, "Failed to start NTP.");
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		} else if (strcmp(get_node_content(new_node), "false") == 0) {
+			if (set_ntp_enabled("0") != EXIT_SUCCESS) {
+				asprintf(&msg, "Failed to start NTP.");
+				return fail(error, msg, EXIT_FAILURE);
+			}
 			if (ntp_stop() != EXIT_SUCCESS) {
 				asprintf(&msg, "Failed to stop NTP.");
 				return fail(error, msg, EXIT_FAILURE);
@@ -733,8 +730,8 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), X
 		return fail(error, msg, EXIT_FAILURE);
 	}
 
-	/* flag for parent callback */
-	ntp_restart_flag = true;
+	/* reload configuration from config file */
+	ntp_reload();
 
 	return EXIT_SUCCESS;
 
