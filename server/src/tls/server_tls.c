@@ -1116,6 +1116,8 @@ int np_tls_session_count(void) {
 }
 
 int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) {
+	int ret;
+
 	new_client->tls = SSL_new(tlsctx);
 	if (new_client->tls == NULL) {
 		nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1129,7 +1131,10 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 	netopeer_state.tls_state->last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 	SSL_set_ex_data(new_client->tls, netopeer_state.tls_state->last_tls_idx, new_client);
 
-	if (SSL_accept(new_client->tls) != 1) {
+	while (((ret = SSL_accept(new_client->tls)) == -1) && (SSL_get_error(new_client->tls, ret) == SSL_ERROR_WANT_READ)) {
+		usleep(READ_SLEEP);
+	}
+	if (ret != 1) {
 		nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 		return 1;
 	}

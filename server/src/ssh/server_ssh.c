@@ -1032,6 +1032,8 @@ int np_ssh_session_count(void) {
 }
 
 int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind) {
+	int ret;
+
 	new_client->ssh_sess = ssh_new();
 	if (new_client->ssh_sess == NULL) {
 		nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1053,10 +1055,15 @@ int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind)
 
 	gettimeofday((struct timeval*)&new_client->conn_time, NULL);
 
-	if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
+	while ((ret = ssh_handle_key_exchange(new_client->ssh_sess)) == SSH_AGAIN) {
+		usleep(READ_SLEEP * 2);
+	}
+	if (ret != SSH_OK) {
 		nc_verb_error("%s: SSH key exchange error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
 		return 1;
 	}
+
+	ssh_set_blocking(new_client->ssh_sess, 0);
 
 	return 0;
 }

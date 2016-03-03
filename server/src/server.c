@@ -415,7 +415,7 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 
 /* always returns only a single new connection */
 static struct client_struct* sock_accept(const struct np_sock* npsock) {
-	int r;
+	int r, flags;
 	unsigned int i;
 	socklen_t client_saddr_len;
 	struct client_struct* ret;
@@ -445,6 +445,13 @@ static struct client_struct* sock_accept(const struct np_sock* npsock) {
 			ret->sock = accept(npsock->pollsock[i].fd, (struct sockaddr*)&ret->saddr, &client_saddr_len);
 			if (ret->sock == -1) {
 				nc_verb_error("%s: accept failed (%s)", __func__, strerror(errno));
+				free(ret);
+				return NULL;
+			}
+			/* make the socket non-blocking */
+			if (((flags = fcntl(ret->sock, F_GETFL)) == -1) || (fcntl(ret->sock, F_SETFL, flags | O_NONBLOCK) == -1)) {
+				nc_verb_error("%s: fcntl failed (%s)", __func__, strerror(errno));
+				close(ret->sock);
 				free(ret);
 				return NULL;
 			}

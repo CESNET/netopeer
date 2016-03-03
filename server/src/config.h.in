@@ -69,6 +69,9 @@
 /* the initial size of the reading buffer */
 #define BASE_READ_BUFFER_SIZE 2048
 
+/* sleeping before retrying non-blocking reads */
+#define READ_SLEEP 100
+
 /* end tags of NETCONF messages */
 #define NC_V10_END_MSG "]]>]]>"
 #define NC_V11_END_MSG "\n##\n"
