@@ -579,6 +579,7 @@ int set_timezone(const char* zone)
 		return (EXIT_FAILURE);
 	}
 
+	/* pernament */
 	if ((edit_config(path, zone, type)) != (EXIT_SUCCESS)) {
 		nc_verb_error("Unable to write timezone to system config file");
 		fclose(timezone_f);

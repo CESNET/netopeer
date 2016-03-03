@@ -242,27 +242,28 @@ int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, cons
 							}
 							break;
 
-						case S_SECTION:
-							if ((strcmp(word, "list")) == 0) {
-							state = S_ITEM;
-						}
-						break;
+				case S_SECTION:
+					if ((strcmp(word, "list")) == 0) {
+						state = S_ITEM;
+					}
+					break;
 
-					case S_ITEM:
-						if ((strcmp(word, arguments->item)) == 0) {
-							state = S_VALUE;
-						}
-						else
-							state = S_SECTION;
-						break;
+				case S_ITEM:
+					if ((strcmp(word, arguments->item)) == 0) {
+						state = S_VALUE;
+					}
+					else {
+						state = S_SECTION;
+					}
+					break;
 
-					case S_VALUE:
-						if ((strcmp(word, value)) == 0) {
-							/* no printing to file - deleting list item */
-							found = true;
-							in_progress = false;
-							state = S_START;
-						}
+				case S_VALUE:
+					if ((strcmp(word, value)) == 0) {
+						/* no printing to file - deleting list item */
+						found = true;
+						in_progress = false;
+						state = S_START;
+					}
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -280,8 +281,8 @@ int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, cons
 			fprintf(new_file, "%s", line);
 		}
 	}
-
-		return EXIT_SUCCESS;
+	free(line);
+	return EXIT_SUCCESS;
 }
 
 int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const char *value)
@@ -828,6 +829,7 @@ int rm_config(char *path, const char *value, t_element_type type)
 
 	arguments.section = NULL;
 
+	printf("2\n");
 	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
 		return EXIT_FAILURE;
 	}
@@ -835,15 +837,18 @@ int rm_config(char *path, const char *value, t_element_type type)
 	char filename[80] = "/etc/config/";
 	strcat(filename, arguments.file);
 
+	printf("3\n");
 	fileptr1 = fopen(filename, "r");
 	fileptr2 = fopen("/etc/config/config.tmp", "w");
 
+	printf("4\n");
 	if (type == OPTION) {
 		fclose(fileptr1);
 		fclose(fileptr2);
 		return EXIT_SUCCESS;
 	}
 	else if (type == LIST) {
+		printf("VALUE - RM_CONFIG: %s\n", value);
 		if (rm_list_item(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS) {
 			fclose(fileptr1);
 			fclose(fileptr2);
@@ -851,12 +856,14 @@ int rm_config(char *path, const char *value, t_element_type type)
 		}
 	}
 
+	printf("1000\n");
 	arg_clear(&arguments);
 	fclose(fileptr1);
 	fclose(fileptr2);
 	if (rename("/etc/config/config.tmp", filename) == -1) {
 		return EXIT_FAILURE;
 	}
+	printf("1001\n");
 
 	return EXIT_SUCCESS;
 }

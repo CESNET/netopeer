@@ -693,26 +693,21 @@ int callback_systemns_system_systemns_ntp_systemns_server(void** UNUSED(data), X
 			return fail(error, msg, EXIT_FAILURE);
 		}
 
-		printf("UDP ADDRESS: %s\n", udp_address);
-
 		association_type = "server";
 
 		/* This loop may be executed more than once only with the association type pool */
 		if (op & XMLDIFF_ADD) {
-			printf("OP XMLDIFF_ADD\n");
 			if (ntp_add_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
 				goto error;
 			}
 		} 
 		else if (op & XMLDIFF_REM) {
 			/* Delete this item from the config */
-			printf("OP XMLDIFF_REM\n");
-			if (ntp_rm_server(old_udp_address, association_type, &msg) != EXIT_SUCCESS) {
+			if (ntp_rm_server(udp_address, association_type, &msg) != EXIT_SUCCESS) {
 				goto error;
 			}
 		} 
 		else { /* XMLDIFF_MOD */
-			printf("OP XMLDIFF_MOD\n");
 		/* Update this item from the config */
 			if (ntp_rm_server(old_udp_address, association_type, &msg) != EXIT_SUCCESS) {
 				goto error;
