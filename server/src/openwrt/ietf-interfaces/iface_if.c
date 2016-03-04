@@ -918,7 +918,7 @@ static void convert_netmask_to_prefix(char* netmask)
 			if (*ptr != '.') {
 				return;
 			}
-			octet = (unsigned)strtol(ptr, &ptr, 10);
+			octet = (unsigned)strtol((ptr+1), &ptr, 10);
 			mask = 0x80;
 		}
 	}
