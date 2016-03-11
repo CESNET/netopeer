@@ -472,7 +472,9 @@ char* get_option_config(char *path)
 	}
 
 	asprintf(&filename, "/etc/config/%s", arguments.file);
-	fileptr = fopen(filename, "r");
+	if ((fileptr = fopen(filename, "r")) == NULL) {
+		return NULL;
+	}
 	free(filename);
 
 	while ((read = getline(&line, &len, fileptr)) != -1) {
@@ -526,13 +528,11 @@ char* get_option_config(char *path)
 					else
 						state = S_SECTION;
 					if (found) {
-						if (line_replic != NULL) {
-							free(line_replic);
-						}
 						arg_clear(&arguments);
 						fclose(fileptr);
 						ret = strdup(word);
 						free(line);
+						free(line_replic);
 						return ret;
 					}
 					break;
