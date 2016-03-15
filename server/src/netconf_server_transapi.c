@@ -192,7 +192,7 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
 		content = get_node_content(old_node);
 		if (content == NULL) {
-			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: internal error at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -203,7 +203,7 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
 		content = get_node_content(new_node);
 		if (content == NULL) {
-			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: internal error at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -256,7 +256,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 		}
 
 		if (addr == NULL || port == 0) {
-			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: missing either address or port at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -281,7 +281,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 		}
 
 		if (new_addr == NULL || new_port == 0) {
-			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: missing either address or port at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
