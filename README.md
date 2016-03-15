@@ -40,6 +40,27 @@ As part of the Netopeer server, there is a set of the following tools:
  * [netopeer-manager(1)](http://netopeer.googlecode.com/git/server/manager/netopeer-manager.1.html)
  * [netopeer-configurator(1)](http://netopeer.googlecode.com/git/server/configurator/netopeer-configurator.1.html)
 
+#### Running the server in docker
+
+This repository has a `Dockerfile` that can be used to create a container that
+builds netopeer-server and starts the service. You need a linux with
+working [docker](https://www.docker.com/) installation to use it.
+
+To build the container:
+~~~
+docker build -t netopeer .
+~~~
+
+To start it:
+~~~
+docker run -it --rm -p 8300:830 --name netopeer netopeer
+~~~
+
+The line above maps netopeer's netconf port to 8300 on the host. You can
+connect to that port with [ncclient](https://github.com/ncclient/ncclient)
+without any user or password (as long as you have a valid private key on the
+host).
+
 ### [TransAPI modules](./transAPI)
 
 Netopeer projects provides several basic transAPI modules that, besides their
@@ -80,9 +101,12 @@ All tools are built on top of the libnetconf library and allows you to use the f
 * NETCONF Call Home ([Reverse SSH draft](http://tools.ietf.org/html/draft-ietf-netconf-reverse-ssh-05), [RFC 5539bis](http://tools.ietf.org/html/draft-ietf-netconf-rfc5539bis-05))
 * NETCONF Server Configuration ([IETF Draft](http://tools.ietf.org/html/draft-kwatsen-netconf-server-01))
 
-
 ## Other Resources
 
 * [libnetconf project](https://github.com/CESNET/libnetconf)
 * [Netopeer GUI](https://github.com/CESNET/Netopeer-GUI)
 * [CESNET TMC department](https://www.liberouter.org/)
+
+## Solving Issues
+
+Please, do not contact authors directly. Instead, use the project [issue tracker](https://github.com/CESNET/netopeer/issues). This way, we can share the solutions to your problems with all users and avoid repeating the same answers over and over again.

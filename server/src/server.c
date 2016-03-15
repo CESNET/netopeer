@@ -1,12 +1,10 @@
 /**
  * @file server.c
  * @author David Kupka <xkupka01@stud.fit.vutbr.cz>
- *         Radek Krejci <rkrejci@cesnet.cz
- * @brief Netopeer server.
+ * @author Radek Krejci <rkrejci@cesnet.cz>
+ * @brief Netopeer server
  *
- * Copyright (c) 2011, CESNET, z.s.p.o.
- * All rights reserved.
- *
+ * Copyright (C) 2011-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -17,22 +15,26 @@
  *    notice, this list of conditions and the following disclaimer in
  *    the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of the CESNET, z.s.p.o. nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is, and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
  */
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
@@ -68,11 +70,12 @@ static const char rcsid[] __attribute__((used)) ="$Id: "__FILE__": "RCSID" $";
 extern struct np_options netopeer_options;
 
 extern pthread_mutex_t callhome_lock;
-extern struct client_struct* callhome_client;
+extern pthread_cond_t callhome_cond;
+extern struct ch_app* callhome_app;
 
 /* one global structure holding all the client information */
 struct np_state netopeer_state = {
-	.global_lock = PTHREAD_RWLOCK_INITIALIZER
+	.global_lock = PTHREAD_MUTEX_INITIALIZER
 };
 
 /* flags of main server loop, they are turned when a signal comes */
@@ -233,9 +236,6 @@ void* client_main_thread(void* arg) {
 	do {
 		skip_sleep = 0;
 
-		/* GLOBAL READ LOCK */
-		pthread_rwlock_rdlock(&netopeer_state.global_lock);
-
 		switch (client->transport) {
 #ifdef NP_SSH
 		case NC_TRANSPORT_SSH:
@@ -253,22 +253,19 @@ void* client_main_thread(void* arg) {
 			nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 		}
 
-		/* GLOBAL READ UNLOCK */
-		pthread_rwlock_unlock(&netopeer_state.global_lock);
-
 		if (!skip_sleep) {
 			/* we did not do anything productive, so let the thread sleep */
 			usleep(netopeer_options.response_time*1000);
 		}
 	} while (!client->to_free);
 
-	/* GLOBAL WRITE LOCK */
-	pthread_rwlock_wrlock(&netopeer_state.global_lock);
+	/* GLOBAL LOCK */
+	pthread_mutex_lock(&netopeer_state.global_lock);
 
 	np_client_detach(&netopeer_state.clients, client);
 
-	/* GLOBAL WRITE UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
+	/* GLOBAL UNLOCK */
+	pthread_mutex_unlock(&netopeer_state.global_lock);
 
 	switch (client->transport) {
 #ifdef NP_SSH
@@ -418,7 +415,7 @@ static void sock_listen(const struct np_bind_addr* addrs, struct np_sock* npsock
 
 /* always returns only a single new connection */
 static struct client_struct* sock_accept(const struct np_sock* npsock) {
-	int r;
+	int r, flags;
 	unsigned int i;
 	socklen_t client_saddr_len;
 	struct client_struct* ret;
@@ -451,6 +448,13 @@ static struct client_struct* sock_accept(const struct np_sock* npsock) {
 				free(ret);
 				return NULL;
 			}
+			/* make the socket non-blocking */
+			if (((flags = fcntl(ret->sock, F_GETFL)) == -1) || (fcntl(ret->sock, F_SETFL, flags | O_NONBLOCK) == -1)) {
+				nc_verb_error("%s: fcntl failed (%s)", __func__, strerror(errno));
+				close(ret->sock);
+				free(ret);
+				return NULL;
+			}
 			ret->transport = npsock->transport[i];
 			npsock->pollsock[i].revents = 0;
 			break;
@@ -458,6 +462,20 @@ static struct client_struct* sock_accept(const struct np_sock* npsock) {
 	}
 
 	return ret;
+}
+
+static void clear_broadcast_callhome_client(int fail) {
+    /* CALLHOME LOCK */
+    pthread_mutex_lock(&callhome_lock);
+    if (callhome_app) {
+        if (fail) {
+            callhome_app->client = NULL;
+        }
+        callhome_app = NULL;
+        pthread_cond_broadcast(&callhome_cond);
+    }
+    /* CALLHOME UNLOCK */
+    pthread_mutex_unlock(&callhome_lock);
 }
 
 void listen_loop(int do_init) {
@@ -511,14 +529,13 @@ void listen_loop(int do_init) {
 #endif
 
 		/* Callhome client check */
-		if (callhome_client != NULL) {
-			/* CALLHOME LOCK */
-			pthread_mutex_lock(&callhome_lock);
-			new_client = callhome_client;
-			callhome_client = NULL;
-			/* CALLHOME UNLOCK */
-			pthread_mutex_unlock(&callhome_lock);
+        /* CALLHOME LOCK */
+        pthread_mutex_lock(&callhome_lock);
+		if (callhome_app) {
+			new_client = callhome_app->client;
 		}
+		/* CALLHOME UNLOCK */
+        pthread_mutex_unlock(&callhome_lock);
 
 		/* Listen client check */
 		if (new_client == NULL) {
@@ -531,12 +548,16 @@ void listen_loop(int do_init) {
 			/* Maximum number of sessions check */
 			if (netopeer_options.max_sessions > 0) {
 				ret = 0;
+				/* GLOBAL LOCK */
+				pthread_mutex_lock(&netopeer_state.global_lock);
 #ifdef NP_SSH
 				ret += np_ssh_session_count();
 #endif
 #ifdef NP_TLS
 				ret += np_tls_session_count();
 #endif
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				if (ret >= netopeer_options.max_sessions) {
 					nc_verb_error("Maximum number of sessions reached, droppping the new client.");
@@ -556,6 +577,8 @@ void listen_loop(int do_init) {
 						free(new_client);
 						nc_verb_error("%s: internal error (%s:%d)", __func__, __FILE__, __LINE__);
 					}
+
+					clear_broadcast_callhome_client(1);
 
 					/* sleep to prevent clients from immediate connection retry */
 					usleep(netopeer_options.response_time*1000);
@@ -590,20 +613,26 @@ void listen_loop(int do_init) {
 
 			/* client is not valid, some error occured */
 			if (ret != 0) {
+                clear_broadcast_callhome_client(1);
 				continue;
 			}
 
 			/* add the client into the global clients structure */
-			/* GLOBAL WRITE LOCK */
-			pthread_rwlock_wrlock(&netopeer_state.global_lock);
+			/* GLOBAL LOCK */
+			pthread_mutex_lock(&netopeer_state.global_lock);
 			client_append(&netopeer_state.clients, new_client);
-			/* GLOBAL WRITE UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
+			/* GLOBAL UNLOCK */
+			pthread_mutex_unlock(&netopeer_state.global_lock);
 
 			/* start the client thread */
 			if ((ret = pthread_create((pthread_t*)&new_client->tid, NULL, client_main_thread, (void*)new_client)) != 0) {
 				nc_verb_error("%s: failed to create a thread (%s)", __func__, strerror(ret));
+
+				/* GLOBAL LOCK */
+				pthread_mutex_lock(&netopeer_state.global_lock);
 				np_client_detach(&netopeer_state.clients, new_client);
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				new_client->tid = 0;
 				new_client->to_free = 1;
@@ -622,8 +651,13 @@ void listen_loop(int do_init) {
 					free(new_client);
 					break;
 				}
+
+				clear_broadcast_callhome_client(1);
 				continue;
 			}
+
+			/* Signal app loops if needed */
+			clear_broadcast_callhome_client(0);
 		}
 
 	} while (!quit && !restart_soft);
@@ -639,24 +673,29 @@ void listen_loop(int do_init) {
 	if (!restart_soft) {
 		/* wait for all the clients to exit nicely themselves */
 		while (1) {
-			/* GLOBAL READ LOCK */
-			pthread_rwlock_rdlock(&netopeer_state.global_lock);
+			/* GLOBAL LOCK */
+			pthread_mutex_lock(&netopeer_state.global_lock);
 
 			if (netopeer_state.clients == NULL) {
-				/* GLOBAL READ UNLOCK */
-				pthread_rwlock_unlock(&netopeer_state.global_lock);
+				/* GLOBAL UNLOCK */
+				pthread_mutex_unlock(&netopeer_state.global_lock);
 
 				break;
 			}
 
 			client_tid = netopeer_state.clients->tid;
 
-			/* GLOBAL READ UNLOCK */
-			pthread_rwlock_unlock(&netopeer_state.global_lock);
+			/* GLOBAL UNLOCK */
+			pthread_mutex_unlock(&netopeer_state.global_lock);
 
 			ret = pthread_join(client_tid, NULL);
-			if (ret != 0 && errno != EINTR) {
-				nc_verb_error("Failed to join client thread (%s).", strerror(errno));
+			if (ret == EINVAL) {
+				/* Call Home app is already waiting for it, let it handle it */
+				usleep(10000);
+				continue;
+			}
+			if (ret != 0) {
+				nc_verb_error("Failed to join client thread (%s).", strerror(ret));
 			}
 		}
 

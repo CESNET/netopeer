@@ -1,10 +1,11 @@
 /**
- * \file netconf-server-transapi.c
- * \author Radek Krejci <rkrejci@cesnet.cz>
+ * @file netconf_server_transapi.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @author Radek Krejci <rkrejci@cesnet.cz>
  * @brief NETCONF device module to configure netconf server following
  * ietf-netconf-server data model
  *
- * Copyright (C) 2014 CESNET, z.s.p.o.
+ * Copyright (C) 2014-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -191,7 +192,7 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	if (op & (XMLDIFF_REM | XMLDIFF_MOD)) {
 		content = get_node_content(old_node);
 		if (content == NULL) {
-			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: internal error at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -202,7 +203,7 @@ int callback_srv_netconf_srv_listen_srv_port(XMLDIFF_OP op, xmlNodePtr old_node,
 	if (op & (XMLDIFF_MOD | XMLDIFF_ADD)) {
 		content = get_node_content(new_node);
 		if (content == NULL) {
-			nc_verb_error("%s: internal error at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: internal error at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -255,7 +256,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 		}
 
 		if (addr == NULL || port == 0) {
-			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: missing either address or port at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -280,7 +281,7 @@ int callback_srv_netconf_srv_listen_srv_interface(XMLDIFF_OP op, xmlNodePtr old_
 		}
 
 		if (new_addr == NULL || new_port == 0) {
-			nc_verb_error("%s: missing either address or port at %s:%s", __func__, __FILE__, __LINE__);
+			nc_verb_error("%s: missing either address or port at %s:%d", __func__, __FILE__, __LINE__);
 			*error = nc_err_new(NC_ERR_OP_FAILED);
 			nc_err_set(*error, NC_ERR_PARAM_MSG, "Check server logs.");
 			return EXIT_FAILURE;
@@ -382,12 +383,16 @@ static struct client_struct* sock_connect(const char* address, uint16_t port) {
 	return ret;
 
 fail:
+	if (ret->sock != -1) {
+		close(ret->sock);
+	}
 	free(ret);
 	return NULL;
 }
 
 pthread_mutex_t callhome_lock = PTHREAD_MUTEX_INITIALIZER;
-volatile struct client_struct* callhome_client = NULL;
+pthread_cond_t callhome_cond = PTHREAD_COND_INITIALIZER;
+volatile struct ch_app* callhome_app = NULL;
 
 /* each app has its own thread */
 __attribute__((noreturn))
@@ -440,33 +445,26 @@ static void* app_loop(void* app_v) {
 		}
 
 		/* publish the new client for the main application loop to create a new session */
-		while (1) {
-			/* CALLHOME LOCK */
-			pthread_mutex_lock(&callhome_lock);
-			if (callhome_client == NULL) {
-				callhome_client = app->client;
-				/* CALLHOME UNLOCK */
-				pthread_mutex_unlock(&callhome_lock);
-				break;
-			}
-			/* CALLHOME UNLOCK */
-			pthread_mutex_unlock(&callhome_lock);
-		}
+        /* CALLHOME LOCK */
+        pthread_mutex_lock(&callhome_lock);
+        while (callhome_app) {
+            /* someone else is waiting already, let's wait with them */
+            pthread_cond_wait(&callhome_cond, &callhome_lock);
+        }
+        callhome_app = app;
 
-		/* wait for the listen loop to create the client thread (a bit shady) */
-		i = 0;
-		while (app->client->tid == 0) {
-			usleep(1000*netopeer_options.response_time);
-			++i;
-			if (i == 10) {
-				nc_verb_error("Call Home (app %s) client thread creation timeout, retrying.", app->name);
-				app->client->to_free = 1;
-				break;
-			}
-		}
-		if (i == 10) {
-			continue;
-		}
+        while (callhome_app) {
+            /* wait for client thread creation */
+            pthread_cond_wait(&callhome_cond, &callhome_lock);
+        }
+
+        /* CALLHOME UNLOCK */
+        pthread_mutex_unlock(&callhome_lock);
+
+        if (!app->client) {
+            nc_verb_error("Call Home (app %s) client creation failed.", app->name);
+            continue;
+        }
 
 		cur_server->active = 1;
 

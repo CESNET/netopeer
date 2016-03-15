@@ -1,9 +1,10 @@
 /**
- * \file cfgnetopeer_transapi.c
- * \author David Kupka <xkupka01@stud.fit.vutbr.cz>
+ * @file cfgnetopeer_transapi.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @author David Kupka <xkupka01@stud.fit.vutbr.cz>
  * @brief NETCONF device module to configure netconf server
  *
- * Copyright (C) 2011 CESNET, z.s.p.o.
+ * Copyright (C) 2011-2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -631,8 +632,8 @@ int callback_n_netopeer_n_modules_n_module_n_enabled(void** UNUSED(data), XMLDIF
 
 	if ((op & XMLDIFF_REM) || ((op & XMLDIFF_MOD) && strcmp(module_enabled, "false") == 0)) {
 		if (module == NULL) {
-			nc_verb_error("%s: internal error: module to disable not found", __func__);
-			return EXIT_FAILURE;
+			/* it does not exist, so it is disabled */
+			return EXIT_SUCCESS;
 		}
 
 		if (module_disable(module, 1)) {

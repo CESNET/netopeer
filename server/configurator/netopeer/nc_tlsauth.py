@@ -220,7 +220,14 @@ class nc_tlsauth(ncmodule.ncmodule):
 		tls_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer/n:tls')
 		if len(tls_node) == 0:
 			netopeer_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup/n:netopeer')
-			tls_node = netopeer_node[0].newChild(netopeer_node[0].ns(), 'tls', None)
+			if len(netopeer_node) == 0:
+				startup_node = self.netopeer_ctxt.xpathEval('/d:datastores/d:startup')
+				netopeer_node = libxml2.newNode('netopeer')
+				netopeer_node.newNs('urn:cesnet:tmc:netopeer:1.0', None)
+				startup_node[0].addChild(netopeer_node)
+			else:
+				netopeer_node = netopeer_node[0]
+			tls_node = netopeer_node.newChild(netopeer_node.ns(), 'tls', None)
 		else:
 			tls_node = tls_node[0]
 

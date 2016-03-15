@@ -1,3 +1,41 @@
+/**
+ * @file server_ssh.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @brief Netopeer server SSH part
+ *
+ * Copyright (C) 2015 CESNET, z.s.p.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is, and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
+ */
+
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
@@ -108,9 +146,9 @@ static struct chan_struct* client_free_channel(struct client_struct_ssh* client,
 
 	if (prev_chan == NULL) {
 		_chan_free(client, cur_chan);
-		free(client->ssh_chans);
-		client->ssh_chans = NULL;
-		return NULL;
+		client->ssh_chans = cur_chan->next;
+		free(cur_chan);
+		return client->ssh_chans;
 	}
 
 	prev_chan->next = cur_chan->next;
@@ -359,6 +397,9 @@ static void sshcb_auth_pubkey(struct client_struct_ssh* client, ssh_message msg)
 static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel channel) {
 	struct chan_struct* cur_chan;
 
+	/* GLOBAL LOCK */
+	pthread_mutex_lock(&netopeer_state.global_lock);
+
 	if (client->ssh_chans == NULL) {
 		client->ssh_chans = calloc(1, sizeof(struct chan_struct));
 		cur_chan = client->ssh_chans;
@@ -368,6 +409,9 @@ static int sshcb_channel_open(struct client_struct_ssh* client, ssh_channel chan
 		cur_chan = cur_chan->next;
 	}
 	cur_chan->ssh_chan = channel;
+
+	/* GLOBAL UNLOCK */
+	pthread_mutex_unlock(&netopeer_state.global_lock);
 
 	gettimeofday((struct timeval*)&cur_chan->last_rpc_time, NULL);
 
@@ -966,8 +1010,6 @@ int np_ssh_session_count(void) {
 	struct chan_struct* chan;
 	int count = 0;
 
-	/* GLOBAL READ LOCK */
-	pthread_rwlock_rdlock(&netopeer_state.global_lock);
 	for (client = (struct client_struct_ssh*)netopeer_state.clients; client != NULL; client = (struct client_struct_ssh*)client->next) {
 		if (client->transport != NC_TRANSPORT_SSH) {
 			continue;
@@ -985,13 +1027,13 @@ int np_ssh_session_count(void) {
 			++count;
 		}
 	}
-	/* GLOBAL READ UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 	return count;
 }
 
 int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind) {
+	int ret;
+
 	new_client->ssh_sess = ssh_new();
 	if (new_client->ssh_sess == NULL) {
 		nc_verb_error("%s: ssh error: failed to allocate a new SSH session (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1013,10 +1055,15 @@ int np_ssh_create_client(struct client_struct_ssh* new_client, ssh_bind sshbind)
 
 	gettimeofday((struct timeval*)&new_client->conn_time, NULL);
 
-	if (ssh_handle_key_exchange(new_client->ssh_sess) != SSH_OK) {
+	while ((ret = ssh_handle_key_exchange(new_client->ssh_sess)) == SSH_AGAIN) {
+		usleep(READ_SLEEP * 2);
+	}
+	if (ret != SSH_OK) {
 		nc_verb_error("%s: SSH key exchange error (%s:%d): %s", __func__, __FILE__, __LINE__, ssh_get_error(new_client->ssh_sess));
 		return 1;
 	}
+
+	ssh_set_blocking(new_client->ssh_sess, 0);
 
 	return 0;
 }

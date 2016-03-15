@@ -222,7 +222,7 @@ int callback_tm_turing_machine_tm_transition_function_tm_delta(void **data, XMLD
 
 	if (op & XMLDIFF_MOD) {
 		/* handle modification of a rule as remove + adding */
-		op = op | (XMLDIFF_REM & XMLDIFF_ADD);
+		op = XMLDIFF_REM | XMLDIFF_ADD;
 	}
 
 	if (op & XMLDIFF_REM) {

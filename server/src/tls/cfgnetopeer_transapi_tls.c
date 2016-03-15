@@ -1,9 +1,9 @@
 /**
- * \file cfgnetopeer_transapi.c
- * \author David Kupka <xkupka01@stud.fit.vutbr.cz>
- * @brief NETCONF device module to configure netconf server
+ * @file cfgnetopeer_transapi_tls.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @brief Netopeer cfgnetopeer transapi module TLS part
  *
- * Copyright (C) 2011 CESNET, z.s.p.o.
+ * Copyright (C) 2015 CESNET, z.s.p.o.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

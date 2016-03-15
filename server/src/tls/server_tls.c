@@ -1,3 +1,41 @@
+/**
+ * @file server_tls.c
+ * @author Michal Vasko <mvasko@cesnet.cz>
+ * @brief Netopeer server TLS part
+ *
+ * Copyright (C) 2015 CESNET, z.s.p.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name of the Company nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * ALTERNATIVELY, provided that this notice is retained in full, this
+ * product may be distributed under the terms of the GNU General Public
+ * License (GPL) version 2 or later, in which case the provisions
+ * of the GPL apply INSTEAD OF those given above.
+ *
+ * This software is provided ``as is, and any express or implied
+ * warranties, including, but not limited to, the implied warranties of
+ * merchantability and fitness for a particular purpose are disclaimed.
+ * In no event shall the company or contributors be liable for any
+ * direct, indirect, incidental, special, exemplary, or consequential
+ * damages (including, but not limited to, procurement of substitute
+ * goods or services; loss of use, data, or profits; or business
+ * interruption) however caused and on any theory of liability, whether
+ * in contract, strict liability, or tort (including negligence or
+ * otherwise) arising in any way out of the use of this software, even
+ * if advised of the possibility of such damage.
+ */
+
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
@@ -1067,21 +1105,19 @@ int np_tls_session_count(void) {
 	struct client_struct_tls* client;
 	int count = 0;
 
-	/* GLOBAL READ LOCK */
-	pthread_rwlock_rdlock(&netopeer_state.global_lock);
 	for (client = (struct client_struct_tls*)netopeer_state.clients; client != NULL; client = (struct client_struct_tls*)client->next) {
 		if (client->transport != NC_TRANSPORT_TLS) {
 			continue;
 		}
 		++count;
 	}
-	/* GLOBAL READ UNLOCK */
-	pthread_rwlock_unlock(&netopeer_state.global_lock);
 
 	return count;
 }
 
 int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) {
+	int ret;
+
 	new_client->tls = SSL_new(tlsctx);
 	if (new_client->tls == NULL) {
 		nc_verb_error("%s: tls error: failed to allocate a new TLS connection (%s:%d)", __func__, __FILE__, __LINE__);
@@ -1095,7 +1131,10 @@ int np_tls_create_client(struct client_struct_tls* new_client, SSL_CTX* tlsctx) 
 	netopeer_state.tls_state->last_tls_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 	SSL_set_ex_data(new_client->tls, netopeer_state.tls_state->last_tls_idx, new_client);
 
-	if (SSL_accept(new_client->tls) != 1) {
+	while (((ret = SSL_accept(new_client->tls)) == -1) && (SSL_get_error(new_client->tls, ret) == SSL_ERROR_WANT_READ)) {
+		usleep(READ_SLEEP);
+	}
+	if (ret != 1) {
 		nc_verb_error("TLS accept failed (%s).", ERR_reason_error_string(ERR_get_error()));
 		return 1;
 	}
