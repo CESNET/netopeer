@@ -79,8 +79,7 @@ CFGS =	model/ietf-interfaces.yin \
 		model/ietf-interfaces-gdefs-config.rng \
 		model/cesnet-dhcp.yin \
 		model/ietf-interfaces-schematron.xsl \
-		model/cesnet-dhcp.yin \
-		model/cesnet-wireless.yin
+		model/cesnet-dhcp.yin
 
 all: clean $(NAME) $(NAME)-init
 
