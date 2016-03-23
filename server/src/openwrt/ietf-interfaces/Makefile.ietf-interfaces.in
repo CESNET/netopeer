@@ -63,6 +63,8 @@ OBJDIR= .obj
 
 SRCS =	ietf-interfaces.c \
 		iface_if.c \
+		dhcp.c \
+		$(TOPDIR)/src/openwrt/ietf-system/dns_resolver.c \
 		$(TOPDIR)/src/openwrt/config-parser/parse.c \
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
@@ -75,7 +77,10 @@ CFGS =	model/ietf-interfaces.yin \
 		model/ietf-inet-types.yin \
 		model/ietf-interfaces-config.rng \
 		model/ietf-interfaces-gdefs-config.rng \
-		model/ietf-interfaces-schematron.xsl
+		model/cesnet-dhcp.yin \
+		model/ietf-interfaces-schematron.xsl \
+		model/cesnet-dhcp.yin \
+		model/cesnet-wireless.yin
 
 all: clean $(NAME) $(NAME)-init
 

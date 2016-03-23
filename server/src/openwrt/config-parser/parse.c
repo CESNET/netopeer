@@ -799,8 +799,12 @@ int edit_config(char *path, const char *value, t_element_type type)
 	char filename[80] = "/etc/config/";
 	strcat(filename, arguments.file);
 
-	fileptr1 = fopen(filename, "r");
-	fileptr2 = fopen("/etc/config/config.tmp", "w");
+	if ((fileptr1 = fopen(filename, "r")) == NULL) {
+		return EXIT_FAILURE;
+	}
+	if ((fileptr2 = fopen("/etc/config/config.tmp", "w")) == NULL) {
+		return EXIT_FAILURE;
+	}
 
 	if (type == OPTION) {
 		if (change_option_value(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS)

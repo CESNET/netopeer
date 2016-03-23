@@ -12,6 +12,7 @@
 #include <libnetconf_xml.h>
 
 #include "ietf-interfaces.h"
+#include "dhcp.h"
 
 /* transAPI version which must be compatible with libnetconf */
 int transapi_version = 6;
@@ -370,12 +371,13 @@ void transapi_close(void)
  */
 xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
 {
-	int i, j;
+	int i, j, dns_index;
 	unsigned int dev_count;
 	xmlDocPtr doc;
-	xmlNodePtr root, interface, ip, addr, stat_node, type;
+	xmlNodePtr root, interface, ip, addr, stat_node, type, dhcp;
 	xmlNsPtr ns, ipns;
 	char** devices, *msg = NULL, *tmp, *tmp2;
+	char* ipv4_default_gateway, *ipv6_default_gateway, **nameserver, **search_domain;
 	struct device_stats stats;
 	struct ip_addrs ips;
 
@@ -474,16 +476,48 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
-				addr = xmlNewChild(ip, ip->ns, BAD_CAST "address", NULL);
-				xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
-				xmlNewTextChild(addr, addr->ns, BAD_CAST "prefix-length", BAD_CAST ips.prefix_or_mac[j]);
-				xmlNewTextChild(addr, addr->ns, BAD_CAST "origin", BAD_CAST ips.origin[j]);
+				xmlNewTextChild(ip, ip->ns, BAD_CAST "origin", BAD_CAST ips.origin[j]);
 
+				if (strcmp(ips.origin[j], "dhcp") == 0) {
+					dhcp = xmlNewChild(ip, ip->ns, BAD_CAST "dhcp-config", NULL);
+					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
+					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "prefix-length", BAD_CAST ips.prefix_or_mac[j]);
+					
+					if ((ipv4_default_gateway = dhcp_get_ipv4_default_gateway(devices[i], &msg)) != NULL) {
+						xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "default-gateway", BAD_CAST ipv4_default_gateway);
+					}
+					
+					if ((nameserver = dhcp_get_dns_server(&msg)) != NULL) {
+						for (dns_index = 0; dns_index < MAX_NAMESERVERS; dns_index++) {
+							if (nameserver[i] == NULL) {
+								break;
+							}
+							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-server", BAD_CAST nameserver[dns_index]);
+							free(nameserver[dns_index]);
+						}
+						free(nameserver);
+					}
+					
+					if ((search_domain = dhcp_get_dns_server(&msg)) != NULL) {
+						for (dns_index = 0; dns_index < MAX_SEARCH_DOMAINS; dns_index++) {
+							if (search_domain[i] == NULL) {
+								break;
+							}
+							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-server", BAD_CAST search_domain[dns_index]);
+							free(search_domain[dns_index]);
+						}
+						free(search_domain);
+					}
+					
+				} else {
+					addr = xmlNewChild(ip, ip->ns, BAD_CAST "address", NULL);
+					xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
+					xmlNewTextChild(addr, addr->ns, BAD_CAST "prefix-length", BAD_CAST ips.prefix_or_mac[j]);
+				}
+				free(ips.origin[j]);
 				free(ips.ip[j]);
 				free(ips.prefix_or_mac[j]);
-				free(ips.origin[j]);
-
-				/* \todo: add gateway as an extension to the model */
+				
 			}
 			if (ips.count != 0) {
 				free(ips.ip);
@@ -511,6 +545,9 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				free(ips.origin);
 				ips.count = 0;
 			}
+
+			/* dhcp state data */
+
 		}
 
 		/* IPv6 */
@@ -791,6 +828,58 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
 
 	ret = iface_ipv4_enabled(iface_name, enabled, node, loopback, &msg);
 	iface_ipv4addr_ignore = 1;
+	return finish(msg, ret, error);
+}
+
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/ip:origin changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_ip_ipv4_ip_origin (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	xmlNodePtr node;
+	int origin = 3;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "dhcp")) {
+		origin = 0;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "dhcp")) {
+		origin = 1;
+		iface_ipv4addr_ignore = 1;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "dhcp")) {
+			origin = 1;
+			iface_ipv4addr_ignore = 1;
+		} else {
+			origin = 0;
+		}
+	}
+
+	if (origin == 3) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
+
+	ret = iface_ipv4_origin(iface_name, origin, op, &msg);
 	return finish(msg, ret, error);
 }
 
@@ -1598,7 +1687,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op,
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 19,
+	.callbacks_count = 20,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1620,7 +1709,8 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-valid-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
 		// {.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
-		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled}
+		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
+		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin}
 	}
 };
 

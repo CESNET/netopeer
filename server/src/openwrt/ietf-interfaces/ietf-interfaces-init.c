@@ -44,6 +44,7 @@
  *
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <dlfcn.h>
 #include <string.h>

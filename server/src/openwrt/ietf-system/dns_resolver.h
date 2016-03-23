@@ -2,7 +2,9 @@
  * \file dns_resolver.c
  * \brief Functions for DNS resolver configuration
  * \author Michal Vasko <mvasko@cesnet.cz>
+ * \author Peter Nagy <xnagyp01@stud.fit.vutbr.cz>
  * \date 2013
+ * \date 2016
  *
  * Copyright (C) 2013 CESNET
  *
@@ -45,6 +47,9 @@
 
 #include <stdbool.h>
 
+#define MAX_SEARCH_DOMAINS 6
+#define MAX_NAMESERVERS 3
+
 /**
  * @brief Get current (real) configuration of the DNS part in XML format.
  * @param ns[in] XML namespace for the XML subtree being created.
@@ -52,6 +57,20 @@
  * @return Created XML subtree or NULL on failure.
  */
 xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg);
+
+/**
+ * @brief Get current (real) configuration of the DNS search domain.
+ * @param path path to resolv.conf file.
+ * @return array of search domains or NULL on failure.
+ */
+char** dns_get_search_domain(char* path);
+
+/**
+ * @brief Get current (real) configuration of the DNS nameserver.
+ * @param path path to resolv.conf file.
+ * @return array of nameservers or NULL on failure.
+ */
+char** dns_get_nameserver(char* path);
 
 /**
  * @brief add a new search domain to the /etc/resolv.conf configuration file

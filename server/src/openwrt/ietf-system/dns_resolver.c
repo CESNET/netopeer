@@ -9,10 +9,8 @@
 #include <libxml/tree.h>
 #include <errno.h>
 
+#include "dns_resolver.h"
 #include "../config-parser/parse.h"
-
-#define MAX_SEARCH_DOMAINS 6
-#define MAX_NAMESERVERS 3
 
 int search_in_line(char *line, const char *search) {
 
@@ -113,7 +111,7 @@ char* add_substring(char *s, const char *to_add, int index)
 	return new_line;
 }
 
-char** dns_get_search_domain()
+char** dns_get_search_domain(char* path)
 {
 	FILE *fileptr1;
 	char* line = NULL;
@@ -122,7 +120,7 @@ char** dns_get_search_domain()
 	size_t len = 0;
 	size_t read;
 
-	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+	if ((fileptr1 = fopen(path, "r")) == NULL) {
 		return NULL;
 	}
 
@@ -154,7 +152,7 @@ char** dns_get_search_domain()
 	return NULL;
 }
 
-char** dns_get_nameserver()
+char** dns_get_nameserver(char* path)
 {
 	FILE *fileptr1;
 	char* line = NULL;
@@ -163,7 +161,7 @@ char** dns_get_nameserver()
 	size_t read;
 	int i = 0;
 
-	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+	if ((fileptr1 = fopen(path, "r")) == NULL) {
 		return NULL;
 	}
 
@@ -188,35 +186,35 @@ char** dns_get_nameserver()
 	return search;
 }
 
-char* dns_get_options_value(char* option)
+char* dns_get_options_value(char* option, char* path)
 {
 	FILE *fileptr1;
 	char* line = NULL;
 	char* search = NULL;
-	char* path;
+	char* option_path;
 	size_t len = 0;
 	size_t read;
 
 	asprintf(&path, "options %s:", option);
-	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+	if ((fileptr1 = fopen(option_path, "r")) == NULL) {
 		return NULL;
 	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
-		if (strncmp(line, path, strlen(path)) == 0) {
+		if (strncmp(line, option_path, strlen(option_path)) == 0) {
 
 			/* Duplicate without options */
-			search = strdup(line + strlen(path));
+			search = strdup(line + strlen(option_path));
 			free(line);
-			free(path);
+			free(option_path);
 			fclose(fileptr1);
 
 			return search;
 		}
 	}
 	free(line);
-	free(path);
+	free(option_path);
 	fclose(fileptr1);
 	return NULL;
 }
@@ -228,13 +226,14 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 	char* value = NULL;
 	char** search_domain;
 	char** nameserver;
+	char* path = "/etc/resolv.conf";
 	xmlNodePtr dns_node, server, aux_node;
 
 	/* dns-resolver */
 	dns_node = xmlNewNode(ns, BAD_CAST "dns-resolver");
 
 	/* dns-resolver/search */
-	if ((search_domain = dns_get_search_domain()) == NULL) {
+	if ((search_domain = dns_get_search_domain(path)) == NULL) {
 		asprintf(msg, "No search domain received");
 	} else {
 		for (i = 0; i < MAX_SEARCH_DOMAINS; ++i) {
@@ -246,7 +245,7 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 	}
 	
 	/* dns-resolver/nameserver */
-	if ((nameserver = dns_get_nameserver()) == NULL) {
+	if ((nameserver = dns_get_nameserver(path)) == NULL) {
 		asprintf(msg, "No nameservers received");
 	} else {
 		for (i = 0; i < MAX_NAMESERVERS; ++i) {
@@ -275,7 +274,7 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 
 	/* dns-resolver/options/timeout */
 	value = NULL;
-	if ((value = dns_get_options_value("timeout")) == NULL) {
+	if ((value = dns_get_options_value("timeout", path)) == NULL) {
 		asprintf(msg, "No timeout defined");
 	} else {
 		if (!options) {
@@ -288,7 +287,7 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 
 	/* dns-resolver/options/attempts */
 	value = NULL;
-	if ((value = dns_get_options_value("attempts")) == NULL) {
+	if ((value = dns_get_options_value("attempts", path)) == NULL) {
 		asprintf(msg, "No attempts defined");
 	} else {
 		if (!options) {
