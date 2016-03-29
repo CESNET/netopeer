@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module name="ietf-inet-types"
-        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
-        xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types">
+<module xmlns="urn:ietf:params:xml:ns:yang:yin:1" xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types" name="ietf-inet-types">
   <namespace uri="urn:ietf:params:xml:ns:yang:ietf-inet-types"/>
   <prefix value="inet"/>
   <revision date="2010-09-24"/>

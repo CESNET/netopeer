@@ -28,14 +28,14 @@ Copyright (C) 2013 CESNET, z.s.p.o.
 TODO: License
 </text>
   </description>
-  <revision date="2013-07-02">
-    <description>
-      <text>Initial revision.</text>
-    </description>
-  </revision>
   <revision date="2016-02-02">
     <description>
       <text>Added feature to configure dhcp server</text>
+    </description>
+  </revision>
+  <revision date="2013-07-02">
+    <description>
+      <text>Initial revision.</text>
     </description>
   </revision>
   <grouping name="dhcp-status">
@@ -123,14 +123,14 @@ TODO: License
       <default value="dhcp"/>
     </leaf>
     <container name="dhcp-server">
-      <when condition="origin = 'manual'"/>
+      <when condition="../origin = 'manual'"/>
       <uses name="dhcp-server"/>
     </container>
   </augment>
   <augment target-node="/if:interfaces-state/if:interface/ip:ipv4">
     <container name="dhcp-config">
       <config value="false"/>
-      <when condition="origin = 'dhcp'"/>
+      <when condition="/if:interfaces/if:interface/ip:ipv4/origin = 'dhcp'"/>
       <uses name="dhcp-status"/>
     </container>
   </augment>
@@ -147,7 +147,7 @@ TODO: License
   <augment target-node="/if:interfaces-state/if:interface/ip:ipv6">
     <container name="dhcp-config">
       <config value="false"/>
-      <when condition="origin = 'dhcp'"/>
+      <when condition="/if:interfaces/if:interface/ip:ipv4/origin = 'dhcp'"/>
       <uses name="dhcp-status"/>
     </container>
   </augment>
