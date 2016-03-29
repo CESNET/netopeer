@@ -1457,12 +1457,14 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 	char** config_sections;
 	char *path = NULL;
 
-	if ((config_sections = get_interface_section(if_name, &count_sections)) == NULL) {
-		/* no ip address set */
-		return EXIT_SUCCESS;
-	}
+	config_sections = get_interface_section(if_name, &count_sections);
 
 	if (config) {
+
+		if (!config_sections) {
+			/* no ip address set in configuration file*/
+			return EXIT_SUCCESS;
+		}
 
 		/* get static ips */
 		for (i = 0; i < count_sections; ++i) {
@@ -1521,11 +1523,16 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 	} else {
 
 		/* get first section to determine ip addr protocol */
-		asprintf(&path, "network.%s.proto", config_sections[0]);
-		if ((origin = get_option_config(path)) == NULL) {
+		if (config_sections) {
+			asprintf(&path, "network.%s.proto", config_sections[0]);
+			if ((origin = get_option_config(path)) == NULL) {
+				origin = NULL;
+			}
+			free(path);
+		} else {
 			origin = NULL;
 		}
-		free(path);
+		
 
 		/* first learn the static addresses, to correctly determine the origin */
 		static_ips.count = 0;
@@ -1584,7 +1591,12 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 				} else if (strcmp(ip, "127.0.0.1") == 0) {
 					ips->origin[ips->count] = strdup("static");
 				} else {
-					ips->origin[ips->count] = strdup(origin);
+					if (origin) {
+						ips->origin[ips->count] = strdup(origin);
+					} else {
+						ips->origin[ips->count] = strdup("dhcp");
+					}
+					
 				}
 			}
 			++ips->count;

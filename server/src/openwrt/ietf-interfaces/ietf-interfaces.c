@@ -375,7 +375,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 	unsigned int dev_count;
 	xmlDocPtr doc;
 	xmlNodePtr root, interface, ip, addr, stat_node, type, dhcp;
-	xmlNsPtr ns, ipns;
+	xmlNsPtr ns, ipns, dhcpns;
 	char** devices, *msg = NULL, *tmp, *tmp2;
 	char* ipv4_default_gateway, *ipv6_default_gateway, **nameserver, **search_domain;
 	struct device_stats stats;
@@ -479,8 +479,11 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				xmlNewTextChild(ip, ip->ns, BAD_CAST "origin", BAD_CAST ips.origin[j]);
 
 				if (strcmp(ips.origin[j], "dhcp") == 0) {
-					dhcp = xmlNewChild(ip, ip->ns, BAD_CAST "dhcp-config", NULL);
-					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
+					dhcp = xmlNewChild(ip, NULL, BAD_CAST "dhcp-config", NULL);
+					dhcpns = xmlNewNs(dhcp, BAD_CAST "urn:ietf:params:xml:ns:yang:cesnet-dhcp", NULL);
+					xmlSetNs(dhcp, dhcpns);
+
+					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "ip-address", BAD_CAST ips.ip[j]);
 					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "prefix-length", BAD_CAST ips.prefix_or_mac[j]);
 					
 					if ((ipv4_default_gateway = dhcp_get_ipv4_default_gateway(devices[i], &msg)) != NULL) {
