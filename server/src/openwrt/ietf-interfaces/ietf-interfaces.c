@@ -480,7 +480,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 
 				if (strcmp(ips.origin[j], "dhcp") == 0) {
 					dhcp = xmlNewChild(ip, NULL, BAD_CAST "dhcp-config", NULL);
-					dhcpns = xmlNewNs(dhcp, BAD_CAST "urn:ietf:params:xml:ns:yang:cesnet-dhcp", NULL);
+					dhcpns = xmlNewNs(dhcp, BAD_CAST "urn:cesnet:yang:dhcp", NULL);
 					xmlSetNs(dhcp, dhcpns);
 
 					xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "ip-address", BAD_CAST ips.ip[j]);
@@ -648,6 +648,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 struct ns_pair namespace_mapping[] = {
 	{"if", "urn:ietf:params:xml:ns:yang:ietf-interfaces"},
 	{"ip", "urn:ietf:params:xml:ns:yang:ietf-ip"},
+	{"dhcp", "urn:cesnet:yang:dhcp"},
 	{NULL, NULL}
 };
 
@@ -1713,7 +1714,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
 		// {.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
-		{.path = "/if:interfaces/if:interface/ip:ipv4/ip:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin}
+		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin}
 	}
 };
 

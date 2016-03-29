@@ -42,7 +42,7 @@ int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, 
 	/* dhcp - client */
 	if (origin) {
 		/* start a new dhcp client */
-		asprintf(&cmd, "udhcpc -p /var/run/udhcpc-%s.pid -s /lib/netifd/dhcp.script -f -t 0 -i %s -C", if_name, if_name);
+		asprintf(&cmd, "udhcpc -p /var/run/udhcpc-%s.pid -f -t 0 -i %s -C", if_name, if_name);
 		output = popen(cmd, "r");
 		free(cmd);
 
@@ -76,7 +76,7 @@ int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, 
 		FILE* fileptr;
 		size_t len = 0;
 		char* dhcp_pid_path;
-		asprintf(&dhcp_pid_path, "/var/run/udhcpc-%s", if_name);
+		asprintf(&dhcp_pid_path, "/var/run/udhcpc-%s.pid", if_name);
 		if ((fileptr = fopen(dhcp_pid_path, "r")) == NULL) {
 			/* dhcp not running on current interface - do noting */
 			return EXIT_SUCCESS;
