@@ -451,6 +451,7 @@ AC_CONFIG_FILES(config/NETCONF-server.xml.tmp:config/NETCONF-server.xml.in)
 AC_CONFIG_FILES(src/config.h)
 AC_CONFIG_FILES(netopeer-server.spec)
 AC_CONFIG_FILES(netopeer.rc)
+
 if test "$NPCONF" = "yes"; then
 	AC_CONFIG_FILES(configurator/netopeer/config.py)
 fi
@@ -460,5 +461,6 @@ AC_CONFIG_FILES(src/openwrt/ietf-system/Makefile.ietf-system)
 
 AC_CONFIG_FILES(src/openwrt/ietf-interfaces/ietf-interfaces.xml)
 AC_CONFIG_FILES(src/openwrt/ietf-interfaces/Makefile.ietf-interfaces)
+AC_CONFIG_FILES(src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng)
 
 AC_OUTPUT

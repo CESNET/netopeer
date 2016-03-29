@@ -5709,6 +5709,7 @@ ac_config_files="$ac_config_files netopeer-server.spec"
 
 ac_config_files="$ac_config_files netopeer.rc"
 
+
 if test "$NPCONF" = "yes"; then
 	ac_config_files="$ac_config_files configurator/netopeer/config.py"
 
@@ -5722,6 +5723,8 @@ ac_config_files="$ac_config_files src/openwrt/ietf-system/Makefile.ietf-system"
 ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/ietf-interfaces.xml"
 
 ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/Makefile.ietf-interfaces"
+
+ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng"
 
 
 cat >confcache <<\_ACEOF
@@ -6442,6 +6445,7 @@ do
     "src/openwrt/ietf-system/Makefile.ietf-system") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system/Makefile.ietf-system" ;;
     "src/openwrt/ietf-interfaces/ietf-interfaces.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/ietf-interfaces.xml" ;;
     "src/openwrt/ietf-interfaces/Makefile.ietf-interfaces") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/Makefile.ietf-interfaces" ;;
+    "src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
