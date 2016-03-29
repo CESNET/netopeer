@@ -1628,12 +1628,14 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 	char** config_sections;
 	char *path = NULL;
 
-	if ((config_sections = get_interface_section(if_name, &count_sections)) == NULL) {
-		/* no ip address set */
-		return EXIT_SUCCESS;
-	}
+	config_sections = get_interface_section(if_name, &count_sections);
 
 	if (config) {
+
+		if (!config_sections) {
+			/* no ip address set in configuration file*/
+			return EXIT_SUCCESS;
+		}
 
 		/* get static ips */
 		for (i = 0; i < count_sections; ++i) {
@@ -1689,11 +1691,16 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 		}
 
 		/* get first section to determine ip addr protocol */
-		asprintf(&path, "network.%s.proto", config_sections[0]);
-		if ((origin = get_option_config(path)) == NULL) {
+		if (config_sections) {
+			asprintf(&path, "network.%s.proto", config_sections[0]);
+			if ((origin = get_option_config(path)) == NULL) {
+				origin = NULL;
+			}
+			free(path);
+		} else {
 			origin = NULL;
 		}
-		free(path);
+		
 
 		asprintf(&cmd, "ip -6 addr show dev %s 2>&1", if_name);
 		output = popen(cmd, "r");
@@ -1748,7 +1755,11 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 					if (strcmp(origin, "dhcpv6") == 0) {
 						ips->origin[ips->count] = strdup("dhcp");
 					} else {
-						ips->origin[ips->count] = strdup(origin);
+						if (origin) {
+							ips->origin[ips->count] = strdup(origin);
+						} else {
+							ips->origin[ips->count] = strdup("dhcp");
+						}
 					}
 				}
 			}

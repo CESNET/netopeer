@@ -81,6 +81,39 @@ TODO: License
       </description>
     </leaf-list>
   </grouping>
+  <grouping name="dhcp-server">
+    <description>
+      <text>DHCP server on interface configuration.</text>
+    </description>
+    <leaf name="start">
+      <type name="uint16">
+        <range value="1..65535"/>
+      </type>
+      <description>
+        <text>Specifies the offset from the network address the minimum address that may be leased to clients</text>
+      </description>
+    </leaf>
+    <leaf name="limit">
+      <type name="uint16">
+        <range value="1..65535"/>
+      </type>
+      <description>
+        <text>Specifies the size of the address pool</text>
+      </description>
+    </leaf>
+    <leaf name="leasetime">
+      <type name="string"/>
+      <description>
+        <text>Specifies the lease time of addresses handed out to clients, for example 12h or 30m</text>
+      </description>
+    </leaf>
+    <leaf name="default-gateway">
+      <type name="inet:ipv4-address-no-zone"/>
+      <description>
+        <text>Specifies alternative default gateway</text>
+      </description>
+    </leaf>
+  </grouping>
   <augment target-node="/if:interfaces/if:interface/ip:ipv4">
     <leaf name="origin">
       <type name="enumeration">
@@ -89,6 +122,12 @@ TODO: License
       </type>
       <default value="dhcp"/>
     </leaf>
+    <container name="dhcp-server">
+      <when condition="origin = 'manual'"/>
+      <uses name="dhcp-server"/>
+    </container>
+  </augment>
+  <augment target-node="/if:interfaces-state/if:interface/ip:ipv4">
     <container name="dhcp-config">
       <config value="false"/>
       <when condition="origin = 'dhcp'"/>
@@ -104,6 +143,8 @@ TODO: License
       </type>
       <default value="dhcp"/>
     </leaf>
+  </augment>
+  <augment target-node="/if:interfaces-state/if:interface/ip:ipv6">
     <container name="dhcp-config">
       <config value="false"/>
       <when condition="origin = 'dhcp'"/>

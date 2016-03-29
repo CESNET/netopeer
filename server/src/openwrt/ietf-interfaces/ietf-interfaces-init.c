@@ -140,7 +140,7 @@ int main(int argc, char** argv)
 
 	/* add imports and augments */
 	if (ncds_add_model("/etc/netopeer/ietf-interfaces/ietf-yang-types.yin") != 0 || ncds_add_model("/etc/netopeer/ietf-interfaces/ietf-inet-types.yin") != 0 ||
-			ncds_add_model("/etc/netopeer/ietf-interfaces/ietf-ip.yin") != 0) {
+			ncds_add_model("/etc/netopeer/ietf-interfaces/ietf-ip.yin") != 0 || ncds_add_model("/etc/netopeer/ietf-interfaces/cesnet-dhcp.yin") != 0) {
 		nc_verb_error("Could not add import and augment models.");
 		nc_close();
 		return 1;
