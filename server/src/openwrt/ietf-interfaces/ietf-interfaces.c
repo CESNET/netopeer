@@ -475,9 +475,8 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			if (iface_get_ipv4_ipaddrs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
-			for (j = 0; j < ips.count; ++j) {
-				xmlNewTextChild(ip, ip->ns, BAD_CAST "origin", BAD_CAST ips.origin[j]);
 
+			for (j = 0; j < ips.count; ++j) {
 				if (strcmp(ips.origin[j], "dhcp") == 0) {
 					dhcp = xmlNewChild(ip, NULL, BAD_CAST "dhcp-config", NULL);
 					dhcpns = xmlNewNs(dhcp, BAD_CAST "urn:cesnet:yang:dhcp", NULL);
@@ -501,12 +500,12 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 						free(nameserver);
 					}
 					
-					if ((search_domain = dhcp_get_dns_server(&msg)) != NULL) {
+					if ((search_domain = dhcp_get_dns_search(&msg)) != NULL) {
 						for (dns_index = 0; dns_index < MAX_SEARCH_DOMAINS; dns_index++) {
 							if (search_domain[i] == NULL) {
 								break;
 							}
-							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-server", BAD_CAST search_domain[dns_index]);
+							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-search", BAD_CAST search_domain[dns_index]);
 							free(search_domain[dns_index]);
 						}
 						free(search_domain);
@@ -516,11 +515,12 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 					addr = xmlNewChild(ip, ip->ns, BAD_CAST "address", NULL);
 					xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
 					xmlNewTextChild(addr, addr->ns, BAD_CAST "prefix-length", BAD_CAST ips.prefix_or_mac[j]);
+					xmlNewTextChild(addr, addr->ns, BAD_CAST "origin", BAD_CAST ips.origin[j]);
 				}
+
 				free(ips.origin[j]);
 				free(ips.ip[j]);
-				free(ips.prefix_or_mac[j]);
-				
+				free(ips.prefix_or_mac[j]);	
 			}
 			if (ips.count != 0) {
 				free(ips.ip);
@@ -532,6 +532,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			if (iface_get_ipv4_neighs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
+
 			for (j = 0; j < ips.count; ++j) {
 				addr = xmlNewChild(ip, ip->ns, BAD_CAST "neighbor", NULL);
 				xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
@@ -542,6 +543,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				free(ips.prefix_or_mac[j]);
 				free(ips.origin[j]);
 			}
+
 			if (ips.count != 0) {
 				free(ips.ip);
 				free(ips.prefix_or_mac);
@@ -577,6 +579,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 			if (iface_get_ipv6_ipaddrs(0, devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
+
 			for (j = 0; j < ips.count; ++j) {
 				addr = xmlNewChild(ip, ip->ns, BAD_CAST "address", NULL);
 				xmlNewTextChild(addr, addr->ns, BAD_CAST "ip", BAD_CAST ips.ip[j]);
@@ -591,6 +594,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 
 				/* \todo: add gateway as an extension to the model */
 			}
+
 			if (ips.count != 0) {
 				free(ips.ip);
 				free(ips.prefix_or_mac);
@@ -617,6 +621,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				free(ips.origin[j]);
 				free(ips.status_or_state[j]);
 			}
+
 			if (ips.count != 0) {
 				free(ips.ip);
 				free(ips.prefix_or_mac);

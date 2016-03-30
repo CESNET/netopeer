@@ -1633,7 +1633,7 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 	if (config) {
 
 		if (!config_sections) {
-			/* no ip address set in configuration file*/
+			/* no ip address set in configuration file */
 			return EXIT_SUCCESS;
 		}
 
@@ -1701,7 +1701,6 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 			origin = NULL;
 		}
 		
-
 		asprintf(&cmd, "ip -6 addr show dev %s 2>&1", if_name);
 		output = popen(cmd, "r");
 		free(cmd);
@@ -1752,13 +1751,13 @@ int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_
 				} else if (strstr(rest, "temporary") != NULL || strstr(rest, "dynamic") != NULL) {
 					ips->origin[ips->count] = strdup("other");
 				} else {
-					if (strcmp(origin, "dhcpv6") == 0) {
+					if (origin == NULL) {
 						ips->origin[ips->count] = strdup("dhcp");
 					} else {
-						if (origin) {
-							ips->origin[ips->count] = strdup(origin);
-						} else {
+						if (strcmp(origin, "dhcpv6") == 0) {
 							ips->origin[ips->count] = strdup("dhcp");
+						} else {
+							ips->origin[ips->count] = strdup(origin);
 						}
 					}
 				}
