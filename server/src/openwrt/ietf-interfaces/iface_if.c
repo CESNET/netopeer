@@ -18,8 +18,6 @@
 
 #define DEV_STATS_PATH "/proc/net/dev"
 
-static int if_sec_id = 0;
-
 /* /proc/sys/net/(ipv4,ipv6)/conf/(if_name)/(variable) = (value) */
 static int write_to_proc_net(unsigned char ipv4, const char* if_name, const char* variable, const char* value)
 {
@@ -149,6 +147,24 @@ char** iface_get_ifcs(unsigned char config, unsigned int* dev_count, char** msg)
 	return ret;
 }
 
+static char* iface_get_section_name_from_ip(const char* ip)
+{
+	char* ret = strdup(ip);
+	char* substring = NULL;
+
+	/* IPv4 - replace dots in ip address by underscore */
+	while ((substring = strstr(ret, ".")) != NULL) {
+		*substring = '_';
+	}
+
+	/* IPv6 - replace colon in ip address by underscore */
+	while ((substring = strstr(ret, ":")) != NULL) {
+		*substring = '_';
+	}
+
+	return ret;
+}
+
 static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, const char* netmask, unsigned char prefix, XMLDIFF_OP op, char** msg)
 {
 	char* cmd, *line = NULL, str_prefix[4];
@@ -189,8 +205,13 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, con
 
 	if (ipv4) { /* IPv4 */
 		if (op & XMLDIFF_ADD) {
-			if_sec_id++;
-			asprintf(&(if_section.section), "%s%d", if_name, if_sec_id);
+
+			/* create section name - generate from ip */
+			if ((if_section.section = iface_get_section_name_from_ip(ip)) == NULL) {
+				asprintf(msg, "Configuring interface %s failed. Failed to get section name from ip", if_name);
+				return EXIT_FAILURE;
+			}
+
 			if_section.ifname = strdup(if_name);
 			if_section.ipv4_addr = strdup(ip);
 			if_section.ipv4_netmask = strdup(netmask);
@@ -256,9 +277,13 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, con
 		if (op & XMLDIFF_ADD) {
 			const char* ip_prefix;
 			asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
-			if_sec_id++;
 
-			asprintf(&(if_section.section), "%s%s", if_name, if_sec_id);
+			/* create section name - generate from ip */
+			if ((if_section.section = iface_get_section_name_from_ip(ip)) == NULL) {
+				asprintf(msg, "Configuring interface %s failed. Failed to get section name from ip", if_name);
+				return EXIT_FAILURE;
+			}
+
 			if_section.ifname = strdup(if_name);
 			if_section.ipv6_addr = strdup(ip);
 			if_section.proto = 0;
