@@ -64,7 +64,7 @@
 #include "encrypt.h"
 
 #define SHADOW_ORIG "/etc/shadow"
-#define SHADOW_COPY "/etc/shadow.cfgsystem"
+#define SHADOW_COPY "/etc/shadow.ietfsystem"
 #define DEFAULT_SHELL "/bin/ash"
 #define BUFLEN 4096
 
@@ -74,12 +74,23 @@ long sha_crypt_max_rounds = -1;
 char *encrypt_method = NULL;
 char md5_crypt_enab = 0;
 
+const char *errmsg[] = {
+	/* 0 success */ "",
+	/* 1 */ "can't update password file",
+	/* 2 */ "invalid command syntax",
+	/* 3,4,5 */ "", "", "",
+	/* 6 */ "specified user doesn't exist",
+	/* 7 */ "",
+	/* 8 */ "user currently logged in",
+	/* 9 */ "",
+	/* 10 */ "can't update group file",
+	/* 11 */ "",
+	/* 12 */ "can't remove home directory",
+};
+
 static const char* set_passwd(const char *name, const char *passwd, char **msg)
 {
-	FILE *f = NULL;
-	struct spwd *spwd, new_spwd;
 	const char *en_passwd; /* encrypted password */
-	struct stat st;
 
 	assert(name);
 	assert(passwd);
@@ -98,56 +109,6 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	} else {
 		en_passwd = passwd;
 	}
-
-	/*
-	 * store encrypted password into shadow
-	 */
-
-	/* lock shadow file */
-	if (lckpwdf() != 0) {
-		*msg = strdup("Failed to acquire shadow file lock.");
-		return (NULL);
-	}
-	/* init position in shadow */
-	setspent();
-
-	/* open new shadow */
-	f = fopen(SHADOW_COPY, "w");
-	if (f == NULL) {
-		asprintf(msg, "Unable to prepare shadow copy (%s).", strerror(errno));
-		endspent();
-		ulckpwdf();
-		return (NULL);
-	}
-	/* get file stat of the original file to make a nice copy of it */
-	stat(SHADOW_ORIG, &st);
-	fchmod(fileno(f), st.st_mode);
-	fchown(fileno(f), st.st_uid, st.st_gid);
-
-	while ((spwd = getspent()) != NULL) {
-		if (strcmp(spwd->sp_namp, name) == 0) {
-			/*
-			 * we have the entry to change,
-			 * make the copy, modifying the original
-			 * structure doesn't seem as a good idea
-			 */
-			memcpy(&new_spwd, spwd, sizeof(struct spwd));
-			new_spwd.sp_pwdp = (char*) en_passwd;
-			spwd = &new_spwd;
-		}
-		/* store the record into the shadow copy */
-		putspent(spwd, f);
-	}
-	endspent();
-	fclose(f);
-
-	if (rename(SHADOW_COPY, SHADOW_ORIG) == -1) {
-		asprintf(msg, "Unable to rewrite shadow database (%s).", strerror(errno));
-		unlink(SHADOW_COPY);
-		ulckpwdf();
-		return (NULL);
-	}
-	ulckpwdf();
 
 	return (en_passwd);
 }
@@ -323,19 +284,6 @@ int users_rm(const char *name, char **msg)
 {
 	int ret;
 	char *cmdline = NULL;
-	const char *errmsg[] = {
-		/* 0 success */ "",
-		/* 1 */ "can't update password file",
-		/* 2 */ "invalid command syntax",
-		/* 3,4,5 */ "", "", "",
-		/* 6 */ "specified user doesn't exist",
-		/* 7 */ "",
-		/* 8 */ "user currently logged in",
-		/* 9 */ "",
-		/* 10 */ "can't update group file",
-		/* 11 */ "",
-		/* 12 */ "can't remove home directory",
-	};
 
 	/* remove user */
 	asprintf(&cmdline, "userdel -r %s", name);
@@ -355,25 +303,8 @@ int users_rm(const char *name, char **msg)
 const char* users_add(const char *name, const char *passwd, char **msg)
 {
 	int ret;
-	const char *retstr;
-	char *aux = NULL;
+	const char *encpass = NULL;
 	char *cmdline = NULL;
-	const char *errmsg[] = {
-		/* 0 success */ "",
-		/* 1 */ "can't update password file",
-		/* 2 */ "invalid command syntax",
-		/* 3 */ "invalid argument to option",
-		/* 4 */ "UID already in use (and no -o)",
-		/* 5 */ "",
-		/* 6 */ "specified group doesn't exist",
-		/* 7,8 */ "", "",
-		/* 9 */ "username already in use",
-		/* 10 */ "can't update group file",
-		/* 11 */ "",
-		/* 12 */ "can't create home directory",
-		/* 13 */ "",
-		/* 14 */ "can't update SELinux user mapping"
-	};
 
 	assert(name);
 	assert(passwd);
@@ -384,8 +315,16 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 	ret = WEXITSTATUS(system(cmdline));
 	free(cmdline);
 
+	/* get encrypted password */
+	if (strlen(passwd) != 0) {
+		encpass = set_passwd(name, passwd, msg);
+		if (encpass == NULL) {
+			return encpass;
+		}
+	}
+
 	/* create user */
-	asprintf(&cmdline, "useradd -m %s -s %s", name, DEFAULT_SHELL);
+	asprintf(&cmdline, "useradd -m %s -s %s -p %s", name, DEFAULT_SHELL, encpass);
 	ret = WEXITSTATUS(system(cmdline));
 	free(cmdline);
 
@@ -414,31 +353,35 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 		return (NULL);
 	}
 
-	/* set password */
-	if (strlen(passwd) != 0) {
-		retstr = set_passwd(name, passwd, msg);
-		if (retstr == NULL) {
-			/* revert changes */
-			users_rm(name, &aux);
-			free(aux);
-		}
-		return (retstr);
-	}
-
 	return (passwd);
 }
 
 const char* users_mod(const char *name, const char *passwd, char **msg)
 {
+	int ret;
+	char* cmdline = NULL;
+	const char* encpass = NULL;
+
 	assert(name);
 	assert(passwd);
 
-	/* set password */
+	/* get encrypted password */
 	if (strlen(passwd) != 0) {
-		return (set_passwd(name, passwd, msg));
+		if ((encpass = set_passwd(name, passwd, msg)) == NULL) {
+			return NULL;
+		}
+
+		asprintf(&cmdline, "usermod -p %s", encpass);
+		ret = WEXITSTATUS(system(cmdline));
+		free(cmdline);
+
+		if (ret != 0) {
+			*msg = strdup(errmsg[ret]);
+			return (NULL);
+		}
 	}
 
-	return (NULL);
+	return encpass;
 }
 
 static xmlNodePtr authkey_getxml(const char* username, const char* home_dir, uid_t uid, gid_t gid, xmlNsPtr ns, char** msg)

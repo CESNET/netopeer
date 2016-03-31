@@ -498,7 +498,7 @@ xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), st
 					
 					if ((nameserver = dhcp_get_dns_server(&msg)) != NULL) {
 						for (dns_index = 0; dns_index < MAX_NAMESERVERS; dns_index++) {
-							if (nameserver[i] == NULL) {
+							if ((nameserver[i] == NULL) || (strcmp(nameserver[i], "\0") == 0)) {
 								break;
 							}
 							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-server", BAD_CAST nameserver[dns_index]);
@@ -509,7 +509,7 @@ xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), st
 					
 					if ((search_domain = dhcp_get_dns_search(&msg)) != NULL) {
 						for (dns_index = 0; dns_index < MAX_SEARCH_DOMAINS; dns_index++) {
-							if (search_domain[i] == NULL) {
+							if ((search_domain[i] == NULL) || (strcmp(search_domain[i], "\0") == 0)) {
 								break;
 							}
 							xmlNewTextChild(dhcp, dhcp->ns, BAD_CAST "dns-search", BAD_CAST search_domain[dns_index]);

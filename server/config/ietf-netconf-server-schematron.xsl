@@ -41,7 +41,7 @@
 <axsl:template match="/"><svrl:schematron-output xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" title="" schemaVersion=""><axsl:comment><axsl:value-of select="$archiveDirParameter"/>   
 		 <axsl:value-of select="$archiveNameParameter"/>  
 		 <axsl:value-of select="$fileNameParameter"/>  
-		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-netconf-server" prefix="ncserver"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-netconf-server</axsl:attribute><axsl:attribute name="name">ietf-netconf-server</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M4"/><svrl:active-pattern><axsl:attribute name="id">idp4496</axsl:attribute><axsl:attribute name="name">idp4496</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M5"/></svrl:schematron-output></axsl:template>
+		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-netconf-server" prefix="ncserver"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-netconf-server</axsl:attribute><axsl:attribute name="name">ietf-netconf-server</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M4"/><svrl:active-pattern><axsl:attribute name="id">idp27725136</axsl:attribute><axsl:attribute name="name">idp27725136</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M5"/></svrl:schematron-output></axsl:template>
 
 <!--SCHEMATRON PATTERNS-->
 <axsl:param name="root" select="/nc:config"/>
@@ -49,7 +49,7 @@
 <!--PATTERN ietf-netconf-server-->
 <axsl:template match="text()" priority="-1" mode="M4"/><axsl:template match="@*|node()" priority="-2" mode="M4"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M4"/></axsl:template>
 
-<!--PATTERN idp4496-->
+<!--PATTERN idp27725136-->
 
 
 	<!--RULE -->
