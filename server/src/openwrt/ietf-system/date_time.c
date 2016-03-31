@@ -758,11 +758,10 @@ int ntp_rm_server(const char *value, const char* association_type, char** msg)
 
 xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 {
-	int i;
+	unsigned int i, count = 0;
 	xmlNodePtr ntp_node, server, aux_node;
 	char* result = NULL, *content = NULL;
 	char** servers = NULL;
-	int count = 0;
 
 	/* ntp */
 	ntp_node = xmlNewNode(ns, BAD_CAST "ntp");

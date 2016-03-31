@@ -152,10 +152,16 @@ int dns_set_opt_attempts(const char* number, char** msg);
 
 /**
  * @brief remove the attempts option from the /etc/resolv.conf configuration file
- * @param number[in] attempts value
  * @param msg[out] error message in case of error
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int dns_rm_opt_attempts(char** msg);
+
+/**
+ * @brief remove auto generated resolv file
+ * @param msg[out] error message in case of error
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int dns_rm_auto_resolv(char** msg);
 
 #endif /* DNS_RESOLVER_H_ */

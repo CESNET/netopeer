@@ -14,6 +14,12 @@
 #include "ietf-interfaces.h"
 #include "dhcp.h"
 
+#ifdef __GNUC__
+#	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#	define UNUSED(x) UNUSED_ ## x
+#endif
+
 /* transAPI version which must be compatible with libnetconf */
 int transapi_version = 6;
 
@@ -76,7 +82,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu(void ** data, XMLDIFF_OP 
 
 xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 {
-	unsigned int j;
+	ssize_t j;
 	unsigned int ipv4_enabled;
 	xmlNodePtr interface, ip, addr, autoconf, type;
 	xmlNsPtr ipns;
@@ -105,7 +111,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 	free(tmp);
 
 	/* IPv4 */
-	if ((j = iface_get_ipv4_presence(if_name, msg)) == -1) {
+	if ((j = iface_get_ipv4_presence(if_name)) == -1) {
 		goto fail;
 	}
 	if (j) {
@@ -116,7 +122,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 		ipv4_enabled = 1;
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "enabled", BAD_CAST "true");
 
-		if ((tmp = iface_get_ipv4_forwarding(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv4_forwarding(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
@@ -160,7 +166,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 			}
 		}
 
-		if (iface_get_ipv4_neighs(1, if_name, &ips, msg) != 0) {
+		if (iface_get_ipv4_neighs(if_name, &ips, msg) != 0) {
 			goto fail;
 		}
 
@@ -233,7 +239,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 			ips.count = 0;
 		}
 
-		if (iface_get_ipv6_neighs(1, if_name, &ips, msg) != 0) {
+		if (iface_get_ipv6_neighs(if_name, &ips, msg) != 0) {
 			goto fail;
 		}
 		for (j = 0; j < ips.count; ++j) {
@@ -249,7 +255,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 			free(ips.prefix_or_mac);
 		}
 
-		if ((tmp = iface_get_ipv6_dup_addr_det(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_dup_addr_det(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(ip, ip->ns, BAD_CAST "dup-addr-detect-transmits", BAD_CAST tmp);
@@ -257,25 +263,25 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 
 		autoconf = xmlNewChild(ip, ip->ns, BAD_CAST "autoconf", NULL);
 
-		if ((tmp = iface_get_ipv6_creat_glob_addr(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_creat_glob_addr(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "create-global-addresses", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_creat_temp_addr(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_creat_temp_addr(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "create-temporary-addresses", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_temp_val_lft(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_temp_val_lft(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "temporary-valid-lifetime", BAD_CAST tmp);
 		free(tmp);
 
-		if ((tmp = iface_get_ipv6_temp_pref_lft(1, if_name, msg)) == NULL) {
+		if ((tmp = iface_get_ipv6_temp_pref_lft(if_name, msg)) == NULL) {
 			goto fail;
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "temporary-preferred-lifetime", BAD_CAST tmp);
@@ -369,9 +375,10 @@ void transapi_close(void)
  * @param[out] err  Double pointer to error structure. Fill error when some occurs.
  * @return State data as libxml2 xmlDocPtr or NULL in case of error.
  */
-xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **err)
+xmlDocPtr get_state_data (xmlDocPtr UNUSED(model), xmlDocPtr UNUSED(running), struct nc_err **err)
 {
-	int i, j, dns_index;
+	size_t i, j, dns_index;
+	ssize_t k;
 	unsigned int dev_count;
 	xmlDocPtr doc;
 	xmlNodePtr root, interface, ip, addr, stat_node, type, dhcp;
@@ -452,15 +459,15 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		xmlNewTextChild(stat_node, stat_node->ns, BAD_CAST "out-errors", BAD_CAST stats.out_errors);
 
 		/* IPv4 */
-		if ((j = iface_get_ipv4_presence(devices[i], &msg)) == -1) {
+		if ((k = iface_get_ipv4_presence(devices[i])) == -1) {
 			goto next_ifc;
 		}
-		if (j) {
+		if (k) {
 			ip = xmlNewChild(interface, NULL, BAD_CAST "ipv4", NULL);
 			ipns = xmlNewNs(ip, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-ip", NULL);
 			xmlSetNs(ip, ipns);
 
-			if ((tmp = iface_get_ipv4_forwarding(0, devices[i], &msg)) == NULL) {
+			if ((tmp = iface_get_ipv4_forwarding(devices[i], &msg)) == NULL) {
 				goto next_ifc;
 			}
 			xmlNewTextChild(ip, ip->ns, BAD_CAST "forwarding", BAD_CAST tmp);
@@ -529,7 +536,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				ips.count = 0;
 			}
 
-			if (iface_get_ipv4_neighs(0, devices[i], &ips, &msg) != 0) {
+			if (iface_get_ipv4_neighs(devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 
@@ -556,10 +563,10 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 		}
 
 		/* IPv6 */
-		if ((j = iface_get_ipv6_presence(0, devices[i], &msg)) == -1) {
+		if ((k = iface_get_ipv6_presence(0, devices[i], &msg)) == -1) {
 			goto next_ifc;
 		}
-		if (j) {
+		if (k) {
 			ip = xmlNewChild(interface, NULL, BAD_CAST "ipv6", NULL);
 			ipns = xmlNewNs(ip, BAD_CAST "urn:ietf:params:xml:ns:yang:ietf-ip", NULL);
 			xmlSetNs(ip, ipns);
@@ -603,7 +610,7 @@ xmlDocPtr get_state_data (xmlDocPtr model, xmlDocPtr running, struct nc_err **er
 				ips.count = 0;
 			}
 
-			if (iface_get_ipv6_neighs(0, devices[i], &ips, &msg) != 0) {
+			if (iface_get_ipv6_neighs(devices[i], &ips, &msg) != 0) {
 				goto next_ifc;
 			}
 			for (j = 0; j < ips.count; ++j) {
@@ -674,7 +681,7 @@ struct ns_pair namespace_mapping[] = {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	char* msg;
 	xmlNodePtr cur;
@@ -717,7 +724,7 @@ int callback_if_interfaces_if_interface (void ** data, XMLDIFF_OP op, xmlNodePtr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4 (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr cur;
 	char* msg = NULL, *ptr;
@@ -782,7 +789,7 @@ int callback_if_interfaces_if_interface_ip_ipv4 (void ** data, XMLDIFF_OP op, xm
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	xmlNodePtr cur, node;
@@ -851,7 +858,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_enabled (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_origin (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_origin (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -903,7 +910,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_origin (void ** data, XMLDIFF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	xmlNodePtr node;
@@ -953,7 +960,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_forwarding (void ** data, XML
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_mtu (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_mtu (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -991,7 +998,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_mtu (void ** data, XMLDIFF_OP
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret, i;
 	char* msg = NULL, *netmask = NULL, *ip = NULL;
@@ -1070,7 +1077,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL, *ip = NULL, *mac = NULL;
@@ -1121,7 +1128,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_neighbor (void ** data, XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6 (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6 (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr UNUSED(new_node), struct nc_err** error)
 {
 	char* msg = NULL;
 
@@ -1158,7 +1165,7 @@ int callback_if_interfaces_if_interface_ip_ipv6 (void ** data, XMLDIFF_OP op, xm
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1208,7 +1215,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_enabled (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1258,7 +1265,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_forwarding (void ** data, XML
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr UNUSED(old_node), xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1296,7 +1303,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_mtu (void ** data, XMLDIFF_OP
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL, *ip = NULL;
@@ -1347,7 +1354,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_address (void ** data, XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL, *ip = NULL, *mac = NULL;
@@ -1398,7 +1405,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_neighbor (void ** data, XMLDI
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1437,7 +1444,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_dup_addr_detect_transmits (vo
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_addresses (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1487,7 +1494,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_global_add
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1537,7 +1544,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1576,7 +1583,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_l
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1651,7 +1658,7 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-int callback_if_interfaces_if_interface_if_enabled (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_if_enabled (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;

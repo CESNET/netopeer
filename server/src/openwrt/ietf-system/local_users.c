@@ -58,6 +58,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <ctype.h>
+#include <libnetconf.h>
 
 #include "local_users.h"
 #include "encrypt.h"
@@ -206,7 +207,7 @@ static char* get_authfile_path()
 	size_t n = 0;
 	ssize_t len;
 	char delimiter[] = " \t";
-	char *token;
+	char *token = NULL;
 
 	if ((file = fopen("/etc/ssh/sshd_config", "r")) == NULL) {
 		return (NULL);
@@ -236,7 +237,7 @@ static FILE* open_authfile(const char *username, const char *opentype, char **pa
 	struct passwd pwd;
 	struct passwd *result;
 	char *buf;
-	size_t bufsize;
+	ssize_t bufsize;
 	char *filepath = NULL;
 	FILE *file;
 	mode_t mask;

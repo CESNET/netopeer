@@ -560,7 +560,7 @@ char* get_option_config(char *path)
 	return NULL;
 }
 
-char** get_list_config(char* path, int* count)
+char** get_list_config(char* path, unsigned int* count)
 {
 	FILE *fileptr;
 	path_data arguments;
@@ -571,7 +571,7 @@ char** get_list_config(char* path, int* count)
 	ssize_t read;
 	bool found = false;
 	t_fsm_state state = S_START;
-	int mem_list = 5;
+	unsigned int mem_list = 5;
 	*count = 0;
 	ret = calloc(mem_list, sizeof(char*));
 
@@ -668,7 +668,7 @@ char** get_list_config(char* path, int* count)
 	return ret;
 }
 
-char** get_interface_section(const char* ifname, int* count)
+char** get_interface_section(const char* ifname, unsigned int* count)
 {
 	char** ret = NULL;
 	FILE *net_config;

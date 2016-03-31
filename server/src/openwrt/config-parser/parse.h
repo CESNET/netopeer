@@ -95,7 +95,7 @@ int rm_config_section(char *path);
  * @param count number of matches
  * @return NULL if element not found, list of found elements
  */
-char** get_list_config(char *path, int *count);
+char** get_list_config(char *path, unsigned int *count);
 
 /**
  * @brief gets option value from openWRT configuration files stored
@@ -109,9 +109,19 @@ char* get_option_config(char *path);
  * @brief gets sections name where interface is configured
  * in /etc/config/network
  * @param ifname path to the configuration element
+ * @param count number of sections on interface
  * @return NULL if element not found, name of section in conf file
  */
-char** get_interface_section(const char* ifname, int* count);
+char** get_interface_section(const char* ifname, unsigned int* count);
+
+/**
+ * @brief gets sections name where interface is configured by dhcp
+ * in /etc/config/network
+ * @param ifname path to the configuration element
+ * @param protocol 0 - IPv4, 1 - IPv6
+ * @return NULL if element not found, name of section in conf file
+ */
+char* get_dhcp_interface_section(const char* ifname, const char protocol);
 
 /**
  * @brief gets openWRT configuration section from files stored in /etc/config

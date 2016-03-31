@@ -19,8 +19,8 @@ int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, 
 
 	char *path = NULL;
 	char** section = NULL;
-	int section_count;
-	int i;
+	unsigned int section_count;
+	unsigned int i;
 
 	/* remove first dhcp interface section */
 	if ((op & XMLDIFF_MOD) || (op & XMLDIFF_REM)) {

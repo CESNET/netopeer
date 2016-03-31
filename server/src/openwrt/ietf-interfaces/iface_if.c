@@ -275,7 +275,7 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, con
 		}
 	} else { /* IPv6 */
 		if (op & XMLDIFF_ADD) {
-			const char* ip_prefix;
+			char* ip_prefix;
 			asprintf(&ip_prefix, "%s/%s", ip, str_prefix);
 
 			/* create section name - generate from ip */
@@ -285,10 +285,11 @@ static int iface_ip(unsigned char ipv4, const char* if_name, const char* ip, con
 			}
 
 			if_section.ifname = strdup(if_name);
-			if_section.ipv6_addr = strdup(ip);
+			if_section.ipv6_addr = strdup(ip_prefix);
 			if_section.proto = 0;
 			if_section.ipv4_addr = NULL;
 			if_section.ipv4_netmask = NULL;
+			free(ip_prefix);
 
 			if (add_interface_section(&if_section) != EXIT_SUCCESS) {
 				asprintf(msg, "Configuring interface %s failed.", if_name);
@@ -347,10 +348,10 @@ int iface_enabled(const char* if_name, unsigned char boolean, char** msg)
 	pclose(output);
 
 	/* pernament */
-	int i;
+	unsigned int i;
 	char *path = NULL;
 	char** section = NULL;
-	int section_count;
+	unsigned int section_count;
 	t_element_type type = OPTION;
 	char* value = (boolean ? "1" : "0");
 
@@ -428,8 +429,7 @@ fail:
 
 int iface_ipv4_mtu(const char* if_name, char* mtu, char** msg)
 {
-	int i;
-	int section_count;
+	unsigned int i, section_count;
 	char *path = NULL;
 	char** section = NULL;
 	t_element_type type = OPTION;
@@ -478,7 +478,6 @@ int iface_ipv4_ip(const char* if_name, const char* ip, const char* netmask, unsi
 /* enabled - 0 (disable), 1 (enable DHCP), 2 (enable static) */
 int iface_ipv4_enabled(const char* if_name, unsigned char enabled, xmlNodePtr node, unsigned char is_loopback, char** msg)
 {
-	xmlNodePtr cur;
 	char* cmd, *line = NULL;
 	FILE* output, *dhcp_pid;
 	size_t len = 0;
@@ -594,10 +593,10 @@ int iface_ipv6_enabled(const char* if_name, unsigned char boolean, char** msg)
 	}
 
 	/* permanent */
-	int i;
+	unsigned int i;
 	char *path = NULL;
 	char** section = NULL;
-	int section_count;
+	unsigned int section_count;
 	t_element_type type = OPTION;
 	char* value = (boolean ? "1" : "0");
 
@@ -639,10 +638,10 @@ int iface_ipv6_mtu(const char* if_name, char* mtu, char** msg)
 	}
 
 	/* permanent */
-	int i;
+	unsigned int i;
 	char *path = NULL;
 	char** section = NULL;
-	int section_count;
+	unsigned int section_count;
 	t_element_type type = OPTION;
 
 	if ((section = get_interface_section(if_name, &section_count)) != NULL) {
@@ -782,9 +781,9 @@ int iface_ipv6_temp_pref_lft(const char* if_name, unsigned int temp_pref_lft, ch
 	return EXIT_SUCCESS;
 }
 
-static int iface_get_neighs(unsigned char ipv4, unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg)
+static int iface_get_neighs(unsigned char ipv4, const char* if_name, struct ip_addrs* neighs, char** msg)
 {
-	int i;
+	size_t i;
 	char* cmd, *ptr, *line = NULL, *ip, *mac;
 	FILE* output;
 	size_t len = 0;
@@ -1064,12 +1063,13 @@ char* iface_get_speed(const char* if_name, char** msg)
 {
 	char* ret;
 
-	ret = read_from_sys_net(if_name, "speed");
-
-	if (ret != NULL) {
-		ret = realloc(ret, (strlen(ret)+6+1) * sizeof(char));
-		strcat(ret, "000000");
+	if ((ret = read_from_sys_net(if_name, "speed")) == NULL) {
+		asprintf(msg, "%s: failed to read from \"/sys/class/net/...\".", __func__);
+		return NULL;
 	}
+
+	ret = realloc(ret, (strlen(ret)+6+1) * sizeof(char));
+	strcat(ret, "000000");
 
 	return ret;
 }
@@ -1080,7 +1080,7 @@ static struct device_stats* if_old_stats;
 
 void iface_cleanup(void)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < if_count; ++i) {
 		free(if_names[i]);
@@ -1098,7 +1098,7 @@ int iface_get_stats(const char* if_name, struct device_stats* stats, char** msg)
 	char* line = NULL, *ptr;
 	size_t len = 0;
 	char aux[16];
-	int i;
+	unsigned int i;
 
 	if ((file = fopen(DEV_STATS_PATH, "r")) == NULL) {
 		asprintf(msg, "%s: unable to open \"%s\" (%s).", __func__, DEV_STATS_PATH, strerror(errno));
@@ -1191,10 +1191,10 @@ int iface_get_stats(const char* if_name, struct device_stats* stats, char** msg)
 }
 
 /* if ipv4 address is set on interface */
-int iface_get_ipv4_presence(const char* if_name, char** msg)
+int iface_get_ipv4_presence(const char* if_name)
 {
 	int ret;
-	char* cmd, *line = NULL, *tmp;
+	char* cmd, *line = NULL;
 	size_t len = 0;
 	FILE* output;
 
@@ -1216,7 +1216,7 @@ int iface_get_ipv4_presence(const char* if_name, char** msg)
 	return ret;
 }
 
-char* iface_get_ipv4_forwarding(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv4_forwarding(const char* if_name, char** msg)
 {
 	char* procval = NULL, *ret;
 
@@ -1252,9 +1252,9 @@ char* iface_get_ipv4_mtu(unsigned char config, const char* if_name, char** msg)
 	return ret;
 }
 
-int iface_get_ipv4_neighs(unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg)
+int iface_get_ipv4_neighs(const char* if_name, struct ip_addrs* neighs, char** msg)
 {
-	return iface_get_neighs(1, config, if_name, neighs, msg);
+	return iface_get_neighs(1, if_name, neighs, msg);
 }
 
 int iface_get_ipv6_presence(unsigned char config, const char* if_name, char** msg)
@@ -1263,8 +1263,8 @@ int iface_get_ipv6_presence(unsigned char config, const char* if_name, char** ms
 	char* procval = NULL;
 
 	if (config) {
-		int i;
-		int section_count = 0;
+		unsigned int i;
+		unsigned int section_count = 0;
 		char* path = NULL;
 		char** section = NULL;
 		
@@ -1321,11 +1321,11 @@ char* iface_get_ipv6_forwarding(unsigned char config, const char* if_name, char*
 
 char* iface_get_ipv6_mtu(unsigned char config, const char* if_name, char** msg)
 {
-	int i;
+	unsigned int i;
 	char* ret = NULL;
 
 	if (config) {
-		int section_count = 0;
+		unsigned int section_count = 0;
 		char* path = NULL;
 		char** section = NULL;
 		
@@ -1352,9 +1352,9 @@ char* iface_get_ipv6_mtu(unsigned char config, const char* if_name, char** msg)
 	return ret;
 }
 
-int iface_get_ipv6_neighs(unsigned char config, const char* if_name, struct ip_addrs* neighs, char** msg)
+int iface_get_ipv6_neighs(const char* if_name, struct ip_addrs* neighs, char** msg)
 {
-	return iface_get_neighs(0, config, if_name, neighs, msg);
+	return iface_get_neighs(0, if_name, neighs, msg);
 }
 
 char* iface_get_enabled(unsigned char config, const char* if_name, char** msg)
@@ -1395,7 +1395,7 @@ char* iface_get_enabled(unsigned char config, const char* if_name, char** msg)
 	return ptr;
 }
 
-char* iface_get_ipv6_dup_addr_det(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv6_dup_addr_det(const char* if_name, char** msg)
 {
 	char *ret;
 
@@ -1407,7 +1407,7 @@ char* iface_get_ipv6_dup_addr_det(unsigned char config, const char* if_name, cha
 	return ret;
 }
 
-char* iface_get_ipv6_creat_glob_addr(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv6_creat_glob_addr(const char* if_name, char** msg)
 {
 	char* glob_addr = NULL, *ret;
 
@@ -1427,7 +1427,7 @@ char* iface_get_ipv6_creat_glob_addr(unsigned char config, const char* if_name, 
 	return ret;
 }
 
-char* iface_get_ipv6_creat_temp_addr(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv6_creat_temp_addr(const char* if_name, char** msg)
 {
 	char* temp_addr = NULL, *ret;
 
@@ -1447,7 +1447,7 @@ char* iface_get_ipv6_creat_temp_addr(unsigned char config, const char* if_name, 
 	return ret;
 }
 
-char* iface_get_ipv6_temp_val_lft(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv6_temp_val_lft(const char* if_name, char** msg)
 {
 	char *ret = NULL;
 
@@ -1459,7 +1459,7 @@ char* iface_get_ipv6_temp_val_lft(unsigned char config, const char* if_name, cha
 	return ret;
 }
 
-char* iface_get_ipv6_temp_pref_lft(unsigned char config, const char* if_name, char** msg)
+char* iface_get_ipv6_temp_pref_lft(const char* if_name, char** msg)
 {
 	char *ret = NULL;
 
@@ -1474,7 +1474,7 @@ char* iface_get_ipv6_temp_pref_lft(unsigned char config, const char* if_name, ch
 int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg)
 {
 	unsigned int i;
-	int count_sections;
+	unsigned int count_sections;
 	char* cmd, *line = NULL, *origin, *ip, *prefix, *proto;
 	struct ip_addrs static_ips;
 	FILE* output;
@@ -1645,7 +1645,7 @@ int iface_get_ipv4_ipaddrs(unsigned char config, const char* if_name, struct ip_
 
 int iface_get_ipv6_ipaddrs(unsigned char config, const char* if_name, struct ip_addrs* ips, char** msg) {
 	unsigned int i;
-	int count_sections;
+	unsigned int count_sections;
 	char* cmd, *line = NULL, *origin, *ip, *prefix, *rest, *proto;
 	FILE* output;
 	struct ip_addrs static_ips;

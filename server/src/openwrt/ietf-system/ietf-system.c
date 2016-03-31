@@ -1004,9 +1004,9 @@ int callback_systemns_system_systemns_dns_resolver(void** UNUSED(data), XMLDIFF_
 int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	xmlNodePtr node_aux, node;
-	const char *name = NULL, *passwd = NULL, *new_passwd;
+	const char *name = NULL, *passwd = NULL, *new_passwd = NULL;
+	char *mod_passwd = NULL;
 	char *msg;
-	int free_passwd = 0;
 
 	/* True only if user is removed */
 	auth_user_rm = false;
@@ -1039,23 +1039,24 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 		}
 
 		if (passwd == NULL) {
-			passwd = calloc(1, sizeof(char));
-			free_passwd = 1;
+			mod_passwd = calloc(1, sizeof(char));
+		} else {
+			mod_passwd = strdup(passwd);
 		}
 
 		if (op & XMLDIFF_ADD) {
 			if (strcmp(name, "root") != 0) {
-				if ((new_passwd = users_add(name, passwd, &msg)) == NULL) {
+				if ((new_passwd = users_add(name, mod_passwd, &msg)) == NULL) {
 					return fail(error, msg, EXIT_FAILURE);
 				}
 			}
 		} else { /* (op & XMLDIFF_MOD) */
-			if ((new_passwd = users_mod(name, passwd, &msg)) == NULL) {
+			if ((new_passwd = users_mod(name, mod_passwd, &msg)) == NULL) {
 				printf("Failed to mod user %s\n", name);
 				return fail(error, msg, EXIT_FAILURE);
 			}
 		}
-		if (new_passwd != passwd && node_aux != NULL) {
+		if (new_passwd != mod_passwd && node_aux != NULL) {
 			/* update password in configuration data */
 			/* securely rewrite/erase the plain text password from memory */
 			memset((char*)(node_aux->children->content), '\0', strlen((char*)(node_aux->children->content)));
@@ -1084,10 +1085,8 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 		}
 	}
 
-	if (free_passwd) {
-		free(passwd);
-	}
-
+	free(mod_passwd);
+	
 	return EXIT_SUCCESS;
 }
 

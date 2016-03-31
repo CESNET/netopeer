@@ -23,6 +23,7 @@ int search_in_line(char *line, const char *search) {
 void format_line(char *s)
 {
 	char* formated_s = calloc(strlen(s), sizeof(char));
+	size_t k = 0;
 	int i = 0;
 	int formated_s_index = 0;
 	bool whitespace_found = false;
@@ -30,13 +31,13 @@ void format_line(char *s)
 
 	/* Delete if there is more than one whitespace - replace with one space */
 	/* Delete whitespaces on line begin */
-	for (i = 0; i < strlen(s); ++i) {
+	for (k = 0; k < strlen(s); ++k) {
 
-		if (isspace(s[i])) {
+		if (isspace(s[k])) {
 			if (whitespace_found || line_begin) {
 				continue;
 			}
-			if (s[i] == '\n') {
+			if (s[k] == '\n') {
 				continue;
 			}
 			/* Add one space between */
@@ -49,7 +50,7 @@ void format_line(char *s)
 			line_begin = false;
 			whitespace_found = false;
 
-			formated_s[formated_s_index] = s[i];
+			formated_s[formated_s_index] = s[k];
 			formated_s_index++;
 		}
 	}
@@ -118,7 +119,7 @@ char** dns_get_search_domain(char* path)
 	char* search_line = NULL;
 	char** search = NULL;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 
 	if ((fileptr1 = fopen(path, "r")) == NULL) {
 		return NULL;
@@ -158,7 +159,7 @@ char** dns_get_nameserver(char* path)
 	char* line = NULL;
 	char** search = NULL;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 	int i = 0;
 
 	if ((fileptr1 = fopen(path, "r")) == NULL) {
@@ -191,14 +192,14 @@ char* dns_get_options_value(char* option, char* path)
 	FILE *fileptr1;
 	char* line = NULL;
 	char* search = NULL;
-	char* option_path;
+	char* option_path = NULL;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 
-	asprintf(&path, "options %s:", option);
-	if ((fileptr1 = fopen(option_path, "r")) == NULL) {
+	if ((fileptr1 = fopen(path, "r")) == NULL) {
 		return NULL;
 	}
+	asprintf(&option_path, "options %s:", option);
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
@@ -309,7 +310,7 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 
 	if (domain == NULL || index < 1) {
 		/* NULL values */
@@ -368,7 +369,7 @@ int dns_rm_search_domain(const char* domain, char** msg)
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
  
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
@@ -424,7 +425,7 @@ void dns_rm_search_domain_all(void)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
  
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
@@ -454,7 +455,7 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 	int i = 1;
 
 	if (address == NULL || index < 1) {
@@ -506,12 +507,11 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 {
 	FILE *fileptr1, *fileptr2;
 	char * line = NULL;
-	char * new_line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	bool written = false;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 	int i = 1;
 
 	if (address == NULL || index < 1) {
@@ -574,7 +574,7 @@ int dns_rm_nameserver(const char* address, char** msg)
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
  
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
@@ -630,7 +630,7 @@ void dns_rm_nameserver_all(void)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
  
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
@@ -659,7 +659,7 @@ int dns_set_opt_timeout(const char* number, char** msg)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 	bool found = false;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
@@ -700,7 +700,7 @@ int dns_rm_opt_timeout(char** msg)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
@@ -730,7 +730,7 @@ int dns_set_opt_attempts(const char* number, char** msg)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 	bool found = false;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
@@ -771,7 +771,7 @@ int dns_rm_opt_attempts(char** msg)
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
-	size_t read;
+	ssize_t read;
 
 	fileptr1 = fopen("/etc/resolv.conf", "r");
 	fileptr2 = fopen("/etc/resolv.tmp", "w");
