@@ -172,7 +172,6 @@ char** dns_get_nameserver(char* path)
 		return NULL;
 	}
 
-	printf("nameserver start\n");
 	while (((read = getline(&line, &len, fileptr1)) != -1) && (i < MAX_NAMESERVERS)) {
 		format_line(line);
 		if (strncmp(line, "nameserver", 10) == 0) {
