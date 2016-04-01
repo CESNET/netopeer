@@ -420,10 +420,10 @@ int transapi_init(xmlDocPtr * running)
 	}
 
 	/* clear default ntp servers */
-	dns_rm_nameserver_all();
+	//dns_rm_nameserver_all();
 
 	/* Clear default dns search domains */
-	dns_rm_search_domain_all();
+	//dns_rm_search_domain_all();
 
 	/* Reset REORDER flags */
 	dns_search_reorder_done = false;
