@@ -521,9 +521,9 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 	}
 
 	if (!found) {
-		/* Nameserver with index not found */
-		asprintf(msg, "Nameserver with index \"%d\" not found", index);
-		return EXIT_FAILURE;
+		/* Nameserver with index not found - write a new entry */
+		fprintf (fileptr2, "nameserver %s\n", address);
+		return EXIT_SUCCESS;
 	}
 
 	free(line);
@@ -540,13 +540,16 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 int dns_add_nameserver(const char* address, int index, char** msg)
 {
 	FILE *fileptr1 = NULL, *fileptr2 = NULL;
-	char * line = NULL;
+	char* line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	bool written = false;
 	size_t len = 0;
 	ssize_t read;
 	int i = 1;
+
+	char *nameserver;
+	asprintf(&nameserver, "nameserver %s", address);
 
 	if (address == NULL || index < 1) {
 		/* NULL values */
@@ -567,21 +570,23 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "nameserver");
+		format_line(line);
 
 		if (searchResult == EXIT_SUCCESS) {
 			found = true;
 			
 			if (i == index && !written) {
 				fprintf (fileptr2, "nameserver %s\n", address);
-				printf ("nameserver %s\n", address);
 				written = true;
 			}
 			i++;
 
-			fprintf (fileptr2, "%s", line);
+			/* Do not write if same as old nameserver */
+			if (strcmp(line, nameserver) != 0) {
+				fprintf (fileptr2, "%s\n", line);
+			}
 		}
 		else {
-			format_line(line);
 			if (found && !written) {
 				/* Do not write - Can be found more nameservers after comment section */
 				if (line[0] != 35) {
@@ -599,6 +604,7 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 		fprintf (fileptr2, "nameserver %s\n", address);
 	}
 
+	free(nameserver);
 	free(line);
 	fclose(fileptr1);
 	fclose(fileptr2);
@@ -614,10 +620,12 @@ int dns_rm_nameserver(const char* address, char** msg)
 {
 	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
-	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
 	ssize_t read;
+
+	char* nameserver;
+	asprintf(&nameserver, "nameserver %s", address);
  
 	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
 		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
@@ -632,33 +640,16 @@ int dns_rm_nameserver(const char* address, char** msg)
 	}
 	
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
-		searchResult = search_in_line(line, "nameserver");
+		format_line(line);
 
-		if (searchResult == EXIT_SUCCESS) {
-
-			searchResult = remove_substring(line, address);
-			format_line(line);
-
-			if (searchResult == EXIT_SUCCESS) {
-				found = true;
-
-				if (strcmp(line, "nameserver") == 0) {
-					continue;
-				}
-				else {
-					fprintf (fileptr2, "%s\n", line);
-				}
-			}
-			else {
-				fprintf (fileptr2, "%s\n", line);
-			}
-		}
-		else {
-			format_line(line);
-			fprintf (fileptr2, "%s\n", line);
+		if (strcmp(line, nameserver) == 0) {
+			found = true;
+		} else {
+			fprintf(fileptr2, "%s\n", line);
 		}
 	}
 
+	free(nameserver);
 	free(line);
 	fclose(fileptr1);
 	fclose(fileptr2);
@@ -668,9 +659,8 @@ int dns_rm_nameserver(const char* address, char** msg)
 	}
 
 	if (!found) {
-		/* Configuration address not found - print error and continue */
-		asprintf(msg, "Match for nameserver \"%s\" failed", address);
-		return EXIT_FAILURE;
+		/* Configuration address not found - continue */
+		return EXIT_SUCCESS;
 	}
 
 	return EXIT_SUCCESS;
