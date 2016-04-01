@@ -12,7 +12,8 @@
 #include "dns_resolver.h"
 #include "../config-parser/parse.h"
 
-int search_in_line(char *line, const char *search) {
+int search_in_line(char *line, const char *search)
+{
 
 	if (strncmp(line, search, strlen(search)) == 0) {
 		return EXIT_SUCCESS;
@@ -303,7 +304,7 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 
 int dns_add_search_domain(const char* domain, int index, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	char * new_line = NULL;
 	int searchResult = EXIT_FAILURE;
@@ -315,9 +316,18 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
 		/* NULL values */
 		return EXIT_FAILURE;
 	}
- 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "search");
@@ -363,15 +373,24 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
 
 int dns_rm_search_domain(const char* domain, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
 	ssize_t read;
  
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 	
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "search");
@@ -420,14 +439,21 @@ int dns_rm_search_domain(const char* domain, char** msg)
 
 void dns_rm_search_domain_all(void)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
  
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			return;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		return;
+	}
 	
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "search");
@@ -449,7 +475,7 @@ void dns_rm_search_domain_all(void)
 
 int dns_mod_nameserver(const char* address, int index, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
@@ -462,8 +488,17 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "nameserver");
@@ -504,7 +539,7 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 
 int dns_add_nameserver(const char* address, int index, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
@@ -518,8 +553,17 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "nameserver");
@@ -568,15 +612,24 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 
 int dns_rm_nameserver(const char* address, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	bool found = false;
 	size_t len = 0;
 	ssize_t read;
  
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 	
 	while ((read = getline(&line, &len, fileptr1)) != -1) {  
 		searchResult = search_in_line(line, "nameserver");
@@ -625,16 +678,23 @@ int dns_rm_nameserver(const char* address, char** msg)
 
 void dns_rm_nameserver_all(void)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
  
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			return;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		return;
+	}
 	
-	while ((read = getline(&line, &len, fileptr1)) != -1) {  
+	while ((read = getline(&line, &len, fileptr1)) != -1) { 
 		searchResult = search_in_line(line, "nameserver");
 		format_line(line);
 
@@ -654,15 +714,24 @@ void dns_rm_nameserver_all(void)
 
 int dns_set_opt_timeout(const char* number, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
 	bool found = false;
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
@@ -695,14 +764,23 @@ int dns_set_opt_timeout(const char* number, char** msg)
 
 int dns_rm_opt_timeout(char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
@@ -725,15 +803,24 @@ int dns_rm_opt_timeout(char** msg)
 
 int dns_set_opt_attempts(const char* number, char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
 	bool found = false;
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
@@ -766,14 +853,23 @@ int dns_set_opt_attempts(const char* number, char** msg)
 
 int dns_rm_opt_attempts(char** msg)
 {
-	FILE *fileptr1, *fileptr2;
+	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	int searchResult = EXIT_FAILURE;
 	size_t len = 0;
 	ssize_t read;
 
-	fileptr1 = fopen("/etc/resolv.conf", "r");
-	fileptr2 = fopen("/etc/resolv.tmp", "w");
+	if ((fileptr1 = fopen("/etc/resolv.conf", "r")) == NULL) {
+		if ((fileptr1 = fopen("/etc/resolv.conf", "w+")) == NULL) {
+			asprintf(msg, "Cannot open or create \"/etc/resolv.conf\" file.");
+			return EXIT_FAILURE;
+		}
+	}
+	if ((fileptr2 = fopen("/etc/resolv.tmp", "w")) == NULL) {
+		fclose(fileptr1);
+		asprintf(msg, "Cannot open or create \"/etc/resolv.tmp\" temporary configuration file.");
+		return EXIT_FAILURE;
+	}
 
 	while ((read = getline(&line, &len, fileptr1)) != -1) {
 		format_line(line);
