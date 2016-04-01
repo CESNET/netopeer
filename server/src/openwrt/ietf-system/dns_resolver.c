@@ -12,6 +12,9 @@
 #include "dns_resolver.h"
 #include "../config-parser/parse.h"
 
+static int num_of_nameservers = 0;
+static int num_of_search = 0;
+
 int search_in_line(char *line, const char *search)
 {
 
@@ -304,6 +307,11 @@ xmlNodePtr dns_getconfig(xmlNsPtr ns, char** msg)
 
 int dns_add_search_domain(const char* domain, int index, char** msg)
 {
+	/* Limit number of seach domain */
+	if (num_of_search >= MAX_SEARCH_DOMAINS) {
+		return EXIT_SUCCESS;
+	}
+
 	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char * line = NULL;
 	char * new_line = NULL;
@@ -368,6 +376,7 @@ int dns_add_search_domain(const char* domain, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
+	num_of_search++;
 	return EXIT_SUCCESS;
 }
 
@@ -434,6 +443,7 @@ int dns_rm_search_domain(const char* domain, char** msg)
 		return EXIT_FAILURE;
 	}
 
+	num_of_search--;
 	return EXIT_SUCCESS;
 }
 
@@ -471,6 +481,7 @@ void dns_rm_search_domain_all(void)
 	fclose(fileptr1);
 	fclose(fileptr2);
 	rename("/etc/resolv.tmp", "/etc/resolv.conf");
+	num_of_search = 0;
 }
 
 int dns_mod_nameserver(const char* address, int index, char** msg)
@@ -539,6 +550,11 @@ int dns_mod_nameserver(const char* address, int index, char** msg)
 
 int dns_add_nameserver(const char* address, int index, char** msg)
 {
+	/* Limit number of nameservers */
+	if (num_of_nameservers >= MAX_NAMESERVERS) {
+		return EXIT_SUCCESS;
+	}
+
 	FILE *fileptr1 = NULL, *fileptr2 = NULL;
 	char* line = NULL;
 	int searchResult = EXIT_FAILURE;
@@ -613,6 +629,7 @@ int dns_add_nameserver(const char* address, int index, char** msg)
 		return EXIT_FAILURE;
 	}
 
+	num_of_nameservers++;
 	return EXIT_SUCCESS;
 }
 
@@ -663,6 +680,7 @@ int dns_rm_nameserver(const char* address, char** msg)
 		return EXIT_SUCCESS;
 	}
 
+	num_of_nameservers--;
 	return EXIT_SUCCESS;
 }
 
@@ -700,6 +718,7 @@ void dns_rm_nameserver_all(void)
 	fclose(fileptr1);
 	fclose(fileptr2);
 	rename("/etc/resolv.tmp", "/etc/resolv.conf");
+	num_of_nameservers = 0;
 }
 
 int dns_set_opt_timeout(const char* number, char** msg)
