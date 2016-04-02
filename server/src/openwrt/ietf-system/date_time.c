@@ -781,6 +781,7 @@ xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 		asprintf(errmsg, "NTP failed to get configuration from config file");
 		return NULL;
 	}
+
 	for (i = 0; i < count; ++i) {
 		/* ntp/server/ */
 		server = xmlNewChild(ntp_node, ntp_node->ns, BAD_CAST "server", NULL);
@@ -794,6 +795,7 @@ xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 		aux_node = xmlNewChild(server, server->ns, BAD_CAST "udp", NULL);
 		xmlNewChild(aux_node, aux_node->ns, BAD_CAST "address", BAD_CAST servers[i]);
 		/* port specification is not supported by OpenWrt basic ntp implementation */
+		free(servers[i]);
 
 		/* ntp/server/association-type */
 		if ((result = get_option_config("system.ntp.enable_server")) == NULL) {
@@ -809,6 +811,7 @@ xmlNodePtr ntp_getconfig(xmlNsPtr ns, char** errmsg)
 
 		/* prefer is not supported by OpenWrt basic ntp implementation */
 	}
+	free(servers);
 
 	return ntp_node;
 }

@@ -636,14 +636,14 @@ char** get_list_config(char* path, unsigned int* count)
 					state = S_SECTION;
 
 					if (*count >= mem_list) {
-						mem_list = mem_list * 2;
-						if ((ret = realloc(ret, sizeof(char*)*2)) == NULL ) {
+						mem_list++;
+						if ((ret = realloc(ret, sizeof(char*)*mem_list)) == NULL ) {
 							fclose(fileptr);
 							free(line);
 							return NULL;
 						}
 					}
-					if ( (ret[*count] = malloc(strlen(word) * sizeof(char))) ) {
+					if ( (ret[*count] = malloc(strlen(word) * sizeof(char))) != NULL) {
 						strcpy(ret[*count], word);
 					}
 					(*count)++;
@@ -665,6 +665,7 @@ char** get_list_config(char* path, unsigned int* count)
 
 	fclose(fileptr);
 	free(line);
+
 	return ret;
 }
 
