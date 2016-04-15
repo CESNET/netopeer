@@ -2,7 +2,7 @@ Introduction
 ============
 
 The Netopeer NETCONF server follows the integrated architecture described at
-[http://libnetconf.googlecode.com/git/doc/doxygen/html/da/db3/server.html].
+[https://rawgit.com/CESNET/libnetconf/master/doc/doxygen/html/da/db3/server.html].
 The source codes of this application can be found in the project Git repository
 inside the `/server/` directory. From here, this server is referred as the
 _Netopeer server_.
@@ -23,8 +23,8 @@ datastore, user should be familiar with the NETCONF protocol [3] and YANG
 language [4]. To communicate with the server and operate with the configuration
 data, the Netopeer project includes the netopeer-cli(1) program.
 
-[1] https://code.google.com/p/libnetconf/
-[2] http://libnetconf.googlecode.com/git/doc/doxygen/html/d9/d25/transapi.html
+[1] https://github.com/CESNET/libnetconf/
+[2] https://rawgit.com/CESNET/libnetconf/master/doc/doxygen/html/d9/d25/transapi.html
 [3] http://tools.ietf.org/html/rfc6241
 [4] http://tools.ietf.org/html/rfc6020
 
