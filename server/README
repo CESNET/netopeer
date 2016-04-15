@@ -1,7 +1,7 @@
 Introduction
 ============
 
-The Netopeer multi-level NETCONF server follows architecture described at
+The Netopeer NETCONF server follows the integrated architecture described at
 [http://libnetconf.googlecode.com/git/doc/doxygen/html/da/db3/server.html].
 The source codes of this application can be found in the project Git repository
 inside the `/server/` directory. From here, this server is referred as the
