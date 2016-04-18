@@ -371,7 +371,7 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 			return NULL;
 		}
 
-		asprintf(&cmdline, "usermod -p %s", encpass);
+		asprintf(&cmdline, "usermod %s -p %s", name, encpass);
 		ret = WEXITSTATUS(system(cmdline));
 		free(cmdline);
 
