@@ -1622,30 +1622,30 @@ int callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferr
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-// int callback_if_interfaces_if_interface_if_name (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
-// 	char* msg = NULL;
-// 	xmlNodePtr node;
+int callback_if_interfaces_if_interface_if_name (void ** data, XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error) {
+	char* msg = NULL;
+	xmlNodePtr node;
 
-// 	if (iface_ignore) {
-// 		return EXIT_SUCCESS;
-// 	}
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
 
-// 	node = (op & XMLDIFF_REM ? old_node : new_node);
+	node = (op & XMLDIFF_REM ? old_node : new_node);
 
-// 	if (node->children == NULL || node->children->content == NULL) {
-// 		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-// 		return finish(msg, EXIT_FAILURE, error);
-// 	}
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
 
-// 	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
-// 		iface_name = strdup((char*)node->children->content);
-// 	} else if (op & XMLDIFF_REM) {
-// 		/* do noting */
-// 		return EXIT_SUCCESS;
-// 	}
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		iface_name = strdup((char*)node->children->content);
+	} else if (op & XMLDIFF_REM) {
+		/* do noting */
+		return EXIT_SUCCESS;
+	}
 
-// 	return finish(msg, EXIT_SUCCESS, error);
-// }
+	return finish(msg, EXIT_SUCCESS, error);
+}
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/if:enabled changes
@@ -1703,7 +1703,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** UNUSED(data), XMLDIF
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 20,
+	.callbacks_count = 21,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1724,7 +1724,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:create-temporary-addresses", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_create_temporary_addresses},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-valid-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_valid_lifetime},
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
-		// {.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
+		{.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin}
 	}

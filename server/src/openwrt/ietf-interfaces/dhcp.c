@@ -42,7 +42,7 @@ int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, 
 	/* dhcp - client */
 	if (origin) {
 		/* start a new dhcp client */
-		asprintf(&cmd, "udhcpc -p /var/run/udhcpc-%s.pid -f -t 0 -i %s -C", if_name, if_name);
+		asprintf(&cmd, "udhcpc -p /var/run/udhcpc-%s.pid -t 0 -i %s -C", if_name, if_name);
 		output = popen(cmd, "r");
 		free(cmd);
 
@@ -69,7 +69,6 @@ int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, 
 		}
 		free(if_section.section);
 		free(if_section.ifname);
-
 	} else {
 		/* kill dhcp client if any */
 		char* line;

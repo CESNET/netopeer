@@ -998,6 +998,9 @@ char* iface_get_type(const char* if_name, char** msg)
 	case 772:
 		return strdup("softwareLoopback");
 		break;
+	case 801:
+		return strdup("ieee80211");
+		break;
 	default:
 		return strdup("other");
 		break;
