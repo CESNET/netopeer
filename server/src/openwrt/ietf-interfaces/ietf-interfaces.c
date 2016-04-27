@@ -13,6 +13,7 @@
 
 #include "ietf-interfaces.h"
 #include "dhcp.h"
+#include "wifi.h"
 
 #ifdef __GNUC__
 #	define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
@@ -661,6 +662,7 @@ struct ns_pair namespace_mapping[] = {
 	{"if", "urn:ietf:params:xml:ns:yang:ietf-interfaces"},
 	{"ip", "urn:ietf:params:xml:ns:yang:ietf-ip"},
 	{"dhcp", "urn:cesnet:yang:dhcp"},
+	{"wifi", "urn:cesnet:yang:wireless"},
 	{NULL, NULL}
 };
 
@@ -1697,13 +1699,63 @@ int callback_if_interfaces_if_interface_if_enabled (void ** UNUSED(data), XMLDIF
 	return finish(msg, ret, error);
 }
 
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:enabled changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned char enabled = 2;
+	xmlNodePtr node;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 1;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 0;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
+			enabled = 0;
+		} else {
+			enabled = 1;
+		}
+	}
+
+	if (enabled == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
+
+	iface_wifi_enabled(iface_name, enabled, &msg);
+	return finish(msg, ret, error);
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 21,
+	.callbacks_count = 22,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1726,7 +1778,8 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv6/ip:autoconf/ip:temporary-preferred-lifetime", .func = callback_if_interfaces_if_interface_ip_ipv6_ip_autoconf_ip_temporary_preferred_lifetime},
 		{.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
-		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin}
+		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:enabled", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled}
 	}
 };
 
@@ -1767,7 +1820,8 @@ int ietfinterfaces_file_change_cb(const char *filepath, xmlDocPtr *edit_config, 
 }
 
 struct transapi_file_callbacks file_clbks = {
-	.callbacks_count = 0,
+	.callbacks_count = 1,
 	.callbacks = {
+		{.path = "/etc/config/network", .func = ietfinterfaces_file_change_cb}
 	}
 };

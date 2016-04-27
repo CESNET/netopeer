@@ -67,7 +67,8 @@ typedef enum
 	S_CONFIG,
 	S_SECTION,
 	S_ITEM,
-	S_VALUE
+	S_VALUE,
+	S_ITEM_DEVICE
 } t_fsm_state;
 
 void arg_clear(path_data *arguments)
@@ -172,6 +173,10 @@ int rm_list(path_data *arguments, FILE *original_file, FILE *new_file)
 				case S_VALUE:
 					break;
 
+				/* not used */
+				case S_ITEM_DEVICE:
+					break;
+
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -264,6 +269,11 @@ int rm_list_item(path_data *arguments, FILE *original_file, FILE *new_file, cons
 						in_progress = false;
 						state = S_START;
 					}
+					break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -333,6 +343,10 @@ int add_list(path_data *arguments, FILE *original_file, FILE *new_file, const ch
 
 				/* not used */
 				case S_VALUE:
+					break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
 					break;
 
 			}
@@ -427,6 +441,10 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 				/* not used */
 				case S_VALUE:
 					break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -449,6 +467,115 @@ int change_option_value(path_data *arguments, FILE *original_file, FILE *new_fil
 		fprintf(new_file, "\toption %s %s\n", arguments->item, value);
 	}
 
+	return EXIT_SUCCESS;
+}
+
+int change_wireless_option_value(FILE *original_file, FILE *new_file, const char* device, const char *option, const char *value)
+{
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+
+	bool found = false;
+	bool in_progress = false;
+	bool in_section = false;
+	t_fsm_state state = S_START;
+
+	while ((read = getline(&line, &len, original_file)) != -1) {
+		if (found) {
+			fprintf(new_file, "%s", line);
+			continue;
+		}
+
+		char *line_replic = malloc(len * sizeof(char));
+		strcpy(line_replic, line);
+		char *word;
+
+		word = strtok (line_replic ," \t\v\f\r\"\'\n");
+		while (word != NULL){
+
+			switch(state) {
+
+				case S_START:
+					if (strcmp(word, "config") == 0) {
+						in_section = false;
+						state = S_CONFIG;
+					}
+					break;
+
+				case S_CONFIG:
+					if((strcmp(word, "wifi-iface")) == 0) {
+						state = S_SECTION;
+						in_progress = true;
+					} else {
+						state = S_START;
+					}
+					break;
+
+				case S_SECTION:
+					if((strcmp(word, "option")) == 0) {
+						state = S_ITEM;
+						in_progress = true;
+					}
+					break;
+
+				case S_ITEM:
+					if ((strcmp(word, "device")) == 0) {
+						state = S_ITEM_DEVICE;
+					} else if (strcmp(word, option) == 0) {
+						if (in_section) {
+							state = S_VALUE;
+						}
+					} else if (in_section && (strcmp(word, "config") == 0)) {
+						fprintf(new_file, "\toption %s %s\n", option, value);
+						fprintf(new_file, "\n");
+						fprintf(new_file, "%s", line);
+						found = true;
+						in_progress = false;
+						in_section = false;
+					}
+					break;
+
+				case S_VALUE:
+					fprintf(new_file, "\toption %s %s\n", option, value);
+					found = true;
+					in_progress = false;
+					in_section = false;
+					state = S_START;
+					break;
+
+				case S_ITEM_DEVICE:
+					if (strcmp(word, device) == 0) {
+						in_section = true;
+					}
+					state = S_SECTION;
+					break;
+			}
+			word = strtok (NULL, " \t\v\f\r\"\'\n");
+		}
+
+		if (state == S_CONFIG) {
+			state = S_START;
+		}
+
+		free(line_replic);
+		if (!in_progress) {
+			state = S_START;
+		}
+		if (!found && (strcmp(line, "\n") != 0)) {
+			if (strncmp("config", line, 6) == 0) {
+				fprintf(new_file, "\n%s", line);
+			} else {
+				fprintf(new_file, "%s", line);
+			}
+		}
+	}
+
+	if (!found && in_progress && in_section) {
+		fprintf(new_file, "\toption %s %s\n", option, value);
+	}
+
+	free(line);
 	return EXIT_SUCCESS;
 }
 
@@ -539,6 +666,10 @@ char* get_option_config(char *path)
 
 				/* not used */
 				case S_VALUE:
+					break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
 					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
@@ -653,6 +784,10 @@ char** get_list_config(char* path, unsigned int* count)
 				/* not used */
     			case S_VALUE:
     			break;
+
+    			/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -765,6 +900,10 @@ char** get_interface_section(const char* ifname, unsigned int* count)
 				/* not used */
     			case S_VALUE:
     			break;
+
+    			/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -827,6 +966,30 @@ int edit_config(char *path, const char *value, t_element_type type)
 	return EXIT_SUCCESS;
 }
 
+int edit_wireless_config(const char* device, char *option, const char *value)
+{
+	FILE *fileptr1, *fileptr2;
+
+	if ((fileptr1 = fopen("/etc/config/wireless", "r")) == NULL) {
+		return EXIT_FAILURE;
+	}
+	if ((fileptr2 = fopen("/etc/config/config.tmp", "w")) == NULL) {
+		return EXIT_FAILURE;
+	}
+
+	if (change_wireless_option_value(fileptr1, fileptr2, device, option, value) != EXIT_SUCCESS) {
+		return EXIT_FAILURE;
+	}
+
+	fclose(fileptr1);
+	fclose(fileptr2);
+	if (rename("/etc/config/config.tmp", "/etc/config/wireless") == -1) {
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 int rm_config(char *path, const char *value, t_element_type type)
 {
 	FILE *fileptr1, *fileptr2;
@@ -834,7 +997,6 @@ int rm_config(char *path, const char *value, t_element_type type)
 
 	arguments.section = NULL;
 
-	printf("2\n");
 	if (get_items_from_path(path, &arguments) != EXIT_SUCCESS){
 		return EXIT_FAILURE;
 	}
@@ -842,18 +1004,15 @@ int rm_config(char *path, const char *value, t_element_type type)
 	char filename[80] = "/etc/config/";
 	strcat(filename, arguments.file);
 
-	printf("3\n");
 	fileptr1 = fopen(filename, "r");
 	fileptr2 = fopen("/etc/config/config.tmp", "w");
 
-	printf("4\n");
 	if (type == OPTION) {
 		fclose(fileptr1);
 		fclose(fileptr2);
 		return EXIT_SUCCESS;
 	}
 	else if (type == LIST) {
-		printf("VALUE - RM_CONFIG: %s\n", value);
 		if (rm_list_item(&arguments, fileptr1, fileptr2, value) != EXIT_SUCCESS) {
 			fclose(fileptr1);
 			fclose(fileptr2);
@@ -861,14 +1020,12 @@ int rm_config(char *path, const char *value, t_element_type type)
 		}
 	}
 
-	printf("1000\n");
 	arg_clear(&arguments);
 	fclose(fileptr1);
 	fclose(fileptr2);
 	if (rename("/etc/config/config.tmp", filename) == -1) {
 		return EXIT_FAILURE;
 	}
-	printf("1001\n");
 
 	return EXIT_SUCCESS;
 }
@@ -951,6 +1108,10 @@ char* get_config_section(char* path, const char* section_type, const char* value
 					state = S_SECTION;
 				}
 				break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -1034,6 +1195,10 @@ int rm_config_section(char *path)
 				/* not used */
 				case S_VALUE:
 					break;
+
+				/* not used */
+				case S_ITEM_DEVICE:
+					break;
 			}
 			word = strtok (NULL, " \t\v\f\r\"\'\n");
 		}
@@ -1085,6 +1250,28 @@ int add_interface_section(struct interface_section* if_section)
 	if ((if_section->ipv6_addr != NULL) && (if_section->proto == 0)) {
 		fprintf(fileptr, "\n\toption ip6addr \'%s\'", if_section->ipv6_addr);
 	}
+
+	fprintf(fileptr, "\n");
+	fclose(fileptr);
+	return EXIT_SUCCESS;
+}
+
+int add_wireless_interface_section(struct wireless_interface_section* if_section)
+{
+	FILE *fileptr;
+
+	if ((fileptr = fopen("/etc/config/wireless", "a")) == NULL) {
+		return EXIT_FAILURE;
+	}
+
+	fprintf(fileptr, "\nconfig wifi-iface");
+	fprintf(fileptr, "\n\toption device \'%s\'", if_section->device);
+	fprintf(fileptr, "\n\toption network \'%s\'", if_section->network);
+	fprintf(fileptr, "\n\toption mode \'%s\'", if_section->mode);
+	fprintf(fileptr, "\n\toption ssid \'%s\'", if_section->ssid);
+	fprintf(fileptr, "\n\toption encryption \'%s\'", if_section->encryption);
+	fprintf(fileptr, "\n\toption key \'%s\'", if_section->key);
+	fprintf(fileptr, "\n\toption hidden \'%d\'", if_section->hidden);
 
 	fprintf(fileptr, "\n");
 	fclose(fileptr);

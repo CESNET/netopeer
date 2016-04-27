@@ -16,6 +16,9 @@
 		<model>
 			<path>@sysconfdir@/netopeer/ietf-interfaces/cesnet-dhcp.yin</path>
 		</model>
+		<model>
+			<path>@sysconfdir@/netopeer/ietf-interfaces/cesnet-wireless.yin</path>
+		</model>
 	</data-models>
 	<repo>
 		<type>file</type>

@@ -62,6 +62,16 @@ struct interface_section {
 	int proto; /* 0 - static, 1 - dhcp */
 };
 
+struct wireless_interface_section {
+	char* device;
+	char* network;
+	char* mode;
+	char* ssid;
+	char* encryption;
+	char* key;
+	int hidden; /* 0 - not hidden, 1 - hidden */
+};
+
 /**
  * @brief edits openWRT configuration files stored in /etc/config
  * if configuration element is not set, it will be added
@@ -71,6 +81,17 @@ struct interface_section {
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int edit_config(char *path, const char *value, t_element_type type);
+
+/**
+ * @brief edits openWRT configuration files stored in /etc/config/wireless
+ * if configuration element is not set, it will be added
+ * @param path path to the configuration element to be edited
+ * @param value configuration elemement value to be set
+ * @param type configuration element type - OPTION or LIST
+ * @param device option device for device name
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int edit_wireless_config(const char* device, char *option, const char *value);
 
 /**
  * @brief removes openWRT configuration from files stored in /etc/config
@@ -87,6 +108,13 @@ int rm_config(char *path, const char *value, t_element_type type);
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int rm_config_section(char *path);
+
+/**
+ * @brief removes openWRT configuration section from files stored in /etc/config/wireless
+ * @param path path to the configuration element to be edited
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int rm_wireless_config_section(char *device);
 
 /**
  * @brief gets list value from openWRT configuration files stored
@@ -135,11 +163,17 @@ char* get_config_section(char* path, const char* section_type, const char* value
 /**
  * @brief edits openWRT configuration files stored in /etc/config/network
  * adds configuration section
- * @param path path to the configuration element to be edited
- * @param value configuration elemement value to be set
- * @param type configuration element type - OPTION or LIST
+ * @param if_section structure with needed section information
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int add_interface_section(struct interface_section* if_section);
+
+/**
+ * @brief edits openWRT wireless configuration files stored in /etc/config/wireless
+ * adds configuration section
+ * @param if_section structure with needed section information
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+int add_wireless_interface_section(struct wireless_interface_section* if_section);
 
 #endif /* PARSE_H_ */

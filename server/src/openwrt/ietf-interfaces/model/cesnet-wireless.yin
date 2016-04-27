@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="cesnet-wireless"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:wifi="urn:cesnet:yang:wireless"
+        xmlns:if="urn:ietf:params:xml:ns:yang:ietf-interfaces">
+  <namespace uri="urn:cesnet:yang:wireless"/>
+  <prefix value="wifi"/>
+  <import module="ietf-interfaces">
+    <prefix value="if"/>
+  </import>
+  <contact>
+    <text>Peter Nagy &lt;xnagyp01@stud.fit.vutbr.cz&gt;</text>
+  </contact>
+  <description>
+    <text>This module contains a data model for the configuration of wireless network.
+
+Copyright (C) 2016 CESNET, z.s.p.o.
+</text>
+  </description>
+  <revision date="2016-02-02">
+    <description>
+      <text>Initial revision.</text>
+    </description>
+  </revision>
+  <typedef name="wireless-mode">
+    <type name="enumeration">
+      <enum name="ap">
+        <description>
+          <text>Access point mode</text>
+        </description>
+      </enum>
+      <enum name="sta">
+        <description>
+          <text>STA for managed - client mode</text>
+        </description>
+      </enum>
+      <enum name="adhoc">
+        <description>
+          <text>Wireless Ad-Hoc mode</text>
+        </description>
+      </enum>
+      <enum name="wds">
+        <description>
+          <text>Static WDS mode</text>
+        </description>
+      </enum>
+      <enum name="monitor">
+        <description>
+          <text>Monitoring mode</text>
+        </description>
+      </enum>
+      <enum name="mesh">
+        <description>
+          <text>Mesh mode</text>
+        </description>
+      </enum>
+    </type>
+    <description>
+      <text>Wireless interface mode</text>
+    </description>
+  </typedef>
+  <identity name="wireless-encryption-algoritm">
+    <description>
+      <text>Base identity for wireless encryption algoritm</text>
+    </description>
+  </identity>
+  <identity name="wep">
+    <base name="wireless-encryption-algoritm"/>
+    <description>
+      <text>WEP encryption</text>
+    </description>
+  </identity>
+  <identity name="psk">
+    <base name="wireless-encryption-algoritm"/>
+    <description>
+      <text>WPA-PSK encryption</text>
+    </description>
+  </identity>
+  <identity name="psk2">
+    <base name="wireless-encryption-algoritm"/>
+    <description>
+      <text>WPA2-PSK encryption</text>
+    </description>
+  </identity>
+  <augment target-node="/if:interfaces/if:interface">
+    <list name="wireless">
+      <key value="device"/>
+      <description>
+        <text>Wireless parameters</text>
+      </description>
+      <leaf name="enabled">
+        <type name="boolean"/>
+        <default value="true"/>
+        <description>
+          <text>Controls whether wireless is enabled of disabled
+on this interface.</text>
+        </description>
+      </leaf>
+      <leaf name="device">
+        <type name="string"/>
+        <description>
+          <text>Controls wireless hardware device</text>
+        </description>
+      </leaf>
+      <leaf name="ssid">
+        <type name="string"/>
+        <default value="OpenWrt"/>
+        <description>
+          <text>Wireless SSID set on this interface</text>
+        </description>
+      </leaf>
+      <leaf name="mode">
+        <type name="wireless-mode"/>
+        <description>
+          <text>Interface wireless mode</text>
+        </description>
+      </leaf>
+      <leaf name="hidden">
+        <type name="boolean"/>
+        <default value="false"/>
+        <description>
+          <text>Controls wireless SSID broadcasting</text>
+        </description>
+      </leaf>
+      <container name="encryption-method">
+        <description>
+          <text>Wireless encryption mode</text>
+        </description>
+        <leaf name="algoritm">
+          <type name="identityref">
+            <base name="wireless-encryption-algoritm"/>
+          </type>
+          <description>
+            <text>Wireless encryption algoritm</text>
+          </description>
+        </leaf>
+        <leaf name="password">
+          <type name="string"/>
+          <description>
+            <text>Wireless encryption password</text>
+          </description>
+        </leaf>
+      </container>
+    </list>
+  </augment>
+</module>
