@@ -5,6 +5,7 @@
  * \author Tomas Cejka <cejkat@cesnet.cz>
  * \author Peter Nagy <xnagyp01@stud.fit.vutbr.cz>
  * \date 2013
+ * \date 2015
  */
 /*
  * Copyright (C) 2013 CESNET
