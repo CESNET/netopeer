@@ -17,11 +17,11 @@
     <prefix value="inet"/>
   </import>
   <contact>
-    <text>Radek Krejci &lt;rkrejci@cesnet.cz&gt;</text>
+    <text>Peter Nagy &lt;xnagyp01@stud.fit.vutbr.cz&gt;</text>
   </contact>
   <description>
-    <text>This module contains a data model for the configuration of network routes
-mainly designed for the default gateway configuration.
+    <text>This module contains a data model for the configuration of dhcp
+and the default gateway configuration.
 
 Copyright (C) 2013 CESNET, z.s.p.o.
  
@@ -38,13 +38,36 @@ TODO: License
       <text>Initial revision.</text>
     </description>
   </revision>
-  <grouping name="dhcp-status">
+  <identity name="origin">
     <description>
-      <text>DHCP state info for interface with enabled DHCP.</text>
+      <text>Base identity for address origin</text>
+    </description>
+  </identity>
+  <identity name="manual">
+    <base name="origin"/>
+    <description>
+      <text>Manual IP address origin</text>
+    </description>
+  </identity>
+  <identity name="dhcp">
+    <base name="origin"/>
+    <description>
+      <text>DHCP IP address origin</text>
+    </description>
+  </identity>
+  <identity name="linklayer">
+    <base name="origin"/>
+    <description>
+      <text>Linklayer IP address address origin</text>
+    </description>
+  </identity>
+  <grouping name="dhcp-status-ipv4">
+    <description>
+      <text>DHCP state info for interface with enabled DHCP, IPv4 protocol.</text>
     </description>
     <leaf name="ip-address">
       <config value="false"/>
-      <type name="inet:ip-address"/>
+      <type name="inet:ipv4-address-no-zone"/>
       <description>
         <text>The IP address on the interface.</text>
       </description>
@@ -60,14 +83,14 @@ TODO: License
     </leaf>
     <leaf name="default-gateway">
       <config value="false"/>
-      <type name="inet:ip-address"/>
+      <type name="inet:ipv4-address-no-zone"/>
       <description>
         <text>The default gateway of an interface.</text>
       </description>
     </leaf>
     <leaf-list name="dns-server">
       <config value="false"/>
-      <type name="inet:ip-address"/>
+      <type name="inet:ipv4-address-no-zone"/>
       <description>
         <text>The DNS server addresses obtained by DHCP.</text>
       </description>
@@ -81,7 +104,50 @@ TODO: License
       </description>
     </leaf-list>
   </grouping>
-  <grouping name="dhcp-server">
+  <grouping name="dhcp-status-ipv6">
+    <description>
+      <text>DHCP state info for interface with enabled DHCP, IPv6 protocol.</text>
+    </description>
+    <leaf name="ip-address">
+      <config value="false"/>
+      <type name="inet:ipv6-address-no-zone"/>
+      <description>
+        <text>The IP address on the interface.</text>
+      </description>
+    </leaf>
+    <leaf name="prefix-length">
+      <config value="false"/>
+      <type name="uint8">
+        <range value="0..128"/>
+      </type>
+      <description>
+        <text>The length of the subnet prefix.</text>
+      </description>
+    </leaf>
+    <leaf name="default-gateway">
+      <config value="false"/>
+      <type name="inet:ipv6-address-no-zone"/>
+      <description>
+        <text>The default gateway of an interface.</text>
+      </description>
+    </leaf>
+    <leaf-list name="dns-server">
+      <config value="false"/>
+      <type name="inet:ipv6-address-no-zone"/>
+      <description>
+        <text>The DNS server addresses obtained by DHCP.</text>
+      </description>
+    </leaf-list>
+    <leaf-list name="dns-search">
+      <config value="false"/>
+      <type name="inet:host"/>
+      <ordered-by value="user"/>
+      <description>
+        <text>List of domains obtained by DHCP to search when resolving a hostname .</text>
+      </description>
+    </leaf-list>
+  </grouping>
+  <grouping name="dhcp-server-ipv4">
     <description>
       <text>DHCP server on interface configuration.</text>
     </description>
@@ -114,41 +180,79 @@ TODO: License
       </description>
     </leaf>
   </grouping>
+  <grouping name="dhcp-server-ipv6">
+    <description>
+      <text>DHCP server on interface configuration.</text>
+    </description>
+    <leaf name="enabled">
+      <type name="boolean"/>
+      <description>
+        <text>Specifies if dhcpv6 server is enabled</text>
+      </description>
+    </leaf>
+    <leaf name="router-advertisements">
+      <type name="enumeration">
+        <enum name="server">
+          <description>
+            <text>Specifies router advertisement to server mode</text>
+          </description>
+        </enum>
+        <enum name="relay">
+          <description>
+            <text>Specifies router advertisement to relay mode</text>
+          </description>
+        </enum>
+        <enum name="disabled">
+          <description>
+            <text>Specifies the router advertisement to be disabled</text>
+          </description>
+        </enum>
+      </type>
+      <description>
+        <text>Specifies the router advertisement type</text>
+      </description>
+    </leaf>
+    <leaf name="ndp">
+      <type name="boolean"/>
+      <description>
+        <text>Specifies Neighbor Discovery Protocol</text>
+      </description>
+    </leaf>
+  </grouping>
   <augment target-node="/if:interfaces/if:interface/ip:ipv4">
     <leaf name="origin">
-      <type name="enumeration">
-        <enum name="manual"/>
-        <enum name="dhcp"/>
+      <type name="identityref">
+        <base name="origin"/>
       </type>
-      <default value="dhcp"/>
     </leaf>
     <container name="dhcp-server">
       <when condition="../origin = 'manual'"/>
-      <uses name="dhcp-server"/>
+      <uses name="dhcp-server-ipv4"/>
     </container>
   </augment>
   <augment target-node="/if:interfaces-state/if:interface/ip:ipv4">
     <container name="dhcp-config">
       <config value="false"/>
       <when condition="/if:interfaces/if:interface/ip:ipv4/origin = 'dhcp'"/>
-      <uses name="dhcp-status"/>
+      <uses name="dhcp-status-ipv4"/>
     </container>
   </augment>
   <augment target-node="/if:interfaces/if:interface/ip:ipv6">
     <leaf name="origin">
-      <type name="enumeration">
-        <enum name="manual"/>
-        <enum name="dhcp"/>
-        <enum name="linklayer"/>
+      <type name="identityref">
+        <base name="origin"/>
       </type>
-      <default value="dhcp"/>
     </leaf>
+    <container name="dhcp-server">
+      <when condition="../origin = 'manual'"/>
+      <uses name="dhcp-server-ipv6"/>
+    </container>
   </augment>
   <augment target-node="/if:interfaces-state/if:interface/ip:ipv6">
     <container name="dhcp-config">
       <config value="false"/>
-      <when condition="/if:interfaces/if:interface/ip:ipv4/origin = 'dhcp'"/>
-      <uses name="dhcp-status"/>
+      <when condition="/if:interfaces/if:interface/ip:ipv6/origin = 'dhcp'"/>
+      <uses name="dhcp-status-ipv6"/>
     </container>
   </augment>
 </module>
