@@ -1059,7 +1059,9 @@ int callback_systemns_system_systemns_authentication_systemns_user(void** UNUSED
 		if (new_passwd != mod_passwd && node_aux != NULL) {
 			/* update password in configuration data */
 			/* securely rewrite/erase the plain text password from memory */
-			memset((char*)(node_aux->children->content), '\0', strlen((char*)(node_aux->children->content)));
+			if (node_aux->children != NULL) {
+				memset((char*)(node_aux->children->content), '\0', strlen((char*)(node_aux->children->content)));
+			}
 
 			/* and now replace content of the xml node */
 			xmlNodeSetContent(node_aux, BAD_CAST new_passwd);

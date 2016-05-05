@@ -324,7 +324,7 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 	}
 
 	/* create user */
-	asprintf(&cmdline, "useradd -m %s -s %s -p %s", name, DEFAULT_SHELL, encpass);
+	asprintf(&cmdline, "useradd -m %s -s %s -p \"%s\"", name, DEFAULT_SHELL, encpass);
 	ret = WEXITSTATUS(system(cmdline));
 	free(cmdline);
 
@@ -358,9 +358,9 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 
 const char* users_mod(const char *name, const char *passwd, char **msg)
 {
-	int ret;
+	int ret = 0;
 	char* cmdline = NULL;
-	const char* encpass = NULL;
+	char* encpass = NULL;
 
 	assert(name);
 	assert(passwd);
@@ -371,16 +371,23 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 			return NULL;
 		}
 
-		asprintf(&cmdline, "usermod %s -p %s", name, encpass);
+		asprintf(&cmdline, "usermod %s -p \"%s\"", name, encpass);
 		ret = WEXITSTATUS(system(cmdline));
 		free(cmdline);
 
-		if (ret != 0) {
-			*msg = strdup(errmsg[ret]);
-			return (NULL);
-		}
+	} else {
+		/* empty password can be set - user root has empty password in default */
+		asprintf(&cmdline, "usermod %s -p \"\"", name);
+		ret = WEXITSTATUS(system(cmdline));
+		free(cmdline);
+
+		encpass = calloc(1, sizeof(char));
 	}
 
+	if (ret != 0) {
+		*msg = strdup(errmsg[ret]);
+		return (NULL);
+	}
 	return encpass;
 }
 
