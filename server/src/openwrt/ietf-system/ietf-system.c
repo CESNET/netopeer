@@ -1382,6 +1382,8 @@ int ietfsystem_file_change(const char* filepath, xmlDocPtr *edit_conf, int *exec
 		config = ntp_getconfig(ns, &msg);
 	} else if (strcmp(filepath, "/etc/resolv.conf") == 0) {
 		config = dns_getconfig(ns, &msg);
+	} else if ((strcmp(filepath, "/etc/passwd") == 0) || (strcmp(filepath, "/etc/shadow") == 0)) {
+		config = users_getxml(ns, &msg);
 	}
 	
 
