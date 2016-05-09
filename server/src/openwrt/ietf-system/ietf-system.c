@@ -232,7 +232,7 @@ static int set_hostname(const char* name)
 		fclose(hostname_f);
 		return (EXIT_FAILURE);
 	}
-
+	
 	if (edit_config(path, name, type) != (EXIT_SUCCESS)) {
 		nc_verb_error("Unable to write hostname to system config file");
 		fclose(hostname_f);

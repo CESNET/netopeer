@@ -1700,6 +1700,75 @@ int callback_if_interfaces_if_interface_if_enabled (void ** UNUSED(data), XMLDIF
 }
 
 /**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server (void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	xmlNodePtr node, node_aux;
+	// unsigned int start = 0, limit = 0;
+	char* leasetime = NULL, *default_gateway = NULL, *start = NULL, *stop = NULL;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+	
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	for (node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
+		if (node_aux->type != XML_ELEMENT_NODE) {
+			continue;
+		}
+
+		if (xmlStrcmp(node_aux->name, BAD_CAST "start") == 0) {
+			start = strdup((char*)node_aux->children->content);
+		} else if (xmlStrcmp(node_aux->name, BAD_CAST "stop") == 0) {
+			stop = strdup((char*)node_aux->children->content);
+		} else if (xmlStrcmp(node_aux->name, BAD_CAST "leasetime") == 0) {
+			leasetime = strdup((char*)node_aux->children->content);
+		} else if (xmlStrcmp(node_aux->name, BAD_CAST "default-gateway") == 0) {
+			default_gateway = strdup((char*)node_aux->children->content);
+		}
+	}
+
+	if (!default_gateway || !start || !stop) {
+		asprintf(&msg, "%s: Not all dhcp-server elements are defined.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+	// if (start == 0) {
+	// 	asprintf(&msg, "%s: start elemnt not defined or defined to zero.", __func__);
+	// 	return finish(msg, EXIT_FAILURE, error);
+	// }
+	// if (limit == 0) {
+	// 	asprintf(&msg, "%s: limit elemnt not defined or defined to zero.", __func__);
+	// 	return finish(msg, EXIT_FAILURE, error);
+	// }
+
+	// ret = dhcp_ipv4_server(start, stop, leasetime, default_gateway, &msg);
+
+	free(leasetime);
+	free(default_gateway);
+	free(start);
+	free(stop);
+	return finish(msg, ret, error);
+}
+
+
+/**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:enabled changes
  *
  * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
@@ -1710,7 +1779,7 @@ int callback_if_interfaces_if_interface_if_enabled (void ** UNUSED(data), XMLDIF
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 /* !DO NOT ALTER FUNCTION SIGNATURE! */
-callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
 {
 	int ret;
 	char* msg = NULL;
@@ -1755,7 +1824,7 @@ callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSED(da
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 22,
+	.callbacks_count = 23,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1779,6 +1848,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/if:name", .func = callback_if_interfaces_if_interface_if_name},
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin},
+		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server},
 		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:enabled", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled}
 	}
 };
