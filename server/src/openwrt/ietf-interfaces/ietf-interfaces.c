@@ -52,6 +52,9 @@ NC_EDIT_ERROPT_TYPE erropt = NC_EDIT_ERROPT_NOTSET;
 /* always learnt in the first callback, used by every other */
 static char* iface_name = NULL;
 
+/* Wireless device learnt in the first callback, used by other wireless callbacks */
+static char* wireless_device = NULL;
+
 /* flag to indicate interface removal - we stop managing an interface - ignore all other children removals */
 static int iface_ignore = 0;
 
@@ -364,6 +367,7 @@ int transapi_init(xmlDocPtr * running)
 void transapi_close(void)
 {
 	free(iface_name);
+	free(wireless_device);
 	iface_cleanup();
 	return;
 }
@@ -1767,6 +1771,43 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server (void ** UNUSED(d
 	return finish(msg, ret, error);
 }
 
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	char* msg = NULL;
+	xmlNodePtr cur, node;
+
+	if (iface_ignore || iface_ipv4addr_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	node = (op & XMLDIFF_ADD ? new_node : old_node);
+	free(wireless_device);
+	wireless_device = NULL;
+
+	for (cur = node->children; cur != NULL; cur = cur->next) {
+		if (cur->children == NULL || cur->children->content == NULL) {
+			continue;
+		}
+
+		if (xmlStrEqual(cur->name, BAD_CAST "device")) {
+			wireless_device = strdup((char*)cur->children->content);
+		}
+	}
+
+	return finish(msg, EXIT_SUCCESS, error);
+}
+
 
 /**
  * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:enabled changes
@@ -1814,7 +1855,7 @@ int callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSE
 		return EXIT_SUCCESS;
 	}
 
-	iface_wifi_enabled(iface_name, enabled, &msg);
+	ret = iface_wifi_enabled(wireless_device, enabled, &msg);
 	return finish(msg, ret, error);
 }
 
@@ -1824,7 +1865,7 @@ int callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSE
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 23,
+	.callbacks_count = 24,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1849,6 +1890,7 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/if:enabled", .func = callback_if_interfaces_if_interface_if_enabled},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server},
+		{.path = "/if:interfaces/if:interface/wifi:wireless", .func = callback_if_interfaces_if_interface_wifi_wireless},
 		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:enabled", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled}
 	}
 };
