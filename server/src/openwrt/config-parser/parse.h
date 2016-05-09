@@ -85,10 +85,9 @@ int edit_config(char *path, const char *value, t_element_type type);
 /**
  * @brief edits openWRT configuration files stored in /etc/config/wireless
  * if configuration element is not set, it will be added
- * @param path path to the configuration element to be edited
+ * @param device edited wireless device
+ * @param option configuration element name
  * @param value configuration elemement value to be set
- * @param type configuration element type - OPTION or LIST
- * @param device option device for device name
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
 int edit_wireless_config(const char* device, char *option, const char *value);
@@ -110,11 +109,12 @@ int rm_config(char *path, const char *value, t_element_type type);
 int rm_config_section(char *path);
 
 /**
- * @brief removes openWRT configuration section from files stored in /etc/config/wireless
- * @param path path to the configuration element to be edited
+ * @brief edits openWRT configuration files stored in /etc/config/wireless
+ * @param device edited wireless device
+ * @param option configuration element name
  * @return EXIT_SUCCESS or EXIT_FAILURE
  */
-int rm_wireless_config_section(char *device);
+int rm_wireless_config(const char* device, char *option);
 
 /**
  * @brief gets list value from openWRT configuration files stored

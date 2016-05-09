@@ -120,7 +120,6 @@ int iface_wifi(const char* if_name, char* device, char* mode, char* ssid, char* 
 
 int iface_wifi_enabled(const char* device, unsigned char boolean, char** msg)
 {
-	/* pernament */
 	char* value = (boolean ? "0" : "1");
 
 	if ((edit_wireless_config(device, "disabled", value)) != (EXIT_SUCCESS)) {
@@ -133,3 +132,75 @@ int iface_wifi_enabled(const char* device, unsigned char boolean, char** msg)
 
 	return EXIT_SUCCESS;
 }
+
+int iface_wifi_ssid(const char* device, const char* ssid, char** msg)
+{
+	if ((edit_wireless_config(device, "ssid", ssid)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring wireless device %s ssid failed.", device);
+		return EXIT_FAILURE;
+	}
+
+	/* Reload wireless configuration */
+	system("wifi reload");
+
+	return EXIT_SUCCESS;
+}
+
+int iface_wifi_mode(const char* device, const char* wireless_mode, char** msg)
+{
+	if ((edit_wireless_config(device, "ssid", wireless_mode)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring wireless device %s ssid failed.", device);
+		return EXIT_FAILURE;
+	}
+
+	/* Reload wireless configuration */
+	system("wifi reload");
+
+	return EXIT_SUCCESS;
+}
+
+int iface_wifi_hidden(const char* device, unsigned char boolean, char** msg)
+{
+	char* value = (boolean ? "1" : "0");
+
+	if ((edit_wireless_config(device, "hidden", value)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring wireless device %s enabled failed.", device);
+		return EXIT_FAILURE;
+	}
+
+	/* Reload wireless configuration */
+	system("wifi reload");
+
+	return EXIT_SUCCESS;
+}
+
+int iface_wifi_algoritm(const char* device, const char* wireless_encryption, char** msg)
+{
+	if ((edit_wireless_config(device, "encryption", wireless_encryption)) != (EXIT_SUCCESS)) {
+		asprintf(msg, "Configuring wireless device %s ssid failed.", device);
+		return EXIT_FAILURE;
+	}
+
+	/* Reload wireless configuration */
+	system("wifi reload");
+
+	return EXIT_SUCCESS;
+}
+
+int iface_wifi_key(const char* device, const char* wireless_key, XMLDIFF_OP op, char** msg)
+{
+	if ((op & XMLDIFF_ADD) || (op & XMLDIFF_MOD)) {
+		if ((edit_wireless_config(device, "key", wireless_key)) != (EXIT_SUCCESS)) {
+			asprintf(msg, "Configuring wireless device %s ssid failed.", device);
+			return EXIT_FAILURE;
+		}
+	} else if (op & XMLDIFF_REM) {
+		rm_wireless_config(device, "key");
+	}
+
+	/* Reload wireless configuration */
+	system("wifi reload");
+
+	return EXIT_SUCCESS;
+}
+

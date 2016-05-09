@@ -1859,13 +1859,213 @@ int callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled(void ** UNUSE
 	return finish(msg, ret, error);
 }
 
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:ssid changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_ssid(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	char* ssid = NULL;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	if (new_node->children == NULL || new_node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM) {
+		/* Set default SSID */
+		ssid = strdup("OpenWrt");
+	} else if (op & XMLDIFF_ADD) {
+		ssid = strdup((char*)new_node->children->content);
+	} else if (op & XMLDIFF_MOD) {
+		ssid = strdup((char*)new_node->children->content);
+	}
+
+	ret = iface_wifi_ssid(wireless_device, ssid, &msg);
+	return finish(msg, ret, error);
+}
+
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:mode changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_mode(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	char* wireless_mode = NULL;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	if (new_node->children == NULL || new_node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM) {
+		/* Set default mode - access point */
+		wireless_mode = strdup("ap");
+	} else if (op & XMLDIFF_ADD) {
+		wireless_mode = strdup((char*)new_node->children->content);
+	} else if (op & XMLDIFF_MOD) {
+		wireless_mode = strdup((char*)new_node->children->content);
+	}
+
+	ret = iface_wifi_mode(wireless_device, wireless_mode, &msg);
+	return finish(msg, ret, error);
+}
+
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:hidden changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_hidden(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	unsigned char enabled = 2;
+	xmlNodePtr node;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	node = (op & XMLDIFF_REM ? old_node : new_node);
+
+	if (node->children == NULL || node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 1;
+	} else if (op & XMLDIFF_ADD && xmlStrEqual(node->children->content, BAD_CAST "false")) {
+		enabled = 0;
+	} else if (op & XMLDIFF_MOD) {
+		if (xmlStrEqual(node->children->content, BAD_CAST "false")) {
+			enabled = 0;
+		} else {
+			enabled = 1;
+		}
+	}
+
+	if (enabled == 2) {
+		/* no real interface change */
+		return EXIT_SUCCESS;
+	}
+
+	ret = iface_wifi_hidden(wireless_device, enabled, &msg);
+	return finish(msg, ret, error);
+}
+
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:encryption-method changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_encryption_method_wifi_algoritm(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	char* wireless_algoritm = NULL;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	if (new_node->children == NULL || new_node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	if (op & XMLDIFF_REM) {
+		/* Set default mode - access point */
+		wireless_algoritm = strdup("none");
+	} else if (op & XMLDIFF_ADD) {
+		wireless_algoritm = strdup((char*)new_node->children->content);
+	} else if (op & XMLDIFF_MOD) {
+		wireless_algoritm = strdup((char*)new_node->children->content);
+	}
+
+	ret = iface_wifi_algoritm(wireless_device, wireless_algoritm, &msg);
+	return finish(msg, ret, error);
+}
+	
+
+/**
+ * @brief This callback will be run when node in path /if:interfaces/if:interface/wifi:wireless/wifi:encryption-method changes
+ *
+ * @param[in] data	Double pointer to void. Its passed to every callback. You can share data using it.
+ * @param[in] op	Observed change in path. XMLDIFF_OP type.
+ * @param[in] node	Modified node. if op == XMLDIFF_REM its copy of node removed.
+ * @param[out] error	If callback fails, it can return libnetconf error structure with a failure description.
+ *
+ * @return EXIT_SUCCESS or EXIT_FAILURE
+ */
+/* !DO NOT ALTER FUNCTION SIGNATURE! */
+int callback_if_interfaces_if_interface_wifi_wireless_wifi_encryption_method_wifi_password(void ** UNUSED(data), XMLDIFF_OP op, xmlNodePtr old_node, xmlNodePtr new_node, struct nc_err** error)
+{
+	int ret;
+	char* msg = NULL;
+	char* wireless_key = NULL;
+
+	if (iface_ignore) {
+		return EXIT_SUCCESS;
+	}
+
+	if (new_node->children == NULL || new_node->children->content == NULL) {
+		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
+		return finish(msg, EXIT_FAILURE, error);
+	}
+
+	wireless_key = strdup((char*)new_node->children->content);
+
+	ret = iface_wifi_key(wireless_device, wireless_key, op, &msg);
+	return finish(msg, ret, error);
+}
+
 /*
 * Structure transapi_config_callbacks provide mapping between callback and path in configuration datastore.
 * It is used by libnetconf library to decide which callbacks will be run.
 * DO NOT alter this structure
 */
 struct transapi_data_callbacks clbks =  {
-	.callbacks_count = 24,
+	.callbacks_count = 29,
 	.data = NULL,
 	.callbacks = {
 		{.path = "/if:interfaces/if:interface", .func = callback_if_interfaces_if_interface},
@@ -1891,7 +2091,12 @@ struct transapi_data_callbacks clbks =  {
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:origin", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_origin},
 		{.path = "/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server", .func = callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server},
 		{.path = "/if:interfaces/if:interface/wifi:wireless", .func = callback_if_interfaces_if_interface_wifi_wireless},
-		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:enabled", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled}
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:enabled", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_enabled},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:ssid", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_ssid},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:mode", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_mode},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:hidden", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_hidden},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:encryption-method/wifi:algoritm", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_encryption_method_wifi_algoritm},
+		{.path = "/if:interfaces/if:interface/wifi:wireless/wifi:encryption-method/wifi:password", .func = callback_if_interfaces_if_interface_wifi_wireless_wifi_encryption_method_wifi_password}
 	}
 };
 

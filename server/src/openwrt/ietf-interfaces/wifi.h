@@ -47,4 +47,14 @@ int iface_wifi(const char* if_name, char* device, char* mode, char* ssid, char* 
 
 int iface_wifi_enabled(const char* device, unsigned char boolean, char** msg);
 
+int iface_wifi_ssid(const char* device, const char* ssid, char** msg);
+
+int iface_wifi_mode(const char* device, const char* wireless_mode, char** msg);
+
+int iface_wifi_hidden(const char* device, unsigned char boolean, char** msg);
+
+int iface_wifi_algoritm(const char* device, const char* wireless_algoritm, char** msg);
+
+int iface_wifi_key(const char* device, const char* wireless_key, XMLDIFF_OP op, char** msg);
+
 #endif
