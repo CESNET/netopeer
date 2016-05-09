@@ -1,6 +1,6 @@
 <?xml version="1.0" standalone="yes"?>
 <!--This XSLT was automatically generated from a Schematron schema.-->
-<axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:dyn="http://exslt.org/dynamic" xmlns:exsl="http://exslt.org/common" xmlns:math="http://exslt.org/math" xmlns:random="http://exslt.org/random" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:axsl="http://www.w3.org/1999/XSL/Transform" xmlns:sch="http://www.ascc.net/xml/schematron" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:dhcp="urn:cesnet:yang:dhcp" xmlns:if="urn:ietf:params:xml:ns:yang:ietf-interfaces" xmlns:ip="urn:ietf:params:xml:ns:yang:ietf-ip" xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type" xmlns:inet="urn:ietf:params:xml:ns:yang:ietf-inet-types" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" extension-element-prefixes="date dyn exsl math random regexp set str" version="1.0"><!--Implementers: please note that overriding process-prolog or process-root is 
+<axsl:stylesheet xmlns:date="http://exslt.org/dates-and-times" xmlns:dyn="http://exslt.org/dynamic" xmlns:exsl="http://exslt.org/common" xmlns:math="http://exslt.org/math" xmlns:random="http://exslt.org/random" xmlns:regexp="http://exslt.org/regular-expressions" xmlns:set="http://exslt.org/sets" xmlns:str="http://exslt.org/strings" xmlns:axsl="http://www.w3.org/1999/XSL/Transform" xmlns:sch="http://www.ascc.net/xml/schematron" xmlns:iso="http://purl.oclc.org/dsdl/schematron" xmlns:dhcp="urn:cesnet:yang:dhcp" xmlns:if="urn:ietf:params:xml:ns:yang:ietf-interfaces" xmlns:wifi="urn:cesnet:yang:wireless" xmlns:ip="urn:ietf:params:xml:ns:yang:ietf-ip" xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" extension-element-prefixes="date dyn exsl math random regexp set str" version="1.0"><!--Implementers: please note that overriding process-prolog or process-root is 
     the preferred method for meta-stylesheets to use where possible. -->
 <axsl:param name="archiveDirParameter"/><axsl:param name="archiveNameParameter"/><axsl:param name="fileNameParameter"/><axsl:param name="fileDirParameter"/>
 
@@ -41,7 +41,7 @@
 <axsl:template match="/"><svrl:schematron-output xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" title="" schemaVersion=""><axsl:comment><axsl:value-of select="$archiveDirParameter"/>   
 		 <axsl:value-of select="$archiveNameParameter"/>  
 		 <axsl:value-of select="$fileNameParameter"/>  
-		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:cesnet:yang:dhcp" prefix="dhcp"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-interfaces" prefix="if"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-ip" prefix="ip"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:iana-if-type" prefix="ianaift"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-inet-types" prefix="inet"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-interfaces</axsl:attribute><axsl:attribute name="name">ietf-interfaces</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M8"/><svrl:active-pattern><axsl:attribute name="id">idp24885008</axsl:attribute><axsl:attribute name="name">idp24885008</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M9"/><svrl:active-pattern><axsl:attribute name="id">idp24886160</axsl:attribute><axsl:attribute name="name">idp24886160</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M10"/><svrl:active-pattern><axsl:attribute name="id">ietf-ip</axsl:attribute><axsl:attribute name="name">ietf-ip</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M11"/><svrl:active-pattern><axsl:attribute name="id">cesnet-dhcp</axsl:attribute><axsl:attribute name="name">cesnet-dhcp</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M12"/><svrl:active-pattern><axsl:attribute name="id">iana-if-type</axsl:attribute><axsl:attribute name="name">iana-if-type</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M13"/><svrl:active-pattern><axsl:attribute name="id">ietf-inet-types</axsl:attribute><axsl:attribute name="name">ietf-inet-types</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M14"/></svrl:schematron-output></axsl:template>
+		 <axsl:value-of select="$fileDirParameter"/></axsl:comment><svrl:ns-prefix-in-attribute-values uri="http://exslt.org/dynamic" prefix="dyn"/><svrl:ns-prefix-in-attribute-values uri="urn:cesnet:yang:dhcp" prefix="dhcp"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-interfaces" prefix="if"/><svrl:ns-prefix-in-attribute-values uri="urn:cesnet:yang:wireless" prefix="wifi"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:ietf-ip" prefix="ip"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:yang:iana-if-type" prefix="ianaift"/><svrl:ns-prefix-in-attribute-values uri="urn:ietf:params:xml:ns:netconf:base:1.0" prefix="nc"/><svrl:active-pattern><axsl:attribute name="id">ietf-interfaces</axsl:attribute><axsl:attribute name="name">ietf-interfaces</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M8"/><svrl:active-pattern><axsl:attribute name="id">idp32387472</axsl:attribute><axsl:attribute name="name">idp32387472</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M9"/><svrl:active-pattern><axsl:attribute name="id">idp32388688</axsl:attribute><axsl:attribute name="name">idp32388688</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M10"/><svrl:active-pattern><axsl:attribute name="id">ietf-ip</axsl:attribute><axsl:attribute name="name">ietf-ip</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M11"/><svrl:active-pattern><axsl:attribute name="id">cesnet-dhcp</axsl:attribute><axsl:attribute name="name">cesnet-dhcp</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M12"/><svrl:active-pattern><axsl:attribute name="id">cesnet-wireless</axsl:attribute><axsl:attribute name="name">cesnet-wireless</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M13"/><svrl:active-pattern><axsl:attribute name="id">iana-if-type</axsl:attribute><axsl:attribute name="name">iana-if-type</axsl:attribute><axsl:apply-templates/></svrl:active-pattern><axsl:apply-templates select="/" mode="M14"/></svrl:schematron-output></axsl:template>
 
 <!--SCHEMATRON PATTERNS-->
 <axsl:param name="root" select="/nc:config"/>
@@ -50,13 +50,13 @@
 
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface" priority="1018" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface" priority="1020" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::if:interface[if:name=current()/if:name]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::if:interface[if:name=current()/if:name]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "if:name"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address" priority="1017" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address" priority="1019" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if>
@@ -65,28 +65,40 @@
 <axsl:choose><axsl:when test="ip:prefix-length[not(processing-instruction('dsrl'))] or ip:netmask[not(processing-instruction('dsrl'))] or false()"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ip:prefix-length[not(processing-instruction('dsrl'))] or ip:netmask[not(processing-instruction('dsrl'))] or false()"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node(s) from one case of mandatory choice "subnet" must exist</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor" priority="1016" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor" priority="1018" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server" priority="1015" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server" priority="1017" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv4/dhcp:dhcp-server"/>
 
 		<!--ASSERT -->
-<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'manual')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'manual')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-server" is only valid when "dhcp:origin = 'manual'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or (../dhcp:origin = 'manual')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or (../dhcp:origin = 'manual')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-server" is only valid when "../dhcp:origin = 'manual'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address" priority="1014" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address" priority="1016" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:address"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:address[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
-<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor" priority="1013" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor"/>
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor" priority="1015" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/ip:neighbor"/>
 
 		<!--REPORT -->
 <axsl:if test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::ip:neighbor[ip:ip=current()/ip:ip]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "ip:ip"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+
+	<!--RULE -->
+<axsl:template match="/nc:config/if:interfaces/if:interface/ip:ipv6/dhcp:dhcp-server" priority="1014" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/ip:ipv6/dhcp:dhcp-server"/>
+
+		<!--ASSERT -->
+<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or (../dhcp:origin = 'manual')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or (../dhcp:origin = 'manual')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-server" is only valid when "../dhcp:origin = 'manual'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+
+	<!--RULE -->
+<axsl:template match="/nc:config/if:interfaces/if:interface/wifi:wireless" priority="1013" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces/if:interface/wifi:wireless"/>
+
+		<!--REPORT -->
+<axsl:if test="preceding-sibling::wifi:wireless[wifi:device=current()/wifi:device]"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="preceding-sibling::wifi:wireless[wifi:device=current()/wifi:device]"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate key "wifi:device"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
 <axsl:template match="/nc:config/if:interfaces-state/if:interface" priority="1012" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface"/>
@@ -122,7 +134,7 @@
 <axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv4/dhcp:dhcp-config" priority="1007" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv4/dhcp:dhcp-config"/>
 
 		<!--ASSERT -->
-<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'dhcp')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'dhcp')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-config" is only valid when "dhcp:origin = 'dhcp'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or ($root/if:interfaces/if:interface/ip:ipv4/dhcp:origin = 'dhcp')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or ($root/if:interfaces/if:interface/ip:ipv4/dhcp:origin = 'dhcp')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-config" is only valid when "$root/if:interfaces/if:interface/ip:ipv4/dhcp:origin = 'dhcp'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
 <axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv4/dhcp:dhcp-config/dhcp:dns-server" priority="1006" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv4/dhcp:dhcp-config/dhcp:dns-server"/>
@@ -152,7 +164,7 @@
 <axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv6/dhcp:dhcp-config" priority="1002" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv6/dhcp:dhcp-config"/>
 
 		<!--ASSERT -->
-<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'dhcp')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or (dhcp:origin = 'dhcp')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-config" is only valid when "dhcp:origin = 'dhcp'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
+<axsl:choose><axsl:when test="ancestor-or-self::*[processing-instruction('dsrl')] or ($root/if:interfaces/if:interface/ip:ipv6/dhcp:origin = 'dhcp')"/><axsl:otherwise><svrl:failed-assert xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="ancestor-or-self::*[processing-instruction('dsrl')] or ($root/if:interfaces/if:interface/ip:ipv6/dhcp:origin = 'dhcp')"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Node "dhcp:dhcp-config" is only valid when "$root/if:interfaces/if:interface/ip:ipv6/dhcp:origin = 'dhcp'"</svrl:text></svrl:failed-assert></axsl:otherwise></axsl:choose><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
 	<!--RULE -->
 <axsl:template match="/nc:config/if:interfaces-state/if:interface/ip:ipv6/dhcp:dhcp-config/dhcp:dns-server" priority="1001" mode="M8"><svrl:fired-rule xmlns:svrl="http://purl.oclc.org/dsdl/svrl" context="/nc:config/if:interfaces-state/if:interface/ip:ipv6/dhcp:dhcp-config/dhcp:dns-server"/>
@@ -166,7 +178,7 @@
 		<!--REPORT -->
 <axsl:if test=". = preceding-sibling::dhcp:dns-search"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test=". = preceding-sibling::dhcp:dns-search"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Duplicate leaf-list entry "<axsl:text/><axsl:value-of select="."/><axsl:text/>".</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template><axsl:template match="text()" priority="-1" mode="M8"/><axsl:template match="@*|node()" priority="-2" mode="M8"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M8"/></axsl:template>
 
-<!--PATTERN idp24885008-->
+<!--PATTERN idp32387472-->
 
 
 	<!--RULE -->
@@ -175,7 +187,7 @@
 		<!--REPORT -->
 <axsl:if test="not($root/if:interfaces-state/if:interface/if:name=.)"><svrl:successful-report xmlns:svrl="http://purl.oclc.org/dsdl/svrl" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:schold="http://www.ascc.net/xml/schematron" test="not($root/if:interfaces-state/if:interface/if:name=.)"><axsl:attribute name="location"><axsl:apply-templates select="." mode="schematron-get-full-path"/></axsl:attribute><svrl:text>Leaf "/nc:config/if:interfaces-state/if:interface/if:name" does not exist for leafref value "<axsl:text/><axsl:value-of select="."/><axsl:text/>"</svrl:text></svrl:successful-report></axsl:if><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M9"/></axsl:template><axsl:template match="text()" priority="-1" mode="M9"/><axsl:template match="@*|node()" priority="-2" mode="M9"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M9"/></axsl:template>
 
-<!--PATTERN idp24886160-->
+<!--PATTERN idp32388688-->
 
 
 	<!--RULE -->
@@ -190,8 +202,8 @@
 <!--PATTERN cesnet-dhcp-->
 <axsl:template match="text()" priority="-1" mode="M12"/><axsl:template match="@*|node()" priority="-2" mode="M12"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M12"/></axsl:template>
 
-<!--PATTERN iana-if-type-->
+<!--PATTERN cesnet-wireless-->
 <axsl:template match="text()" priority="-1" mode="M13"/><axsl:template match="@*|node()" priority="-2" mode="M13"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M13"/></axsl:template>
 
-<!--PATTERN ietf-inet-types-->
+<!--PATTERN iana-if-type-->
 <axsl:template match="text()" priority="-1" mode="M14"/><axsl:template match="@*|node()" priority="-2" mode="M14"><axsl:apply-templates select="*|comment()|processing-instruction()" mode="M14"/></axsl:template></axsl:stylesheet>
