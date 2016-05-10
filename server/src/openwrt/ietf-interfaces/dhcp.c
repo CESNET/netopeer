@@ -396,6 +396,9 @@ xmlNodePtr dhcpv4_getconfig(xmlNsPtr ns, const char* if_name, char** msg)
 					xmlNewChild(dhcp_node, dhcp_node->ns, BAD_CAST "stop", BAD_CAST token);
 				}
 				if (i == 3) {
+					if (token[strlen(token)] == '\n') {
+						token[strlen(token)] = '\0';
+					}
 					xmlNewChild(dhcp_node, dhcp_node->ns, BAD_CAST "leasetime", BAD_CAST token);
 				}
 
@@ -412,6 +415,9 @@ xmlNodePtr dhcpv4_getconfig(xmlNsPtr ns, const char* if_name, char** msg)
 			while (token != NULL){
 
 				if (i == 2) {
+					if (token[strlen(token)] == '\n') {
+						token[strlen(token)] = '\0';
+					}
 					xmlNewChild(dhcp_node, dhcp_node->ns, BAD_CAST "default-gateway", BAD_CAST token);
 				}
 
@@ -421,5 +427,8 @@ xmlNodePtr dhcpv4_getconfig(xmlNsPtr ns, const char* if_name, char** msg)
 		}
 	}
 
+	if (dhcp_node->children == NULL) {
+		return NULL;
+	}
 	return dhcp_node;
 }
