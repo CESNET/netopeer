@@ -28,9 +28,9 @@
 #include <arpa/inet.h>
 
 #include "../config-parser/parse.h"
-#include "dns_resolver.h"
-#include "local_users.h"
-#include "date_time.h"
+#include "base/dns_resolver.h"
+#include "base/local_users.h"
+#include "base/date_time.h"
 
 #define NTP_SERVER_ASSOCTYPE_DEFAULT "server"
 #define APOSTROPHE 39

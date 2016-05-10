@@ -63,18 +63,21 @@ OBJDIR= .obj
 
 SRCS =	ietf-system.c \
 		$(TOPDIR)/src/openwrt/config-parser/parse.c \
-		date_time.c \
-		dns_resolver.c \
-		local_users.c \
-		encrypt.c \
-		salt.c
+		base/date_time.c \
+		base/dns_resolver.c \
+		base/local_users.c \
+		base/encrypt.c \
+		base/salt.c
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
-CFGS =	ietf-system.yin \
-	ietf-yang-types.yin \
-	ietf-netconf-acm.yin \
-	ietf-system.xml
+CFGS =	model/ietf-system.yin \
+	model/ietf-yang-types.yin \
+	model/ietf-netconf-acm.yin \
+	ietf-system.xml \
+	model/ietf-system-config.rng \
+	model/ietf-system-gdefs-config.rng \
+	model/ietf-system-schematron.xsl
 
 all: clean $(NAME) $(NAME)-init
 
