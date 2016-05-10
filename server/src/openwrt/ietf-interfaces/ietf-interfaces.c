@@ -1736,11 +1736,6 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server (void ** UNUSED(d
 	}
 
 	node = (op & XMLDIFF_REM ? old_node : new_node);
-	
-	if (node->children == NULL || node->children->content == NULL) {
-		asprintf(&msg, "Empty node in \"%s\", internal error.", __func__);
-		return finish(msg, EXIT_FAILURE, error);
-	}
 
 	for (node_aux = node->children; node_aux != NULL; node_aux = node_aux->next) {
 		if (node_aux->type != XML_ELEMENT_NODE) {
