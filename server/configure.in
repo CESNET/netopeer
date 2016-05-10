@@ -462,5 +462,6 @@ AC_CONFIG_FILES(src/openwrt/ietf-system/Makefile.ietf-system)
 AC_CONFIG_FILES(src/openwrt/ietf-interfaces/ietf-interfaces.xml)
 AC_CONFIG_FILES(src/openwrt/ietf-interfaces/Makefile.ietf-interfaces)
 AC_CONFIG_FILES(src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng)
+AC_CONFIG_FILES(src/openwrt/ietf-system/model/ietf-system-config.rng)
 
 AC_OUTPUT

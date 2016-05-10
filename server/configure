@@ -5726,6 +5726,8 @@ ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/Makefile.ietf-inte
 
 ac_config_files="$ac_config_files src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng"
 
+ac_config_files="$ac_config_files src/openwrt/ietf-system/model/ietf-system-config.rng"
+
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -6446,6 +6448,7 @@ do
     "src/openwrt/ietf-interfaces/ietf-interfaces.xml") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/ietf-interfaces.xml" ;;
     "src/openwrt/ietf-interfaces/Makefile.ietf-interfaces") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/Makefile.ietf-interfaces" ;;
     "src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-interfaces/model/ietf-interfaces-config.rng" ;;
+    "src/openwrt/ietf-system/model/ietf-system-config.rng") CONFIG_FILES="$CONFIG_FILES src/openwrt/ietf-system/model/ietf-system-config.rng" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
