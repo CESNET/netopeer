@@ -19,7 +19,7 @@
 and the default gateway configuration.
 
 Copyright (C) 2013 CESNET, z.s.p.o.
- 
+  
 TODO: License
 </text>
   </description>
@@ -147,19 +147,15 @@ TODO: License
       <text>DHCP server on interface configuration.</text>
     </description>
     <leaf name="start">
-      <type name="uint16">
-        <range value="1..65535"/>
-      </type>
+      <type name="inet:ipv4-address-no-zone"/>
       <description>
-        <text>Specifies the offset from the network address the minimum address that may be leased to clients</text>
+        <text>Specifies the start network address, the minimum address that may be leased to clients</text>
       </description>
     </leaf>
-    <leaf name="limit">
-      <type name="uint16">
-        <range value="1..65535"/>
-      </type>
+    <leaf name="stop">
+      <type name="inet:ipv4-address-no-zone"/>
       <description>
-        <text>Specifies the size of the address pool</text>
+        <text>Specifies the last network address, the maximum address that may be leased to clients</text>
       </description>
     </leaf>
     <leaf name="leasetime">
