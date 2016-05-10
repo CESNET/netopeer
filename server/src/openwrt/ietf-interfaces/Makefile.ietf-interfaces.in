@@ -65,7 +65,7 @@ SRCS =	ietf-interfaces.c \
 		iface_if.c \
 		dhcp.c \
 		wifi.c \
-		$(TOPDIR)/src/openwrt/ietf-system/dns_resolver.c \
+		$(TOPDIR)/src/openwrt/ietf-system/base/dns_resolver.c \
 		$(TOPDIR)/src/openwrt/config-parser/parse.c \
 
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)

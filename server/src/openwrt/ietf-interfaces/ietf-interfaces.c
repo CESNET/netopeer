@@ -88,7 +88,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 {
 	ssize_t j;
 	unsigned int ipv4_enabled;
-	xmlNodePtr interface, ip, addr, autoconf, type, dhcpv4;
+	xmlNodePtr interface, ip, addr, autoconf, type, dhcpv4, wifi;
 	xmlNsPtr ipns;
 	char* tmp, *tmp2;
 	struct ip_addrs ips;
@@ -295,6 +295,11 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 		}
 		xmlNewTextChild(autoconf, autoconf->ns, BAD_CAST "temporary-preferred-lifetime", BAD_CAST tmp);
 		free(tmp);
+	}
+
+	/* Wireless configuration */
+	if ((wifi =  wifi_getconfig(interface->ns, if_name, &msg)) != NULL) {
+		xmlAddChild(interface, wifi);
 	}
 
 	return interface;

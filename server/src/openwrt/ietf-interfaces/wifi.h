@@ -57,4 +57,6 @@ int iface_wifi_algoritm(const char* device, const char* wireless_algoritm, char*
 
 int iface_wifi_key(const char* device, const char* wireless_key, XMLDIFF_OP op, char** msg);
 
+xmlNodePtr wifi_getconfig(xmlNsPtr ns, const char* if_name, char** msg);
+
 #endif

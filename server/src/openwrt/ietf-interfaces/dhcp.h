@@ -44,7 +44,7 @@
 #define _DHCP_H_
 
 #include <libnetconf_xml.h>
-#include "../ietf-system/dns_resolver.h"
+#include "../ietf-system/base/dns_resolver.h"
 
 int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, char** msg);
 int dhcp_ipv4_server(const char* if_name, char* start, char* stop, char* leasetime, char* default_gateway, XMLDIFF_OP op, char** msg);

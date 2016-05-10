@@ -148,7 +148,7 @@ int iface_wifi_ssid(const char* device, const char* ssid, char** msg)
 
 int iface_wifi_mode(const char* device, const char* wireless_mode, char** msg)
 {
-	if ((edit_wireless_config(device, "ssid", wireless_mode)) != (EXIT_SUCCESS)) {
+	if ((edit_wireless_config(device, "mode", wireless_mode)) != (EXIT_SUCCESS)) {
 		asprintf(msg, "Configuring wireless device %s ssid failed.", device);
 		return EXIT_FAILURE;
 	}
@@ -202,5 +202,15 @@ int iface_wifi_key(const char* device, const char* wireless_key, XMLDIFF_OP op, 
 	system("wifi reload");
 
 	return EXIT_SUCCESS;
+}
+
+xmlNodePtr wifi_getconfig(xmlNsPtr ns, const char* if_name, char** msg)
+{
+
+	/* Get interface section name */
+
+	/* Get wireless configuration */
+
+	return NULL;
 }
 
