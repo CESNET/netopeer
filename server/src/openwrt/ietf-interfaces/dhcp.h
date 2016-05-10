@@ -47,10 +47,11 @@
 #include "../ietf-system/dns_resolver.h"
 
 int iface_ipv4_origin(const char* if_name, unsigned char origin, XMLDIFF_OP op, char** msg);
-int dhcp_ipv4_server(char* start, char* stop, char* leasetime, char* default_gateway, XMLDIFF_OP op, char** msg);
+int dhcp_ipv4_server(const char* if_name, char* start, char* stop, char* leasetime, char* default_gateway, XMLDIFF_OP op, char** msg);
 char* dhcp_get_ipv4_default_gateway(const char* if_name, char** msg);
 char** dhcp_get_dns_server(char** msg);
 char** dhcp_get_dns_search(char** msg);
+xmlNodePtr dhcpv4_getconfig(xmlNsPtr ns, const char* if_name, char** msg);
 
 char* dhcp_get_ipv6_default_gateway(const char* if_name, char** msg);
 

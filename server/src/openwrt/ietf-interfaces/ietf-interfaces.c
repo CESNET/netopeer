@@ -88,7 +88,7 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 {
 	ssize_t j;
 	unsigned int ipv4_enabled;
-	xmlNodePtr interface, ip, addr, autoconf, type;
+	xmlNodePtr interface, ip, addr, autoconf, type, dhcpv4;
 	xmlNsPtr ipns;
 	char* tmp, *tmp2;
 	struct ip_addrs ips;
@@ -187,6 +187,11 @@ xmlNodePtr parse_iface_config(const char* if_name, xmlNsPtr ns, char** msg)
 			free(ips.ip);
 			free(ips.prefix_or_mac);
 			ips.count = 0;
+		}
+
+		/* DHCPv4 configuration */
+		if ((dhcpv4 =  dhcpv4_getconfig(ip->ns, if_name, &msg)) != NULL) {
+			xmlAddChild(ip, dhcpv4);
 		}
 	}
 
@@ -1719,7 +1724,6 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server (void ** UNUSED(d
 	int ret;
 	char* msg = NULL;
 	xmlNodePtr node, node_aux;
-	// unsigned int start = 0, limit = 0;
 	char* leasetime = NULL, *default_gateway = NULL, *start = NULL, *stop = NULL;
 
 	if (iface_ignore) {
@@ -1753,16 +1757,8 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_dhcp_server (void ** UNUSED(d
 		asprintf(&msg, "%s: Not all dhcp-server elements are defined.", __func__);
 		return finish(msg, EXIT_FAILURE, error);
 	}
-	// if (start == 0) {
-	// 	asprintf(&msg, "%s: start elemnt not defined or defined to zero.", __func__);
-	// 	return finish(msg, EXIT_FAILURE, error);
-	// }
-	// if (limit == 0) {
-	// 	asprintf(&msg, "%s: limit elemnt not defined or defined to zero.", __func__);
-	// 	return finish(msg, EXIT_FAILURE, error);
-	// }
 
-	// ret = dhcp_ipv4_server(start, stop, leasetime, default_gateway, &msg);
+	ret = dhcp_ipv4_server(iface_name, start, stop, leasetime, default_gateway, op, &msg);
 
 	free(leasetime);
 	free(default_gateway);
