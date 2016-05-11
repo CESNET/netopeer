@@ -303,7 +303,8 @@ int users_rm(const char *name, char **msg)
 const char* users_add(const char *name, const char *passwd, char **msg)
 {
 	int ret;
-	const char *encpass = NULL;
+	char *encpass = NULL;
+	char *despass = NULL;
 	char *cmdline = NULL;
 
 	assert(name);
@@ -353,7 +354,11 @@ const char* users_add(const char *name, const char *passwd, char **msg)
 		return (NULL);
 	}
 
-	return (passwd);
+	if (encpass[0] != '$') {
+		asprintf(&despass, "$des$%s", encpass);
+		return despass;
+	}
+	return (encpass);
 }
 
 const char* users_mod(const char *name, const char *passwd, char **msg)
@@ -361,6 +366,7 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	int ret = 0;
 	char* cmdline = NULL;
 	char* encpass = NULL;
+	char *despass = NULL;
 
 	assert(name);
 	assert(passwd);
@@ -387,6 +393,10 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	if (ret != 0) {
 		*msg = strdup(errmsg[ret]);
 		return (NULL);
+	}
+	if (encpass[0] != '$') {
+		asprintf(&despass, "$des$%s", encpass);
+		return despass;
 	}
 	return encpass;
 }
@@ -532,16 +542,20 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 			if (spwd != NULL && /* no record */
 					spwd->sp_pwdp[0] != '!' && /* account not initiated or locked */
 					spwd->sp_pwdp[0] != '*') { /* login disabled */
-				asprintf(&user_pass,"$1$%s", spwd->sp_pwdp);
-				if (strlen(user_pass) > 3) { /* Empty password not allowed */
+				if (spwd->sp_pwdp[0] != '$') { /* password encrypted using des */
+					asprintf(&user_pass,"$des$%s", spwd->sp_pwdp);	
+				}
+				if (strlen(user_pass) > 5) { /* Empty password not allowed */
 					xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST user_pass);
 				}
 				free(user_pass);
 			}
 		} else if (pwd->pw_passwd[0] != '*') {
 			/* password is stored in /etc/passwd or refers to something */
-			asprintf(&user_pass,"$1$%s", pwd->pw_passwd);
-			if (strlen(user_pass) > 3) { /* Empty password not allowed */
+			if (pwd->pw_passwd[0] != '$') { /* password encrypted using des */
+					asprintf(&user_pass,"$des$%s", pwd->pw_passwd);
+				}
+			if (strlen(user_pass) > 5) { /* Empty password not allowed */
 				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST user_pass);
 			}
 			free(user_pass);

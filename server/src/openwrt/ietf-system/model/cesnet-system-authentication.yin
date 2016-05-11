@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="cesnet-system-authentication"
+        xmlns="urn:ietf:params:xml:ns:yang:yin:1"
+        xmlns:sys-auth="urn:cesnet:yang:system-authentication"
+        xmlns:ianach="urn:ietf:params:xml:ns:yang:iana-crypt-hash"
+        xmlns:sys="urn:ietf:params:xml:ns:yang:ietf-system">
+  <namespace uri="urn:cesnet:yang:system-authentication"/>
+  <prefix value="sys-auth"/>
+  <import module="iana-crypt-hash">
+    <prefix value="ianach"/>
+  </import>
+  <import module="ietf-system">
+    <prefix value="sys"/>
+  </import>
+  <description>
+    <text>Add support for des encryption used in OpenWrt
+
+Copyright (C) 2016 CESNET, z.s.p.o.
+</text>
+  </description>
+  <revision date="2016-06-11">
+    <description>
+      <text>Initial revision.</text>
+    </description>
+  </revision>
+  <deviation target-node="/sys:system/sys:authentication/sys:user/sys:password">
+    <deviate value="replace">
+      <type name="union">
+        <type name="ianach:crypt-hash"/>
+        <type name="string">
+          <pattern value="$des$[a-zA-Z0-9./]*"/>
+        </type>
+      </type>
+    </deviate>
+  </deviation>
+</module>
