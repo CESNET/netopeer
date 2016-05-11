@@ -1056,9 +1056,10 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** UNUSED(data)
 	}
 
 	if (netmask != NULL) {
+		char* netmask_dup = strdup(netmask);
 		prefix_len = 0;
 		mask = 0x80;
-		octet = (unsigned)atoi(strtok(netmask, "."));
+		octet = (unsigned)atoi(strtok(netmask_dup, "."));
 		i = 0;
 		while (mask & octet) {
 			++prefix_len;
@@ -1072,6 +1073,7 @@ int callback_if_interfaces_if_interface_ip_ipv4_ip_address (void ** UNUSED(data)
 				mask = 0x80;
 			}
 		}
+		free(netmask_dup);
 	} else {
 		unsigned long ip_mask = (0xFFFFFFFF << (32 - (int)prefix_len)) & 0xFFFFFFFF;
 		asprintf(&netmask, "%lu.%lu.%lu.%lu", ip_mask >> 24, (ip_mask >> 16) & 0xFF, (ip_mask >> 8) & 0xFF, ip_mask & 0xFF);
