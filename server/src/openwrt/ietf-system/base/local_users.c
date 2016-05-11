@@ -495,6 +495,7 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 	xmlNodePtr auth_node, user, aux_node;
 	struct passwd *pwd;
 	struct spwd *spwd;
+	char* user_pass = NULL;
 
 	if (!ncds_feature_isenabled("ietf-system", "local-users")) {
 		return (NULL);
@@ -528,14 +529,22 @@ xmlNodePtr users_getxml(xmlNsPtr ns, char** msg)
 			/* get data from /etc/shadow */
 			setspent();
 			spwd = getspnam(pwd->pw_name);
-			if (spwd != NULL && /* no record, wtf?!? */
+			if (spwd != NULL && /* no record */
 					spwd->sp_pwdp[0] != '!' && /* account not initiated or locked */
 					spwd->sp_pwdp[0] != '*') { /* login disabled */
-				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST spwd->sp_pwdp);
+				asprintf(&user_pass,"$1$%s", spwd->sp_pwdp);
+				if (strlen(user_pass) > 3) { /* Empty password not allowed */
+					xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST user_pass);
+				}
+				free(user_pass);
 			}
 		} else if (pwd->pw_passwd[0] != '*') {
-			/* password is stored in /etc/passwd or refers to something else (e.g., NIS server) */
-			xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST pwd->pw_passwd);
+			/* password is stored in /etc/passwd or refers to something */
+			asprintf(&user_pass,"$1$%s", pwd->pw_passwd);
+			if (strlen(user_pass) > 3) { /* Empty password not allowed */
+				xmlNewChild(user, user->ns, BAD_CAST "password", BAD_CAST user_pass);
+			}
+			free(user_pass);
 		} /* else password is disabled */
 
 		/* authentication/user/authorized-key[] */

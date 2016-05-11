@@ -386,7 +386,7 @@ int transapi_init(xmlDocPtr * running)
 	/* timezone-location */
 	if ((zonename = get_timezone()) != NULL) {
 		clock = xmlNewChild(running_root, NULL, BAD_CAST "clock", NULL);
-		xmlNewChild(clock, NULL, BAD_CAST "timezone-location", BAD_CAST zonename);
+		xmlNewChild(clock, NULL, BAD_CAST "timezone-name", BAD_CAST zonename);
 		free(zonename);
 	}
 

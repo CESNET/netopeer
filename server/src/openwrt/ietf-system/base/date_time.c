@@ -534,9 +534,12 @@ struct tmz timezones[] = {
 
 char* get_timezone(void)
 {
+	int i;
+	int found = 0;
 	FILE* zonename_f;
 	char *line = NULL;
 	size_t len = 0;
+	char *timezone_name = NULL;
 
 	if ((zonename_f = fopen("/etc/TZ", "r")) == NULL) {
 		return (NULL);
@@ -554,8 +557,23 @@ char* get_timezone(void)
 		line[strlen(line) - 1] = '\0';
 	}
 
+	/* change to timezone-name */
+	for (i = 0; timezones[i].TZString != NULL; ++i) {
+		if (strcmp(timezones[i].TZString, line) == 0) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found == 1) {
+		timezone_name = strdup(timezones[i].zonename);
+	} else {
+		timezone_name = strdup(line);
+	}
+
 	pclose(zonename_f);
-	return (line);
+	free(line);
+	return timezone_name;
 }
 
 int set_timezone(const char* zone)
