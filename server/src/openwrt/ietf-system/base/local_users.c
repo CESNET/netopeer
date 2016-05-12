@@ -97,10 +97,21 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 
 	/* check password format - empty password can be set */
 	if (((passwd[0] != '$') ||
-			(passwd[1] != '0' && passwd[1] != '1' && passwd[1] != '5' && passwd[1] != '6') ||
-			(passwd[2] != '$')) && (strlen(passwd) != 1)) {
+			(passwd[1] != '0' && passwd[1] != '1' && passwd[1] != '5' && passwd[1] != '6' && passwd[1] != 'd') ||
+			(passwd[2] != '$' && passwd[2] != 'e')) && (strlen(passwd) != 1)) {
 		asprintf(msg, "Wrong password format (user %s).", name);
 		return (NULL);
+	}
+
+	/* satisfies previous patern - check if DES method */
+	if (strncmp("$de", passwd, 3) == 0) {
+		if (strncmp("$des$", passwd, 5) == 0) {
+			en_passwd = strdup(&(passwd[5]));
+			return en_passwd;
+		} else {
+			asprintf(msg, "Wrong password format (user %s).", name);
+			return (NULL);
+		}
 	}
 
 	if (passwd[1] == '0') {
