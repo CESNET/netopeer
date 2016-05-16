@@ -304,7 +304,9 @@ int users_rm(const char *name, char **msg)
 	if (ret != 0) {
 		*msg = strdup(errmsg[ret]);
 		if (ret != 12) {
-			return (EXIT_FAILURE);
+			/* Some users cannot be deleted - write message, but do not end with error */
+			asprintf(msg, "User %s cannot be deleted.", name);
+			return (EXIT_SUCCESS);
 		}
 	}
 
