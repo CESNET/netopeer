@@ -291,6 +291,9 @@ int cmd_status(const char* UNUSED(arg), const char* UNUSED(old_input_file), FILE
 
 	if (session == NULL) {
 		fprintf(output, "Client is not connected to any NETCONF server.\n");
+	} else if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
+		fprintf(output, "Session is broken, cleaning out.\n");
+		cmd_disconnect(NULL, NULL, output, NULL);
 	} else {
 		fprintf(output, "Current NETCONF session:\n");
 		fprintf(output, "  ID          : %s\n", nc_session_get_id(session));
@@ -542,6 +545,13 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 		clock_gettime(CLOCK_MONOTONIC, &tsold);
 	}
 
+	if (nc_session_get_status(session) != NC_SESSION_STATUS_WORKING) {
+		INSTRUCTION(output, "Session is broken, cleaning out.\n");
+		cmd_disconnect(NULL, NULL, output, NULL);
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	/* send the request and get the reply */
 	msg_type = nc_session_send_recv(session, rpc, &reply);
 
@@ -601,6 +611,8 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 		ret = EXIT_FAILURE;
 		break;
 	}
+
+cleanup:
 	nc_rpc_free(rpc);
 	nc_reply_free(reply);
 
