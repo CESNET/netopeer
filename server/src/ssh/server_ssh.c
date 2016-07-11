@@ -92,9 +92,10 @@ void client_free_ssh(struct client_struct_ssh* client) {
 		ssh_free(client->ssh_sess);
 	}
 
-	if (client->sock != -1) {
+	/* ssh_free does this for us */
+	/*if (client->sock != -1) {
 		close(client->sock);
-	}
+	}*/
 
 	free(client->username);
 	free(client);
