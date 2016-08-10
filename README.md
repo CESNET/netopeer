@@ -48,6 +48,8 @@ working [docker](https://www.docker.com/) installation to use it.
 
 To build the container:
 ~~~
+git clone https://github.com/CESNET/netopeer.git
+cd netopeer
 docker build -t netopeer .
 ~~~
 
