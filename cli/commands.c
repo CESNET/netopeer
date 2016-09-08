@@ -709,7 +709,8 @@ int cmd_editconfig(const char* arg, const char* old_input_file, FILE* output, FI
 			/* remove the <config> root if included */
 			root = xmlDocGetRootElement(doc);
 			if (root != NULL) {
-				if (xmlStrEqual(root->name, BAD_CAST "config") && xmlStrEqual(root->ns->href, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0")) {
+				if (xmlStrEqual(root->name, BAD_CAST "config") && root->ns != NULL
+                        && xmlStrEqual(root->ns->href, BAD_CAST "urn:ietf:params:xml:ns:netconf:base:1.0")) {
 					xmlDocSetRootElement(doc, root->children);
 					xmlUnlinkNode(root);
 					xmlFree(root);
