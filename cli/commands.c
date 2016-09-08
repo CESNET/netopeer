@@ -587,7 +587,13 @@ static int send_recv_process(const char* operation, nc_rpc* rpc, const char* out
 					ret = EXIT_FAILURE;
 					break;
 				}
-				fprintf(out_stream, "%s", data = nc_reply_get_data(reply));
+				if (!strcmp(operation, "get-config")) {
+                    fprintf(out_stream, "<config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
+                }
+				fprintf(out_stream, "%s\n", data = nc_reply_get_data(reply));
+                if (!strcmp(operation, "get-config")) {
+                    fprintf(out_stream, "</config>\n");
+                }
 				fclose(out_stream);
 			} else {
 				INSTRUCTION(output, "Result:\n");
