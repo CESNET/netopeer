@@ -785,6 +785,9 @@ int sshcb_msg(ssh_session session, ssh_message msg, void* UNUSED(data)) {
 		case SSH_AUTH_METHOD_GSSAPI_MIC:
 			str_subtype = "gssapi-mic";
 			break;
+		default:
+			str_subtype = "unknown";
+			break;
 		}
 		break;
 
