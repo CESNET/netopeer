@@ -277,6 +277,10 @@ static int auth_password_compare_pwd(const char* pass_hash, const char* pass_cle
 	}
 
 	new_pass_hash = crypt(pass_clear, pass_hash);
+	if (!new_pass_hash) {
+		nc_verb_error("%s: crypt() failed (setting \"%s\").", __func__, pass_hash);
+		return 1;
+	}
 	return strcmp(new_pass_hash, pass_hash);
 }
 
