@@ -136,7 +136,7 @@ static const char* set_passwd(const char *name, const char *passwd, char **msg)
 	if ((passwd[0] != '$') ||
 			(passwd[1] != '0' && passwd[1] != '1' && passwd[1] != '5' && passwd[1] != '6') ||
 			(passwd[2] != '$')) {
-		asprintf(msg, "Wrong password format (user %s).", name);
+		asprintf(msg, "Wrong password format (user %s), it must be of type \"crypt-hash\" from iana-crypt-hash model.", name);
 		return (NULL);
 	}
 
@@ -345,11 +345,7 @@ const char* users_mod(const char *name, const char *passwd, char **msg)
 	assert(passwd);
 
 	/* set password */
-	if (strlen(passwd) != 0) {
-		return (set_passwd(name, passwd, msg));
-	}
-
-	return (NULL);
+	return (set_passwd(name, passwd, msg));
 }
 
 static xmlNodePtr authkey_getxml(const char* username, xmlNsPtr ns, char** msg)
