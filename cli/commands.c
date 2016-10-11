@@ -2461,9 +2461,16 @@ int cmd_auth(const char* arg, const char* UNUSED(old_input_file), FILE* output, 
 			free(pubkey);
 
 			free(opts->keys[i]);
-			memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i)-1);
 			--opts->key_count;
-			opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+			if (!opts->key_count) {
+				free(opts->keys);
+				opts->keys = NULL;
+			} else {
+				if (i < opts->key_count) {
+					memmove(opts->keys+i, opts->keys+i+1, (opts->key_count-i) * sizeof(char*));
+				}
+				opts->keys = realloc(opts->keys, opts->key_count*sizeof(char*));
+			}
 
 		} else {
 			ERROR("auth keys", "Wrong argument (%s)", cmd);
