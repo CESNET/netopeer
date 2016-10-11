@@ -142,7 +142,7 @@ static int del_trusted_cert(struct np_trusted_cert** root, const char* cert, uin
 }
 
 static void add_ctn_item(struct np_ctn_item** root, uint32_t id, const char* fingerprint, CTN_MAP_TYPE map_type, const char* name) {
-	struct np_ctn_item* ctn, *ctn_prev;
+	struct np_ctn_item* ctn, *ctn_next;
 
 	if (root == NULL || fingerprint == NULL) {
 		return;
@@ -157,42 +157,34 @@ static void add_ctn_item(struct np_ctn_item** root, uint32_t id, const char* fin
 			(*root)->name = strdup(name);
 		}
 		return;
+	} else if (id < (*root)->id) {
+		ctn = calloc(1, sizeof(struct np_ctn_item));
+		ctn->id = id;
+		ctn->fingerprint = strdup(fingerprint);
+		ctn->map_type = map_type;
+		if (name != NULL) {
+			ctn->name = strdup(name);
+		}
+		ctn->next = *root;
+		(*root)->prev = ctn;
+		*root = ctn;
+		return;
 	}
 
-	for (ctn = *root;; ctn = ctn->next) {
-		if (id > ctn->id) {
-			break;
-		}
-
-		/* id is the largest, add at the end */
-		if (ctn->next == NULL) {
-			ctn->next = calloc(1, sizeof(struct np_ctn_item));
-			ctn->next->id = id;
-			ctn->next->fingerprint = strdup(fingerprint);
-			ctn->next->map_type = map_type;
-			if (name != NULL) {
-				ctn->next->name = strdup(name);
-			}
-			ctn->next->prev = ctn;
-			return;
-		}
-	}
-
-	/* add it BEFORE ctn */
-	ctn_prev = ctn->prev;
-	ctn->prev = calloc(1, sizeof(struct np_ctn_item));
-	ctn->prev->id = id;
-	ctn->prev->fingerprint = strdup(fingerprint);
-	ctn->prev->map_type = map_type;
+	for (ctn = *root; ctn->next && ctn->next->id <= id; ctn = ctn->next);
+	ctn_next = ctn->next;
+	ctn->next = calloc(1, sizeof(struct np_ctn_item));
+	ctn->next->id = id;
+	ctn->next->fingerprint = strdup(fingerprint);
+	ctn->next->map_type = map_type;
 	if (name != NULL) {
-		ctn->prev->name = strdup(name);
+		ctn->next->name = strdup(name);
 	}
-	ctn->prev->next = ctn;
-	if (ctn_prev != NULL) {
-		ctn->prev->prev = ctn_prev;
-		ctn_prev->next = ctn->prev;
+	ctn->next->next = ctn_next;
+	if (ctn_next) {
+		ctn_next->prev = ctn->next;
 	}
-
+	ctn->next->prev = ctn;
 }
 
 static int del_ctn_item(struct np_ctn_item** root, uint32_t id, const char* fingerprint, CTN_MAP_TYPE map_type, const char* name) {
