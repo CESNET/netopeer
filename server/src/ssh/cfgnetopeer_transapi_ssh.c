@@ -249,12 +249,11 @@ int callback_n_netopeer_n_ssh_n_client_auth_keys_n_client_auth_key(void** UNUSED
 			netopeer_options.ssh_opts->client_auth_keys->path = strdup(path);
 			netopeer_options.ssh_opts->client_auth_keys->username = strdup(username);
 		} else {
-			for (key = netopeer_options.ssh_opts->client_auth_keys; key->next != NULL; key = key->next) {
-				key->next = calloc(1, sizeof(struct np_auth_key));
-				key->path = strdup(path);
-				key->username = strdup(username);
-				key->next->prev = key;
-			}
+			for (key = netopeer_options.ssh_opts->client_auth_keys; key->next != NULL; key = key->next);
+			key->next = calloc(1, sizeof(struct np_auth_key));
+			key->path = strdup(path);
+			key->username = strdup(username);
+			key->next->prev = key;
 		}
 
 		/* CLIENT KEYS UNLOCK */
