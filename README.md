@@ -8,6 +8,12 @@ to their NETCONF-enabled devices as well as developers to allow control their
 devices via NETCONF. More information about NETCONF protocol can be found at
 [NETCONF WG](http://trac.tools.ietf.org/wg/netconf/trac/wiki). 
 
+With the experiences from **Netopeer**, we have moved our activities to
+work on next generation of this NETCONF toolset based on [libyang](https://github.com/CESNET/libyang)
+library. [Netopeer2](https://github.com/CESNET/Netopeer2)
+is mature enough to be used as a replacement of the original **Netopeer** tools. Therefore, the
+**Netopeer** is no more developed neither maintained.
+
 ## Tools Overview
 
 ![Netopeer Tools Scheme](https://raw.githubusercontent.com/CESNET/netopeer/wiki/new_netopeer_arch.png)
@@ -109,4 +115,4 @@ All tools are built on top of the libnetconf library and allows you to use the f
 
 ## Solving Issues
 
-Please, do not contact authors directly. Instead, use the project [issue tracker](https://github.com/CESNET/netopeer/issues). This way, we can share the solutions to your problems with all users and avoid repeating the same answers over and over again.
+Since the development activities were moved to the [Netopeer2](https://github.com/CESNET/Netopeer2) project, we do not maintain this project. However, the [issue tracker](https://github.com/CESNET/netopeer/issues) is kept open to allow community to discuss the issues and possibly share the solutions or advices. Anyway, note that authors propose to move to the **Netopeer2** project.
