@@ -1,10 +1,9 @@
 # NETCONF toolset Netopeer
 
-[![Project Stats](https://www.openhub.net/p/netopeer/widgets/project_thin_badge.gif)]
-(https://www.openhub.net/p/netopeer)
+[![Project Stats](https://www.openhub.net/p/netopeer/widgets/project_thin_badge.gif)](https://www.openhub.net/p/netopeer)
 
-**Netopeer** is a set of NETCONF tools built on the [libnetconf]
-(https://github.com/CESNET/libnetconf) library. It allows operators to connect
+**Netopeer** is a set of NETCONF tools built on the [libnetconf](https://github.com/CESNET/libnetconf)
+library. It allows operators to connect
 to their NETCONF-enabled devices as well as developers to allow control their
 devices via NETCONF. More information about NETCONF protocol can be found at
 [NETCONF WG](http://trac.tools.ietf.org/wg/netconf/trac/wiki). 
@@ -23,8 +22,7 @@ and manipulate its configuration data.
 
 ### [netopeer-server](./server)
 
-The main Netopeer server following the [integrated architecture]
-(https://rawgit.com/CESNET/libnetconf/master/doc/doxygen/html/da/db3/server.html#server-arch-integrated).
+The main Netopeer server following the [integrated architecture](https://rawgit.com/CESNET/libnetconf/master/doc/doxygen/html/da/db3/server.html#server-arch-integrated).
 `netopeer-server` is supposed to run as a system service controlling a device. By default,
 we provide example modules to control several areas of a GNU/Linux desktop (network interfaces,
 packet filter and overall system information). The `netopeer-server` allows you to simply switch
